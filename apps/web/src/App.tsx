@@ -7,15 +7,17 @@ import { Vertraege } from './features/Vertraege';
 import { Kassenbon } from './features/Kassenbon';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
+import { Konto } from './features/Konto';
 import { euro } from './components/Feld';
 
-type Reiter = 'basis' | 's1' | 's2' | 's3';
+type Reiter = 'basis' | 's1' | 's2' | 's3' | 'konto';
 
 const REITER: { id: Reiter; text: string }[] = [
   { id: 'basis', text: 'Basisdaten' },
   { id: 's1', text: 'Schicht 1' },
   { id: 's2', text: 'Schicht 2' },
   { id: 's3', text: 'Schicht 3' },
+  { id: 'konto', text: 'Konto' },
 ];
 
 export default function App() {
@@ -112,6 +114,7 @@ export default function App() {
           {reiter === 's1' && <Vertraege schicht={1} />}
           {reiter === 's2' && <Vertraege schicht={2} />}
           {reiter === 's3' && <Vertraege schicht={3} />}
+          {reiter === 'konto' && <Konto />}
         </div>
 
         <div className="space-y-4 lg:col-span-7">
@@ -146,8 +149,8 @@ export default function App() {
 
       <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-slate-500">
         <p>
-          Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Alle Eingaben bleiben
-          auf diesem Gerät — die Berechnung läuft vollständig im Browser.
+          Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Berechnung läuft
+          vollständig in Ihrem Browser — ohne Anmeldung verlassen Ihre Eingaben dieses Gerät nicht.
         </p>
       </footer>
     </div>

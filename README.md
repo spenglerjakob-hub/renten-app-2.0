@@ -8,21 +8,25 @@ Einkommensteuergesetzes und der Sozialversicherung.
 ```
 packages/
   engine/    Rechenkern. Reines TypeScript, keine React- oder DOM-Abhaengigkeit.
-  schema/    zod-Schemas fuer Szenarien. Von Browser und Backend gemeinsam genutzt.
+  schema/    zod-Schemas fuer Szenarien. Von Browser und Datenbank gemeinsam genutzt.
 apps/
-  web/       React + Vite. Ruft die Engine in einem Web Worker.
-  api/       Hono. Konten und gespeicherte Szenarien — kein Rechenendpunkt.
+  web/       React + Vite. Rechnet im Web Worker, spricht direkt mit Supabase.
+supabase/
+  migrations/  Tabelle und Row-Level-Security-Policies.
 ```
+
+Es gibt **keinen eigenen Server**. Das Frontend ist ein statisches Bundle,
+Anmeldung und Datenbank uebernimmt Supabase.
 
 ## Warum die Berechnung im Browser bleibt
 
 Das war die zentrale Architekturfrage. Die Antwort ist nicht offensichtlich:
 
-| Schicht                 | Last je Nutzer                 | Skalierung                     |
-|-------------------------|--------------------------------|--------------------------------|
-| Statisches Bundle (CDN) | ein Download, danach Cache     | unabhaengig von der Nutzerzahl |
-| Engine (Browser/Worker) | **0 Server-CPU**               | skaliert mit den Endgeraeten   |
-| API (Konten/Szenarien)  | ~20 Anfragen je Sitzung, ~2 KB | 10.000 DAU ≈ 2,3 Writes/s      |
+| Schicht                    | Last je Nutzer                 | Skalierung                     |
+|----------------------------|--------------------------------|--------------------------------|
+| Statisches Bundle (CDN)    | ein Download, danach Cache     | unabhaengig von der Nutzerzahl |
+| Engine (Browser/Worker)    | **0 Server-CPU**               | skaliert mit den Endgeraeten   |
+| Supabase (Konten/Szenarien)| ~20 Anfragen je Sitzung, ~2 KB | 10.000 DAU ≈ 2,3 Writes/s      |
 
 Ein serverseitiger Rechenendpunkt wuerde bei Live-Eingabe rund zehn
 Berechnungen pro Sekunde und Nutzer ausloesen — bei gleicher Nutzerzahl also
@@ -32,8 +36,24 @@ Rechenlast; die Rechenlast verschwindet dadurch, dass sie gar nicht erst auf
 dem Server entsteht.
 
 Die Engine ist trotzdem serverfaehig: Wird spaeter etwa serverseitiges
-PDF-Rendering gebraucht, importiert die API dasselbe Paket — kein zweiter
-Rechenweg, keine Divergenz.
+PDF-Rendering gebraucht, importiert eine Edge Function dasselbe Paket — kein
+zweiter Rechenweg, keine Divergenz.
+
+## Datenhaltung
+
+Eine Tabelle, `public.szenarien`. Gespeichert werden ausschliesslich
+**Eingaben**, niemals Rechenergebnisse — eine Aktualisierung des Rechtsstands
+bewertet dadurch alle gespeicherten Szenarien automatisch neu.
+
+Weil der Browser direkt mit der Datenbank spricht, ist **Row Level Security die
+einzige Schutzschicht**. Vier Policies binden jede Zeile an `auth.uid()`; das
+`with check` beim Update verhindert, dass jemand seine Zeile in ein fremdes
+Konto verschiebt. Die Migration liegt in `supabase/migrations/`.
+
+Anmeldung per Magic Link — es werden keine Passwoerter gespeichert.
+
+Ohne Anmeldung ist die Anwendung voll nutzbar: Die Eingaben bleiben dann im
+localStorage und verlassen das Geraet nicht.
 
 ## Rechtsstand
 
@@ -59,16 +79,19 @@ Verlauf des Grenzsteuersatzes automatisch.
 ```bash
 pnpm install
 pnpm -r build      # engine und schema nach dist, danach die Web-App
-pnpm -r test       # 79 Tests
+pnpm -r test
 pnpm dev           # Web-App auf http://localhost:5173
 ```
 
-Die API separat:
+Fuer Anmeldung und gespeicherte Szenarien in `apps/web/.env.local`:
 
-```bash
-pnpm --filter @renten/api build
-pnpm --filter @renten/api start   # http://localhost:8787
 ```
+VITE_SUPABASE_URL=https://<projekt>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon key>
+```
+
+Fehlen die Werte, startet die Anwendung trotzdem — der Konto-Bereich blendet
+sich dann aus.
 
 ## Bekannte Luecken
 
@@ -78,11 +101,15 @@ pnpm --filter @renten/api start   # http://localhost:8787
   `packages/engine/src/pension/besoldung-daten.ts`, Eintragen ist ein reiner
   Daten-Commit.
 - **Hinterbliebenenversorgung** ist nicht abgebildet.
-- **Hosting** ist noch nicht festgelegt; die API laeuft lokal gegen SQLite.
-  Fuer den Produktivbetrieb sind Hosting in der EU, Verschluesselung at rest,
-  Auftragsverarbeitungsvertrag, Loeschkonzept und Datenschutzerklaerung
-  erforderlich — Geburtsdatum, Einkommen und Anwartschaften sind
-  personenbezogene Finanzdaten.
+- **Hosting des Frontends** ist noch nicht festgelegt. Als statisches Bundle
+  passt jedes CDN; Build Command `pnpm -r build`, Output `apps/web/dist`.
+- **Datenschutz:** Das Supabase-Projekt liegt in der EU (eu-west-3).
+  Geburtsdatum, Einkommen und Anwartschaften sind personenbezogene
+  Finanzdaten — fuer den Produktivbetrieb sind Auftragsverarbeitungsvertrag,
+  Loeschkonzept und Datenschutzerklaerung erforderlich.
+- **E-Mail-Versand** der Anmeldelinks laeuft ueber Supabase; dessen
+  eingebauter Versand hat enge Limits, produktiv ist ein eigener SMTP-Anbieter
+  zu hinterlegen.
 
 ## Rechtlicher Hinweis
 
