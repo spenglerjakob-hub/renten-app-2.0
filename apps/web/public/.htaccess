@@ -3,6 +3,12 @@
 # Diese Datei liegt in apps/web/public und wird von Vite unveraendert nach
 # dist kopiert — sie ist damit bei jedem Deployment automatisch dabei.
 
+# --- Startseite ------------------------------------------------------------
+# In der Dokumentwurzel liegt Hostingers Platzhalter default.php. Ohne diese
+# Zeile koennte Apache ihn der index.html vorziehen und weiterhin die
+# Platzhalterseite ausliefern.
+DirectoryIndex index.html
+
 # --- Single-Page-Anwendung -------------------------------------------------
 # Die Anwendung verwaltet ihre Adressen im Browser. Ohne die folgende Regel
 # liefert der Server beim Neuladen einer Unterseite einen 404, weil es die

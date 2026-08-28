@@ -71,7 +71,13 @@ jobs:
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local-dir: ./apps/web/dist/
-          server-dir: ${{ vars.HOSTINGER_ZIELVERZEICHNIS || 'public_html/' }}
+          # Der Haupt-FTP-Zugang von Hostinger landet im Heimatverzeichnis
+          # (/home/u964247325/), nicht in der Dokumentwurzel. Der Pfad dorthin
+          # stammt aus der Hostinger-API:
+          #   /home/u964247325/domains/js-rentenplaner.de/public_html
+          # Landet der FTP-Zugang doch direkt in der Wurzel, die Variable
+          # HOSTINGER_ZIELVERZEICHNIS auf ./ setzen.
+          server-dir: ${{ vars.HOSTINGER_ZIELVERZEICHNIS || 'domains/js-rentenplaner.de/public_html/' }}
           # Punktdateien muessen mit, sonst fehlt die .htaccess.
           dangerous-clean-slate: false
           exclude: |
