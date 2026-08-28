@@ -52,6 +52,18 @@ Konto verschiebt. Die Migration liegt in `supabase/migrations/`.
 
 Anmeldung per Magic Link — es werden keine Passwoerter gespeichert.
 
+Die Absicherung ist nachgewiesen, nicht nur behauptet:
+`supabase/tests/rls-nachweis.sql` legt zwei Konten an und prueft in einer
+zurueckgerollten Transaktion, dass Konto B die Daten von Konto A weder lesen
+noch aendern noch loeschen kann, dass es seine eigene Zeile keinem fremden
+Konto unterschieben kann und dass TRUNCATE abgewiesen wird. Neun Pruefungen,
+alle bestanden.
+
+Ein Hinweis fuer eigene Tabellen: Supabase vergibt im public-Schema
+standardmaessig ALLE Tabellenrechte an `authenticated`, darunter TRUNCATE —
+und TRUNCATE unterliegt keiner Row Level Security. Rechte muessen daher aktiv
+entzogen werden, ein grant der gewuenschten Rechte genuegt nicht.
+
 Ohne Anmeldung ist die Anwendung voll nutzbar: Die Eingaben bleiben dann im
 localStorage und verlassen das Geraet nicht.
 

@@ -112,7 +112,15 @@ create policy "eigene loeschen" on public.szenarien
   for delete to authenticated
   using ((select auth.uid()) = besitzer);
 
--- Anonyme Zugriffe sind nirgends erlaubt: Ohne Policy fuer die Rolle "anon"
--- gibt RLS grundsaetzlich nichts frei.
-revoke all on public.szenarien from anon;
+-- Rechtevergabe.
+--
+-- WICHTIG: Supabase vergibt im public-Schema standardmaessig ALLE
+-- Tabellenrechte an authenticated — darunter TRUNCATE. TRUNCATE unterliegt
+-- KEINER Row Level Security. Ohne den folgenden revoke koennte jeder
+-- angemeldete Nutzer die Daten aller Nutzer auf einen Schlag loeschen, ohne
+-- dass eine Policy greift. Ein blosses grant der gewuenschten Rechte genuegt
+-- also nicht; die Vorgaben muessen aktiv entzogen werden.
+--
+-- Der Sicherheitsberater von Supabase meldet diesen Fall nicht.
+revoke all on public.szenarien from anon, authenticated;
 grant select, insert, update, delete on public.szenarien to authenticated;
