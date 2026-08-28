@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Trash2, PlusCircle } from 'lucide-react';
 import type { Vertrag, VertragsTyp } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
@@ -28,7 +29,8 @@ const SCHICHT_TITEL: Record<1 | 2 | 3, string> = {
 function istKapital(t: VertragsTyp) { return t === 'bavKapital' || t === 'prvKapital'; }
 
 function VertragsKarte({ v }: { v: Vertrag }) {
-  const { vertragAendern, vertragEntfernen } = useSzenario();
+  const vertragAendern = useSzenario((x) => x.vertragAendern);
+  const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
 
   return (
@@ -130,8 +132,13 @@ function VertragsKarte({ v }: { v: Vertrag }) {
 }
 
 export function Vertraege({ schicht }: { schicht: 1 | 2 | 3 }) {
-  const vertraege = useSzenario((x) => x.szenario.vertraege.filter((v) => v.schicht === schicht));
-  const { vertragHinzufuegen } = useSzenario();
+  // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
+  // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
+  // deshalb fuer eine Aenderung und rendert endlos neu (React-Fehler #185).
+  // Deshalb die unveraenderte Liste abonnieren und erst hier filtern.
+  const alle = useSzenario((x) => x.szenario.vertraege);
+  const vertraege = useMemo(() => alle.filter((v) => v.schicht === schicht), [alle, schicht]);
+  const vertragHinzufuegen = useSzenario((x) => x.vertragHinzufuegen);
 
   return (
     <Karte titel={SCHICHT_TITEL[schicht]}>
