@@ -99,8 +99,13 @@ Fuer Anmeldung und gespeicherte Szenarien in `apps/web/.env.local`:
 
 ```
 VITE_SUPABASE_URL=https://<projekt>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon key>
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
+
+Vorlage: `apps/web/.env.example`. Beide Werte sind oeffentlich — sie stecken in
+jedem ausgelieferten Bundle. Das ist bei Supabase so vorgesehen; die
+Absicherung leistet allein Row Level Security. Der aeltere
+`VITE_SUPABASE_ANON_KEY` wird als Rueckfallebene weiterhin gelesen.
 
 Fehlen die Werte, startet die Anwendung trotzdem — der Konto-Bereich blendet
 sich dann aus.

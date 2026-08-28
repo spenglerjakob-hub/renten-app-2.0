@@ -10,12 +10,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  */
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-export const supabaseKonfiguriert = Boolean(url && anonKey);
+// Supabase empfiehlt den moderneren "sb_publishable_..."-Schluessel, der sich
+// unabhaengig rotieren laesst. Der aeltere anon-Schluessel bleibt als
+// Rueckfallebene, damit bestehende Konfigurationen weiter funktionieren.
+const oeffentlicherSchluessel =
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
+
+export const supabaseKonfiguriert = Boolean(url && oeffentlicherSchluessel);
 
 export const supabase: SupabaseClient | null = supabaseKonfiguriert
-  ? createClient(url!, anonKey!, {
+  ? createClient(url!, oeffentlicherSchluessel!, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
