@@ -142,6 +142,45 @@ npx skills add supabase/agent-skills
   eingebauter Versand hat enge Limits, produktiv ist ein eigener SMTP-Anbieter
   zu hinterlegen.
 
+## Deployment
+
+**GitHub baut, Hostinger liefert nur aus.**
+
+Das Shared Hosting von Hostinger fuehrt keinen Node-Build aus. Deshalb baut
+`.github/workflows/deploy-hostinger.yml` das Bundle bei jedem Push und laedt
+`apps/web/dist` per FTP nach `public_html`. Vorher laufen Typpruefung und
+Tests — kaputter Code geht nicht online.
+
+Einmalig in den Repository-Einstellungen unter *Settings → Secrets and
+variables → Actions* hinterlegen:
+
+| Secret | Woher |
+|---|---|
+| `HOSTINGER_FTP_SERVER` | hPanel → Dateien → FTP-Konten |
+| `HOSTINGER_FTP_USERNAME` | ebenda |
+| `HOSTINGER_FTP_PASSWORD` | ebenda |
+| `VITE_SUPABASE_URL` | Supabase → Project Settings → API |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | ebenda |
+
+Die beiden Supabase-Werte muessen als Secret vorliegen, weil Vite sie **beim
+Bauen** in das Bundle einsetzt — auf dem Server werden sie nicht gelesen.
+
+Abweichendes Zielverzeichnis (etwa eine Subdomain): Variable
+`HOSTINGER_ZIELVERZEICHNIS` setzen, Standard ist `public_html/`.
+
+### Von Hand hochladen
+
+Geht ebenso: `pnpm -r build`, dann den **Inhalt** von `apps/web/dist` nach
+`public_html` — nicht den Ordner selbst.
+
+### .htaccess
+
+`apps/web/public/.htaccess` wird von Vite unveraendert nach `dist` kopiert und
+ist bei jedem Deployment dabei. Sie leitet unbekannte Adressen auf
+`index.html` (ohne das gibt es beim Neuladen einer Unterseite einen 404),
+setzt die Zwischenspeicherung passend zu Vites gehashten Dateinamen und
+ergaenzt einige Sicherheitskopfzeilen.
+
 ## Rechtlicher Hinweis
 
 Modellrechnung ohne Gewaehr. Keine Steuer-, Renten- oder Anlageberatung.

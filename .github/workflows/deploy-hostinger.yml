@@ -1,0 +1,75 @@
+name: Deployment zu Hostinger
+
+# GitHub baut, Hostinger liefert nur aus.
+#
+# Das Shared Hosting von Hostinger fuehrt keinen Node-Build aus. Deshalb
+# entsteht das fertige Bundle hier und wird anschliessend per FTP hochgeladen.
+# Hostinger muss dadurch nichts koennen ausser Dateien auszuliefern.
+
+on:
+  push:
+    branches: [main, claude/german-pension-calculator-review-cql8d6]
+  workflow_dispatch:
+
+# Zwei gleichzeitige Deployments wuerden sich im Zielverzeichnis in die Quere
+# kommen. Das neuere gewinnt, das aeltere wird abgebrochen.
+concurrency:
+  group: deployment-hostinger
+  cancel-in-progress: true
+
+jobs:
+  bauen-und-ausliefern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Abhaengigkeiten installieren
+        run: pnpm install --frozen-lockfile
+
+      - name: Typen pruefen
+        run: pnpm -r typecheck
+
+      # Kaputter Code darf nicht online gehen. Schlaegt etwas fehl, bricht der
+      # Lauf ab und das Deployment findet nicht statt.
+      - name: Tests
+        run: pnpm -r test
+
+      - name: Bauen
+        env:
+          # Vite setzt diese Werte BEIM BAUEN in das Bundle ein, nicht zur
+          # Laufzeit. Sie muessen deshalb hier vorliegen, nicht auf dem Server.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: pnpm -r build
+
+      - name: Build pruefen
+        run: |
+          test -f apps/web/dist/index.html || { echo "index.html fehlt"; exit 1; }
+          test -f apps/web/dist/.htaccess  || { echo ".htaccess fehlt — SPA-Routing waere kaputt"; exit 1; }
+          if ! grep -rq "supabase.co" apps/web/dist/assets/*.js; then
+            echo "Warnung: Keine Supabase-URL im Bundle. Sind die Secrets gesetzt?"
+          fi
+          echo "Bundle in Ordnung:"; du -sh apps/web/dist
+
+      - name: Per FTP zu Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          local-dir: ./apps/web/dist/
+          server-dir: ${{ vars.HOSTINGER_ZIELVERZEICHNIS || 'public_html/' }}
+          # Punktdateien muessen mit, sonst fehlt die .htaccess.
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**

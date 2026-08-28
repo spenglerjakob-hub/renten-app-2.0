@@ -1,0 +1,56 @@
+# Auslieferung auf Apache (Hostinger Shared Hosting).
+#
+# Diese Datei liegt in apps/web/public und wird von Vite unveraendert nach
+# dist kopiert — sie ist damit bei jedem Deployment automatisch dabei.
+
+# --- Single-Page-Anwendung -------------------------------------------------
+# Die Anwendung verwaltet ihre Adressen im Browser. Ohne die folgende Regel
+# liefert der Server beim Neuladen einer Unterseite einen 404, weil es die
+# Datei physisch nicht gibt.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Vorhandene Dateien und Verzeichnisse unveraendert ausliefern.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Alles Uebrige an die Anwendung.
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# --- Zwischenspeicherung ---------------------------------------------------
+<IfModule mod_headers.c>
+  # Vite haengt an jeden Dateinamen einen Hash. Aendert sich der Inhalt,
+  # aendert sich der Name — diese Dateien duerfen deshalb dauerhaft im Cache
+  # bleiben.
+  <FilesMatch "\.(js|css|woff2?|ttf|png|jpe?g|svg|webp|avif)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # index.html verweist auf die gehashten Dateien und muss deshalb bei jedem
+  # Aufruf neu geprueft werden. Sonst sehen Nutzer nach einem Deployment
+  # weiterhin die alte Fassung.
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # --- Sicherheitskopfzeilen ----------------------------------------------
+  # Die Anwendung verarbeitet Geburtsdatum und Einkommen. Diese Kopfzeilen
+  # kosten nichts und schliessen die haeufigsten Angriffswege.
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
+</IfModule>
+
+# --- Komprimierung ---------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# --- Verzeichnisauflistung unterbinden -------------------------------------
+Options -Indexes
