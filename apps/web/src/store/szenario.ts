@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { szenarioSchema, importiere, exportiere, type SzenarioParsed } from '@renten/schema';
+import {
+  szenarioSchema, importiere, exportiere, annahmenKoppeln, type SzenarioParsed,
+} from '@renten/schema';
+import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze } from '@renten/engine';
 import type { Szenario, Vertrag, Person } from '@renten/engine';
 
 const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
@@ -46,7 +49,8 @@ export interface SzenarioStore {
   setzeAnnahmen: (p: Partial<SzenarioParsed['annahmen']>) => void;
   setzeEinkommen: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
   setzePlaner: (p: Partial<SzenarioParsed['planer']>) => void;
-  setzePerson: (id: 'A' | 'B', p: Partial<Person>) => void;
+  setzePerson: (id: 'A' | 'B', p: Partial<SzenarioParsed['personen'][number]>) => void;
+  rentenbeginnZuruecksetzen: (id: 'A' | 'B') => void;
   partnerHinzufuegen: () => void;
 
   tuevHinzufuegen: (vertragId: string) => void;
@@ -65,6 +69,25 @@ export interface SzenarioStore {
   zuruecksetzen: () => void;
 }
 
+/**
+ * Rentenbeginn aus dem Geburtsdatum, als deutsches Datum.
+ * Null, wenn das Geburtsdatum (noch) nicht lesbar ist.
+ */
+export function automatischerRentenbeginn(geburtsdatum: string): string | null {
+  const g = parseDatum(geburtsdatum);
+  return g ? toDe(regelaltersrentenbeginn(g)) : null;
+}
+
+/** Regelaltersgrenze als Text, fuer den Hinweis unter dem Feld. */
+export function regelaltersgrenzeText(geburtsdatum: string): string | null {
+  const g = parseDatum(geburtsdatum);
+  if (!g) return null;
+  const jahre = regelaltersgrenze(g.jahr);
+  const volle = Math.floor(jahre + 1e-9);
+  const monate = Math.round((jahre - volle) * 12);
+  return monate === 0 ? `${volle} Jahre` : `${volle} Jahre und ${monate} Monate`;
+}
+
 function neueId(praefix: string) {
   return `${praefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -80,12 +103,44 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   setze: (fn) => set((st) => { const s = fn(st.szenario); speichere(s); return { szenario: s }; }),
 
   setzeHaushalt: (p) => get().setze((s) => ({ ...s, haushalt: { ...s.haushalt, ...p } })),
-  setzeAnnahmen: (p) => get().setze((s) => ({ ...s, annahmen: { ...s.annahmen, ...p } })),
+  // Die Oberflaeche kennt nur Inflation und Rentendynamik; Gehaltsdynamik und
+  // Steuertarif-Index folgen ihnen. Wird der Tarif-Index ausdruecklich gesetzt
+  // (Regler in der Rechtsstand-Karte), bleibt er davon unberuehrt.
+  setzeAnnahmen: (p) => get().setze((s) => annahmenKoppeln(
+    { ...s, annahmen: { ...s.annahmen, ...p } },
+    { tarifIndexBehalten: p.tarifIndex !== undefined },
+  )),
   setzeEinkommen: (p) => get().setze((s) => ({ ...s, einkommenHeute: { ...s.einkommenHeute, ...p } })),
   setzePlaner: (p) => get().setze((s) => ({ ...s, planer: { ...s.planer, ...p } })),
 
   setzePerson: (id, p) => get().setze((s) => ({
-    ...s, personen: s.personen.map((x) => (x.id === id ? { ...x, ...p } : x)),
+    ...s,
+    personen: s.personen.map((x) => {
+      if (x.id !== id) return x;
+      const neu = { ...x, ...p };
+
+      // Von Hand gesetzter Rentenbeginn wird gemerkt und danach in Ruhe
+      // gelassen — sonst ginge ein geplanter Vorruhestand verloren, sobald
+      // das Geburtsdatum nachtraeglich korrigiert wird.
+      if (p.rentenbeginn !== undefined && p.rentenbeginn !== x.rentenbeginn) {
+        return { ...neu, rentenbeginnManuell: true };
+      }
+
+      if (p.geburtsdatum !== undefined && p.geburtsdatum !== x.geburtsdatum && !neu.rentenbeginnManuell) {
+        const auto = automatischerRentenbeginn(neu.geburtsdatum);
+        if (auto) return { ...neu, rentenbeginn: auto };
+      }
+      return neu;
+    }),
+  })),
+
+  rentenbeginnZuruecksetzen: (id) => get().setze((s) => ({
+    ...s,
+    personen: s.personen.map((x) => {
+      if (x.id !== id) return x;
+      const auto = automatischerRentenbeginn(x.geburtsdatum);
+      return auto ? { ...x, rentenbeginn: auto, rentenbeginnManuell: false } : x;
+    }),
   })),
 
   partnerHinzufuegen: () => get().setze((s) => {

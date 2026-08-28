@@ -1,12 +1,14 @@
 import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, besoldungstabelle } from '@renten/engine';
-import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { RotateCcw } from 'lucide-react';
+import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
+import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
 export function Basisdaten() {
   const s = useSzenario((x) => x.szenario);
-  const { setzeHaushalt, setzeAnnahmen, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
+  const { setzeHaushalt, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
+  const rentenbeginnZuruecksetzen = useSzenario((x) => x.rentenbeginnZuruecksetzen);
 
   const besoldungBelegt = besoldungstabelle(s.einkommenHeute.besoldungsland, new Date().getFullYear()).belegt;
 
@@ -111,22 +113,6 @@ export function Basisdaten() {
         )}
       </Abschnitt>
 
-      <Abschnitt titel="Annahmen">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ProzentFeld label="Inflation p. a." wert={s.annahmen.inflation}
-            onChange={(n) => setzeAnnahmen({ inflation: n })}
-            hilfe="Nur für die Umrechnung auf heutige Kaufkraft." />
-          <ProzentFeld label="Rentendynamik p. a." wert={s.annahmen.rentendynamik}
-            onChange={(n) => setzeAnnahmen({ rentendynamik: n })}
-            hilfe="Jährliche Anpassung der Renten und Pensionen." />
-          <ProzentFeld label="Steuertarif-Index p. a." wert={s.annahmen.tarifIndex}
-            onChange={(n) => setzeAnnahmen({ tarifIndex: n })}
-            hilfe="0 % = kalte Progression, gleich der Rentendynamik = voller Ausgleich." />
-          <ProzentFeld label="Gehaltsdynamik p. a." wert={s.annahmen.gehaltsdynamik}
-            onChange={(n) => setzeAnnahmen({ gehaltsdynamik: n })} />
-        </div>
-      </Abschnitt>
-
       {s.personen.map((p) => (
         <Abschnitt key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -135,10 +121,28 @@ export function Basisdaten() {
             <AuswahlFeld label="Versorgungsart" wert={p.art}
               onChange={(v) => setzePerson(p.id, { art: v })}
               optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
-            <TextFeld label="Geburtsdatum" wert={p.geburtsdatum}
-              onChange={(v) => setzePerson(p.id, { geburtsdatum: v })} platzhalter="TT.MM.JJJJ" />
-            <TextFeld label="Rentenbeginn" wert={p.rentenbeginn}
-              onChange={(v) => setzePerson(p.id, { rentenbeginn: v })} platzhalter="TT.MM.JJJJ" />
+            <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
+              onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
+              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld." />
+            <DatumFeld
+              label="Rentenbeginn"
+              wert={p.rentenbeginn}
+              onChange={(v) => setzePerson(p.id, { rentenbeginn: v })}
+              hilfe={
+                p.rentenbeginnManuell
+                  ? 'Von Hand gesetzt.'
+                  : `Automatisch: Regelaltersgrenze ${regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.`
+              }
+              zusatz={p.rentenbeginnManuell ? (
+                <button
+                  type="button"
+                  onClick={() => rentenbeginnZuruecksetzen(p.id)}
+                  className="mt-1 flex items-center gap-1 text-xs font-medium text-indigo-700 hover:underline"
+                >
+                  <RotateCcw className="h-3 w-3" aria-hidden /> Auf Regelaltersgrenze zurücksetzen
+                </button>
+              ) : null}
+            />
             {p.art === 'grv' ? (
               <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
                 onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"

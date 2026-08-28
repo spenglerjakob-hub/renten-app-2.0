@@ -63,21 +63,14 @@ function SchichtBlock({
   );
 }
 
+/**
+ * Die Zeile kommt von aussen, damit Kassenbon, Steuer-Engine und Fussleiste
+ * garantiert dieselbe zeigen — und damit bei fehlender Zeitachse dieselbe
+ * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
+ */
 export function Kassenbon({
-  ergebnis, kaufkraftHeute,
-}: { ergebnis: ProjektionsErgebnis; kaufkraftHeute: boolean }) {
-  const zeile: Jahreszeile | undefined =
-    ergebnis.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr) ??
-    ergebnis.zeilen.find((z) => z.vollstaendigImRuhestand);
-
-  if (!zeile) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm text-slate-500">Noch keine auswertbaren Daten.</p>
-      </div>
-    );
-  }
-
+  ergebnis, zeile, kaufkraftHeute,
+}: { ergebnis: ProjektionsErgebnis; zeile: Jahreszeile; kaufkraftHeute: boolean }) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
 

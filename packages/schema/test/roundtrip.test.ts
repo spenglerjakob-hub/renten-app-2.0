@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { szenarioSchema } from '../src/szenario.js';
-import { importiere, exportiere, ausLegacyFormat } from '../src/migration.js';
+import { importiere, exportiere, ausLegacyFormat, annahmenKoppeln } from '../src/migration.js';
 
 const vollstaendig = {
   schemaVersion: 1 as const,
   haushalt: { verheiratet: true, bundesland: 'Bayern', kirchensteuer: true, hatKinder: true, kinderUnter25: 2, kvStatus: 'freiwillig' as const, pkvPraemieMonat: 0, zielNettoHeute: 3200 },
-  annahmen: { inflation: 0.025, rentendynamik: 0.015, tarifIndex: 0.01, gehaltsdynamik: 0.03 },
+  // Gekoppelt: gehaltsdynamik folgt der inflation, tarifIndex der rentendynamik.
+  annahmen: { inflation: 0.025, rentendynamik: 0.015, tarifIndex: 0.015, gehaltsdynamik: 0.025 },
   einkommenHeute: { modus: 'besoldung' as const, betrag: 0, auszahlungen: 12, besoldungsgruppe: 'A14', besoldungsstufe: 6, besoldungsland: 'Baden-Württemberg' },
   personen: [
     { id: 'A' as const, name: 'Anna', geburtsdatum: '1980-05-12', rentenbeginn: '2047-06-01', art: 'pension' as const, grvBruttoHeute: 0, besoldungsgruppe: 'A14', besoldungsstufe: 8, ruhegehaltssatz: 68.5, dienstbeginn: '2010-09-01', teilzeitphasen: [{ id: 't1', bezeichnung: 'Elternzeit', vonJahr: 2015, bisJahr: 2017, beschaeftigungsgrad: 0 }] },
@@ -32,6 +33,13 @@ describe('Abwaertskompatibilitaet', () => {
     expect(r.warnungen).toEqual([]);
   });
 
+  it('liest Dateien ohne rentenbeginnManuell ein und setzt die Marke auf false', () => {
+    const r = importiere(JSON.stringify(vollstaendig));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.personen[0]!.rentenbeginnManuell).toBe(false);
+  });
+
   it('erhaelt erfasste TUEV-Positionen ueber Export und Import', () => {
     const mitTuev = szenarioSchema.parse({
       ...vollstaendig,
@@ -45,6 +53,54 @@ describe('Abwaertskompatibilitaet', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.szenario.tuev).toEqual(mitTuev.tuev);
+  });
+});
+
+describe('Kopplung der Annahmen', () => {
+  it('gleicht Gehaltsdynamik an die Inflation an und warnt dabei', () => {
+    const abweichend = {
+      ...vollstaendig,
+      annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.035 },
+    };
+    const r = importiere(JSON.stringify(abweichend));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.annahmen.gehaltsdynamik).toBe(0.02);
+    expect(r.warnungen.join(' ')).toContain('Gehaltsdynamik');
+  });
+
+  it('gleicht die Steuertarif-Indexierung an die Rentendynamik an und warnt', () => {
+    const abweichend = {
+      ...vollstaendig,
+      annahmen: { inflation: 0.02, rentendynamik: 0.015, tarifIndex: 0, gehaltsdynamik: 0.02 },
+    };
+    const r = importiere(JSON.stringify(abweichend));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.annahmen.tarifIndex).toBe(0.015);
+    expect(r.warnungen.join(' ')).toContain('Steuertarif');
+  });
+
+  it('warnt nicht, wenn die Werte bereits gekoppelt sind', () => {
+    const gekoppelt = {
+      ...vollstaendig,
+      annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
+    };
+    const r = importiere(JSON.stringify(gekoppelt));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.warnungen).toEqual([]);
+  });
+
+  it('laesst den Tarif-Index in Ruhe, wenn er ausdruecklich behalten werden soll', () => {
+    // Der Regler in der Rechtsstand-Karte setzt ihn bewusst abweichend.
+    const s = szenarioSchema.parse({
+      ...vollstaendig,
+      annahmen: { inflation: 0.02, rentendynamik: 0.015, tarifIndex: 0, gehaltsdynamik: 0.035 },
+    });
+    const r = annahmenKoppeln(s, { tarifIndexBehalten: true });
+    expect(r.annahmen.tarifIndex).toBe(0);
+    expect(r.annahmen.gehaltsdynamik).toBe(0.02);
   });
 });
 
@@ -65,7 +121,7 @@ describe('Szenario-Roundtrip', () => {
     // Genau die Felder, die der Prototyp beim Laden verlor
     expect(r.szenario.haushalt.kvStatus).toBe('freiwillig');
     expect(r.szenario.haushalt.kirchensteuer).toBe(true);
-    expect(r.szenario.annahmen.tarifIndex).toBe(0.01);
+    expect(r.szenario.annahmen.tarifIndex).toBe(0.015);
     expect(r.szenario.annahmen.inflation).toBe(0.025);
     expect(r.szenario.personen[0]!.ruhegehaltssatz).toBe(68.5);
     expect(r.szenario.personen[0]!.teilzeitphasen).toHaveLength(1);
@@ -117,8 +173,12 @@ describe('Migration aus dem Prototyp-Format', () => {
     expect(s.haushalt.kvStatus).toBe('pkv');
     expect(s.haushalt.pkvPraemieMonat).toBe(620);
     expect(s.haushalt.kirchensteuer).toBe(true);
-    expect(s.annahmen.tarifIndex).toBeCloseTo(0.015, 6);
     expect(s.annahmen.rentendynamik).toBeCloseTo(0.01, 6);
+    // Die Prototyp-Datei trug taxIndexRate 1,5 % bei grvIncreaseRate 1,0 %.
+    // Durch die Kopplung folgt der Tarif-Index jetzt der Rentendynamik. Das
+    // aendert die Zahlen des Nutzers und muss deshalb gemeldet werden.
+    expect(s.annahmen.tarifIndex).toBeCloseTo(0.01, 6);
+    expect(r.warnungen.join(' ')).toContain('Steuertarif');
     expect(s.einkommenHeute.modus).toBe('brutto');
     expect(s.einkommenHeute.auszahlungen).toBe(13);
     expect(s.personen).toHaveLength(2);

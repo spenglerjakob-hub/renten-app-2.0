@@ -42,6 +42,13 @@ export const personSchema = z.object({
   name: z.string().default(''),
   geburtsdatum: datumString,
   rentenbeginn: datumString,
+  /**
+   * true, sobald der Rentenbeginn von Hand gesetzt wurde. Dann laesst die
+   * Automatik ihn in Ruhe — sonst ginge ein geplanter Vorruhestand verloren,
+   * wenn nachtraeglich das Geburtsdatum korrigiert wird.
+   * .default(false), damit frueher gespeicherte Dateien weiter laden.
+   */
+  rentenbeginnManuell: z.boolean().default(false),
   art: z.enum(['grv', 'pension']).default('grv'),
   grvBruttoHeute: z.number().min(0).default(0),
   besoldungsgruppe: z.string().default('A13'),

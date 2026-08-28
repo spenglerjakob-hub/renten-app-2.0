@@ -3,6 +3,7 @@ import {
   ChevronDown, ChevronUp, Coins, Download, FolderOpen, List, Printer,
   RotateCcw, Settings, TrendingUp, User, Users, Wallet,
 } from 'lucide-react';
+import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from './store/szenario';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
@@ -29,6 +30,25 @@ const REITER: { id: Reiter; text: string }[] = [
 ];
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
+
+/**
+ * Rueckfallebene, wenn der Rechenkern keine Zeitachse liefern kann — etwa
+ * weil ein Geburtsdatum unvollstaendig ist.
+ *
+ * Frueher hing die gesamte rechte Spalte an `ergebnis && zeile`. Fehlte die
+ * Zeile, verschwanden Kennzahlen, Kassenbon und Fussleiste schlagartig, und es
+ * stand nur noch "Berechnung laeuft ..." da. Mit dieser Zeile bleibt das
+ * Geruest stehen und zeigt Nullwerte; der Grund steht als Hinweis darueber.
+ */
+const LEERE_ZEILE: Jahreszeile = {
+  jahr: new Date().getFullYear(),
+  alterA: 0, alterB: null,
+  vollstaendigImRuhestand: false, gemischtePhase: false,
+  bruttoGesamt: 0, kvPvGesamt: 0, steuerGesamt: 0, nettoGesamt: 0, nettoMonat: 0,
+  zielNettoMonat: 0, kaufkraftfaktor: 1,
+  zve: 0, durchschnittssatz: 0, grenzsatz: 0,
+  posten: [], parameterFortgeschrieben: false,
+};
 
 /** Kleine Auswahl in der dunklen Kopfleiste. */
 function KopfAuswahl({
@@ -91,11 +111,14 @@ export default function App() {
     e.target.value = '';
   };
 
-  const zeile =
+  const echteZeile =
     ergebnis?.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr) ??
     ergebnis?.zeilen.find((z) => z.vollstaendigImRuhestand);
-  const faktor = zeile && kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
-  const luecke = zeile ? Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat) : 0;
+  const zeile = echteZeile ?? LEERE_ZEILE;
+  const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
+  const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
+  // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
+  const hinweise = ergebnis && !echteZeile ? ergebnis.hinweise : [];
 
   const verheiratet = szenario.haushalt.verheiratet;
 
@@ -176,9 +199,9 @@ export default function App() {
                   farbe="bg-emerald-600"
                 />
                 <KopfAuswahl
-                  titel="Index:"
-                  wert={szenario.annahmen.tarifIndex}
-                  onChange={(n) => setzeAnnahmen({ tarifIndex: n })}
+                  titel="Rente:"
+                  wert={szenario.annahmen.rentendynamik}
+                  onChange={(n) => setzeAnnahmen({ rentendynamik: n })}
                   farbe="bg-indigo-600"
                 />
                 <span className="my-1 h-px w-full bg-slate-700 sm:mx-0.5 sm:my-0 sm:h-5 sm:w-px" />
@@ -323,7 +346,15 @@ export default function App() {
             </div>
           )}
 
-          {ergebnis && zeile ? (
+          {hinweise.length > 0 && (
+            <div role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <ul className="list-inside list-disc space-y-1">
+                {hinweise.map((h, i) => <li key={i}>{h}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {ergebnis ? (
             <>
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
@@ -374,7 +405,7 @@ export default function App() {
               </div>
 
               <div className={ansicht === 'kassenbon' ? 'block' : 'hidden print:block'}>
-                <Kassenbon ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
+                <Kassenbon ergebnis={ergebnis} zeile={zeile} kaufkraftHeute={kaufkraftHeute} />
               </div>
               <div className={ansicht === 'verlauf' ? 'block' : 'hidden print:block'}>
                 <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />

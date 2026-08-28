@@ -1,4 +1,5 @@
 import type { LegalParameters } from '../params/types.js';
+import { datumPlus, type Datum } from '../util/datum.js';
 
 /**
  * Regelaltersgrenze § 235 SGB VI, gestaffelt nach Geburtsjahrgang.
@@ -13,6 +14,29 @@ export function regelaltersgrenze(geburtsjahr: number): number {
   if (geburtsjahr <= 1958) return 65 + (geburtsjahr - 1946) / 12;
   if (geburtsjahr <= 1963) return 66 + ((geburtsjahr - 1958) * 2) / 12;
   return 67;
+}
+
+/**
+ * Beginn der Regelaltersrente aus dem Geburtsdatum.
+ *
+ * Zwei Regeln greifen nacheinander:
+ *  1. § 235 SGB VI — die nach Jahrgang gestaffelte Regelaltersgrenze, oben.
+ *  2. § 99 Abs. 1 SGB VI — die Rente beginnt mit dem Kalendermonat, zu dessen
+ *     Beginn die Voraussetzungen erfuellt sind. Wer am Monatsersten geboren
+ *     ist, erfuellt sie am Ersten dieses Monats; alle anderen erst im Lauf des
+ *     Monats, die Rente beginnt dann am Ersten des FOLGEmonats.
+ *
+ * Beispiel: geboren am 15.03.1970 -> Regelaltersgrenze 67 -> 15.03.2037 ->
+ * Rentenbeginn 01.04.2037. Geboren am 01.03.1970 -> 01.03.2037.
+ */
+export function regelaltersrentenbeginn(geburt: Datum): Datum {
+  const grenze = regelaltersgrenze(geburt.jahr);
+  const erreicht = datumPlus(geburt, grenze);
+
+  if (geburt.tag === 1) return { ...erreicht, tag: 1 };
+
+  const folgemonat = datumPlus({ ...erreicht, tag: 1 }, 0, 1);
+  return { ...folgemonat, tag: 1 };
 }
 
 /**

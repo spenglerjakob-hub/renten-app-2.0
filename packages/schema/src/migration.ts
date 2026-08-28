@@ -137,6 +137,36 @@ export function ausLegacyFormat(d: LegacyExport): unknown {
   };
 }
 
+/**
+ * Erzwingt die Kopplung der Annahmen.
+ *
+ * Die Oberflaeche kennt nur noch zwei Regler: Inflation und Rentendynamik.
+ * Die Gehaltsdynamik folgt der Inflation, die Steuertarif-Indexierung folgt
+ * der Rentendynamik. Der Rechenkern behaelt alle vier Felder — die
+ * Unterscheidung ist fachlich echt —, aber die Anwendung setzt sie gleich.
+ *
+ * Ausnahme: Wurde die Indexierung bewusst abweichend gesetzt (Regler in der
+ * Rechtsstand-Karte, um kalte Progression zu zeigen), bleibt sie stehen.
+ */
+export function annahmenKoppeln(
+  s: SzenarioParsed,
+  opts: { tarifIndexBehalten?: boolean } = {},
+): SzenarioParsed {
+  const a = s.annahmen;
+  const gekoppelt = {
+    ...a,
+    gehaltsdynamik: a.inflation,
+    tarifIndex: opts.tarifIndexBehalten ? a.tarifIndex : a.rentendynamik,
+  };
+  if (
+    gekoppelt.gehaltsdynamik === a.gehaltsdynamik &&
+    gekoppelt.tarifIndex === a.tarifIndex
+  ) {
+    return s;
+  }
+  return { ...s, annahmen: gekoppelt };
+}
+
 export function importiere(rohJson: string): ImportErgebnis {
   let daten: unknown;
   try {
@@ -160,7 +190,27 @@ export function importiere(rohJson: string): ImportErgebnis {
       fehler: r.error.issues.map((i) => `${i.path.join('.') || 'Datei'}: ${i.message}`),
     };
   }
-  return { ok: true, szenario: r.data, migriertVon: istLegacy ? 'prototyp' : 'v1', warnungen };
+  // Die Kopplung gilt auch fuer geladene Dateien. Weicht dort etwas ab,
+  // wird es angeglichen — aber nicht stillschweigend.
+  const gekoppelt = annahmenKoppeln(r.data);
+  if (gekoppelt !== r.data) {
+    const a = r.data.annahmen;
+    if (gekoppelt.annahmen.gehaltsdynamik !== a.gehaltsdynamik) {
+      warnungen.push(
+        `Gehaltsdynamik an die Inflation angeglichen (${(a.gehaltsdynamik * 100).toLocaleString('de-DE')} % -> ` +
+        `${(gekoppelt.annahmen.gehaltsdynamik * 100).toLocaleString('de-DE')} %).`,
+      );
+    }
+    if (gekoppelt.annahmen.tarifIndex !== a.tarifIndex) {
+      warnungen.push(
+        `Steuertarif-Indexierung an die Rentendynamik angeglichen (${(a.tarifIndex * 100).toLocaleString('de-DE')} % -> ` +
+        `${(gekoppelt.annahmen.tarifIndex * 100).toLocaleString('de-DE')} %). ` +
+        'In der Karte "Rechtsstand und Annahmen" laesst sie sich wieder abweichend setzen.',
+      );
+    }
+  }
+
+  return { ok: true, szenario: gekoppelt, migriertVon: istLegacy ? 'prototyp' : 'v1', warnungen };
 }
 
 export function exportiere(s: SzenarioParsed): string {

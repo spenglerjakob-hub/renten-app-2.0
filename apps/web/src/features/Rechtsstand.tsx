@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { BASISJAHR } from '@renten/engine';
-import { prozent } from '../components/Feld';
+import { useSzenario } from '../store/szenario';
+import { ProzentFeld, prozent } from '../components/Feld';
 
 /**
  * Erlaeuterung des verwendeten Rechtsstands und der Fortschreibungsannahme.
@@ -16,6 +19,9 @@ export function Rechtsstand({
   rentendynamik: number;
   inflation: number;
 }) {
+  const setzeAnnahmen = useSzenario((s) => s.setzeAnnahmen);
+  const [reglerOffen, setReglerOffen] = useState(false);
+
   const r = ergebnis.rechtsstand;
   const ohneIndexierung = tarifIndex === 0;
   const vollIndexiert = Math.abs(tarifIndex - rentendynamik) < 0.0005;
@@ -119,6 +125,53 @@ export function Rechtsstand({
           Renten- oder Anlageberatung. Massgeblich sind allein die Bescheide der
           Finanzverwaltung und der Versorgungstraeger.
         </p>
+      </div>
+
+      {/*
+        Regler fuer die Steuertarif-Indexierung.
+
+        Normalerweise folgt sie der Rentendynamik — das entspricht dem vollen
+        Ausgleich der kalten Progression und ist die guenstigste Annahme. Wer
+        den realistischeren Fall sehen will (Tarif waechst langsamer als die
+        Bezuege, die Steuerquote steigt), setzt sie hier abweichend.
+      */}
+      <div className="mt-3 border-t border-slate-100 pt-3 print:hidden">
+        <button
+          type="button"
+          onClick={() => setReglerOffen((v) => !v)}
+          aria-expanded={reglerOffen}
+          className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 hover:underline"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+          {reglerOffen ? 'Steuertarif-Indexierung schließen' : 'Kalte Progression durchrechnen'}
+        </button>
+
+        {reglerOffen && (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <ProzentFeld
+              label="Steuertarif-Indexierung p. a."
+              wert={tarifIndex}
+              onChange={(n) => setzeAnnahmen({ tarifIndex: n })}
+              max={10}
+              hilfe="0 % = keinerlei Ausgleich der kalten Progression. Gleich der Rentendynamik = voller Ausgleich."
+            />
+            <p className="mt-2 text-xs text-slate-600">
+              Die Rentendynamik liegt bei <strong>{prozent(rentendynamik)}</strong>.{' '}
+              {vollIndexiert
+                ? 'Der Tarif wächst genauso schnell — die Steuerquote bleibt über die Jahre stabil.'
+                : 'Der Tarif wächst langsamer — die Steuerquote steigt im Zeitverlauf.'}
+            </p>
+            {!vollIndexiert && (
+              <button
+                type="button"
+                onClick={() => setzeAnnahmen({ rentendynamik })}
+                className="mt-2 text-xs font-medium text-indigo-700 hover:underline"
+              >
+                Wieder an die Rentendynamik koppeln
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {ergebnis.hinweise.length > 0 && (

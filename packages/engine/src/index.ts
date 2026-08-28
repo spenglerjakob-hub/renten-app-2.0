@@ -28,7 +28,7 @@ export {
   altersentlastungsbetrag, ertragsanteil, type EingefrorenerFreibetrag,
 } from './pension/freibetraege.js';
 export {
-  regelaltersgrenze, zugangsfaktor, renteAusEntgeltpunkten, entgeltpunkteJahr,
+  regelaltersgrenze, regelaltersrentenbeginn, zugangsfaktor, renteAusEntgeltpunkten, entgeltpunkteJahr,
   schaetzeEntgeltpunkte, type KarriereSchaetzung,
 } from './pension/grv.js';
 export {

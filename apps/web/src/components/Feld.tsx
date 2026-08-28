@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { parseDatum, toDe } from '@renten/engine';
 
 /**
  * Zahleneingabe mit deutscher Notation.
@@ -102,6 +103,100 @@ export function TextFeld(props: {
         }`}
       />
       {props.fehler && <p className="mt-1 text-xs text-rose-600">{props.fehler}</p>}
+    </div>
+  );
+}
+
+/**
+ * Datumseingabe mit Ziffernmaske.
+ *
+ * Zwei Dinge macht dieses Feld anders als das vorherige TextFeld:
+ *
+ * 1. MASKE: Es genuegt, die acht Ziffern zu tippen — die Punkte setzt das Feld.
+ *    Alles ausser Ziffern wird verworfen, deshalb funktionieren auch
+ *    12/05/1980 und 12-05-1980 beim Einfuegen aus der Zwischenablage.
+ *
+ * 2. NUR GUELTIGES WANDERT WEITER: Das TextFeld reichte jeden Tastenanschlag
+ *    sofort an den Speicher. Nach dem ersten Zeichen stand dort
+ *    geburtsdatum: "1", der Rechenkern konnte das nicht parsen und lieferte
+ *    eine LEERE Zeitachse — die gesamte rechte Spalte verschwand beim Tippen.
+ *    Hier bleibt der zuletzt gueltige Wert stehen, bis die Eingabe vollstaendig
+ *    und kalendarisch moeglich ist.
+ */
+export function DatumFeld(props: {
+  label: string;
+  wert: string;
+  onChange: (s: string) => void;
+  hilfe?: ReactNode;
+  zusatz?: ReactNode;
+}) {
+  const id = `d-${props.label.replace(/\W+/g, '-').toLowerCase()}`;
+
+  const anzeige = (roh: string) => {
+    const d = parseDatum(roh);
+    return d ? toDe(d) : roh;
+  };
+
+  const [text, setText] = useState(() => anzeige(props.wert));
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  // Aendert sich der Wert von aussen (Laden, Zuruecksetzen, Automatik),
+  // uebernimmt das Feld ihn — aber nicht, waehrend gerade getippt wird und
+  // die Eingabe noch unfertig ist.
+  useEffect(() => {
+    const formatiert = anzeige(props.wert);
+    setText((bisher) => (parseDatum(bisher) && toDe(parseDatum(bisher)!) === formatiert ? bisher : formatiert));
+    setFehler(null);
+  }, [props.wert]);
+
+  const maskieren = (roh: string) => {
+    const z = roh.replace(/\D/g, '').slice(0, 8);
+    if (z.length <= 2) return z;
+    if (z.length <= 4) return `${z.slice(0, 2)}.${z.slice(2)}`;
+    return `${z.slice(0, 2)}.${z.slice(2, 4)}.${z.slice(4)}`;
+  };
+
+  const uebernehmen = (roh: string) => {
+    const maskiert = maskieren(roh);
+    setText(maskiert);
+
+    const ziffern = maskiert.replace(/\D/g, '');
+    if (ziffern.length < 8) {
+      // Noch im Tippen — kein Fehler anzeigen, nichts weitergeben.
+      setFehler(null);
+      return;
+    }
+
+    const d = parseDatum(maskiert);
+    if (!d) {
+      setFehler('Dieses Datum gibt es nicht');
+      return;
+    }
+    setFehler(null);
+    props.onChange(toDe(d));
+  };
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-600">{props.label}</label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="TT.MM.JJJJ"
+        value={text}
+        onChange={(e) => uebernehmen(e.target.value)}
+        aria-invalid={fehler ? true : undefined}
+        aria-describedby={fehler ? `${id}-fehler` : undefined}
+        className={`w-full rounded-md border p-2 text-sm tabular-nums ${
+          fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
+        }`}
+      />
+      {fehler
+        ? <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>
+        : props.hilfe && <p className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
+      {props.zusatz}
     </div>
   );
 }

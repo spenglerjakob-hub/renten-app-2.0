@@ -4,4 +4,6 @@ export {
   tuevPositionSchema,
   type SzenarioInput, type SzenarioParsed,
 } from './szenario.js';
-export { importiere, exportiere, ausLegacyFormat, type ImportErgebnis } from './migration.js';
+export {
+  importiere, exportiere, ausLegacyFormat, annahmenKoppeln, type ImportErgebnis,
+} from './migration.js';
