@@ -1,11 +1,64 @@
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { ProjektionsErgebnis, Jahreszeile } from '@renten/engine';
-import { Karte, euro, prozent } from '../components/Feld';
+import { euro, prozent } from '../components/Feld';
 
-function Zeile({ links, rechts, klein }: { links: string; rechts: string; klein?: boolean }) {
+/** Farbgebung der drei Schichten, wie im urspruenglichen Entwurf. */
+const SCHICHT = {
+  1: { titel: 'Schicht 1 (Basis / Pension)', rahmen: 'border-blue-100', text: 'text-blue-900', balken: 'bg-blue-500', punkt: 'bg-blue-500' },
+  2: { titel: 'Schicht 2 (Zusatz)', rahmen: 'border-purple-100', text: 'text-purple-900', balken: 'bg-purple-500', punkt: 'bg-purple-500' },
+  3: { titel: 'Schicht 3 (Privat)', rahmen: 'border-emerald-100', text: 'text-emerald-900', balken: 'bg-emerald-500', punkt: 'bg-emerald-500' },
+} as const;
+
+function SchichtBlock({
+  schicht, netto, kinder, w,
+}: {
+  schicht: 1 | 2 | 3;
+  netto: number;
+  kinder: Jahreszeile['posten'];
+  w: (n: number) => string;
+}) {
+  const [offen, setOffen] = useState(true);
+  const f = SCHICHT[schicht];
+
   return (
-    <div className={`flex items-baseline justify-between gap-3 ${klein ? 'text-xs text-slate-500' : 'text-sm'}`}>
-      <span className="truncate">{links}</span>
-      <span className="shrink-0 font-semibold tabular-nums">{rechts}</span>
+    <div className={`overflow-hidden rounded-lg border ${f.rahmen} print:border-slate-300`}>
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        className="druck-kopf flex w-full items-center justify-between gap-3 border-b border-slate-50 bg-white p-2.5 text-left sm:p-4"
+      >
+        <span className={`text-[11px] font-bold sm:text-base ${f.text}`}>{f.titel}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-[11px] font-bold tabular-nums sm:text-base">{w(netto)}</span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${offen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </span>
+      </button>
+
+      <div className={`space-y-2 bg-white p-2.5 text-xs sm:p-3 ${offen ? 'block' : 'hidden'} druck-inhalt`}>
+        {kinder.map((p) => (
+          <div key={p.id} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 sm:p-3">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className={`truncate text-[11px] font-semibold sm:text-sm ${f.text}`}>
+                {p.bezeichnung}
+              </span>
+              <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
+                {w(p.nettoJahr)}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 text-[9px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
+              <span>Brutto: {w(p.bruttoJahr)}</span>
+              <span className="leading-tight text-rose-500 sm:text-right">
+                KV/PV: {w(p.kvPvJahr)} | Steuer: {w(p.steuerJahr)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -18,114 +71,87 @@ export function Kassenbon({
     ergebnis.zeilen.find((z) => z.vollstaendigImRuhestand);
 
   if (!zeile) {
-    return <Karte titel="Ergebnis"><p className="text-sm text-slate-500">Noch keine auswertbaren Daten.</p></Karte>;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-sm text-slate-500">Noch keine auswertbaren Daten.</p>
+      </div>
+    );
   }
 
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
 
-  const nachSchicht = [1, 2, 3].map((sch) => ({
+  const nachSchicht = ([1, 2, 3] as const).map((sch) => ({
     schicht: sch,
     posten: zeile.posten.filter((p) => p.schicht === sch && p.nettoJahr !== 0),
     netto: zeile.posten.filter((p) => p.schicht === sch).reduce((s, p) => s + p.nettoJahr, 0),
   }));
 
-  const luecke = zeile.zielNettoMonat - zeile.nettoMonat;
+  const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
+  const skala = Math.max(zeile.zielNettoMonat, zeile.nettoMonat, 1);
+  const anteil = (n: number) => `${Math.max(0, (n / 12 / skala) * 100)}%`;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Karte titel={`Bedarf ${zeile.jahr}`}>
-          <p className="text-2xl font-bold tabular-nums">{euro(zeile.zielNettoMonat * f)}</p>
-          <p className="mt-1 text-xs text-slate-500">pro Monat</p>
-        </Karte>
-        <Karte titel="Versorgungslücke" klasse={luecke > 0 ? 'border-rose-200' : 'border-emerald-200'}>
-          <p className={`text-2xl font-bold tabular-nums ${luecke > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {luecke > 0 ? euro(luecke * f) : 'Gedeckt'}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {luecke > 0 ? `${prozent(zeile.nettoMonat / zeile.zielNettoMonat, 0)} des Ziels erreicht` : 'Ziel erreicht'}
-          </p>
-        </Karte>
-      </div>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
+      <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
+        Ihr Haushalts-Netto im Jahr {zeile.jahr}
+        <span className="ml-2 font-normal text-slate-500">
+          {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
+        </span>
+      </h2>
 
-      <Karte
-        titel={`Haushaltsnetto im Jahr ${zeile.jahr}`}
-        kopfzeile={<span className="text-xs text-slate-500">{kaufkraftHeute ? 'Kaufkraft heute' : 'nominal'}</span>}
-      >
-        <div className="space-y-4">
-          {nachSchicht.map(({ schicht, posten, netto }) =>
-            posten.length === 0 ? null : (
-              <div key={schicht}>
-                <div className="mb-2 flex items-baseline justify-between border-b border-slate-100 pb-1">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Schicht {schicht}</h3>
-                  <span className="text-sm font-bold tabular-nums">{w(netto)}</span>
-                </div>
-                <div className="space-y-2">
-                  {posten.map((p) => (
-                    <div key={p.id} className="rounded-md bg-slate-50 px-3 py-2">
-                      <Zeile links={p.bezeichnung} rechts={w(p.nettoJahr)} />
-                      <div className="mt-1 flex flex-wrap justify-between gap-x-4 text-xs text-slate-500">
-                        <span>Brutto {w(p.bruttoJahr)}</span>
-                        <span className="text-rose-600">
-                          KV/PV {w(p.kvPvJahr)} · Steuer {w(p.steuerJahr)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      {/* Gestapelter Fortschrittsbalken */}
+      <div className="mb-5 sm:mb-6">
+        <div className="mb-1 flex justify-between text-[9px] font-bold uppercase text-slate-500 sm:text-[10px]">
+          <span>Ziel-Erreichung</span>
+          <span>
+            {luecke > 0
+              ? `${prozent(zeile.nettoMonat / Math.max(1, zeile.zielNettoMonat), 1)} erreicht`
+              : 'Ziel erreicht / übertroffen'}
+          </span>
+        </div>
+        <div className="flex h-3 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner sm:h-4">
+          {nachSchicht.map(({ schicht, netto }) =>
+            netto <= 0 ? null : (
+              <div
+                key={schicht}
+                style={{ width: anteil(netto) }}
+                className={`${SCHICHT[schicht].balken} transition-all duration-500`}
+              />
             ),
           )}
-
-          <div className="flex items-baseline justify-between rounded-lg bg-slate-900 px-4 py-3 text-white">
-            <span className="font-bold">Gesamt-Netto</span>
-            <span className="text-xl font-bold tabular-nums">{w(zeile.nettoGesamt)}</span>
-          </div>
+          {luecke > 0 && (
+            <div style={{ width: `${(luecke / skala) * 100}%` }} className="bg-white transition-all duration-500" />
+          )}
         </div>
-      </Karte>
+        <div className="mt-1.5 flex flex-wrap gap-2 text-[8px] font-semibold text-slate-500 sm:mt-2 sm:gap-3 sm:text-[9px]">
+          {nachSchicht.map(({ schicht }) => (
+            <span key={schicht} className="flex items-center gap-1">
+              <span className={`h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2 ${SCHICHT[schicht].punkt}`} />
+              Schicht {schicht}
+            </span>
+          ))}
+          {luecke > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full border border-slate-300 bg-white sm:h-2 sm:w-2" />
+              Lücke
+            </span>
+          )}
+        </div>
+      </div>
 
-      <Karte titel="Steuer und Abgaben">
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <dt className="text-xs text-slate-500">Zu versteuerndes Einkommen</dt>
-            <dd className="text-lg font-bold tabular-nums">{euro(zeile.zve * f)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">Steuerfrei (Freibetrag)</dt>
-            <dd className="text-lg font-bold tabular-nums text-emerald-600">
-              {euro(ergebnis.freibetraege.reduce((s, x) => s + x.wert.jahresbetrag, 0) * f)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">Durchschnittssatz</dt>
-            <dd className="text-lg font-bold tabular-nums">{prozent(zeile.durchschnittssatz)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">Grenzsteuersatz</dt>
-            <dd className="text-lg font-bold tabular-nums text-indigo-600">{prozent(zeile.grenzsatz)}</dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-slate-500">
-          Der <strong>Durchschnittssatz</strong> beschreibt die Gesamtbelastung. Für die Frage, ob sich
-          eine zusätzliche Einzahlung lohnt, ist allein der <strong>Grenzsteuersatz</strong> maßgeblich —
-          er gilt für den nächsten verdienten Euro.
-        </p>
-
-        {ergebnis.freibetraege.length > 0 && (
-          <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-            {ergebnis.freibetraege.map((fb) => (
-              <p key={fb.personId} className="text-xs text-slate-600">
-                <strong>Person {fb.personId}:</strong>{' '}
-                {fb.art === 'rente'
-                  ? `Rentenfreibetrag ${euro(fb.wert.jahresbetrag)} pro Jahr (Besteuerungsanteil ${prozent(fb.wert.besteuerungsanteil ?? 0, 1)}, Kohorte ${fb.wert.kohortenjahr}).`
-                  : `Versorgungsfreibetrag ${euro(fb.wert.jahresbetrag)} pro Jahr inkl. Zuschlag (Kohorte ${fb.wert.kohortenjahr}).`}{' '}
-                Dieser Betrag bleibt lebenslang unverändert, während die Bezüge steigen.
-              </p>
-            ))}
-          </div>
+      <div className="space-y-2 sm:space-y-3">
+        {nachSchicht.map(({ schicht, posten, netto }) =>
+          posten.length === 0 ? null : (
+            <SchichtBlock key={schicht} schicht={schicht} netto={netto} kinder={posten} w={w} />
+          ),
         )}
-      </Karte>
+
+        <div className="flex items-baseline justify-between rounded-lg bg-slate-900 px-4 py-3 text-white">
+          <span className="font-bold">Gesamt-Netto</span>
+          <span className="text-xl font-bold tabular-nums">{w(zeile.nettoGesamt)}</span>
+        </div>
+      </div>
     </div>
   );
 }

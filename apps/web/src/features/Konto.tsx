@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { LogIn, LogOut, Save, FolderOpen, Trash2, RefreshCw } from 'lucide-react';
 import { useFernSzenarien, supabaseKonfiguriert } from '../store/szenarien-fern';
 import { useSzenario } from '../store/szenario';
-import { Karte } from '../components/Feld';
 
 /**
  * Anmeldung und gespeicherte Szenarien.
@@ -28,27 +27,30 @@ export function Konto() {
 
   if (!supabaseKonfiguriert) {
     return (
-      <Karte titel="Konto">
-        <p className="text-sm text-slate-600">
-          Die Anmeldung ist nicht eingerichtet. Ihre Eingaben bleiben auf diesem Gerät
-          gespeichert und lassen sich als Datei sichern.
-        </p>
-      </Karte>
+      <p className="text-sm text-slate-600">
+        Die Anmeldung ist nicht eingerichtet. Ihre Eingaben bleiben auf diesem Gerät
+        gespeichert und lassen sich als Datei sichern.
+      </p>
     );
   }
 
   return (
-    <Karte
-      titel="Konto und gespeicherte Szenarien"
-      kopfzeile={
-        angemeldetAls ? (
-          <button type="button" onClick={() => void abmelden()}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+    <div className="space-y-3">
+      {angemeldetAls && (
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+          <span className="truncate text-xs text-slate-500">
+            Angemeldet als <strong className="text-slate-700">{angemeldetAls}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => void abmelden()}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+          >
             <LogOut className="h-3.5 w-3.5" aria-hidden /> Abmelden
           </button>
-        ) : null
-      }
-    >
+        </div>
+      )}
+
       {meldung && (
         <div role="status"
           className={`mb-3 flex items-start justify-between gap-3 rounded-md px-3 py-2 text-sm ${
@@ -87,8 +89,6 @@ export function Konto() {
         </form>
       ) : (
         <div className="space-y-4">
-          <p className="text-xs text-slate-500">Angemeldet als {angemeldetAls}</p>
-
           <div className="flex gap-2">
             <div className="flex-1">
               <label htmlFor="szenario-name" className="sr-only">Name des Szenarios</label>
@@ -154,6 +154,6 @@ export function Konto() {
           </div>
         </div>
       )}
-    </Karte>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, besoldungstabelle } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Karte, euro } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -12,7 +12,7 @@ export function Basisdaten() {
 
   return (
     <div className="space-y-4">
-      <Karte titel="Haushalt">
+      <Abschnitt titel="Haushalt">
         <div className="grid gap-3 sm:grid-cols-2">
           <AuswahlFeld
             label="Bundesland (Kirchensteuer, Besoldung)"
@@ -58,9 +58,9 @@ export function Basisdaten() {
           <Schalter label="Kirchensteuerpflichtig" wert={s.haushalt.kirchensteuer}
             onChange={(b) => setzeHaushalt({ kirchensteuer: b })} />
         </div>
-      </Karte>
+      </Abschnitt>
 
-      <Karte titel="Heutiges Einkommen">
+      <Abschnitt titel="Heutiges Einkommen">
         <div className="grid gap-3 sm:grid-cols-3">
           <AuswahlFeld
             label="Art"
@@ -109,9 +109,9 @@ export function Basisdaten() {
             um mehrere hundert Euro im Monat abweichen.
           </p>
         )}
-      </Karte>
+      </Abschnitt>
 
-      <Karte titel="Annahmen">
+      <Abschnitt titel="Annahmen">
         <div className="grid gap-3 sm:grid-cols-2">
           <ProzentFeld label="Inflation p. a." wert={s.annahmen.inflation}
             onChange={(n) => setzeAnnahmen({ inflation: n })}
@@ -125,10 +125,10 @@ export function Basisdaten() {
           <ProzentFeld label="Gehaltsdynamik p. a." wert={s.annahmen.gehaltsdynamik}
             onChange={(n) => setzeAnnahmen({ gehaltsdynamik: n })} />
         </div>
-      </Karte>
+      </Abschnitt>
 
       {s.personen.map((p) => (
-        <Karte key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>
+        <Abschnitt key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
               platzhalter={`Person ${p.id}`} />
@@ -154,7 +154,7 @@ export function Basisdaten() {
               </>
             )}
           </div>
-        </Karte>
+        </Abschnitt>
       ))}
 
       {!s.haushalt.verheiratet && s.personen.length === 1 && (

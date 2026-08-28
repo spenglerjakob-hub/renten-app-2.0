@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Trash2, PlusCircle } from 'lucide-react';
 import type { Vertrag, VertragsTyp } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Karte } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt } from '../components/Feld';
 
 const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
   1: [{ wert: 'basis', text: 'Rürup / Basisrente' }],
@@ -141,7 +141,7 @@ export function Vertraege({ schicht }: { schicht: 1 | 2 | 3 }) {
   const vertragHinzufuegen = useSzenario((x) => x.vertragHinzufuegen);
 
   return (
-    <Karte titel={SCHICHT_TITEL[schicht]}>
+    <Abschnitt titel={SCHICHT_TITEL[schicht]}>
       <div className="space-y-3">
         {vertraege.length === 0 && (
           <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
@@ -157,6 +157,6 @@ export function Vertraege({ schicht }: { schicht: 1 | 2 | 3 }) {
           <PlusCircle className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
         </button>
       </div>
-    </Karte>
+    </Abschnitt>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 /**
  * Zahleneingabe mit deutscher Notation.
@@ -147,6 +148,63 @@ export function Karte(props: { titel: string; kopfzeile?: ReactNode; children: R
         {props.kopfzeile}
       </header>
       <div className="p-4">{props.children}</div>
+    </section>
+  );
+}
+
+/**
+ * Schlichter Abschnitt ohne Kartenrahmen. Fuer Inhalte, die BEREITS in einer
+ * Karte stecken — sonst entstuenden verschachtelte Kaesten.
+ */
+export function Abschnitt(props: { titel: string; children: ReactNode }) {
+  return (
+    <section className="druckbereich">
+      <h3 className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+        {props.titel}
+      </h3>
+      {props.children}
+    </section>
+  );
+}
+
+/**
+ * Einklappbare Karte.
+ *
+ * Die Ueberschrift sitzt IM Knopf. Damit sie im Druck nicht verschwindet,
+ * traegt der Knopf die Klasse `druck-kopf` — die Druckregeln in index.css
+ * nehmen ihn davon aus, dass Bedienelemente ausgeblendet werden. Der Inhalt
+ * ist im Druck immer sichtbar, unabhaengig vom Zustand am Bildschirm.
+ */
+export function AkkordeonKarte(props: {
+  titel: string;
+  offen: boolean;
+  onUmschalten: () => void;
+  symbol?: ReactNode;
+  kopfzeile?: ReactNode;
+  children: ReactNode;
+  klasse?: string;
+}) {
+  return (
+    <section className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich ${props.klasse ?? ''}`}>
+      <button
+        type="button"
+        onClick={props.onUmschalten}
+        aria-expanded={props.offen}
+        className="druck-kopf flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+      >
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700">
+          {props.symbol}
+          {props.titel}
+        </h2>
+        <span className="flex items-center gap-3">
+          {props.kopfzeile}
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${props.offen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </span>
+      </button>
+      <div className={`p-4 ${props.offen ? 'block' : 'hidden'} druck-inhalt`}>{props.children}</div>
     </section>
   );
 }
