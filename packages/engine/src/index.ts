@@ -48,9 +48,15 @@ export {
 export {
   bavKapitalSteuer, bavKapitalMonatswert, riesterZulagen, riesterZulagenkuerzung,
 } from './products/bav.js';
+export {
+  entnahmeRate, entnahmeplanBewerten, type EntnahmeErgebnis,
+} from './products/entnahmeplaner.js';
 
 // Projektion
-export { projiziere, type Jahreszeile, type JahresPosten, type ProjektionsErgebnis } from './projection/timeline.js';
+export {
+  projiziere,
+  type Jahreszeile, type JahresPosten, type ProjektionsErgebnis, type PlanerErgebnis,
+} from './projection/timeline.js';
 
 // Datum
 export {
