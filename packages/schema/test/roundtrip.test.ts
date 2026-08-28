@@ -18,6 +18,36 @@ const vollstaendig = {
   planer: { startkapital: 25000, dauerJahre: 30, rendite: 0.025, dynamik: 0.01, insNettoEinrechnen: true },
 };
 
+describe('Abwaertskompatibilitaet', () => {
+  it('liest Dateien ohne das neue tuev-Feld ohne Warnung ein', () => {
+    // Der Vertrags-TUEV kam spaeter dazu. Frueher gespeicherte Szenarien und
+    // Exportdateien duerfen dadurch nicht unlesbar werden.
+    const alt = JSON.stringify(vollstaendig);
+    expect(JSON.parse(alt).tuev).toBeUndefined();
+
+    const r = importiere(alt);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.tuev).toEqual([]);
+    expect(r.warnungen).toEqual([]);
+  });
+
+  it('erhaelt erfasste TUEV-Positionen ueber Export und Import', () => {
+    const mitTuev = szenarioSchema.parse({
+      ...vollstaendig,
+      tuev: [{
+        id: 't1', vertragId: 'v1', beitragMonat: 250, dynamik: 0.02,
+        agZuschussMonat: 50, kinder: [{ id: 'k1', geburtsjahr: 2019 }],
+        beginnJahr: 2020, lebenserwartung: 88, vergleichen: true,
+      }],
+    });
+    const r = importiere(exportiere(mitTuev));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.tuev).toEqual(mitTuev.tuev);
+  });
+});
+
 describe('Szenario-Roundtrip', () => {
   it('Export -> Import ist verlustfrei', () => {
     const parsed = szenarioSchema.parse(vollstaendig);

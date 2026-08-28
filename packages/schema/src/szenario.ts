@@ -115,6 +115,36 @@ export const planerSchema = z.object({
   insNettoEinrechnen: z.boolean().default(false),
 });
 
+/**
+ * Ein zur Pruefung ausgewaehlter Vertrag im Vertrags-TUEV.
+ *
+ * Das Feld ist NEU. Es traegt deshalb `.default([])` im Szenario — sonst
+ * liessen sich frueher gespeicherte Szenarien und Exportdateien nicht mehr
+ * einlesen.
+ */
+export const tuevPositionSchema = z.object({
+  id: z.string().min(1).max(64),
+  /** Verweis auf den geprueften Vertrag */
+  vertragId: z.string().min(1).max(64),
+  beitragMonat: z.number().min(0).max(100_000).default(100),
+  dynamik: z.number().min(-1).max(1).default(0),
+  agZuschussMonat: z.number().min(0).max(100_000).default(0),
+  kinder: z.array(z.object({
+    id: z.string().min(1).max(64),
+    geburtsjahr: z.number().int().min(1900).max(2200),
+  })).max(10).default([]),
+  beginnJahr: z.number().int().min(1900).max(2200).default(new Date().getFullYear()),
+  lebenserwartung: z.number().int().min(60).max(120).default(85),
+  /** Zusaetzlich Rente gegen Kapital gegenueberstellen */
+  vergleichen: z.boolean().default(false),
+  /**
+   * Die NETTO-Kapitalauszahlung, die der Anbieter alternativ zur Rente
+   * leisten wuerde. Ohne diese Angabe ist der Vergleich sinnlos: man
+   * vergliche die Rente mit ihrer eigenen Auszahlungssumme.
+   */
+  vergleichKapitalNetto: z.number().min(0).max(100_000_000).default(0),
+});
+
 export const szenarioSchema = z.object({
   schemaVersion: z.literal(1),
   haushalt: haushaltSchema,
@@ -123,6 +153,7 @@ export const szenarioSchema = z.object({
   personen: z.array(personSchema).min(1).max(2),
   vertraege: z.array(vertragSchema).max(50).default([]),
   planer: planerSchema,
+  tuev: z.array(tuevPositionSchema).max(20).default([]),
 });
 
 export type SzenarioInput = z.input<typeof szenarioSchema>;

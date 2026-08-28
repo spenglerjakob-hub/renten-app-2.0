@@ -27,7 +27,7 @@ const szenario: Szenario = {
   planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
 };
 
-function vertrag(over: Partial<Vertrag>): Vertrag {
+function vertrag(over: Partial<Vertrag> = {}): Vertrag {
   return {
     id: 'v1', inhaber: 'A', schicht: 3, typ: 'prvRente', name: 'Test',
     brutto: 0, strategie: 'rente', altvertrag: false,

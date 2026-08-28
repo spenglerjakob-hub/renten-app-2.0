@@ -49,6 +49,13 @@ export interface SzenarioStore {
   setzePerson: (id: 'A' | 'B', p: Partial<Person>) => void;
   partnerHinzufuegen: () => void;
 
+  tuevHinzufuegen: (vertragId: string) => void;
+  tuevAendern: (id: string, p: Partial<SzenarioParsed['tuev'][number]>) => void;
+  tuevEntfernen: (id: string) => void;
+  tuevKindHinzufuegen: (id: string) => void;
+  tuevKindAendern: (id: string, kindId: string, geburtsjahr: number) => void;
+  tuevKindEntfernen: (id: string, kindId: string) => void;
+
   vertragHinzufuegen: (schicht: 1 | 2 | 3) => void;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
   vertragEntfernen: (id: string) => void;
@@ -56,6 +63,10 @@ export interface SzenarioStore {
   alsJsonExportieren: () => string;
   ausJsonImportieren: (roh: string) => void;
   zuruecksetzen: () => void;
+}
+
+function neueId(praefix: string) {
+  return `${praefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function speichere(s: SzenarioParsed) {
@@ -86,10 +97,59 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     };
   }),
 
+  tuevHinzufuegen: (vertragId) => get().setze((s) => {
+    if (s.tuev.some((x) => x.vertragId === vertragId)) return s;
+    const v = s.vertraege.find((x) => x.id === vertragId);
+    return {
+      ...s,
+      tuev: [...s.tuev, {
+        id: neueId('t'),
+        vertragId,
+        // Bei laufenden Vertraegen ist das Brutto die Rente, nicht der
+        // Beitrag — deshalb nur ein Startwert, den der Nutzer anpasst.
+        beitragMonat: v?.monatsbeitrag ?? v?.sparrate ?? 100,
+        dynamik: v?.dynamik ?? 0,
+        agZuschussMonat: 0,
+        kinder: [],
+        beginnJahr: v?.beginnJahr ?? new Date().getFullYear(),
+        lebenserwartung: 85,
+        vergleichen: false,
+        vergleichKapitalNetto: 0,
+      }],
+    };
+  }),
+
+  tuevAendern: (id, p) => get().setze((s) => ({
+    ...s, tuev: s.tuev.map((x) => (x.id === id ? { ...x, ...p } : x)),
+  })),
+
+  tuevEntfernen: (id) => get().setze((s) => ({
+    ...s, tuev: s.tuev.filter((x) => x.id !== id),
+  })),
+
+  tuevKindHinzufuegen: (id) => get().setze((s) => ({
+    ...s,
+    tuev: s.tuev.map((x) => (x.id === id
+      ? { ...x, kinder: [...x.kinder, { id: neueId('k'), geburtsjahr: new Date().getFullYear() }] }
+      : x)),
+  })),
+
+  tuevKindAendern: (id, kindId, geburtsjahr) => get().setze((s) => ({
+    ...s,
+    tuev: s.tuev.map((x) => (x.id === id
+      ? { ...x, kinder: x.kinder.map((k) => (k.id === kindId ? { ...k, geburtsjahr } : k)) }
+      : x)),
+  })),
+
+  tuevKindEntfernen: (id, kindId) => get().setze((s) => ({
+    ...s,
+    tuev: s.tuev.map((x) => (x.id === id ? { ...x, kinder: x.kinder.filter((k) => k.id !== kindId) } : x)),
+  })),
+
   vertragHinzufuegen: (schicht) => get().setze((s) => {
     const typ = schicht === 1 ? 'basis' : schicht === 2 ? 'bav' : 'prvRente';
     const neu: Vertrag = {
-      id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: neueId('v'),
       inhaber: 'A', schicht, typ, name: '', brutto: 0,
       strategie: 'rente', altvertrag: false,
     };
@@ -101,7 +161,10 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   })),
 
   vertragEntfernen: (id) => get().setze((s) => ({
-    ...s, vertraege: s.vertraege.filter((v) => v.id !== id),
+    ...s,
+    vertraege: s.vertraege.filter((v) => v.id !== id),
+    // Sonst bliebe im TUEV eine Position ohne Vertrag zurueck.
+    tuev: s.tuev.filter((x) => x.vertragId !== id),
   })),
 
   alsJsonExportieren: () => exportiere(get().szenario),

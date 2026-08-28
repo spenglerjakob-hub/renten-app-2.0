@@ -13,6 +13,7 @@ import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
 import { Konto } from './features/Konto';
+import { VertragsTuev } from './features/VertragsTuev';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
 import { AkkordeonKarte, euro } from './components/Feld';
@@ -397,6 +398,8 @@ export default function App() {
           </p>
         </div>
       </main>
+
+      <VertragsTuev ergebnis={ergebnis ?? null} szenario={szenario} />
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500">
         <p>
