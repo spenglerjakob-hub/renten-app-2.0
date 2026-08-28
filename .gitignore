@@ -6,3 +6,8 @@ coverage/
 .env.local
 .DS_Store
 dist/
+
+# Ueber `npx skills add` installierte Agent-Skills.
+# Reproduzierbar aus skills-lock.json, deshalb nicht eingecheckt.
+.agents/
+.claude/skills/

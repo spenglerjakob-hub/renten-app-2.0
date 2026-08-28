@@ -36,6 +36,7 @@ create index if not exists szenarien_besitzer_idx
 create or replace function public.szenarien_geaendert_am()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.geaendert_am := now();
@@ -51,11 +52,13 @@ create trigger szenarien_geaendert_am
   for each row execute function public.szenarien_geaendert_am();
 
 -- Hoechstzahl je Konto
+-- Bewusst OHNE security definer: Die Funktion zaehlt ausschliesslich Zeilen
+-- des Aufrufers, dafuer reichen dessen eigene Rechte. Eine Rechteausweitung
+-- waere hier unnoetiges Risiko.
 create or replace function public.szenarien_anzahl_pruefen()
 returns trigger
 language plpgsql
-security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   anzahl integer;
@@ -75,7 +78,14 @@ create trigger szenarien_anzahl
   for each row execute function public.szenarien_anzahl_pruefen();
 
 -- Row Level Security
+--
+-- Hinweis zur Schreibweise: auth.uid() steht in einem SELECT. Ohne das wuerde
+-- die Funktion fuer JEDE gepruefte Zeile erneut aufgerufen; so wird sie einmal
+-- ausgewertet und zwischengespeichert (Supabase-Empfehlung zur RLS-Performance).
 alter table public.szenarien enable row level security;
+-- Auch der Tabelleneigentuemer unterliegt den Policies. Verhindert, dass ein
+-- versehentlich unter der Eigentuemerrolle laufender Zugriff alles sieht.
+alter table public.szenarien force row level security;
 
 drop policy if exists "eigene lesen"    on public.szenarien;
 drop policy if exists "eigene anlegen"  on public.szenarien;
@@ -84,23 +94,23 @@ drop policy if exists "eigene loeschen" on public.szenarien;
 
 create policy "eigene lesen" on public.szenarien
   for select to authenticated
-  using (auth.uid() = besitzer);
+  using ((select auth.uid()) = besitzer);
 
 create policy "eigene anlegen" on public.szenarien
   for insert to authenticated
-  with check (auth.uid() = besitzer);
+  with check ((select auth.uid()) = besitzer);
 
 -- Das "with check" ist der Punkt, der gern fehlt: Ohne ihn koennte ein Nutzer
 -- seine eigene Zeile auf einen fremden Besitzer umschreiben und sie damit in
 -- ein anderes Konto verschieben.
 create policy "eigene aendern" on public.szenarien
   for update to authenticated
-  using (auth.uid() = besitzer)
-  with check (auth.uid() = besitzer);
+  using ((select auth.uid()) = besitzer)
+  with check ((select auth.uid()) = besitzer);
 
 create policy "eigene loeschen" on public.szenarien
   for delete to authenticated
-  using (auth.uid() = besitzer);
+  using ((select auth.uid()) = besitzer);
 
 -- Anonyme Zugriffe sind nirgends erlaubt: Ohne Policy fuer die Rolle "anon"
 -- gibt RLS grundsaetzlich nichts frei.

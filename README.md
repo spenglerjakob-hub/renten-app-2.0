@@ -93,6 +93,20 @@ VITE_SUPABASE_ANON_KEY=<anon key>
 Fehlen die Werte, startet die Anwendung trotzdem — der Konto-Bereich blendet
 sich dann aus.
 
+### Supabase-Werkzeuge fuer Claude Code
+
+`.mcp.json` konfiguriert den Supabase-MCP-Server projektweit. Beim ersten
+`claude` im Projektverzeichnis muss der Server einmal bestaetigt und ueber
+`/mcp` authentifiziert werden — das laeuft ueber einen Browser-Login und
+funktioniert nur in einem echten Terminal, nicht in einer Web-Sitzung.
+
+Die begleitenden Agent-Skills sind nicht eingecheckt, sondern aus
+`skills-lock.json` reproduzierbar:
+
+```bash
+npx skills add supabase/agent-skills
+```
+
 ## Bekannte Luecken
 
 - **Besoldungstabellen.** Fuer Beamte liegen noch keine amtlichen Tabellen
