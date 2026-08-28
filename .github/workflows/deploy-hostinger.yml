@@ -36,14 +36,9 @@ jobs:
       - name: Abhaengigkeiten installieren
         run: pnpm install --frozen-lockfile
 
-      - name: Typen pruefen
-        run: pnpm -r typecheck
-
-      # Kaputter Code darf nicht online gehen. Schlaegt etwas fehl, bricht der
-      # Lauf ab und das Deployment findet nicht statt.
-      - name: Tests
-        run: pnpm -r test
-
+      # Bauen MUSS vor Typpruefung und Tests kommen: engine und schema liefern
+      # ihre Typdeklarationen erst nach dem Build in dist/. Ohne das findet
+      # tsc die Pakete nicht und meldet Dutzende Folgefehler.
       - name: Bauen
         env:
           # Vite setzt diese Werte BEIM BAUEN in das Bundle ein, nicht zur
@@ -51,6 +46,14 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: pnpm -r build
+
+      - name: Typen pruefen
+        run: pnpm -r typecheck
+
+      # Kaputter Code darf nicht online gehen. Schlaegt etwas fehl, bricht der
+      # Lauf ab und das Deployment findet nicht statt.
+      - name: Tests
+        run: pnpm -r test
 
       - name: Build pruefen
         run: |
