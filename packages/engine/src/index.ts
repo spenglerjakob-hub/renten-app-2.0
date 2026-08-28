@@ -52,6 +52,12 @@ export {
   entnahmeRate, entnahmeplanBewerten, type EntnahmeErgebnis,
 } from './products/entnahmeplaner.js';
 
+// Analyse
+export {
+  vertragsTuev, renteOderKapital,
+  type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
+} from './analyse/vertrags-tuev.js';
+
 // Projektion
 export {
   projiziere,
