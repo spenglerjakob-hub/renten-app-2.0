@@ -12,14 +12,14 @@ function standardSzenario(): SzenarioParsed {
   return szenarioSchema.parse({
     schemaVersion: 1,
     haushalt: {
-      verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
+      verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
       hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 600,
       zielNettoHeute: 2000,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
     einkommenHeute: {
       modus: 'brutto', betrag: 4000, auszahlungen: 12,
-      besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+      besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
     },
     personen: [{
       id: 'A', name: '', geburtsdatum: '01.01.1985', rentenbeginn: `01.01.${1985 + 67}`,

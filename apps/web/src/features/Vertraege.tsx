@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Trash2, PlusCircle } from 'lucide-react';
 import type { Vertrag, VertragsTyp } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
 const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
   1: [{ wert: 'basis', text: 'Rürup / Basisrente' }],
@@ -28,7 +28,7 @@ const SCHICHT_TITEL: Record<1 | 2 | 3, string> = {
 
 function istKapital(t: VertragsTyp) { return t === 'bavKapital' || t === 'prvKapital'; }
 
-function VertragsKarte({ v }: { v: Vertrag }) {
+function VertragsKarte({ v, depot }: { v: Vertrag; depot?: DepotAnzeige }) {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
@@ -83,6 +83,11 @@ function VertragsKarte({ v }: { v: Vertrag }) {
               onChange={(n) => vertragAendern(v.id, { sparrate: n })} einheit="€" />
             <ProzentFeld label="Rendite Ansparphase" wert={v.renditeAnsparphase ?? 0.06}
               onChange={(n) => vertragAendern(v.id, { renditeAnsparphase: n })} />
+            <ProzentFeld label="Rendite Entnahmephase" wert={v.renditeEntnahme ?? 0.02}
+              onChange={(n) => vertragAendern(v.id, { renditeEntnahme: n })}
+              hilfe="In der Entnahmephase wird meist vorsichtiger angelegt." />
+            <ProzentFeld label="Ausgabeaufschlag" wert={v.ausgabeaufschlag ?? 0}
+              onChange={(n) => vertragAendern(v.id, { ausgabeaufschlag: n })} max={10} />
             <ProzentFeld label="Laufende Kosten (TER)" wert={v.ter ?? 0.002}
               onChange={(n) => vertragAendern(v.id, { ter: n })} max={5} />
             <ZahlFeld label="Entnahmedauer" wert={v.entnahmedauer ?? 25}
@@ -119,6 +124,27 @@ function VertragsKarte({ v }: { v: Vertrag }) {
         </div>
       )}
 
+      {v.typ === 'etf' && depot && depot.endkapital > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Depotwert bei Rentenbeginn
+            </div>
+            <div className="text-sm font-black tabular-nums text-emerald-800">
+              {euro(depot.endkapital)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Entnahme brutto
+            </div>
+            <div className="text-sm font-black tabular-nums text-emerald-800">
+              {euro(depot.bruttoMonat)} <span className="text-xs font-normal">/ Monat</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {v.typ === 'bavKapital' && !v.altvertrag && (
         <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600">
           Kapitalauszahlungen aus Direktversicherung, Pensionskasse und Pensionsfonds sind im
@@ -131,7 +157,9 @@ function VertragsKarte({ v }: { v: Vertrag }) {
   );
 }
 
-export function Vertraege({ schicht }: { schicht: 1 | 2 | 3 }) {
+export interface DepotAnzeige { vertragId: string; endkapital: number; bruttoMonat: number }
+
+export function Vertraege({ schicht, depots = [] }: { schicht: 1 | 2 | 3; depots?: DepotAnzeige[] }) {
   // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
   // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
   // deshalb fuer eine Aenderung und rendert endlos neu (React-Fehler #185).
@@ -148,7 +176,9 @@ export function Vertraege({ schicht }: { schicht: 1 | 2 | 3 }) {
             Noch kein Vertrag in dieser Schicht.
           </p>
         )}
-        {vertraege.map((v) => <VertragsKarte key={v.id} v={v} />)}
+        {vertraege.map((v) => (
+          <VertragsKarte key={v.id} v={v} depot={depots.find((d) => d.vertragId === v.id)} />
+        ))}
         <button
           type="button"
           onClick={() => vertragHinzufuegen(schicht)}

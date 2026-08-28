@@ -321,9 +321,9 @@ export default function App() {
               beschriftung="Versorgungsschichten"
             />
             <div className="min-h-[300px] bg-slate-50/50 p-3 sm:min-h-[400px] sm:p-4">
-              {reiter === 's1' && <Vertraege schicht={1} />}
-              {reiter === 's2' && <Vertraege schicht={2} />}
-              {reiter === 's3' && <Vertraege schicht={3} />}
+              {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} />}
+              {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} />}
+              {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} />}
               {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
             </div>
           </section>

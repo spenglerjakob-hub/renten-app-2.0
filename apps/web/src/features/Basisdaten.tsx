@@ -1,6 +1,7 @@
 import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, besoldungstabelle } from '@renten/engine';
 import { RotateCcw } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
+import { Rentenschaetzer } from './Rentenschaetzer';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
@@ -144,9 +145,12 @@ export function Basisdaten() {
               ) : null}
             />
             {p.art === 'grv' ? (
-              <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
-                onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
-                hilfe="Wert aus der Renteninformation: bisher erreichter Anspruch." />
+              <>
+                <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
+                  onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
+                  hilfe="Wert aus der Renteninformation: bisher erreichter Anspruch." />
+                <Rentenschaetzer personId={p.id} />
+              </>
             ) : (
               <>
                 <AuswahlFeld label="End-Besoldungsgruppe" wert={p.besoldungsgruppe}

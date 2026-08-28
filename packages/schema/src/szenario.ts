@@ -89,7 +89,7 @@ export const vertragSchema = z.object({
 
 export const haushaltSchema = z.object({
   verheiratet: z.boolean().default(false),
-  bundesland: z.string().default('Nordrhein-Westfalen'),
+  bundesland: z.string().default('Baden-Württemberg'),
   kirchensteuer: z.boolean().default(false),
   hatKinder: z.boolean().default(false),
   kinderUnter25: z.number().int().min(0).max(15).default(0),
@@ -111,7 +111,7 @@ export const einkommenHeuteSchema = z.object({
   auszahlungen: z.number().min(12).max(14).default(12),
   besoldungsgruppe: z.string().default('A13'),
   besoldungsstufe: z.number().int().min(1).max(12).default(4),
-  besoldungsland: z.string().default('Bund'),
+  besoldungsland: z.string().default('Baden-Württemberg'),
 });
 
 export const planerSchema = z.object({

@@ -4,7 +4,10 @@ import {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer, type Einkunftsquelle,
 } from '../tax/haushalt.js';
 import { kirchensteuersatz } from '../tax/estg.js';
-import { kvPvImAlter, type Beitragspflichtig, type KinderStatus } from '../social/kv-pv.js';
+import {
+  kvPvImAlter, kvSatzVoll, pvSatzMitglied,
+  type Beitragspflichtig, type KinderStatus,
+} from '../social/kv-pv.js';
 import {
   versorgungsfreibetrag, rentenfreibetrag, ertragsanteil,
   altersentlastungsbetrag, type EingefrorenerFreibetrag,
@@ -13,7 +16,7 @@ import { zugangsfaktor } from '../pension/grv.js';
 import { besoldung } from '../pension/beamte.js';
 import { bruttoZuNetto, nettoZuBrutto } from '../erwerb/netto.js';
 import { bavKapitalMonatswert, bavKapitalSteuer } from '../products/bav.js';
-import { kapitalversicherungErtrag, ansparphase } from '../products/kapitalanlage.js';
+import { kapitalversicherungErtrag, ansparphase, entnahmeplan } from '../products/kapitalanlage.js';
 import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
 import { parseDatum, alterExakt, heute, type Datum } from '../util/datum.js';
 
@@ -91,6 +94,11 @@ export interface ProjektionsErgebnis {
   freibetraege: { personId: string; art: 'rente' | 'versorgung'; wert: EingefrorenerFreibetrag }[];
   /** Auszahlungs-Planer; null, wenn kein Kapital vorhanden ist */
   planer: PlanerErgebnis | null;
+  /**
+   * Je Wertpapierdepot der erreichte Wert zum Rentenbeginn. Ohne diese Angabe
+   * bliebe unsichtbar, was die Sparrate ueber die Jahre aufgebaut hat.
+   */
+  depots: { vertragId: string; endkapital: number; bruttoMonat: number }[];
   hinweise: string[];
 }
 
@@ -165,7 +173,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
   if (personen.length === 0) {
     return {
-      zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null,
+      zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
       hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
@@ -242,6 +250,17 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           imNettoEnthalten: s.planer.insNettoEinrechnen,
         }
       : null;
+
+  // --- Wertpapierdepots ---
+  // Der Aufbau ist ueber alle Jahre konstant und die Entnahmerate haengt vom
+  // Endkapital ab, deshalb einmal VOR der Schleife.
+  const depots = new Map<string, EtfVerlauf>();
+  for (const v of s.vertraege) {
+    if (v.typ !== 'etf' || v.strategie !== 'rente') continue;
+    const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+    const jahreBis = Math.max(0, k.rentenbeginnJahr - jetzt.jahr);
+    depots.set(v.id, etfVerlauf(v, s, pRuhestand, jahreBis));
+  }
 
   const zeilen: Jahreszeile[] = [];
 
@@ -366,6 +385,47 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       });
     }
 
+    // --- Wertpapierdepots als eigene Posten in Schicht 3 ---
+    // Depotentnahmen unterliegen der Abgeltungsteuer, nicht dem Tarif; sie
+    // laufen deshalb nicht ueber `quellen`, sondern fertig versteuert hierher.
+    for (const [id, e] of depots) {
+      const v = s.vertraege.find((x) => x.id === id);
+      if (!v) continue;
+      const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+      const jahreSeitRente = jahr - k.rentenbeginnJahr;
+      if (jahreSeitRente < 0 || jahreSeitRente >= e.entnahmedauer) continue;
+      if (e.bruttoProJahr <= 0) continue;
+
+      const gewinnanteil = e.gewinnanteilJeJahr[jahreSeitRente] ?? 0;
+      const { steuer } = abgeltungsteuer(
+        e.bruttoProJahr * gewinnanteil,
+        {
+          kirchensteuerpflichtig: s.haushalt.kirchensteuer,
+          bundesland: s.haushalt.bundesland,
+          teilfreistellung: e.teilfreistellung,
+          sparerpauschbetrag: p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1),
+        },
+        p,
+      );
+
+      // Nur freiwillig gesetzlich Versicherte zahlen auf Kapitalertraege
+      // KV/PV-Beitraege; in der KVdR bleiben sie beitragsfrei.
+      const kvPvJahr = s.haushalt.kvStatus === 'freiwillig'
+        ? e.bruttoProJahr * (kvSatzVoll(p) + pvSatzMitglied(kinder, p))
+        : 0;
+
+      posten.push({
+        id: v.id,
+        bezeichnung: v.name || 'Wertpapierdepot',
+        schicht: 3,
+        bruttoJahr: e.bruttoProJahr,
+        zveBeitrag: 0,
+        kvPvJahr,
+        steuerJahr: steuer,
+        nettoJahr: e.bruttoProJahr - steuer - kvPvJahr,
+      });
+    }
+
     // --- Auszahlungs-Planer als eigener Posten in Schicht 3 ---
     // Die Entnahme unterliegt der Abgeltungsteuer und wird deshalb NICHT in
     // den Tarif des Haushalts eingerechnet, sondern fertig versteuert
@@ -422,6 +482,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       wert: k.freibetrag,
     })),
     planer: planerErgebnis,
+    depots: [...depots.values()].map((e) => ({
+      vertragId: e.vertragId,
+      endkapital: e.endkapital,
+      bruttoMonat: e.bruttoProJahr / 12,
+    })),
     hinweise,
   };
 }
@@ -505,39 +570,96 @@ function planerKapital(
     if (v.typ === 'etf') {
       // Depotwert zum Rentenbeginn abzueglich Abgeltungsteuer auf den Gewinn.
       const jahreBis = Math.max(0, ruhestandsjahr - new Date().getFullYear());
-      const teilfreistellung = v.teilfreistellung ?? 0.3;
-      const sparerpauschbetrag = p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1);
-      const verlauf = ansparphase({
-        startkapital: v.kapitalHeute ?? 0,
-        einstandswert: v.einstandswert ?? v.kapitalHeute ?? 0,
-        sparrateMonat: v.sparrate ?? 0,
-        jahre: jahreBis,
-        renditeBrutto: v.renditeAnsparphase ?? 0.06,
-        ter: v.ter ?? 0.002,
-        ausgabeaufschlag: v.ausgabeaufschlag ?? 0,
-        depotgebuehrJahr: v.depotgebuehrJahr ?? 0,
-        sonderzahlung: v.sonderzahlung,
-        sonderzahlungInJahr: v.sonderzahlungJahr,
-        teilfreistellung,
-        basiszins: BASISZINS,
-        sparerpauschbetrag,
-        abgeltungsteuerSatzEffektiv: p.abgeltungsteuersatz,
-      });
-      const gewinn = Math.max(0, verlauf.endkapital - verlauf.anschaffungskosten);
+      const e = etfVerlauf(v, s, p, jahreBis);
+      const gewinn = Math.max(0, e.endkapital - e.anschaffungskosten);
       const { steuer } = abgeltungsteuer(
         gewinn,
         {
           kirchensteuerpflichtig: s.haushalt.kirchensteuer,
           bundesland: s.haushalt.bundesland,
-          teilfreistellung,
-          sparerpauschbetrag,
+          teilfreistellung: e.teilfreistellung,
+          sparerpauschbetrag: p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1),
         },
         p,
       );
-      summe += Math.max(0, verlauf.endkapital - steuer);
+      summe += Math.max(0, e.endkapital - steuer);
     }
   }
   return summe;
+}
+
+export interface EtfVerlauf {
+  vertragId: string;
+  /** Depotwert zum Rentenbeginn, nach Kosten und Vorabpauschalen */
+  endkapital: number;
+  /** Steuerlich massgebliche Anschaffungskosten */
+  anschaffungskosten: number;
+  /** Jaehrliche Bruttoentnahme */
+  bruttoProJahr: number;
+  /** Steuerpflichtiger Gewinnanteil je Entnahmejahr (0..1) */
+  gewinnanteilJeJahr: number[];
+  entnahmedauer: number;
+  teilfreistellung: number;
+}
+
+/**
+ * Ansparen und Entnehmen eines Wertpapierdepots.
+ *
+ * BEFUND: Die Zeitachse teilte bisher schlicht den heutigen Depotwert durch
+ * die Entnahmedauer. Sparrate, Rendite, TER, Ausgabeaufschlag, Depotgebuehr
+ * und Sonderzahlung blieben damit vollstaendig wirkungslos — man konnte sie
+ * eingeben, sie veraenderten das Ergebnis nicht.
+ *
+ * Die richtigen Funktionen lagen fertig in products/kapitalanlage.ts, waren
+ * aber nie angeschlossen. Hier passiert das, an EINER Stelle fuer die
+ * Zeitachse und den Kapitaluebertrag in den Planer.
+ */
+function etfVerlauf(
+  v: Vertrag,
+  s: Szenario,
+  p: ReturnType<typeof parameterFuer>,
+  jahreBisRente: number,
+): EtfVerlauf {
+  const teilfreistellung = v.teilfreistellung ?? 0.3;
+  const sparerpauschbetrag = p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1);
+  const entnahmedauer = Math.max(1, v.entnahmedauer ?? 25);
+
+  const verlauf = ansparphase({
+    startkapital: v.kapitalHeute ?? 0,
+    einstandswert: v.einstandswert ?? v.kapitalHeute ?? 0,
+    sparrateMonat: v.sparrate ?? 0,
+    jahre: jahreBisRente,
+    renditeBrutto: v.renditeAnsparphase ?? 0.06,
+    ter: v.ter ?? 0.002,
+    ausgabeaufschlag: v.ausgabeaufschlag ?? 0,
+    depotgebuehrJahr: v.depotgebuehrJahr ?? 0,
+    sonderzahlung: v.sonderzahlung,
+    sonderzahlungInJahr: v.sonderzahlungJahr,
+    teilfreistellung,
+    basiszins: BASISZINS,
+    sparerpauschbetrag,
+    abgeltungsteuerSatzEffektiv: p.abgeltungsteuersatz,
+  });
+
+  // In der Entnahmephase wird ueblicherweise vorsichtiger angelegt; die TER
+  // faellt weiter an.
+  const renditeEntnahme = Math.max(0, (v.renditeEntnahme ?? 0.02) - (v.ter ?? 0.002));
+  const plan = entnahmeplan(
+    verlauf.endkapital,
+    verlauf.anschaffungskosten,
+    entnahmedauer,
+    renditeEntnahme,
+  );
+
+  return {
+    vertragId: v.id,
+    endkapital: verlauf.endkapital,
+    anschaffungskosten: verlauf.anschaffungskosten,
+    bruttoProJahr: Math.max(0, plan.bruttoProJahr - (v.depotgebuehrJahr ?? 0)),
+    gewinnanteilJeJahr: plan.gewinnanteilJeJahr,
+    entnahmedauer,
+    teilfreistellung,
+  };
 }
 
 /** Laufende Auszahlung eines Vertrags in einem Kalenderjahr. */
@@ -660,15 +782,9 @@ function vertragImJahr(
       const zve = Math.max(0, kaltmiete * (1 - kostenquote));
       return { brutto: cashflow, zveBeitrag: zve, kvArt: 'sonstiges' };
     }
-    case 'etf': {
-      const dauer = v.entnahmedauer ?? 25;
-      if (jahreSeitRente >= dauer) return null;
-      if (v.strategie !== 'rente') return null;
-      // Vereinfachte laufende Entnahme; die exakte FIFO-Rechnung liefert
-      // products/kapitalanlage.ts und wird im Vertrags-TUEV verwendet.
-      const brutto = (v.kapitalHeute ?? 0) / Math.max(1, dauer);
-      return { brutto, zveBeitrag: brutto * 0.3, kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null };
-    }
+    // 'etf' bewusst NICHT hier: Depotentnahmen unterliegen der
+    // Abgeltungsteuer, nicht dem Tarif. Sie werden vor der Jahresschleife
+    // ueber etfVerlauf aufgebaut und als eigener Posten gefuehrt.
     default:
       return null;
   }
