@@ -106,6 +106,10 @@ export interface Haushalt {
   kirchensteuer: boolean;
   hatKinder: boolean;
   kinderUnter25: number;
+  /** Geburtsjahre der Kinder — massgeblich fuer die Dauer der Kinderzulage */
+  kinderGeburtsjahre: number[];
+  /** Kinder voraussichtlich in Ausbildung oder Studium */
+  kinderInAusbildung: boolean;
   kvStatus: KvStatus;
   pkvPraemieMonat: number;
   /** Zielnetto in heutiger Kaufkraft */

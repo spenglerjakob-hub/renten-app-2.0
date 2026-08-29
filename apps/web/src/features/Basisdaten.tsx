@@ -51,11 +51,57 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
           <ZahlFeld
             label="Kinder unter 25"
             wert={s.haushalt.kinderUnter25}
-            onChange={(n) => setzeHaushalt({ kinderUnter25: n, hatKinder: n > 0 })}
+            onChange={(n) => setzeHaushalt({
+              kinderUnter25: n,
+              hatKinder: n > 0,
+              // Geburtsjahre mitfuehren: die Anzahl steuert die
+              // Pflegeversicherung, die Jahre entscheiden, wie lange die
+              // Kinderzulage des Altersvorsorgedepots laeuft.
+              kinderGeburtsjahre: Array.from(
+                { length: Math.max(0, Math.min(15, Math.round(n))) },
+                (_, i) => s.haushalt.kinderGeburtsjahre[i] ?? new Date().getFullYear() - 5,
+              ),
+            })}
             max={15}
             hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag."
           />
         </div>
+
+        {s.haushalt.kinderUnter25 > 0 && (
+          <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Geburtsjahre — für die Kinderzulage des Altersvorsorgedepots
+            </p>
+            {s.haushalt.kinderGeburtsjahre.map((gj, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`hh-kind-${i}`}>
+                  {i + 1}. Kind, geb.
+                </label>
+                <input
+                  id={`hh-kind-${i}`}
+                  type="number"
+                  value={gj}
+                  min={1900}
+                  max={2200}
+                  onChange={(e) => {
+                    const wert = Number(e.target.value);
+                    setzeHaushalt({
+                      kinderGeburtsjahre: s.haushalt.kinderGeburtsjahre.map(
+                        (x, k) => (k === i ? wert : x),
+                      ),
+                    });
+                  }}
+                  className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
+                />
+              </div>
+            ))}
+            <Schalter
+              label="Ausbildung oder Studium — Kinderzulage bis 25"
+              wert={s.haushalt.kinderInAusbildung}
+              onChange={(b) => setzeHaushalt({ kinderInAusbildung: b })}
+            />
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-4">
           <Schalter label="Verheiratet (Splittingtarif)" wert={s.haushalt.verheiratet}
             onChange={(b) => {

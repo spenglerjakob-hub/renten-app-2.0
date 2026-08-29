@@ -93,6 +93,15 @@ export const haushaltSchema = z.object({
   kirchensteuer: z.boolean().default(false),
   hatKinder: z.boolean().default(false),
   kinderUnter25: z.number().int().min(0).max(15).default(0),
+  /**
+   * Geburtsjahre der Kinder. Getrennt von kinderUnter25 gefuehrt: die Zahl
+   * steuert Pflegeversicherung und Besoldung, die Jahre entscheiden, wie lange
+   * die Kinderzulage laeuft. Alte Dateien haben sie nicht — dann gibt es keine
+   * Kinderzulage, statt eine Laufzeit zu erfinden.
+   */
+  kinderGeburtsjahre: z.array(z.number().int().min(1900).max(2200)).default([]),
+  /** Kinder voraussichtlich in Ausbildung oder Studium — Zulage dann bis 25 */
+  kinderInAusbildung: z.boolean().default(false),
   kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).default('kvdr'),
   pkvPraemieMonat: z.number().min(0).default(0),
   zielNettoHeute: z.number().min(0).default(2000),

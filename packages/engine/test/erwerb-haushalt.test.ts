@@ -101,7 +101,7 @@ describe('Erwerbseinkommen in der Projektion', () => {
     schemaVersion: 1,
     haushalt: {
       verheiratet: true, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+      hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
       zielNettoHeute: 3000,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },

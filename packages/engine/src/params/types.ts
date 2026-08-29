@@ -148,6 +148,16 @@ export interface AvdParameter {
   stufe2Satz: number;
   /** Zulage je kindergeldberechtigtem Kind */
   kinderzulage: number;
+  /**
+   * Bis zu welchem Alter des Kindes die Zulage laeuft.
+   *
+   * Sie ist an den Kindergeldanspruch gebunden: im Regelfall bis 18, bei
+   * Ausbildung oder Studium hoechstens bis 25. Vorbelegt ist der Regelfall;
+   * die Oberflaeche kann auf 25 umschalten.
+   */
+  kinderzulageBisAlter: number;
+  /** Alterslimit bei Ausbildung oder Studium */
+  kinderzulageBisAlterAusbildung: number;
   /** Einmaliger Berufseinsteigerbonus */
   berufseinsteigerbonus: number;
   /** Hoechstalter fuer den Bonus (Vollendung) */

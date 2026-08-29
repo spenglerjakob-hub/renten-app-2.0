@@ -39,6 +39,8 @@ const avdStandard = {
   stufe2Grenze: 1800,
   stufe2Satz: 0.25,
   kinderzulage: 300,
+  kinderzulageBisAlter: 18,
+  kinderzulageBisAlterAusbildung: 25,
   berufseinsteigerbonus: 200,
   berufseinsteigerAlterMax: 25,
   auszahlungAbAlter: 65,

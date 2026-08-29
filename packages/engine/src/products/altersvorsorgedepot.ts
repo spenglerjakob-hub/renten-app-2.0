@@ -30,6 +30,8 @@ export interface AvdZulagen {
   kinderzulage: number;
   /** Einmaliger Berufseinsteigerbonus */
   bonus: number;
+  /** Wie viele Kinder in DIESEM Jahr noch Anspruch haben */
+  kinderMitAnspruch: number;
   /**
    * Was es JEDES Jahr gibt: Grundzulage plus Kinderzulage, ohne den einmaligen
    * Bonus.
@@ -57,17 +59,38 @@ export interface AvdZulagen {
  * Deshalb steht das hier als eigener Hinweis und nicht nur als stille Null.
  */
 export function avdZulagen(
-  args: { eigenbeitragJahr: number; kinder: number; alter: number; jahr?: number },
+  args: {
+    eigenbeitragJahr: number;
+    /**
+     * Geburtsjahre der Kinder — NICHT ihre Anzahl.
+     *
+     * Die Kinderzulage haengt am Kindergeldanspruch und endet mit ihm. Mit
+     * einer blossen Anzahl liesse sie sich ueber die ganze Ansparphase
+     * rechnen; bei 30 Jahren Laufzeit waeren das leicht 5 000 EUR zu viel.
+     * Riester macht es in `products/bav.ts` seit jeher ueber die Geburtsjahre.
+     */
+    kinderGeburtsjahre?: readonly number[];
+    /** Alter des SPARERS — entscheidet ueber den Berufseinsteigerbonus */
+    alter: number;
+    /**
+     * Beitragsjahr. PFLICHT, weil ohne Jahr nicht zu entscheiden waere, welche
+     * Kinder noch Anspruch haben — und ein stillschweigendes "alle zaehlen"
+     * genau der Fehler waere, den diese Aenderung behebt.
+     */
+    jahr: number;
+    /** true, wenn die Kinder voraussichtlich Ausbildung oder Studium machen */
+    kinderInAusbildung?: boolean;
+  },
   p: AvdParameter,
 ): AvdZulagen {
   const hinweise: string[] = [];
   const eigen = Math.max(0, args.eigenbeitragJahr);
   const leer: AvdZulagen = {
-    stufe1: 0, stufe2: 0, grundzulage: 0, kinderzulage: 0, bonus: 0,
+    stufe1: 0, stufe2: 0, grundzulage: 0, kinderzulage: 0, bonus: 0, kinderMitAnspruch: 0,
     dauerhaft: 0, gesamt: 0, foerderquote: 0, foerderquoteDauerhaft: 0, hinweise,
   };
 
-  if (args.jahr !== undefined && args.jahr < p.abJahr) {
+  if (args.jahr < p.abJahr) {
     hinweise.push(`Das Altersvorsorgedepot gibt es erst ab ${p.abJahr}.`);
     return leer;
   }
@@ -89,7 +112,17 @@ export function avdZulagen(
   // je Kind ein Euro fuer jeden eigenen Euro, hoechstens 300 EUR. Die vollen
   // 300 EUR je Kind gibt es deshalb erst ab 300 EUR Eigenbeitrag im Jahr —
   // unabhaengig davon, wie viele Kinder es sind.
-  const kinder = Math.max(0, args.kinder);
+  //
+  // Und sie laeuft nur, solange Kindergeld fliesst: im Regelfall bis 18, bei
+  // Ausbildung oder Studium bis 25.
+  const bisAlter = args.kinderInAusbildung
+    ? p.kinderzulageBisAlterAusbildung
+    : p.kinderzulageBisAlter;
+  const kinder = (args.kinderGeburtsjahre ?? []).filter((gj) => {
+    const alterDesKindes = args.jahr - gj;
+    return alterDesKindes >= 0 && alterDesKindes < bisAlter;
+  }).length;
+
   const jeKind = Math.min(p.kinderzulage, eigen);
   const kinderzulage = kinder * jeKind;
   if (kinder > 0 && jeKind < p.kinderzulage) {
@@ -112,7 +145,8 @@ export function avdZulagen(
   const dauerhaft = grundzulage + kinderzulage;
   const gesamt = dauerhaft + bonus;
   return {
-    stufe1, stufe2, grundzulage, kinderzulage, bonus, dauerhaft, gesamt,
+    stufe1, stufe2, grundzulage, kinderzulage, bonus, kinderMitAnspruch: kinder,
+    dauerhaft, gesamt,
     foerderquote: eigen > 0 ? gesamt / eigen : 0,
     foerderquoteDauerhaft: eigen > 0 ? dauerhaft / eigen : 0,
     hinweise,
@@ -165,7 +199,8 @@ export function avdAnsparphase(
     jahre: number;
     renditeBrutto: number;
     ter: number;
-    kinder: number;
+    kinderGeburtsjahre?: readonly number[];
+    kinderInAusbildung?: boolean;
     alterHeute: number;
     startjahr: number;
   },
@@ -186,7 +221,8 @@ export function avdAnsparphase(
     const z = avdZulagen(
       {
         eigenbeitragJahr: eigen,
-        kinder: args.kinder,
+        kinderGeburtsjahre: args.kinderGeburtsjahre,
+        kinderInAusbildung: args.kinderInAusbildung,
         alter: args.alterHeute + j,
         jahr: args.startjahr + j,
       },
@@ -237,7 +273,12 @@ export function avdAnsparphase(
     eigenbeitraege: eigenSumme,
     zulagenGesamt: zulagenSumme,
     ersteZulagen: ersteZulagen ?? avdZulagen(
-      { eigenbeitragJahr: 0, kinder: args.kinder, alter: args.alterHeute }, p.avd,
+      {
+        eigenbeitragJahr: 0, kinderGeburtsjahre: args.kinderGeburtsjahre,
+        kinderInAusbildung: args.kinderInAusbildung, alter: args.alterHeute,
+        jahr: args.startjahr,
+      },
+      p.avd,
     ),
     verlauf,
     hinweise,
@@ -411,7 +452,8 @@ export function avdGegenFreiesDepot(
     renditeBrutto: number;
     /** Effektivkosten p. a., auf beiden Seiten gleich angesetzt */
     kosten: number;
-    kinder: number;
+    kinderGeburtsjahre?: readonly number[];
+    kinderInAusbildung?: boolean;
     alterHeute: number;
     alterBeiRente: number;
     startjahr: number;
@@ -430,7 +472,9 @@ export function avdGegenFreiesDepot(
     {
       beitragMonat: args.beitragMonat, dynamik: 0, startkapital: 0, jahre: args.jahre,
       renditeBrutto: args.renditeBrutto, ter: args.kosten,
-      kinder: args.kinder, alterHeute: args.alterHeute, startjahr: args.startjahr,
+      kinderGeburtsjahre: args.kinderGeburtsjahre,
+      kinderInAusbildung: args.kinderInAusbildung,
+      alterHeute: args.alterHeute, startjahr: args.startjahr,
     },
     p,
   );
@@ -572,7 +616,8 @@ export function avdProfitabilitaet(
   args: {
     beitragMonat: number;
     jahre: number;
-    kinder: number;
+    kinderGeburtsjahre?: readonly number[];
+    kinderInAusbildung?: boolean;
     alterHeute: number;
     startjahr: number;
     zveHeute: number;
@@ -601,7 +646,13 @@ export function avdProfitabilitaet(
   for (let j = 0; j < Math.max(0, args.jahre); j++) {
     const eigen = args.beitragMonat * 12;
     const z = avdZulagen(
-      { eigenbeitragJahr: eigen, kinder: args.kinder, alter: args.alterHeute + j, jahr: args.startjahr + j },
+      {
+        eigenbeitragJahr: eigen,
+        kinderGeburtsjahre: args.kinderGeburtsjahre,
+        kinderInAusbildung: args.kinderInAusbildung,
+        alter: args.alterHeute + j,
+        jahr: args.startjahr + j,
+      },
       p.avd,
     );
     const bonus = bonusVerbraucht ? 0 : z.bonus;

@@ -53,14 +53,17 @@ const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
  */
 const BEISPIEL = {
   beitragMonat: 100,
-  kinder: 0,
+  kinderGeburtsjahre: [] as readonly number[],
   geburtsdatum: '1985-01-01',
   bruttoJahr: 45_000,
 } as const;
 
 export function Seite() {
   const [beitragMonat, setBeitragMonat] = useState<number>(BEISPIEL.beitragMonat);
-  const [kinder, setKinder] = useState<number>(BEISPIEL.kinder);
+  const [kinderGeburtsjahre, setKinderGeburtsjahre] =
+    useState<readonly number[]>(BEISPIEL.kinderGeburtsjahre);
+  const [kinderInAusbildung, setKinderInAusbildung] = useState(false);
+  const kinder = kinderGeburtsjahre.length;
   const [geburtsdatum, setGeburtsdatum] = useState<string>(BEISPIEL.geburtsdatum);
   const [bruttoJahr, setBruttoJahr] = useState<number>(BEISPIEL.bruttoJahr);
   const [rendite, setRendite] = useState(0.04);
@@ -80,7 +83,8 @@ export function Seite() {
   const leeren = () => {
     setIstBeispiel(false);
     setBeitragMonat(0);
-    setKinder(0);
+    setKinderGeburtsjahre([]);
+    setKinderInAusbildung(false);
     setGeburtsdatum('');
     setBruttoJahr(0);
     setUebernommen(null);
@@ -98,8 +102,14 @@ export function Seite() {
   const alterBeiRente = geburt && rentenbeginn ? rentenbeginn.jahr - geburt.jahr : 0;
 
   const zulagen = useMemo(
-    () => avdZulagen({ eigenbeitragJahr: beitragMonat * 12, kinder, alter: alterHeute }, a),
-    [beitragMonat, kinder, alterHeute, a],
+    () => avdZulagen(
+      {
+        eigenbeitragJahr: beitragMonat * 12, kinderGeburtsjahre,
+        kinderInAusbildung, alter: alterHeute, jahr: startjahr,
+      },
+      a,
+    ),
+    [beitragMonat, kinderGeburtsjahre, kinderInAusbildung, alterHeute, startjahr, a],
   );
 
   // Auszahldauer: bis mindestens 85, wie es das Gesetz verlangt.
@@ -111,7 +121,8 @@ export function Seite() {
     const anspar = avdAnsparphase(
       {
         beitragMonat, dynamik: 0, startkapital: 0, jahre: jahreBisRente,
-        renditeBrutto: rendite, ter: kosten, kinder, alterHeute, startjahr,
+        renditeBrutto: rendite, ter: kosten,
+        kinderGeburtsjahre, kinderInAusbildung, alterHeute, startjahr,
       },
       p,
     );
@@ -124,7 +135,8 @@ export function Seite() {
       a,
     );
     return { anspar, aus };
-  }, [geburt, jahreBisRente, beitragMonat, rendite, kosten, kinder, alterHeute, startjahr,
+  }, [geburt, jahreBisRente, beitragMonat, rendite, kosten, kinderGeburtsjahre,
+      kinderInAusbildung, alterHeute, startjahr,
       alterBeiRente, auszahldauer, teilauszahlungQuote, p, a]);
 
   /**
@@ -164,11 +176,17 @@ export function Seite() {
       // ersten Jahr gibt — bei kleinen Beitraegen bis zu 243 % statt 150 %.
       punkte.push({
         beitrag: b,
-        quote: avdZulagen({ eigenbeitragJahr: b, kinder, alter: alterHeute }, a).foerderquoteDauerhaft,
+        quote: avdZulagen(
+          {
+            eigenbeitragJahr: b, kinderGeburtsjahre, kinderInAusbildung,
+            alter: alterHeute, jahr: startjahr,
+          },
+          a,
+        ).foerderquoteDauerhaft,
       });
     }
     return punkte;
-  }, [kinder, alterHeute, a]);
+  }, [kinderGeburtsjahre, kinderInAusbildung, alterHeute, startjahr, a]);
 
   /**
    * Steuer auf die Auszahlung. Das Altersvorsorgedepot ist VOLLSTAENDIG
@@ -263,14 +281,15 @@ export function Seite() {
     return avdGegenFreiesDepot(
       {
         beitragMonat, jahre: jahreBisRente, renditeBrutto: rendite, kosten,
-        kinder, alterHeute, alterBeiRente, startjahr,
+        kinderGeburtsjahre, kinderInAusbildung, alterHeute, alterBeiRente, startjahr,
         auszahldauer, renditeAuszahlung: 0, teilauszahlungQuote,
         zveHeute, steuersatzImAlter: netto.satz,
       },
       STEUER_OPT,
       p,
     );
-  }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, rendite, kosten, kinder,
+  }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, rendite, kosten,
+      kinderGeburtsjahre, kinderInAusbildung,
       alterHeute, alterBeiRente, startjahr, auszahldauer, teilauszahlungQuote, zveHeute, p]);
 
   /**
@@ -284,7 +303,8 @@ export function Seite() {
     if (!lauf || !netto || bruttoJahr <= 0 || jahreBisRente <= 0) return null;
     return avdProfitabilitaet(
       {
-        beitragMonat, jahre: jahreBisRente, kinder, alterHeute, startjahr,
+        beitragMonat, jahre: jahreBisRente, kinderGeburtsjahre, kinderInAusbildung,
+        alterHeute, startjahr,
         zveHeute,
         endkapital: lauf.anspar.endkapital,
         bruttoRenteJahr: lauf.aus.bruttoJahr,
@@ -296,7 +316,8 @@ export function Seite() {
       STEUER_OPT,
       p,
     );
-  }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, kinder, alterHeute, startjahr, zveHeute, p]);
+  }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, kinderGeburtsjahre,
+      kinderInAusbildung, alterHeute, startjahr, zveHeute, p]);
 
   const uebernehmen = () => {
     setIstBeispiel(false);
@@ -309,7 +330,8 @@ export function Seite() {
       const s = r.szenario;
       const person = s.personen[0];
       if (person?.geburtsdatum) setGeburtsdatum(person.geburtsdatum);
-      setKinder(s.haushalt.kinderUnter25);
+      setKinderGeburtsjahre(s.haushalt.kinderGeburtsjahre);
+      setKinderInAusbildung(s.haushalt.kinderInAusbildung);
       const e = s.einkommenHeute;
       if (e.modus !== 'besoldung') setBruttoJahr(Math.round(e.betrag * e.auszahlungen));
       setUebernommen('Geburtsdatum, Kinder und Einkommen wurden übernommen.');
@@ -383,11 +405,96 @@ export function Seite() {
           )}
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€"
-              hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
+            <div>
+              <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€"
+                hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
+              {/* Schnellwahl: die zwei Betraege, an denen sich die Foerderung
+                  entscheidet. Einen dritten Knopf "Maximum" gibt es bewusst
+                  nicht — oberhalb der Foerdergrenze kommt keine Zulage mehr
+                  dazu, ein solcher Knopf verspraeche mehr, als es gibt. */}
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <SchnellWahl
+                  betragJahr={a.mindesteigenbeitragJahr}
+                  text="Mindestbeitrag"
+                  aktiv={beitragMonat * 12 === a.mindesteigenbeitragJahr}
+                  onWaehlen={() => eigen(setBeitragMonat)(a.mindesteigenbeitragJahr / 12)}
+                />
+                <SchnellWahl
+                  betragJahr={a.stufe2Grenze}
+                  text="Volle Förderung"
+                  aktiv={beitragMonat * 12 === a.stufe2Grenze}
+                  onWaehlen={() => eigen(setBeitragMonat)(a.stufe2Grenze / 12)}
+                />
+              </div>
+            </div>
+
             <DatumFeld label="Geburtsdatum" wert={geburtsdatum} onChange={eigen(setGeburtsdatum)}
               hilfe="Acht Ziffern genügen — die Punkte setzt das Feld." />
-            <ZahlFeld label="Kinder mit Kindergeldanspruch" wert={kinder} onChange={eigen(setKinder)} max={15} />
+
+            <div>
+              <ZahlFeld
+                label="Kinder mit Kindergeldanspruch"
+                wert={kinder}
+                onChange={(n) => {
+                  setIstBeispiel(false);
+                  // Vorhandene Jahrgaenge behalten, fehlende mit einem
+                  // Vorschlag auffuellen.
+                  setKinderGeburtsjahre((bisher) =>
+                    Array.from({ length: Math.max(0, Math.min(15, Math.round(n))) },
+                      (_, i) => bisher[i] ?? jetzt - 5),
+                  );
+                }}
+                max={15}
+                hilfe="Die Zulage läuft nur, solange Kindergeld fließt — dafür brauche ich das Geburtsjahr."
+              />
+
+              {kinder > 0 && (
+                <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+                  {kinderGeburtsjahre.map((gj, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`kind-${i}`}>
+                        {i + 1}. Kind, geb.
+                      </label>
+                      <input
+                        id={`kind-${i}`}
+                        type="number"
+                        value={gj}
+                        min={1900}
+                        max={2200}
+                        onChange={(e) => {
+                          setIstBeispiel(false);
+                          const wert = Number(e.target.value);
+                          setKinderGeburtsjahre((bisher) =>
+                            bisher.map((x, k) => (k === i ? wert : x)));
+                        }}
+                        className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
+                      />
+                      <span className="w-24 shrink-0 text-right text-[10px] text-slate-500">
+                        {(() => {
+                          const bis = gj + (kinderInAusbildung
+                            ? a.kinderzulageBisAlterAusbildung
+                            : a.kinderzulageBisAlter);
+                          const jahre = bis - Math.max(jetzt, a.abJahr);
+                          if (jahre <= 0) return 'kein Anspruch';
+                          return jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`;
+                        })()}
+                      </span>
+                    </div>
+                  ))}
+                  <Schalter
+                    label={`Ausbildung oder Studium — Zulage bis ${a.kinderzulageBisAlterAusbildung}`}
+                    wert={kinderInAusbildung}
+                    onChange={eigen(setKinderInAusbildung)}
+                  />
+                  <p className="text-[10px] leading-relaxed text-slate-500">
+                    Der Kindergeldanspruch endet mit {a.kinderzulageBisAlter} — bei Ausbildung oder
+                    Studium spätestens mit {a.kinderzulageBisAlterAusbildung}. Genau so lange läuft
+                    auch die Kinderzulage.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <ZahlFeld label="Bruttoeinkommen im Jahr" wert={bruttoJahr} onChange={eigen(setBruttoJahr)} einheit="€"
               hilfe="Die Zulagen hängen allein vom Beitrag ab. Das Einkommen dient der Schätzung Ihrer gesetzlichen Rente — und damit Ihres Steuersatzes im Alter." />
           </div>
@@ -604,7 +711,14 @@ export function Seite() {
                 <Zeile text={`Grundzulage Stufe 1 — 50 % auf die ersten ${euro(a.stufe1Grenze)}`} wert={euro(zulagen.stufe1)} />
                 <Zeile text={`Grundzulage Stufe 2 — 25 % auf die weiteren ${euro(a.stufe2Grenze - a.stufe1Grenze)}`} wert={euro(zulagen.stufe2)} />
                 {kinder > 0 && (
-                  <Zeile text={`Kinderzulage — ${euro(a.kinderzulage)} je Kind`} wert={euro(zulagen.kinderzulage)} />
+                  <Zeile
+                    text={
+                      zulagen.kinderMitAnspruch > 0
+                        ? `Kinderzulage — ${euro(a.kinderzulage)} je Kind, noch für ${zulagen.kinderMitAnspruch} von ${kinder}`
+                        : 'Kinderzulage — kein Kind mehr im Kindergeldalter'
+                    }
+                    wert={euro(zulagen.kinderzulage)}
+                  />
                 )}
                 <div className="flex items-baseline justify-between gap-4 pt-3">
                   <dt className="text-sm font-bold text-slate-800">Zulagen jedes Jahr</dt>
@@ -917,7 +1031,15 @@ export function Seite() {
             </li>
           </ul>
 
-          <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+            <strong>Zum Sparerpauschbetrag:</strong> Er gilt hier <em>nicht</em>. Die Auszahlung ist
+            eine sonstige Einkunft nach § 22 Nr. 5 EStG, kein Kapitalertrag — anders als beim freien
+            Depot, wo er sehr wohl greift. Der Werbungskosten-Pauschbetrag von 102 € gilt dagegen
+            schon; diese Rechnung setzt ihn bei der gesetzlichen Rente an. Wer keine gesetzliche
+            Rente bezieht, steht hier deshalb um rund 30 € Steuer im Jahr zu ungünstig da.
+          </p>
+
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
             <strong>Zum Steuervorteil:</strong> Absetzbar sind Eigenbeiträge bis{' '}
             {euro(a.hoechstbetragEigenbeitrag)} im Jahr <em>zuzüglich</em> Ihres Zulagenanspruchs — für
             Alleinstehende ohne Kinder also {euro(a.hoechstbetragEigenbeitrag + 540)}. Das Finanzamt
@@ -942,6 +1064,28 @@ function Zeile({ text, wert }: { text: string; wert: string }) {
       <dt className="text-sm text-slate-600">{text}</dt>
       <dd className="shrink-0 text-sm font-bold tabular-nums text-slate-800">{wert}</dd>
     </div>
+  );
+}
+
+function SchnellWahl({ betragJahr, text, aktiv, onWaehlen }: {
+  betragJahr: number; text: string; aktiv: boolean; onWaehlen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onWaehlen}
+      aria-pressed={aktiv}
+      className={`rounded-lg border px-2 py-1.5 text-center transition-colors ${
+        aktiv ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-400'
+      }`}
+    >
+      <span className="block text-sm font-bold tabular-nums text-slate-800">
+        {euro(betragJahr / 12)}
+      </span>
+      <span className="block text-[10px] leading-tight text-slate-500">
+        {text} · {euro(betragJahr)} im Jahr
+      </span>
+    </button>
   );
 }
 

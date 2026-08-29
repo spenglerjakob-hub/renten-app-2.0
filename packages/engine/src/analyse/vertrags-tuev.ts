@@ -36,8 +36,10 @@ export interface TuevAnnahmen {
   dynamik: number;
   /** bAV: monatlicher Arbeitgeberzuschuss (mindert den eigenen Aufwand) */
   agZuschussMonat: number;
-  /** Riester: Geburtsjahre der zulageberechtigten Kinder */
+  /** Riester und Altersvorsorgedepot: Geburtsjahre der Kinder */
   kinder: { geburtsjahr: number }[];
+  /** Kinder voraussichtlich in Ausbildung oder Studium — Zulage dann bis 25 */
+  kinderInAusbildung?: boolean;
   /** Jahr, ab dem eingezahlt wird */
   beginnJahr: number;
   /** Angenommene Lebenserwartung — bestimmt die Dauer der Auszahlphase */
@@ -202,14 +204,27 @@ export function vertragsTuev(
       // Ohne diesen Zweig fiel der Vertrag in den Fall "aus versteuertem Geld"
       // und wurde damit erheblich zu schlecht gezeigt: ohne Zulagen und ohne
       // Steuervorteil.
+      // a.kinder traegt die Geburtsjahre; frueher stand hier .length, womit
+      // die Kinderzulage bis zum Rentenbeginn weiterlief statt mit dem
+      // Kindergeldanspruch zu enden.
       const z = avdZulagen(
-        { eigenbeitragJahr: beitragJahr, kinder: a.kinder.length, alter: alterImJahr(jahr) },
+        {
+          eigenbeitragJahr: beitragJahr,
+          kinderGeburtsjahre: a.kinder.map((kind) => kind.geburtsjahr),
+          kinderInAusbildung: a.kinderInAusbildung,
+          alter: alterImJahr(jahr),
+          jahr,
+        },
         p.avd,
       );
       // Der Berufseinsteigerbonus faellt nur einmal an.
       const bonus = bonusVerbraucht ? 0 : z.bonus;
       if (bonus > 0) bonusVerbraucht = true;
       zulageJahr = z.grundzulage + z.kinderzulage + bonus;
+
+      // Sonst bliebe unerklaert, warum ein vor 2027 beginnender Vertrag in
+      // den ersten Jahren ohne Zulage dasteht.
+      for (const h of z.hinweise) if (!hinweise.includes(h)) hinweise.push(h);
 
       const vorteil = avdSteuervorteil(
         { eigenbeitragJahr: beitragJahr, zulagenJahr: zulageJahr, zveHeute: k.zveHeute },

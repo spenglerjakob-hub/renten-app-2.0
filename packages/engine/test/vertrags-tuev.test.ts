@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { vertragsTuev, renteOderKapital, type TuevAnnahmen, type TuevKontext } from '../src/analyse/vertrags-tuev.js';
 import { parameterFuer } from '../src/params/registry.js';
+import { avdProfitabilitaet } from '../src/products/altersvorsorgedepot.js';
 import { projiziere } from '../src/projection/timeline.js';
 import type { Szenario, Vertrag } from '../src/model.js';
 
@@ -10,7 +11,7 @@ const szenario: Szenario = {
   schemaVersion: 1,
   haushalt: {
     verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
-    hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+    hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
     zielNettoHeute: 2000,
   },
   annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0, gehaltsdynamik: 0.02 },
@@ -244,9 +245,13 @@ describe('Vertrags-TUEV: Altersvorsorgedepot', () => {
   // versteuertem Geld" — ohne Zulagen und ohne Steuervorteil. Der Vertrag
   // stand damit erheblich zu schlecht da.
   const avd = vertrag({ typ: 'avd', schicht: 2, name: 'Altersvorsorgedepot' });
+  // Das Altersvorsorgedepot gibt es erst ab 2027 — ein frueherer Beginn
+  // ergibt zu Recht keine Zulage.
+  const avdAnnahmen = (over: Partial<TuevAnnahmen> = {}) =>
+    annahmen({ beitragMonat: 150, beginnJahr: 2027, ...over });
 
   it('rechnet die Zulagen an', () => {
-    const r = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    const r = vertragsTuev(avd, avdAnnahmen(), kontext(), szenario, p);
     expect(r.zulageMonat).toBeCloseTo(540 / 12, 6);
   });
 
@@ -254,7 +259,7 @@ describe('Vertrags-TUEV: Altersvorsorgedepot', () => {
     // Die Zulagen fliessen in den Vertrag, nicht aus der eigenen Tasche. Der
     // Aufwand sinkt deshalb nur um die Steuerersparnis, genau wie im
     // Riester-Zweig direkt darueber.
-    const r = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    const r = vertragsTuev(avd, avdAnnahmen(), kontext(), szenario, p);
     expect(r.echterAufwandMonat).toBeLessThan(150);
     expect(r.echterAufwandMonat).toBeCloseTo(150 - r.steuerersparnisMonat, 6);
     expect(r.zulageMonat).toBeGreaterThan(0);
@@ -263,25 +268,61 @@ describe('Vertrags-TUEV: Altersvorsorgedepot', () => {
   it('gibt den Steuervorteil nur, soweit er die Zulagen uebersteigt', () => {
     // Guenstigerpruefung: bei kleinem zvE bleibt es bei der blossen Zulage.
     const klein = vertragsTuev(
-      avd, annahmen({ beitragMonat: 150 }), kontext({ zveHeute: 8_000 }), szenario, p,
+      avd, avdAnnahmen(), kontext({ zveHeute: 8_000 }), szenario, p,
     );
     expect(klein.steuerersparnisMonat).toBe(0);
 
     const gross = vertragsTuev(
-      avd, annahmen({ beitragMonat: 150 }), kontext({ zveHeute: 90_000 }), szenario, p,
+      avd, avdAnnahmen(), kontext({ zveHeute: 90_000 }), szenario, p,
     );
     expect(gross.steuerersparnisMonat).toBeGreaterThan(0);
   });
 
   it('zahlt den Berufseinsteigerbonus nur einmal ueber die Laufzeit', () => {
     // Rentenbeginn 2042, Beginn 2026, Alter dort 51 — kein Bonus.
-    const alt = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    const alt = vertragsTuev(avd, avdAnnahmen(), kontext(), szenario, p);
     // Dieselbe Person 30 Jahre juenger: Bonus genau im ersten Jahr.
     const jung = vertragsTuev(
-      avd, annahmen({ beitragMonat: 150 }),
+      avd, avdAnnahmen(),
       kontext({ alterBeiRentenbeginn: 37 }), szenario, p,
     );
     expect(alt.zulageMonat).toBeCloseTo(540 / 12, 6);
     expect(jung.zulageMonat).toBeCloseTo((540 + 200) / 12, 6);
+  });
+});
+
+describe('Gegenprobe: TUEV und Landingpage rechnen dieselbe Zulage', () => {
+  // Beide Stellen der Anwendung bewerten denselben Vertrag. Laufen sie
+  // auseinander, glaubt der Nutzer zu Recht keiner von beiden.
+  it('gleiche Kinder, gleicher Beitrag, gleiche Zulage im ersten Jahr', () => {
+    const kinderGeburtsjahre = [2015, 2022];
+    const beitragMonat = 150;
+
+    const ausTuev = vertragsTuev(
+      vertrag({ typ: 'avd', schicht: 2 }),
+      annahmen({
+        beitragMonat,
+        beginnJahr: 2027,
+        kinder: kinderGeburtsjahre.map((geburtsjahr) => ({ geburtsjahr })),
+      }),
+      kontext(),
+      szenario,
+      p,
+    );
+
+    const ausSeite = avdProfitabilitaet(
+      {
+        beitragMonat, jahre: 15, kinderGeburtsjahre,
+        alterHeute: 40, startjahr: 2027, zveHeute: 40_000, endkapital: 50_000,
+        bruttoRenteJahr: 3_000, steuerRenteJahr: 800, jahreAuszahlung: 18,
+        bruttoEinmal: 0, steuerEinmal: 0,
+      },
+      { verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuerpflichtig: false },
+      p,
+    );
+
+    expect(ausTuev.zulageMonat).toBeCloseTo(ausSeite.zulageMonat, 6);
+    // 540 Grundzulage plus zweimal 300 Kinderzulage
+    expect(ausTuev.zulageMonat * 12).toBeCloseTo(1140, 4);
   });
 });
