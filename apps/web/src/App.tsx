@@ -445,6 +445,11 @@ export default function App() {
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Berechnung läuft
           vollständig in Ihrem Browser — ohne Anmeldung verlassen Ihre Eingaben dieses Gerät nicht.
         </p>
+        <p className="mt-2">
+          <a href="/altersvorsorgedepot" className="font-medium text-indigo-700 hover:underline">
+            Altersvorsorgedepot ab 2027: Zulagen berechnen
+          </a>
+        </p>
       </footer>
 
       {/* FESTE FUSSLEISTE */}

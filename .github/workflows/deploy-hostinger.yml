@@ -59,6 +59,11 @@ jobs:
         run: |
           test -f apps/web/dist/index.html || { echo "index.html fehlt"; exit 1; }
           test -f apps/web/dist/.htaccess  || { echo ".htaccess fehlt — SPA-Routing waere kaputt"; exit 1; }
+          test -f apps/web/dist/altersvorsorgedepot.html || { echo "Landingpage fehlt"; exit 1; }
+          # Die Umschreibungsregel MUSS vor dem Auffangmuster stehen, sonst
+          # landet /altersvorsorgedepot im Rechner statt auf der Landingpage.
+          awk '/altersvorsorgedepot\.html/ { a=NR } /RewriteRule \. \/index\.html/ { b=NR } END { exit !(a && b && a < b) }' apps/web/dist/.htaccess \
+            || { echo "Umschreibungsregel fuer /altersvorsorgedepot fehlt oder steht hinter dem Auffangmuster"; exit 1; }
           if ! grep -rq "supabase.co" apps/web/dist/assets/*.js; then
             echo "Warnung: Keine Supabase-URL im Bundle. Sind die Secrets gesetzt?"
           fi

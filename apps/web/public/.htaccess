@@ -22,6 +22,14 @@ DirectoryIndex index.html
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
+  # --- Landingpage Altersvorsorgedepot ------------------------------------
+  # Eigene Seite mit eigenem Bundle, KEIN Teil der Anwendung. Diese Regel muss
+  # deshalb VOR dem Auffangmuster stehen — sonst schickt die letzte Zeile die
+  # Adresse an index.html und der Rechner erscheint statt der Seite.
+  # Mit und ohne abschliessenden Schraegstrich, Gross- und Kleinschreibung
+  # egal (NC): Verlinkungen und Suchmaschinen schreiben es unterschiedlich.
+  RewriteRule ^altersvorsorgedepot/?$ /altersvorsorgedepot.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
