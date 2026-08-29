@@ -28,7 +28,25 @@ const SCHICHT_TITEL: Record<1 | 2 | 3, string> = {
 
 function istKapital(t: VertragsTyp) { return t === 'bavKapital' || t === 'prvKapital'; }
 
-function VertragsKarte({ v, depot }: { v: Vertrag; depot?: DepotAnzeige }) {
+/**
+ * "Kapitalauszahlung" gibt es nur beim Depot. Bei Ruerup ist eine Kapitalwahl
+ * gesetzlich ausgeschlossen (§ 10 EStG verlangt eine lebenslange Rente), bei
+ * bAV und privater Rente gibt es dafuer eigene Vertragsarten.
+ */
+const STRATEGIEN: Record<'etf' | 'sonst', { wert: Vertrag['strategie']; text: string }[]> = {
+  etf: [
+    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
+    { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
+    { wert: 'kapital', text: 'Kapitalauszahlung (einmalig)' },
+  ],
+  sonst: [
+    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
+    { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
+    { wert: 'ignorieren', text: 'Nicht einrechnen' },
+  ],
+};
+
+function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige }) {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
@@ -110,11 +128,7 @@ function VertragsKarte({ v, depot }: { v: Vertrag; depot?: DepotAnzeige }) {
 
         <AuswahlFeld label="Auszahlungsstrategie" wert={v.strategie}
           onChange={(st) => vertragAendern(v.id, { strategie: st })}
-          optionen={[
-            { wert: 'rente', text: 'Als laufende Rente ins Netto' },
-            { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
-            { wert: 'ignorieren', text: 'Nicht einrechnen' },
-          ]} />
+          optionen={STRATEGIEN[v.typ === 'etf' ? 'etf' : 'sonst']} />
       </div>
 
       {(v.typ === 'bav' || v.typ === 'bavKapital' || v.typ === 'prvRente' || v.typ === 'prvKapital') && (
@@ -124,7 +138,22 @@ function VertragsKarte({ v, depot }: { v: Vertrag; depot?: DepotAnzeige }) {
         </div>
       )}
 
-      {v.typ === 'etf' && depot && depot.endkapital > 0 && (
+      {v.typ === 'etf' && v.strategie === 'kapital' && auszahlung && (
+        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Einmalige Kapitalauszahlung {auszahlung.jahr}
+          </div>
+          <div className="text-sm font-black tabular-nums text-indigo-900">
+            {euro(auszahlung.nettoKapital)} netto
+          </div>
+          <div className="mt-0.5 text-[10px] text-slate-500">
+            Brutto {euro(auszahlung.bruttoKapital)} − Abgeltungsteuer {euro(auszahlung.steuer)}.
+            Zählt nicht zum monatlichen Netto.
+          </div>
+        </div>
+      )}
+
+      {v.typ === 'etf' && v.strategie !== 'kapital' && depot && depot.endkapital > 0 && (
         <div className="mt-3 grid grid-cols-2 gap-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -158,8 +187,13 @@ function VertragsKarte({ v, depot }: { v: Vertrag; depot?: DepotAnzeige }) {
 }
 
 export interface DepotAnzeige { vertragId: string; endkapital: number; bruttoMonat: number }
+export interface AuszahlungAnzeige {
+  vertragId: string; jahr: number; bruttoKapital: number; steuer: number; nettoKapital: number;
+}
 
-export function Vertraege({ schicht, depots = [] }: { schicht: 1 | 2 | 3; depots?: DepotAnzeige[] }) {
+export function Vertraege({
+  schicht, depots = [], auszahlungen = [],
+}: { schicht: 1 | 2 | 3; depots?: DepotAnzeige[]; auszahlungen?: AuszahlungAnzeige[] }) {
   // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
   // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
   // deshalb fuer eine Aenderung und rendert endlos neu (React-Fehler #185).
@@ -177,7 +211,12 @@ export function Vertraege({ schicht, depots = [] }: { schicht: 1 | 2 | 3; depots
           </p>
         )}
         {vertraege.map((v) => (
-          <VertragsKarte key={v.id} v={v} depot={depots.find((d) => d.vertragId === v.id)} />
+          <VertragsKarte
+            key={v.id}
+            v={v}
+            depot={depots.find((d) => d.vertragId === v.id)}
+            auszahlung={auszahlungen.find((a) => a.vertragId === v.id)}
+          />
         ))}
         <button
           type="button"

@@ -1,4 +1,4 @@
-import type { Szenario, Person, Vertrag } from '../model.js';
+import type { Szenario, Person, Vertrag, EinkommenHeute } from '../model.js';
 import { parameterFuer, rechtsstandInfo, type RechtsstandInfo } from '../params/registry.js';
 import {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer, type Einkunftsquelle,
@@ -14,7 +14,7 @@ import {
 } from '../pension/freibetraege.js';
 import { zugangsfaktor } from '../pension/grv.js';
 import { besoldung } from '../pension/beamte.js';
-import { bruttoZuNetto, nettoZuBrutto } from '../erwerb/netto.js';
+import { bruttoZuNetto, nettoZuBrutto, erwerbHaushalt } from '../erwerb/netto.js';
 import { bavKapitalMonatswert, bavKapitalSteuer } from '../products/bav.js';
 import { kapitalversicherungErtrag, ansparphase, entnahmeplan } from '../products/kapitalanlage.js';
 import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
@@ -99,6 +99,15 @@ export interface ProjektionsErgebnis {
    * bliebe unsichtbar, was die Sparrate ueber die Jahre aufgebaut hat.
    */
   depots: { vertragId: string; endkapital: number; bruttoMonat: number }[];
+  /**
+   * Einmalige Kapitalauszahlungen (Strategie "kapital"). BEWUSST NICHT Teil
+   * von nettoGesamt oder nettoMonat: eine Einmalzahlung ist keine laufende
+   * Rente; sonst spraenge das Monatsnetto im Rentenjahr sinnlos nach oben.
+   */
+  kapitalauszahlungen: {
+    vertragId: string; bezeichnung: string; jahr: number;
+    bruttoKapital: number; steuer: number; nettoKapital: number;
+  }[];
   hinweise: string[];
 }
 
@@ -174,6 +183,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   if (personen.length === 0) {
     return {
       zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
+      kapitalauszahlungen: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
       hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
@@ -184,38 +194,61 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   const personA = personen[0]!;
   const letztesJahr = personA.geburt.jahr + 100;
 
-  // Erwerbseinkommen heute als Ausgangsbasis
+  // --- Erwerbseinkommen heute ---
   const pHeute = parameterFuer(jetzt.jahr, { indexRate: s.annahmen.tarifIndex });
   const erwerbsOpt = {
     verheiratet: s.haushalt.verheiratet,
     bundesland: s.haushalt.bundesland,
     kirchensteuerpflichtig: s.haushalt.kirchensteuer,
     kinder,
-    beamter: s.einkommenHeute.modus === 'besoldung',
     pkvPraemieMonat: s.haushalt.kvStatus === 'pkv' ? s.haushalt.pkvPraemieMonat : 0,
   };
 
-  let erwerbsBruttoHeute: number;
-  if (s.einkommenHeute.modus === 'besoldung') {
-    const b = besoldung(
-      s.einkommenHeute.besoldungsgruppe, s.einkommenHeute.besoldungsstufe,
-      s.einkommenHeute.besoldungsland, jetzt.jahr,
-      { verheiratet: s.haushalt.verheiratet, kinder: s.haushalt.kinderUnter25 },
-    );
-    erwerbsBruttoHeute = b.brutto * 12;
-    if (!b.belegt) {
-      hinweise.push(
-        'Die Besoldung beruht auf einer Naeherung, nicht auf der amtlichen Tabelle des Dienstherrn. ' +
-        'Der ausgewiesene Betrag kann um mehrere hundert Euro im Monat abweichen.',
-      );
+  /** Jahresbrutto aus einer Einkommensangabe, egal in welcher Form erfasst. */
+  const bruttoAus = (e: EinkommenHeute): number => {
+    if (e.modus === 'besoldung') {
+      const b = besoldung(e.besoldungsgruppe, e.besoldungsstufe, e.besoldungsland, jetzt.jahr, {
+        verheiratet: s.haushalt.verheiratet,
+        kinder: s.haushalt.kinderUnter25,
+      });
+      if (!b.belegt) {
+        hinweise.push(
+          'Die Besoldung beruht auf einer Naeherung, nicht auf der amtlichen Tabelle des Dienstherrn. ' +
+          'Der ausgewiesene Betrag kann um mehrere hundert Euro im Monat abweichen.',
+        );
+      }
+      return b.brutto * 12;
     }
-  } else if (s.einkommenHeute.modus === 'netto') {
-    erwerbsBruttoHeute = nettoZuBrutto(
-      s.einkommenHeute.betrag * s.einkommenHeute.auszahlungen, erwerbsOpt, pHeute,
-    ).jahresbrutto;
-  } else {
-    erwerbsBruttoHeute = s.einkommenHeute.betrag * s.einkommenHeute.auszahlungen;
-  }
+    if (e.modus === 'netto') {
+      return nettoZuBrutto(e.betrag * e.auszahlungen, {
+        ...erwerbsOpt, beamter: false,
+      }, pHeute).jahresbrutto;
+    }
+    return e.betrag * e.auszahlungen;
+  };
+
+  /**
+   * Erwerbseinkommen je Person, in der Reihenfolge von `personen`.
+   *
+   * BEFUND: Frueher lief das gesamte Haushaltseinkommen als EINE Person durch
+   * bruttoZuNetto. Die Beitragsbemessungsgrenzen gelten aber je Person; die
+   * Sozialabgaben fielen dadurch bei Doppelverdienern deutlich zu niedrig aus.
+   * Deshalb wird das Einkommen jetzt in jedem Fall auf Personen verteilt —
+   * bei getrennter Erfassung mit den echten Betraegen, sonst haelftig.
+   */
+  const einkommenJePerson: { brutto: number; beamter: boolean }[] = (() => {
+    const getrennt = s.einkommenGetrennt === true && personen.length > 1;
+    if (getrennt) {
+      const zweites = s.einkommenPartner ?? s.einkommenHeute;
+      return personen.map((_, i) => {
+        const e = i === 0 ? s.einkommenHeute : zweites;
+        return { brutto: bruttoAus(e), beamter: e.modus === 'besoldung' };
+      });
+    }
+    const gesamt = bruttoAus(s.einkommenHeute);
+    const beamter = s.einkommenHeute.modus === 'besoldung';
+    return personen.map(() => ({ brutto: gesamt / personen.length, beamter }));
+  })();
 
   // --- Auszahlungs-Planer ---
   // Kapital aus Vertraegen mit Strategie "planer" wird im Zuflussjahr
@@ -262,6 +295,22 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     depots.set(v.id, etfVerlauf(v, s, pRuhestand, jahreBis));
   }
 
+  // --- Einmalige Kapitalauszahlungen ---
+  const kapitalauszahlungen: ProjektionsErgebnis['kapitalauszahlungen'] = [];
+  for (const v of s.vertraege) {
+    if (v.typ !== 'etf' || v.strategie !== 'kapital') continue;
+    const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+    const jahreBis = Math.max(0, k.rentenbeginnJahr - jetzt.jahr);
+    const r = etfNettoKapital(v, s, pRuhestand, jahreBis);
+    if (r.bruttoKapital <= 0) continue;
+    kapitalauszahlungen.push({
+      vertragId: v.id,
+      bezeichnung: v.name || 'Wertpapierdepot',
+      jahr: k.rentenbeginnJahr,
+      ...r,
+    });
+  }
+
   const zeilen: Jahreszeile[] = [];
 
   for (let jahr = jetzt.jahr; jahr <= letztesJahr; jahr++) {
@@ -306,13 +355,22 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     // Der Prototyp sprang von "alle arbeiten" direkt auf "alle in Rente" und
     // liess die gemischte Phase aus.
     if (nochErwerbstaetig) {
-      const anteil = personen.filter((k) => jahr < k.rentenbeginnJahr).length / personen.length;
-      const bruttoJahr =
-        erwerbsBruttoHeute * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute) * anteil;
-      const n = bruttoZuNetto(bruttoJahr, erwerbsOpt, p);
+      // Nur die Personen, die in DIESEM Jahr noch arbeiten. Frueher wurde das
+      // Haushaltseinkommen pauschal nach Koepfen geteilt — unabhaengig davon,
+      // wer wie viel verdient hat.
+      const arbeitend = personen
+        .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
+        .filter(({ k }) => jahr < k.rentenbeginnJahr)
+        .map(({ e }) => ({
+          jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
+          beamter: e.beamter,
+          pkvPraemieMonat: erwerbsOpt.pkvPraemieMonat,
+        }));
+
+      const n = erwerbHaushalt(arbeitend, { ...erwerbsOpt, beamter: false }, p);
       posten.push({
         id: 'erwerb', bezeichnung: 'Erwerbseinkommen', schicht: 1,
-        bruttoJahr, zveBeitrag: n.zve, kvPvJahr: n.sv,
+        bruttoJahr: n.jahresbrutto, zveBeitrag: n.zve, kvPvJahr: n.sv,
         steuerJahr: n.est + n.soli + n.kirchensteuer, nettoJahr: n.jahresnetto,
       });
     }
@@ -487,6 +545,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       endkapital: e.endkapital,
       bruttoMonat: e.bruttoProJahr / 12,
     })),
+    kapitalauszahlungen,
     hinweise,
   };
 }
@@ -568,24 +627,41 @@ function planerKapital(
     }
 
     if (v.typ === 'etf') {
-      // Depotwert zum Rentenbeginn abzueglich Abgeltungsteuer auf den Gewinn.
       const jahreBis = Math.max(0, ruhestandsjahr - new Date().getFullYear());
-      const e = etfVerlauf(v, s, p, jahreBis);
-      const gewinn = Math.max(0, e.endkapital - e.anschaffungskosten);
-      const { steuer } = abgeltungsteuer(
-        gewinn,
-        {
-          kirchensteuerpflichtig: s.haushalt.kirchensteuer,
-          bundesland: s.haushalt.bundesland,
-          teilfreistellung: e.teilfreistellung,
-          sparerpauschbetrag: p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1),
-        },
-        p,
-      );
-      summe += Math.max(0, e.endkapital - steuer);
+      summe += etfNettoKapital(v, s, p, jahreBis).nettoKapital;
     }
   }
   return summe;
+}
+
+/**
+ * Netto-Kapital eines Depots zum Rentenbeginn: Depotwert abzueglich
+ * Abgeltungsteuer auf den Gewinn. Wird an zwei Stellen gebraucht — beim
+ * Uebertrag in den Auszahlungs-Planer und bei der Strategie "kapital".
+ */
+function etfNettoKapital(
+  v: Vertrag,
+  s: Szenario,
+  p: ReturnType<typeof parameterFuer>,
+  jahreBisRente: number,
+): { bruttoKapital: number; steuer: number; nettoKapital: number } {
+  const e = etfVerlauf(v, s, p, jahreBisRente);
+  const gewinn = Math.max(0, e.endkapital - e.anschaffungskosten);
+  const { steuer } = abgeltungsteuer(
+    gewinn,
+    {
+      kirchensteuerpflichtig: s.haushalt.kirchensteuer,
+      bundesland: s.haushalt.bundesland,
+      teilfreistellung: e.teilfreistellung,
+      sparerpauschbetrag: p.pauschbetraege.sparer * (s.haushalt.verheiratet ? 2 : 1),
+    },
+    p,
+  );
+  return {
+    bruttoKapital: e.endkapital,
+    steuer,
+    nettoKapital: Math.max(0, e.endkapital - steuer),
+  };
 }
 
 export interface EtfVerlauf {

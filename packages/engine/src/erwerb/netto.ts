@@ -25,20 +25,28 @@ export interface ErwerbsNetto {
   zve: number;
 }
 
-/** Brutto -> Netto fuer die Erwerbsphase. */
-export function bruttoZuNetto(
+/**
+ * Sozialabgaben und zvE-Beitrag EINER Person.
+ *
+ * Bewusst je Person, denn `kvPvArbeitnehmer` deckelt an den
+ * Beitragsbemessungsgrenzen — und die gelten je Person, nicht je Haushalt.
+ * Auch die Pauschbetraege nach § 9a und § 10c stehen jeder Person einzeln zu.
+ */
+function personAnteil(
   jahresbrutto: number,
   o: ErwerbsOptionen,
   p: LegalParameters,
-): ErwerbsNetto {
+  beamter: boolean,
+  pkvPraemieMonat: number,
+): { brutto: number; sv: number; zveBeitrag: number } {
   const brutto = Math.max(0, jahresbrutto);
 
-  let sv = 0;
-  let vorsorgeAbzug = 0;
+  let sv: number;
+  let vorsorgeAbzug: number;
 
-  if (o.beamter) {
+  if (beamter) {
     // Keine gesetzliche RV/AV. Krankenversicherung privat (Beihilfe).
-    const praemie = (o.pkvPraemieMonat ?? 0) * 12;
+    const praemie = Math.max(0, pkvPraemieMonat) * 12;
     sv = praemie;
     vorsorgeAbzug = praemie * 0.8; // Basisabsicherungsanteil
   } else {
@@ -47,10 +55,24 @@ export function bruttoZuNetto(
     vorsorgeAbzug = b.abzugsfaehig;
   }
 
-  const zve = Math.max(
+  const zveBeitrag = Math.max(
     0,
     brutto - p.pauschbetraege.arbeitnehmer - p.pauschbetraege.sonderausgaben - vorsorgeAbzug,
   );
+
+  return { brutto, sv, zveBeitrag };
+}
+
+/** Brutto -> Netto fuer die Erwerbsphase, EINE Person. */
+export function bruttoZuNetto(
+  jahresbrutto: number,
+  o: ErwerbsOptionen,
+  p: LegalParameters,
+): ErwerbsNetto {
+  const a = personAnteil(jahresbrutto, o, p, o.beamter ?? false, o.pkvPraemieMonat ?? 0);
+  const brutto = a.brutto;
+  const sv = a.sv;
+  const zve = a.zveBeitrag;
 
   const est = einkommensteuer(zve, o.verheiratet, p);
   const soli = solidaritaetszuschlag(est, o.verheiratet, p);
@@ -63,6 +85,65 @@ export function bruttoZuNetto(
     monatsbrutto: brutto / 12,
     monatsnetto: netto / 12,
     sv, est, soli, kirchensteuer: kist, zve,
+  };
+}
+
+export interface HaushaltsPerson {
+  jahresbrutto: number;
+  beamter: boolean;
+  /** Nur bei Beamten/privat Versicherten */
+  pkvPraemieMonat?: number;
+}
+
+export interface ErwerbHaushaltErgebnis {
+  jahresbrutto: number;
+  jahresnetto: number;
+  /** Sozialabgaben ALLER Personen zusammen */
+  sv: number;
+  /** Gemeinsames zu versteuerndes Einkommen */
+  zve: number;
+  est: number;
+  soli: number;
+  kirchensteuer: number;
+  /** Brutto und SV je Person, in der uebergebenen Reihenfolge */
+  proPerson: { brutto: number; sv: number; zveBeitrag: number }[];
+}
+
+/**
+ * Erwerbseinkommen eines HAUSHALTS.
+ *
+ * BEFUND: Die Zeitachse schickte das gesamte Haushaltseinkommen als EINE
+ * Person durch `bruttoZuNetto`. Die Beitragsbemessungsgrenzen gelten aber je
+ * Person. Bei zwei Verdienern mit je 60 000 EUR wurden dadurch 18 526 EUR
+ * Sozialabgaben statt 26 100 EUR angesetzt — rund 630 EUR im Monat zu wenig,
+ * das ausgewiesene Netto war entsprechend zu hoch.
+ *
+ * Deshalb die Zweiteilung, die dem Gesetz entspricht:
+ *  - Sozialabgaben JE PERSON, jede mit eigener Beitragsbemessungsgrenze.
+ *  - Einkommensteuer EINMAL auf das gemeinsame zvE, mit Splittingtarif.
+ */
+export function erwerbHaushalt(
+  personen: readonly HaushaltsPerson[],
+  o: ErwerbsOptionen,
+  p: LegalParameters,
+): ErwerbHaushaltErgebnis {
+  const proPerson = personen.map((x) =>
+    personAnteil(x.jahresbrutto, o, p, x.beamter, x.pkvPraemieMonat ?? 0),
+  );
+
+  const jahresbrutto = proPerson.reduce((sum, x) => sum + x.brutto, 0);
+  const sv = proPerson.reduce((sum, x) => sum + x.sv, 0);
+  const zve = proPerson.reduce((sum, x) => sum + x.zveBeitrag, 0);
+
+  const est = einkommensteuer(zve, o.verheiratet, p);
+  const soli = solidaritaetszuschlag(est, o.verheiratet, p);
+  const kist = o.kirchensteuerpflichtig ? est * kirchensteuersatz(o.bundesland) : 0;
+
+  return {
+    jahresbrutto,
+    jahresnetto: jahresbrutto - sv - est - soli - kist,
+    sv, zve, est, soli, kirchensteuer: kist,
+    proPerson,
   };
 }
 

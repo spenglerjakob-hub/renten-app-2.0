@@ -65,7 +65,7 @@ export const vertragSchema = z.object({
   typ: z.enum(['basis', 'bav', 'bavUkasse', 'bavKapital', 'riester', 'prvRente', 'prvKapital', 'immobilie', 'etf']),
   name: z.string().default(''),
   brutto: z.number().min(0).default(0),
-  strategie: z.enum(['rente', 'planer', 'ignorieren']).default('rente'),
+  strategie: z.enum(['rente', 'planer', 'kapital', 'ignorieren']).default('rente'),
   altvertrag: z.boolean().default(false),
 
   beginnJahr: z.number().int().min(1900).max(2200).optional(),
@@ -159,6 +159,15 @@ export const szenarioSchema = z.object({
   einkommenHeute: einkommenHeuteSchema,
   personen: z.array(personSchema).min(1).max(2),
   vertraege: z.array(vertragSchema).max(50).default([]),
+  /**
+   * true: je Partner ein eigenes Einkommen (einkommenHeute fuer A,
+   * einkommenPartner fuer B). false: ein Haushaltsbetrag, der fuer die
+   * Sozialabgaben haelftig auf beide verteilt wird.
+   * .default(false), damit frueher gespeicherte Dateien weiter laden.
+   */
+  einkommenGetrennt: z.boolean().default(false),
+  einkommenPartner: einkommenHeuteSchema.default({}),
+
   planer: planerSchema,
   tuev: z.array(tuevPositionSchema).max(20).default([]),
 });

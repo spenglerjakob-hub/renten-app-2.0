@@ -167,6 +167,24 @@ export function annahmenKoppeln(
   return { ...s, annahmen: gekoppelt };
 }
 
+/**
+ * Depots, die auf "ignorieren" standen, auf "kapital" umstellen.
+ *
+ * Aendert KEINE Monatsbetraege: der Vertrag war vorher wie nachher nicht im
+ * laufenden Netto. Es kommt nur die Angabe hinzu, was netto einmalig
+ * ausgezahlt wuerde.
+ */
+export function depotStrategieMigrieren(s: SzenarioParsed): SzenarioParsed {
+  const betroffen = s.vertraege.some((v) => v.typ === 'etf' && v.strategie === 'ignorieren');
+  if (!betroffen) return s;
+  return {
+    ...s,
+    vertraege: s.vertraege.map((v) =>
+      v.typ === 'etf' && v.strategie === 'ignorieren' ? { ...v, strategie: 'kapital' as const } : v,
+    ),
+  };
+}
+
 export function importiere(rohJson: string): ImportErgebnis {
   let daten: unknown;
   try {
@@ -210,7 +228,16 @@ export function importiere(rohJson: string): ImportErgebnis {
     }
   }
 
-  return { ok: true, szenario: gekoppelt, migriertVon: istLegacy ? 'prototyp' : 'v1', warnungen };
+  const fertig = depotStrategieMigrieren(gekoppelt);
+  if (fertig !== gekoppelt) {
+    warnungen.push(
+      'Wertpapierdepot auf "Kapitalauszahlung" umgestellt (bisher "Nicht einrechnen"). ' +
+      'Die monatlichen Betraege aendern sich dadurch nicht; es wird nur zusaetzlich ' +
+      'ausgewiesen, was netto einmalig ausgezahlt wuerde.',
+    );
+  }
+
+  return { ok: true, szenario: fertig, migriertVon: istLegacy ? 'prototyp' : 'v1', warnungen };
 }
 
 export function exportiere(s: SzenarioParsed): string {

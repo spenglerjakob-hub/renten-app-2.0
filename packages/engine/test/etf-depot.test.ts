@@ -153,6 +153,34 @@ describe('Wertpapierdepot: Laufzeit', () => {
     expect(kurz).toBeGreaterThan(lang);
   });
 
+  it('zahlt bei Strategie "kapital" einmalig aus statt laufend', () => {
+    const r = projiziere(szenario({ strategie: 'kapital' }));
+    const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;
+
+    // Keine laufende Entnahme mehr ...
+    expect(zeile.posten.some((x) => x.id === 'd1')).toBe(false);
+    // ... dafuer eine Einmalzahlung.
+    const a = r.kapitalauszahlungen.find((x) => x.vertragId === 'd1')!;
+    expect(a).toBeDefined();
+    expect(a.nettoKapital).toBeGreaterThan(100_000);
+    expect(a.steuer).toBeGreaterThan(0);
+    expect(a.nettoKapital).toBeCloseTo(a.bruttoKapital - a.steuer, 6);
+    expect(a.jahr).toBe(r.ruhestandsjahr);
+  });
+
+  it('haelt die Einmalzahlung aus dem Monatsnetto heraus', () => {
+    // Sonst spraenge das Monatsnetto im Rentenjahr sinnlos nach oben.
+    const ohne = projiziere(szenario({ strategie: 'ignorieren' }));
+    const mit = projiziere(szenario({ strategie: 'kapital' }));
+
+    const netto = (r: ReturnType<typeof projiziere>) =>
+      r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!.nettoGesamt;
+
+    expect(netto(mit)).toBeCloseTo(netto(ohne), 6);
+    expect(mit.kapitalauszahlungen).toHaveLength(1);
+    expect(ohne.kapitalauszahlungen).toHaveLength(0);
+  });
+
   it('erscheint nicht, wenn der Vertrag ignoriert wird', () => {
     const r = projiziere(szenario({ strategie: 'ignorieren' }));
     const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;

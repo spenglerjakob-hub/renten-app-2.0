@@ -15,6 +15,7 @@ import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
 import { Konto } from './features/Konto';
 import { VertragsTuev } from './features/VertragsTuev';
+import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
 import { AkkordeonKarte, euro } from './components/Feld';
@@ -90,6 +91,7 @@ export default function App() {
   const [menueOffen, setMenueOffen] = useState(false);
   const [basisOffen, setBasisOffen] = useState(true);
   const [kontoOffen, setKontoOffen] = useState(false);
+  const [ehepartnerDialog, setEhepartnerDialog] = useState(false);
   const dateiRef = useRef<HTMLInputElement>(null);
 
   const { ergebnis, rechnet, fehler, dauerMs } = useProjektion(szenario);
@@ -217,7 +219,11 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setzeHaushalt({ verheiratet: true }); partnerHinzufuegen(); }}
+                  onClick={() => {
+                    setzeHaushalt({ verheiratet: true });
+                    partnerHinzufuegen();
+                    setEhepartnerDialog(true);
+                  }}
                   aria-pressed={verheiratet}
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-all sm:flex-none sm:text-xs ${
                     verheiratet ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
@@ -310,7 +316,7 @@ export default function App() {
             onUmschalten={() => setBasisOffen((v) => !v)}
             symbol={<User className="h-4 w-4 text-slate-400" aria-hidden />}
           >
-            <Basisdaten />
+            <Basisdaten onEhepartnerDialog={() => setEhepartnerDialog(true)} />
           </AkkordeonKarte>
 
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -321,9 +327,9 @@ export default function App() {
               beschriftung="Versorgungsschichten"
             />
             <div className="min-h-[300px] bg-slate-50/50 p-3 sm:min-h-[400px] sm:p-4">
-              {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} />}
-              {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} />}
-              {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} />}
+              {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} />}
+              {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} />}
+              {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} />}
               {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
             </div>
           </section>
@@ -429,6 +435,8 @@ export default function App() {
           </p>
         </div>
       </main>
+
+      <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
 
       <VertragsTuev ergebnis={ergebnis ?? null} szenario={szenario} />
 

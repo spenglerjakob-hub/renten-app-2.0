@@ -40,6 +40,46 @@ describe('Abwaertskompatibilitaet', () => {
     expect(r.szenario.personen[0]!.rentenbeginnManuell).toBe(false);
   });
 
+  it('stellt ein Depot von "ignorieren" auf "kapital" um und warnt dabei', () => {
+    // Die Strategie "Nicht einrechnen" wurde beim Depot durch
+    // "Kapitalauszahlung" ersetzt. Die Umstellung aendert KEINE
+    // Monatsbetraege — der Vertrag war vorher wie nachher nicht im laufenden
+    // Netto — es kommt nur die Angabe hinzu, was netto ausgezahlt wuerde.
+    const alt = {
+      ...vollstaendig,
+      vertraege: [
+        { id: 'd1', inhaber: 'A' as const, schicht: 3 as const, typ: 'etf' as const, name: 'Depot',
+          brutto: 0, strategie: 'ignorieren' as const, altvertrag: false, kapitalHeute: 50000 },
+        { id: 'v1', inhaber: 'A' as const, schicht: 2 as const, typ: 'bav' as const, name: 'bAV',
+          brutto: 300, strategie: 'ignorieren' as const, altvertrag: false },
+      ],
+    };
+    const r = importiere(JSON.stringify(alt));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    expect(r.szenario.vertraege[0]!.strategie).toBe('kapital');
+    // Bei anderen Vertragsarten bleibt "ignorieren" erhalten — dort ist es
+    // weiterhin nuetzlich, einen Vertrag herauszunehmen.
+    expect(r.szenario.vertraege[1]!.strategie).toBe('ignorieren');
+    expect(r.warnungen.join(' ')).toContain('Kapitalauszahlung');
+  });
+
+  it('laesst ein Depot mit anderer Strategie unangetastet', () => {
+    const s = {
+      ...vollstaendig,
+      vertraege: [
+        { id: 'd1', inhaber: 'A' as const, schicht: 3 as const, typ: 'etf' as const, name: 'Depot',
+          brutto: 0, strategie: 'rente' as const, altvertrag: false, kapitalHeute: 50000 },
+      ],
+    };
+    const r = importiere(JSON.stringify(s));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.vertraege[0]!.strategie).toBe('rente');
+    expect(r.warnungen.join(' ')).not.toContain('Kapitalauszahlung');
+  });
+
   it('erhaelt erfasste TUEV-Positionen ueber Export und Import', () => {
     const mitTuev = szenarioSchema.parse({
       ...vollstaendig,

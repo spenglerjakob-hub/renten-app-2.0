@@ -1,17 +1,18 @@
-import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, besoldungstabelle } from '@renten/engine';
+import { BUNDESLAENDER, BESOLDUNGSGRUPPEN } from '@renten/engine';
 import { RotateCcw } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
+import { EinkommenFelder } from './EinkommenFelder';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
-export function Basisdaten() {
+export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => void } = {}) {
   const s = useSzenario((x) => x.szenario);
   const { setzeHaushalt, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
+  const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
+  const setzeEinkommenGetrennt = useSzenario((x) => x.setzeEinkommenGetrennt);
   const rentenbeginnZuruecksetzen = useSzenario((x) => x.rentenbeginnZuruecksetzen);
-
-  const besoldungBelegt = besoldungstabelle(s.einkommenHeute.besoldungsland, new Date().getFullYear()).belegt;
 
   return (
     <div className="space-y-4">
@@ -57,62 +58,39 @@ export function Basisdaten() {
         </div>
         <div className="mt-3 flex flex-wrap gap-4">
           <Schalter label="Verheiratet (Splittingtarif)" wert={s.haushalt.verheiratet}
-            onChange={(b) => { setzeHaushalt({ verheiratet: b }); if (b) partnerHinzufuegen(); }} />
+            onChange={(b) => {
+              setzeHaushalt({ verheiratet: b });
+              if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
+            }} />
           <Schalter label="Kirchensteuerpflichtig" wert={s.haushalt.kirchensteuer}
             onChange={(b) => setzeHaushalt({ kirchensteuer: b })} />
         </div>
       </Abschnitt>
 
-      <Abschnitt titel="Heutiges Einkommen">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <AuswahlFeld
-            label="Art"
-            wert={s.einkommenHeute.modus}
-            onChange={(v) => setzeEinkommen({ modus: v })}
-            optionen={[
-              { wert: 'brutto', text: 'Angestellt (Brutto)' },
-              { wert: 'netto', text: 'Angestellt (Netto)' },
-              { wert: 'besoldung', text: 'Beamter (Besoldung)' },
-            ]}
-          />
-          {s.einkommenHeute.modus !== 'besoldung' ? (
-            <>
-              <ZahlFeld label="Betrag monatlich" wert={s.einkommenHeute.betrag}
-                onChange={(n) => setzeEinkommen({ betrag: n })} einheit="€" />
-              <AuswahlFeld
-                label="Auszahlungen pro Jahr"
-                wert={String(s.einkommenHeute.auszahlungen)}
-                onChange={(v) => setzeEinkommen({ auszahlungen: Number(v) })}
-                optionen={[
-                  { wert: '12', text: '12 Gehälter' },
-                  { wert: '12.5', text: '12,5 (halbes 13.)' },
-                  { wert: '13', text: '13 Gehälter' },
-                  { wert: '14', text: '14 Gehälter' },
-                ]}
-              />
-            </>
-          ) : (
-            <>
-              <AuswahlFeld label="Besoldungsgruppe" wert={s.einkommenHeute.besoldungsgruppe}
-                onChange={(v) => setzeEinkommen({ besoldungsgruppe: v })}
-                optionen={BESOLDUNGSGRUPPEN.map((g) => ({ wert: g as string, text: g }))} />
-              <AuswahlFeld label="Erfahrungsstufe" wert={String(s.einkommenHeute.besoldungsstufe)}
-                onChange={(v) => setzeEinkommen({ besoldungsstufe: Number(v) })}
-                optionen={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ wert: String(n), text: `Stufe ${n}` }))} />
-              <AuswahlFeld label="Dienstherr" wert={s.einkommenHeute.besoldungsland}
-                onChange={(v) => setzeEinkommen({ besoldungsland: v })} optionen={laenderOptionen} />
-            </>
-          )}
-        </div>
+      <Abschnitt titel={s.einkommenGetrennt ? 'Einkommen — Person A' : 'Heutiges Einkommen'}>
+        <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} />
 
-        {s.einkommenHeute.modus === 'besoldung' && !besoldungBelegt && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <strong>Näherung:</strong> Für {s.einkommenHeute.besoldungsland} ist noch keine amtliche
-            Besoldungstabelle hinterlegt. Der Wert wird aus einer linearen Näherung geschätzt und kann
-            um mehrere hundert Euro im Monat abweichen.
-          </p>
+        {s.haushalt.verheiratet && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <Schalter
+              label="Einkommen je Partner getrennt erfassen"
+              wert={s.einkommenGetrennt}
+              onChange={setzeEinkommenGetrennt}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              {s.einkommenGetrennt
+                ? 'Die Sozialabgaben werden je Person mit eigener Beitragsbemessungsgrenze gerechnet.'
+                : 'Der Haushaltsbetrag wird für die Sozialabgaben hälftig auf beide verteilt.'}
+            </p>
+          </div>
         )}
       </Abschnitt>
+
+      {s.haushalt.verheiratet && s.einkommenGetrennt && (
+        <Abschnitt titel="Einkommen — Person B">
+          <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} />
+        </Abschnitt>
+      )}
 
       {s.personen.map((p) => (
         <Abschnitt key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>

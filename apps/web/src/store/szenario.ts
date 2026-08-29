@@ -48,6 +48,8 @@ export interface SzenarioStore {
   setzeHaushalt: (p: Partial<SzenarioParsed['haushalt']>) => void;
   setzeAnnahmen: (p: Partial<SzenarioParsed['annahmen']>) => void;
   setzeEinkommen: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
+  setzeEinkommenPartner: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
+  setzeEinkommenGetrennt: (b: boolean) => void;
   setzePlaner: (p: Partial<SzenarioParsed['planer']>) => void;
   setzePerson: (id: 'A' | 'B', p: Partial<SzenarioParsed['personen'][number]>) => void;
   rentenbeginnZuruecksetzen: (id: 'A' | 'B') => void;
@@ -111,6 +113,10 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     { tarifIndexBehalten: p.tarifIndex !== undefined },
   )),
   setzeEinkommen: (p) => get().setze((s) => ({ ...s, einkommenHeute: { ...s.einkommenHeute, ...p } })),
+  setzeEinkommenPartner: (p) => get().setze((s) => ({
+    ...s, einkommenPartner: { ...s.einkommenPartner, ...p },
+  })),
+  setzeEinkommenGetrennt: (b) => get().setze((s) => ({ ...s, einkommenGetrennt: b })),
   setzePlaner: (p) => get().setze((s) => ({ ...s, planer: { ...s.planer, ...p } })),
 
   setzePerson: (id, p) => get().setze((s) => ({

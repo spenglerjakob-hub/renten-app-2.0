@@ -145,6 +145,40 @@ export function Kassenbon({
           <span className="text-xl font-bold tabular-nums">{w(zeile.nettoGesamt)}</span>
         </div>
       </div>
+
+      {/*
+        Einmalzahlungen stehen BEWUSST ausserhalb der Monatsrechnung. Sie in
+        das Monatsnetto zu mischen liesse die Zahl im Rentenjahr sinnlos nach
+        oben springen.
+      */}
+      {ergebnis.kapitalauszahlungen.length > 0 && (
+        <div className="mt-5 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 sm:mt-6 sm:p-4">
+          <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-900 sm:text-xs">
+            Einmalige Kapitalauszahlungen
+          </h3>
+          <div className="space-y-2">
+            {ergebnis.kapitalauszahlungen.map((a) => (
+              <div key={a.vertragId} className="rounded-md bg-white px-3 py-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[11px] font-semibold text-indigo-900 sm:text-sm">
+                    {a.bezeichnung} <span className="font-normal text-slate-500">({a.jahr})</span>
+                  </span>
+                  <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
+                    {euro(a.nettoKapital)}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[9px] text-slate-500 sm:text-[10px]">
+                  <span>Brutto: {euro(a.bruttoKapital)}</span>
+                  <span className="text-rose-500">Abgeltungsteuer: {euro(a.steuer)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+            Einmalbeträge — im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

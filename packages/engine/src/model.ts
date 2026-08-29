@@ -14,7 +14,13 @@ export type VertragsTyp =
   | 'immobilie'
   | 'etf';
 
-export type Auszahlungsstrategie = 'rente' | 'planer' | 'ignorieren';
+/**
+ * 'kapital' gibt es derzeit nur beim Wertpapierdepot: der Betrag zaehlt nicht
+ * zur laufenden Rente, wird aber als einmalige Nettoauszahlung ausgewiesen.
+ * Bei Ruerup ist eine Kapitalwahl gesetzlich ausgeschlossen, bei den uebrigen
+ * Arten gibt es dafuer eigene Vertragstypen (bavKapital, prvKapital).
+ */
+export type Auszahlungsstrategie = 'rente' | 'planer' | 'kapital' | 'ignorieren';
 
 export interface Teilzeitphase {
   id: string;
@@ -129,6 +135,9 @@ export interface Szenario {
   haushalt: Haushalt;
   annahmen: Annahmen;
   einkommenHeute: EinkommenHeute;
+  /** true: getrennte Einkommen je Partner (siehe einkommenPartner) */
+  einkommenGetrennt?: boolean;
+  einkommenPartner?: EinkommenHeute;
   personen: Person[];
   vertraege: Vertrag[];
   planer: Entnahmeplaner;

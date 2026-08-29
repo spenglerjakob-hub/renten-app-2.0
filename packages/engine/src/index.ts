@@ -20,7 +20,10 @@ export {
 } from './social/kv-pv.js';
 
 // Erwerbsphase
-export { bruttoZuNetto, nettoZuBrutto, type ErwerbsNetto, type ErwerbsOptionen } from './erwerb/netto.js';
+export {
+  bruttoZuNetto, nettoZuBrutto, erwerbHaushalt,
+  type ErwerbsNetto, type ErwerbsOptionen, type HaushaltsPerson, type ErwerbHaushaltErgebnis,
+} from './erwerb/netto.js';
 
 // Altersversorgung
 export {

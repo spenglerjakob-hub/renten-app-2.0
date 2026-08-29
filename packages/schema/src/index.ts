@@ -5,5 +5,6 @@ export {
   type SzenarioInput, type SzenarioParsed,
 } from './szenario.js';
 export {
-  importiere, exportiere, ausLegacyFormat, annahmenKoppeln, type ImportErgebnis,
+  importiere, exportiere, ausLegacyFormat, annahmenKoppeln, depotStrategieMigrieren,
+  type ImportErgebnis,
 } from './migration.js';
