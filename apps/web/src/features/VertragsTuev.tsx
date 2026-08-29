@@ -5,32 +5,9 @@ import {
   type ProjektionsErgebnis,
 } from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, Schalter, euro, prozent } from '../components/Feld';
-
-function Kennzahl({ titel, wert, farbe, fussnote }: {
-  titel: string; wert: string; farbe?: string; fussnote?: string;
-}) {
-  return (
-    <div>
-      <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
-        {titel}
-      </div>
-      <div className={`text-base font-black tabular-nums sm:text-lg ${farbe ?? 'text-slate-800'}`}>
-        {wert}
-      </div>
-      {fussnote && <div className="mt-0.5 text-[10px] text-slate-500">{fussnote}</div>}
-    </div>
-  );
-}
-
-function GegenueberZeile({ text, wert, farbe }: { text: string; wert: string; farbe?: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="text-slate-600">{text}</span>
-      <span className={`shrink-0 font-semibold tabular-nums ${farbe ?? 'text-slate-800'}`}>{wert}</span>
-    </div>
-  );
-}
+import {
+  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
+} from '../components/Feld';
 
 /**
  * VERTRAGS-TUEV

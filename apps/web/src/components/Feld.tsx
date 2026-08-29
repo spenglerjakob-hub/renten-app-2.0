@@ -304,6 +304,41 @@ export function AkkordeonKarte(props: {
   );
 }
 
+/**
+ * Kennzahlkachel: grosser Wert, kleine Ueberschrift, optionale Fussnote.
+ *
+ * Steht hier statt im Vertrags-TUEV, weil die Seite zum Altersvorsorgedepot
+ * dieselben Kennzahlen zeigt. Zwei Fassungen wuerden mit der Zeit
+ * unterschiedlich aussehen.
+ */
+export function Kennzahl(props: {
+  titel: string; wert: string; farbe?: string; fussnote?: string;
+}) {
+  return (
+    <div>
+      <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
+        {props.titel}
+      </div>
+      <div className={`text-base font-black tabular-nums sm:text-lg ${props.farbe ?? 'text-slate-800'}`}>
+        {props.wert}
+      </div>
+      {props.fussnote && <div className="mt-0.5 text-[10px] text-slate-500">{props.fussnote}</div>}
+    </div>
+  );
+}
+
+/** Eine Zeile einer Gegenueberstellung: Beschriftung links, Betrag rechts. */
+export function GegenueberZeile(props: { text: string; wert: string; farbe?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-slate-600">{props.text}</span>
+      <span className={`shrink-0 font-semibold tabular-nums ${props.farbe ?? 'text-slate-800'}`}>
+        {props.wert}
+      </span>
+    </div>
+  );
+}
+
 export const euro = (n: number) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(
     Number.isFinite(n) ? n : 0,

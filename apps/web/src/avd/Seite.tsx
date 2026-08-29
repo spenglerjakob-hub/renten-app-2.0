@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Download, Info, Scale, TrendingUp } from 'lucide-react';
+import { ArrowRight, Calculator, Download, Info, Scale, TrendingUp } from 'lucide-react';
 import {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+  avdProfitabilitaet,
   parameterFuer, regelaltersrentenbeginn, parseDatum, haushaltssteuer,
   schaetzeEntgeltpunkte, rentenfreibetrag, bruttoZuNetto,
 } from '@renten/engine';
 import { importiere } from '@renten/schema';
 import { Logo } from '../components/Logo';
-import { ZahlFeld, ProzentFeld, DatumFeld, Schalter, euro, prozent } from '../components/Feld';
+import {
+  ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
+} from '../components/Feld';
 import { KapitalaufbauDiagramm, FoerderquoteDiagramm } from './Diagramme';
 
 /**
@@ -223,6 +226,30 @@ export function Seite() {
   }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, rendite, kosten, kinder,
       alterHeute, alterBeiRente, startjahr, auszahldauer, teilauszahlungQuote, zveHeute, p]);
 
+  /**
+   * Profitabilitaet — dieselbe Rechnung und dieselben Kennzahlen wie im
+   * Vertrags-TUEV. Die AUSZAHLSEITE wird uebergeben, nicht neu gerechnet:
+   * `netto` oben hat sie bereits ueber den Haushaltstarif mit geschaetzter
+   * gesetzlicher Rente ermittelt. Zwei Rechnungen wuerden auseinanderlaufen,
+   * und die Seite widerspraeche sich dann selbst.
+   */
+  const profit = useMemo(() => {
+    if (!lauf || !netto || bruttoJahr <= 0 || jahreBisRente <= 0) return null;
+    return avdProfitabilitaet(
+      {
+        beitragMonat, jahre: jahreBisRente, kinder, alterHeute, startjahr,
+        zveHeute,
+        bruttoRenteJahr: lauf.aus.bruttoJahr,
+        steuerRenteJahr: netto.steuer,
+        jahreAuszahlung: lauf.aus.dauerJahre,
+        bruttoEinmal: lauf.aus.teilauszahlung,
+        steuerEinmal: netto.steuerEinmal,
+      },
+      STEUER_OPT,
+      p,
+    );
+  }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, kinder, alterHeute, startjahr, zveHeute, p]);
+
   const uebernehmen = () => {
     try {
       const roh = localStorage.getItem(SPEICHER_SCHLUESSEL);
@@ -245,7 +272,7 @@ export function Seite() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
       <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
           <Logo klasse="h-9 w-9" />
           <div>
             <a href="/" className="text-sm font-black tracking-tight hover:underline">JS-Rentenplaner</a>
@@ -254,21 +281,27 @@ export function Seite() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
           Altersvorsorgedepot: Was Ihnen der Staat ab 2027 dazugibt
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
           Ab dem <strong>1. Januar 2027</strong> löst das geförderte Altersvorsorgedepot die
           Riester-Rente ab. Anders als dort gibt es keine Beitragsgarantie und keinen Zwang zur
           Versicherung — Sie sparen in Fonds oder ETFs und bekommen trotzdem Zulagen. Rechnen Sie
           hier aus, wie viel das in Ihrem Fall ist.
         </p>
 
+        {/* Angaben links, Wirkung rechts: so sieht man beim Tippen sofort, was
+            sich aendert. Die linke Spalte bleibt beim Scrollen stehen; auf
+            schmalen Geraeten stapelt das Raster wie bisher. */}
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
+        <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-4 lg:self-start">
+
         {/* --- Rechner --- */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={setBeitragMonat} einheit="€"
               hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
             <ZahlFeld label="Kinder mit Kindergeldanspruch" wert={kinder} onChange={setKinder} max={15} />
@@ -313,16 +346,130 @@ export function Seite() {
             <p className="mt-2 text-xs text-slate-600">{uebernommen}</p>
           )}
         </section>
+        </div>
+
+        <div className="space-y-4 lg:col-span-7">
+
+        {/* --- Profitabilitaet --- */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <Calculator className="h-4 w-4" aria-hidden /> Was es kostet, was es bringt
+          </h2>
+
+          {!profit ? (
+            <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+              Tragen Sie links Beitrag, Geburtsdatum und Bruttoeinkommen ein — dann steht hier,
+              was der Vertrag Sie netto kostet und was netto herauskommt.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Ihre Belastung (Ansparphase)
+                </h3>
+                <div className="space-y-1">
+                  <GegenueberZeile
+                    text={`Ihre Eigenbeiträge über ${jahreBisRente} Jahre`}
+                    wert={euro(profit.eigenbeitraegeGesamt)} />
+                  <GegenueberZeile text="+ Zulagen vom Staat"
+                    wert={euro(profit.zulagenGesamt)} farbe="text-teal-700" />
+                  <div className="!mt-2 border-t border-slate-100 pt-2">
+                    <GegenueberZeile text="= fließt ins Depot"
+                      wert={euro(profit.zuflussInsDepotGesamt)} />
+                  </div>
+                  <GegenueberZeile text="− Steuerersparnis"
+                    wert={euro(profit.steuerersparnisGesamt)} farbe="text-teal-700" />
+                </div>
+                <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
+                  <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
+                  <span className="text-lg font-black tabular-nums text-slate-800">
+                    {euro(profit.eigenaufwandNettoGesamt)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
+                  {euro(profit.eigenbeitragMonat)}. Die Zulagen mindern Ihre Kosten nicht — sie
+                  kommen vom Staat und stehen als höheres Kapital auf der anderen Seite.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                  Ihr Ertrag (Auszahlungsphase)
+                </h3>
+                <div className="space-y-1">
+                  <GegenueberZeile text="Brutto-Rente / Monat" wert={euro(profit.bruttoRenteMonat)} />
+                  <GegenueberZeile text="− Steuer" wert={euro(profit.steuerRenteMonat)} farbe="text-rose-600" />
+                </div>
+                <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-amber-200 pt-2">
+                  <span className="text-xs font-bold text-amber-900">Echte Netto-Rente</span>
+                  <span className="text-lg font-black tabular-nums text-amber-900">
+                    {euro(profit.nettoRenteMonat)} <span className="text-xs font-bold">/ Monat</span>
+                  </span>
+                </div>
+                {profit.nettoEinmal > 0 && (
+                  <p className="mt-1 text-[10px] text-amber-900">
+                    Dazu einmalig {euro(profit.nettoEinmal)} netto zu Rentenbeginn
+                    ({euro(profit.bruttoEinmal)} brutto − {euro(profit.steuerEinmal)} Steuer).
+                  </p>
+                )}
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Über {profit.jahreAuszahlung} Auszahlungsjahre zusammen{' '}
+                  {euro(profit.summeAuszahlung)}.
+                </p>
+              </div>
+
+              <div className={`rounded-lg border p-3 ${profit.nettoHebel >= 1 ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Kennzahl
+                    titel="Netto-Hebel"
+                    wert={`${profit.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ×`}
+                    farbe={profit.nettoHebel >= 1 ? 'text-emerald-700' : 'text-rose-700'}
+                    fussnote="Auszahlung je Euro Einzahlung"
+                  />
+                  <Kennzahl
+                    titel="Nettorendite"
+                    wert={prozent(profit.rendite, 2)}
+                    farbe={profit.rendite > 0 ? 'text-emerald-700' : 'text-rose-700'}
+                    fussnote="p. a. nach allen Abzügen"
+                  />
+                  <Kennzahl
+                    titel="Netto-Gewinn"
+                    wert={euro(profit.echterGewinn)}
+                    farbe={profit.echterGewinn >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+                  />
+                  <Kennzahl
+                    titel="Amortisation"
+                    wert={`${profit.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} J.`}
+                    fussnote="ab Rentenbeginn"
+                  />
+                </div>
+              </div>
+
+              {profit.hinweise.map((h) => (
+                <p key={h} className="flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> {h}
+                </p>
+              ))}
+
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                Die Steuerersparnis ist mit Ihrem heutigen Einkommen gerechnet und auf die Laufzeit
+                hochgerechnet. Genauer wäre Jahr für Jahr — dafür müsste man aber eine
+                Gehaltsentwicklung unterstellen, die niemand kennt.
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* --- Zulagen --- */}
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Ihre Förderung je Jahr
           </h2>
 
           {beitragMonat <= 0 ? (
             <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-              Tragen Sie oben einen monatlichen Beitrag ein.
+              Tragen Sie links einen monatlichen Beitrag ein.
             </p>
           ) : (
             <>
@@ -359,7 +506,7 @@ export function Seite() {
                 </h3>
                 {bruttoJahr <= 0 ? (
                   <p className="mt-2 text-sm text-slate-600">
-                    Tragen Sie oben Ihr Bruttoeinkommen ein — ob der Sonderausgabenabzug über die
+                    Tragen Sie links Ihr Bruttoeinkommen ein — ob der Sonderausgabenabzug über die
                     Zulagen hinaus etwas bringt, hängt an Ihrem Steuersatz.
                   </p>
                 ) : (
@@ -409,18 +556,18 @@ export function Seite() {
         </section>
 
         {/* --- Hochrechnung --- */}
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
             <TrendingUp className="h-4 w-4" aria-hidden /> Bis zu Ihrem Rentenbeginn
           </h2>
 
           {!geburt ? (
             <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-              Tragen Sie oben Ihr Geburtsdatum ein — daraus ergibt sich Ihr Rentenbeginn.
+              Tragen Sie links Ihr Geburtsdatum ein — daraus ergibt sich Ihr Rentenbeginn.
             </p>
           ) : !lauf ? (
             <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-              Tragen Sie oben einen monatlichen Beitrag ein.
+              Tragen Sie links einen monatlichen Beitrag ein.
             </p>
           ) : (
             <>
@@ -430,14 +577,13 @@ export function Seite() {
                 Gerechnet ab {startjahr}, das sind {jahreBisRente} Beitragsjahre.
               </p>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Kachel titel="Ihre Eigenbeiträge" wert={euro(lauf.anspar.eigenbeitraege)} />
-                <Kachel titel="Zulagen vom Staat" wert={euro(lauf.anspar.zulagenGesamt)} farbe="text-emerald-700" />
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <Kachel titel="Kapital bei Rentenbeginn" wert={euro(lauf.anspar.endkapital)} />
+                <Kachel titel="Davon Zulagen" wert={euro(lauf.anspar.zulagenGesamt)} farbe="text-teal-700" />
                 <Kachel
-                  titel="Auszahlung netto"
-                  wert={netto ? `${euro(netto.nettoJahr / 12)} / Monat` : '—'}
-                  farbe="text-indigo-700"
+                  titel="Davon Kursgewinne"
+                  wert={euro(Math.max(0, lauf.anspar.endkapital - lauf.anspar.eigenbeitraege - lauf.anspar.zulagenGesamt))}
+                  farbe="text-orange-700"
                 />
               </div>
 
@@ -457,7 +603,7 @@ export function Seite() {
                     <>
                       <strong>Ohne Angabe Ihres Einkommens</strong> ist das Depot hier die einzige
                       Einkunft und bleibt deshalb weitgehend unter dem Grundfreibetrag. Tragen Sie
-                      oben Ihr Bruttoeinkommen ein — dann wird die gesetzliche Rente geschätzt und
+                      links Ihr Bruttoeinkommen ein — dann wird die gesetzliche Rente geschätzt und
                       die Auszahlung mit dem Satz belastet, der Sie wirklich trifft.
                     </>
                   )}
@@ -466,10 +612,9 @@ export function Seite() {
 
               {netto && lauf.aus.teilauszahlung > 0 && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">
-                  Dazu einmalig <strong>{euro(netto.nettoEinmal)} netto</strong> zu Rentenbeginn
-                  ({euro(lauf.aus.teilauszahlung)} brutto − {euro(netto.steuerEinmal)} Steuer,{' '}
-                  {prozent(netto.satzEinmal)}). Der Satz liegt über dem der laufenden Auszahlung, weil
-                  der ganze Betrag in einem einzigen Jahr anfällt.
+                  Die Teilauszahlung kostet {prozent(netto.satzEinmal)} Steuer — mehr als die{' '}
+                  {prozent(netto.satz)} auf die laufende Rente, weil der ganze Betrag in einem
+                  einzigen Jahr anfällt und dadurch in höhere Tarifzonen rutscht.
                 </p>
               )}
 
@@ -494,7 +639,7 @@ export function Seite() {
         </section>
 
         {/* --- Vergleich mit einem freien Depot --- */}
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
             <Scale className="h-4 w-4" aria-hidden /> Lohnt sich die Förderung?
           </h2>
@@ -522,7 +667,7 @@ export function Seite() {
                     ['− Steuer (persönlicher Satz)', euro(vergleich.gefoerdert.steuerJahr / 12)],
                   ]}
                   ergebnis={`${euro(vergleich.gefoerdert.nettoMonat)} netto`}
-                  fuss={`Hat Sie netto ${euro(vergleich.gefoerdert.eigenaufwandNetto)} gekostet`}
+                  fuss={`Aus Ihrer Tasche: ${euro(vergleich.gefoerdert.eigenaufwandNetto)}`}
                 />
                 <Saeule
                   titel="Freies Wertpapierdepot"
@@ -532,7 +677,7 @@ export function Seite() {
                     ['− Abgeltungsteuer auf den Gewinn', euro(vergleich.frei.steuerJahr / 12)],
                   ]}
                   ergebnis={`${euro(vergleich.frei.nettoMonat)} netto`}
-                  fuss={`Hat Sie netto ${euro(vergleich.frei.eigenaufwandNetto)} gekostet`}
+                  fuss={`Aus Ihrer Tasche: ${euro(vergleich.frei.eigenaufwandNetto)}`}
                 />
               </div>
 
@@ -540,19 +685,16 @@ export function Seite() {
                 {vergleich.gefoerdert.nettoMonat >= vergleich.frei.nettoMonat ? (
                   <>
                     Das <strong>geförderte Depot liegt vorn</strong>, um{' '}
-                    {euro(vergleich.gefoerdert.nettoMonat - vergleich.frei.nettoMonat)} im Monat — und
-                    hat dabei{' '}
-                    {euro(vergleich.frei.eigenaufwandNetto - vergleich.gefoerdert.eigenaufwandNetto)}{' '}
-                    weniger eigenes Geld gekostet.
+                    {euro(vergleich.gefoerdert.nettoMonat - vergleich.frei.nettoMonat)} im Monat —
+                    bei praktisch gleichem eigenem Einsatz. Die Zulagen kommen obendrauf, sie
+                    ersetzen Ihren Beitrag nicht.
                   </>
                 ) : (
                   <>
                     Das <strong>freie Depot liegt vorn</strong>, um{' '}
                     {euro(vergleich.frei.nettoMonat - vergleich.gefoerdert.nettoMonat)} im Monat. Die
-                    volle Besteuerung im Alter wiegt hier schwerer als Zulagen und Steuervorteil —
-                    dafür hat das geförderte Depot{' '}
-                    {euro(vergleich.frei.eigenaufwandNetto - vergleich.gefoerdert.eigenaufwandNetto)}{' '}
-                    weniger eigenes Geld gebunden.
+                    volle Besteuerung im Alter wiegt hier schwerer als Zulagen und Steuervorteil
+                    zusammen.
                   </>
                 )}{' '}
                 Entschieden wird das an Ihrem Steuersatz im Alter, hier {prozent(netto.satz)}.
@@ -561,13 +703,18 @@ export function Seite() {
               <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                 Für beide Wege sind {prozent(kosten)} Kosten angesetzt. In der Praxis kosten
                 geförderte Produkte oft mehr als ein schlichter ETF-Sparplan — rechnen Sie das
-                oben durch, indem Sie die Kosten verändern.
+                links durch, indem Sie die Kosten verändern.
               </p>
             </>
           )}
         </section>
 
-        {/* --- Einordnung --- */}
+        </div>
+        </div>
+
+        {/* --- Einordnung ---
+            Ueber die volle Breite: erklaerender Text, kein Ergebnis. Er
+            braucht keine Spalte neben den Eingaben. */}
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Was Sie wissen sollten

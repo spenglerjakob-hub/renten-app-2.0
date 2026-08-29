@@ -147,7 +147,7 @@ export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[]
             {[0, 0.25, 0.5, 0.75, 1].map((q) => (
               <g key={q}>
                 <line x1={L} y1={y(max * q)} x2={B - R} y2={y(max * q)} stroke={RASTER} strokeWidth="1" />
-                <text x={L - 8} y={y(max * q) + 4} textAnchor="end" fontSize="11" fill={BESCHRIFTUNG}>
+                <text x={L - 8} y={y(max * q) + 4} textAnchor="end" fontSize="13" fill={BESCHRIFTUNG}>
                   {kurz(max * q)}
                 </text>
               </g>
@@ -179,7 +179,7 @@ export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[]
               const anteil = oben - unten;
               if (anteil / max < 0.06) return null;
               return (
-                <text key={e.schluessel} x={B - R + 8} y={y(mitte) + 4} fontSize="11" fill={BESCHRIFTUNG}>
+                <text key={e.schluessel} x={B - R + 8} y={y(mitte) + 4} fontSize="13" fill={BESCHRIFTUNG}>
                   {kurz(anteil)} {e.text}
                 </text>
               );
@@ -188,12 +188,12 @@ export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[]
             <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke={ACHSE} strokeWidth="1.5" />
             {verlauf.map((r, i) =>
               r.alter % 5 === 0 ? (
-                <text key={r.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize="11" fill={BESCHRIFTUNG}>
+                <text key={r.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize="13" fill={BESCHRIFTUNG}>
                   {r.alter}
                 </text>
               ) : null,
             )}
-            <text x={B - 4} y={H - 12} textAnchor="end" fontSize="10" fill={ACHSE}>Alter</text>
+            <text x={B - 4} y={H - 12} textAnchor="end" fontSize="12" fill={ACHSE}>Alter</text>
 
             {aktiv !== null && (
               <line x1={x(aktiv)} y1={T} x2={x(aktiv)} y2={T + plotH}
@@ -310,7 +310,7 @@ export function FoerderquoteDiagramm({
           {[0, 0.25, 0.5, 0.75, 1].map((q) => (
             <g key={q}>
               <line x1={L} y1={y(maxQuote * q)} x2={B - R} y2={y(maxQuote * q)} stroke={RASTER} strokeWidth="1" />
-              <text x={L - 8} y={y(maxQuote * q) + 4} textAnchor="end" fontSize="11" fill={BESCHRIFTUNG}>
+              <text x={L - 8} y={y(maxQuote * q) + 4} textAnchor="end" fontSize="13" fill={BESCHRIFTUNG}>
                 {Math.round(maxQuote * q * 100)} %
               </text>
             </g>
@@ -337,7 +337,7 @@ export function FoerderquoteDiagramm({
               <text
                 x={Math.min(x(eigenbeitragJahr) + 10, B - R - 92)}
                 y={Math.max(y(quoteHier) - 10, T + 12)}
-                fontSize="11" fontWeight="700" fill="#0f172a"
+                fontSize="13" fontWeight="700" fill="#0f172a"
               >
                 Sie: {prozent(quoteHier)}
               </text>
@@ -347,12 +347,12 @@ export function FoerderquoteDiagramm({
           <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke={ACHSE} strokeWidth="1.5" />
           {[0, 900, 1800, 2700, 3600].map((b) =>
             b <= maxBeitrag ? (
-              <text key={b} x={x(b)} y={H - 30} textAnchor="middle" fontSize="11" fill={BESCHRIFTUNG}>
+              <text key={b} x={x(b)} y={H - 30} textAnchor="middle" fontSize="13" fill={BESCHRIFTUNG}>
                 {b.toLocaleString('de-DE')}
               </text>
             ) : null,
           )}
-          <text x={B - R} y={H - 10} textAnchor="end" fontSize="10" fill={ACHSE}>
+          <text x={B - R} y={H - 10} textAnchor="end" fontSize="12" fill={ACHSE}>
             Eigenbeitrag im Jahr, €
           </text>
         </svg>
