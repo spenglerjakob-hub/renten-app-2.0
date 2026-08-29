@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+  avdProfitabilitaet,
 } from '../src/products/altersvorsorgedepot.js';
 import { ansparphase } from '../src/products/kapitalanlage.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -374,14 +375,32 @@ describe('Altersvorsorgedepot: Sonderausgabenabzug', () => {
     );
     expect(r.guenstigerAlsZulage).toBe(false);
     expect(r.ueberZulagen).toBe(0);
-    expect(r.eigenaufwandNetto).toBeCloseTo(1800 - 540, 6);
+    expect(r.eigenaufwandNetto).toBeCloseTo(1800, 6);
+  });
+
+  it('KORREKTUR: die Zulagen mindern den Eigenaufwand NICHT', () => {
+    // Sie kommen nicht aus der eigenen Tasche, sondern vom Staat, und stehen
+    // bereits als hoeheres Kapital auf der Habenseite. Sie ein zweites Mal als
+    // Kostenminderung zu buchen zaehlte sie doppelt und liess das gefoerderte
+    // Depot aussehen, als brauche es nur halb so viel Geld.
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 1800, zulagenJahr: 540, zveHeute: 60_000 }, opt, p,
+    );
+    expect(r.eigenaufwandNetto).toBeCloseTo(1800 - r.ueberZulagen, 6);
+    expect(r.eigenaufwandNetto).toBeGreaterThan(1800 - 540);
+
+    // Auf der Habenseite tauchen sie dagegen sehr wohl auf.
+    expect(r.zuflussInsDepot).toBeCloseTo(1800 + 540, 6);
   });
 
   it('der Netto-Aufwand faellt nie unter null', () => {
+    // Bei sehr kleinem Beitrag und sehr hohem Steuersatz kann die Ersparnis
+    // den Beitrag uebersteigen — negativ wird der Aufwand trotzdem nicht.
     const r = avdSteuervorteil(
-      { eigenbeitragJahr: 200, zulagenJahr: 1140, zveHeute: 120_000 }, opt, p,
+      { eigenbeitragJahr: 200, zulagenJahr: 200, zveHeute: 250_000 }, opt, p,
     );
-    expect(r.eigenaufwandNetto).toBe(0);
+    expect(r.eigenaufwandNetto).toBeGreaterThanOrEqual(0);
+    expect(r.eigenaufwandNetto).toBeLessThanOrEqual(200);
   });
 });
 
@@ -486,5 +505,67 @@ describe('Vergleich: Besteuerung des freien Depots', () => {
     expect(r.frei.steuerJahr).toBeGreaterThan(0);
     expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeGreaterThan(0.05);
     expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeLessThan(0.25);
+  });
+});
+
+describe('Altersvorsorgedepot: Profitabilitaet', () => {
+  const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
+  const basis = {
+    beitragMonat: 150, jahre: 30, kinder: 0, alterHeute: 37, startjahr: 2027,
+    zveHeute: 50_000,
+    bruttoRenteJahr: 10_000, steuerRenteJahr: 2_700, jahreAuszahlung: 18,
+    bruttoEinmal: 0, steuerEinmal: 0,
+  };
+
+  it('trennt Zufluss ins Depot von dem, was es wirklich kostet', () => {
+    const r = avdProfitabilitaet(basis, opt, p);
+    expect(r.eigenbeitraegeGesamt).toBeCloseTo(150 * 12 * 30, 4);
+    expect(r.zulagenGesamt).toBeCloseTo(540 * 30, 4);
+    expect(r.zuflussInsDepotGesamt).toBeCloseTo(r.eigenbeitraegeGesamt + r.zulagenGesamt, 4);
+
+    // Was aus der Tasche geht, ist der Eigenbeitrag MINUS Steuerersparnis —
+    // die Zulagen mindern es nicht.
+    expect(r.eigenaufwandNettoGesamt)
+      .toBeCloseTo(r.eigenbeitraegeGesamt - r.steuerersparnisGesamt, 4);
+    expect(r.eigenaufwandNettoGesamt).toBeGreaterThan(
+      r.eigenbeitraegeGesamt - r.zulagenGesamt,
+    );
+  });
+
+  it('reicht die uebergebene Auszahlseite unveraendert durch', () => {
+    // Sie wird NICHT neu gerechnet: die Oberflaeche ermittelt sie ueber den
+    // Haushaltstarif, und beide Stellen duerfen nicht auseinanderlaufen.
+    const r = avdProfitabilitaet(basis, opt, p);
+    expect(r.bruttoRenteMonat).toBeCloseTo(10_000 / 12, 6);
+    expect(r.steuerRenteMonat).toBeCloseTo(2_700 / 12, 6);
+    expect(r.nettoRenteMonat).toBeCloseTo(7_300 / 12, 6);
+  });
+
+  it('rechnet dieselben Kennzahlen wie der Vertrags-TUEV', () => {
+    const r = avdProfitabilitaet(basis, opt, p);
+    expect(r.summeAuszahlung).toBeCloseTo(7_300 * 18, 4);
+    expect(r.nettoHebel).toBeCloseTo(r.summeAuszahlung / r.summeEinzahlung, 6);
+    expect(r.echterGewinn).toBeCloseTo(r.summeAuszahlung - r.summeEinzahlung, 4);
+    expect(r.rendite).toBeGreaterThan(0);
+    expect(r.amortisationsJahre).toBeGreaterThan(0);
+  });
+
+  it('nimmt die Teilauszahlung in die Kennzahlen auf', () => {
+    const ohne = avdProfitabilitaet(basis, opt, p);
+    const mit = avdProfitabilitaet(
+      { ...basis, bruttoRenteJahr: 7_000, steuerRenteJahr: 1_890, bruttoEinmal: 54_000, steuerEinmal: 18_700 },
+      opt, p,
+    );
+    expect(mit.nettoEinmal).toBeCloseTo(54_000 - 18_700, 4);
+    // Der Einmalbetrag kommt frueher — die Amortisation verkuerzt sich.
+    expect(mit.amortisationsJahre).toBeLessThan(ohne.amortisationsJahre);
+  });
+
+  it('warnt, wenn hinten weniger herauskommt als vorn hinein', () => {
+    const r = avdProfitabilitaet(
+      { ...basis, bruttoRenteJahr: 1_000, steuerRenteJahr: 270 }, opt, p,
+    );
+    expect(r.nettoHebel).toBeLessThan(1);
+    expect(r.hinweise.join(' ')).toMatch(/weniger heraus, als eingezahlt/);
   });
 });

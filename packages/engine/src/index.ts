@@ -56,11 +56,16 @@ export {
 } from './products/entnahmeplaner.js';
 export {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+  avdProfitabilitaet,
   type AvdZulagen, type AvdAnsparErgebnis, type AvdJahr,
-  type AvdSteuervorteil, type DepotSeite,
+  type AvdSteuervorteil, type DepotSeite, type AvdProfitabilitaet,
 } from './products/altersvorsorgedepot.js';
 
 // Analyse
+export {
+  internerZins, kennzahlen,
+  type Zahlungsreihe, type Kennzahlen,
+} from './analyse/kennzahlen.js';
 export {
   vertragsTuev, renteOderKapital,
   type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,

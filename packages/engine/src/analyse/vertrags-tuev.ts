@@ -3,6 +3,7 @@ import type { Szenario, Vertrag } from '../model.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
 import { riesterZulagen, riesterZulagenkuerzung } from '../products/bav.js';
 import { avdZulagen, avdSteuervorteil } from '../products/altersvorsorgedepot.js';
+import { kennzahlen } from './kennzahlen.js';
 
 /**
  * VERTRAGS-TUEV
@@ -132,45 +133,6 @@ function svErsparnisQuote(jahresbrutto: number, p: LegalParameters): number {
   return quote;
 }
 
-/**
- * Interner Zinsfuss der Netto-Zahlungsreihe: Einzahlungen negativ waehrend der
- * Ansparphase, Auszahlungen positiv danach. Bisektion, weil die Reihe genau
- * einen Vorzeichenwechsel hat und damit monoton im Zins ist.
- */
-function internerZins(
-  einzahlungenJeJahr: number[],
-  auszahlungJeJahr: number,
-  jahreAuszahlung: number,
-  kapitalEinmalig: number,
-): number {
-  const n = einzahlungenJeJahr.length;
-  if (n === 0) return 0;
-
-  const kapitalwert = (zins: number) => {
-    let npv = 0;
-    for (let t = 0; t < n; t++) npv -= einzahlungenJeJahr[t]! / Math.pow(1 + zins, t + 1);
-    if (kapitalEinmalig > 0) {
-      npv += kapitalEinmalig / Math.pow(1 + zins, n);
-    } else {
-      for (let t = 1; t <= jahreAuszahlung; t++) {
-        npv += auszahlungJeJahr / Math.pow(1 + zins, n + t);
-      }
-    }
-    return npv;
-  };
-
-  let lo = -0.5, hi = 0.5;
-  if (kapitalwert(lo) < 0) return lo;
-  if (kapitalwert(hi) > 0) return hi;
-
-  for (let i = 0; i < 80; i++) {
-    const mid = (lo + hi) / 2;
-    if (kapitalwert(mid) > 0) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-
 export function vertragsTuev(
   v: Vertrag,
   a: TuevAnnahmen,
@@ -293,16 +255,14 @@ export function vertragsTuev(
 
   const istKapital = k.nettoKapital > 0;
   const auszahlungJeJahr = k.nettoRenteMonat * 12;
-  const summeAuszahlung = istKapital ? k.nettoKapital : auszahlungJeJahr * jahreAuszahlung;
 
-  const nettoHebel = summeEinzahlung > 0 ? summeAuszahlung / summeEinzahlung : 0;
-  const rendite =
-    summeEinzahlung > 0 && summeAuszahlung > 0
-      ? internerZins(einzahlungenJeJahr, auszahlungJeJahr, jahreAuszahlung, istKapital ? k.nettoKapital : 0)
-      : 0;
-
-  const amortisationsJahre =
-    !istKapital && auszahlungJeJahr > 0 ? summeEinzahlung / auszahlungJeJahr : 0;
+  const kz = kennzahlen({
+    einzahlungenJeJahr,
+    auszahlungJeJahr: istKapital ? 0 : auszahlungJeJahr,
+    jahreAuszahlung: istKapital ? 0 : jahreAuszahlung,
+    kapitalEinmalig: istKapital ? k.nettoKapital : 0,
+  });
+  const { summeAuszahlung, nettoHebel, rendite, amortisationsJahre } = kz;
 
   if (nettoHebel > 0 && nettoHebel < 1) {
     hinweise.push(
@@ -340,7 +300,7 @@ export function vertragsTuev(
     nettoHebel,
     rendite,
     amortisationsJahre,
-    echterGewinn: summeAuszahlung - summeEinzahlung,
+    echterGewinn: kz.echterGewinn,
     zulagenGekuerzt,
     hinweise,
   };

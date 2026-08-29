@@ -1,6 +1,7 @@
 import type { AvdParameter, LegalParameters } from '../params/types.js';
 import { ansparphase, entnahmeplan, type DepotVerlauf } from './kapitalanlage.js';
 import { zusatzsteuer, abgeltungsteuer } from '../tax/haushalt.js';
+import { kennzahlen } from '../analyse/kennzahlen.js';
 
 /**
  * Altersvorsorgedepot ab dem 01.01.2027.
@@ -295,8 +296,19 @@ export interface AvdSteuervorteil {
   steuerersparnis: number;
   /** Was die Ersparnis UEBER die Zulagen hinaus bringt — nur das zaehlt */
   ueberZulagen: number;
-  /** Eigenbeitrag abzueglich Zulagen und zusaetzlicher Steuerersparnis */
+  /**
+   * Was aus der eigenen Tasche geht: Eigenbeitrag abzueglich Steuerersparnis.
+   *
+   * Die Zulagen werden hier BEWUSST NICHT abgezogen. Sie kommen nicht vom
+   * Sparer, sondern vom Staat, und stehen bereits als hoeheres Kapital auf der
+   * Habenseite. Sie ein zweites Mal als Kostenminderung zu buchen zaehlt sie
+   * doppelt und laesst das gefoerderte Depot so aussehen, als brauche es nur
+   * halb so viel Geld. (Der Riester-Zweig im Vertrags-TUEV rechnet es seit
+   * jeher richtig; dieser Zweig wich davon ab.)
+   */
   eigenaufwandNetto: number;
+  /** Was insgesamt im Depot ankommt: Eigenbeitrag PLUS Zulagen */
+  zuflussInsDepot: number;
   /** true, wenn der Abzug guenstiger ist als die blosse Zulage */
   guenstigerAlsZulage: boolean;
 }
@@ -336,7 +348,8 @@ export function avdSteuervorteil(
     abzugsfaehig,
     steuerersparnis,
     ueberZulagen,
-    eigenaufwandNetto: Math.max(0, eigen - zulagen - ueberZulagen),
+    eigenaufwandNetto: Math.max(0, eigen - ueberZulagen),
+    zuflussInsDepot: eigen + zulagen,
     guenstigerAlsZulage: steuerersparnis > zulagen,
   };
 }
@@ -489,4 +502,158 @@ export function avdGegenFreiesDepot(
   };
 
   return { gefoerdert, frei };
+}
+
+export interface AvdProfitabilitaet {
+  /** --- Ansparphase, ueber die gesamte Laufzeit --- */
+  eigenbeitraegeGesamt: number;
+  zulagenGesamt: number;
+  /** Was insgesamt im Depot ankommt: Eigenbeitraege PLUS Zulagen */
+  zuflussInsDepotGesamt: number;
+  steuerersparnisGesamt: number;
+  /** Was es wirklich kostet: Eigenbeitraege minus Steuerersparnis */
+  eigenaufwandNettoGesamt: number;
+  /** Monatswerte des ersten Beitragsjahres */
+  eigenbeitragMonat: number;
+  zulageMonat: number;
+  steuerersparnisMonat: number;
+  eigenaufwandNettoMonat: number;
+
+  /** --- Auszahlphase --- */
+  bruttoRenteMonat: number;
+  steuerRenteMonat: number;
+  nettoRenteMonat: number;
+  bruttoEinmal: number;
+  steuerEinmal: number;
+  nettoEinmal: number;
+  jahreAuszahlung: number;
+
+  /** --- Kennzahlen, dieselben wie im Vertrags-TUEV --- */
+  summeEinzahlung: number;
+  summeAuszahlung: number;
+  nettoHebel: number;
+  rendite: number;
+  echterGewinn: number;
+  amortisationsJahre: number;
+  hinweise: string[];
+}
+
+/**
+ * Profitabilitaet eines Altersvorsorgedepots — brutto hinein, netto heraus.
+ *
+ * Bewusst nach demselben Muster wie der Vertrags-TUEV, bis hin zu denselben
+ * Kennzahlen aus `analyse/kennzahlen.ts`. Wer beide Stellen der Anwendung
+ * nutzt, soll dort nicht zwei verschiedene Bewertungen desselben Vertrags
+ * vorfinden.
+ *
+ * Die AUSZAHLSEITE wird uebergeben, nicht neu gerechnet. Die Oberflaeche
+ * ermittelt sie ueber den Haushaltstarif mit geschaetzter gesetzlicher Rente;
+ * eine zweite Rechnung hier wuerde davon abweichen, sobald sich eine der
+ * beiden aendert.
+ */
+export function avdProfitabilitaet(
+  args: {
+    beitragMonat: number;
+    jahre: number;
+    kinder: number;
+    alterHeute: number;
+    startjahr: number;
+    zveHeute: number;
+    /** Aus der Projektion: laufende Bruttoauszahlung und ihre Steuer, je Jahr */
+    bruttoRenteJahr: number;
+    steuerRenteJahr: number;
+    jahreAuszahlung: number;
+    /** Einmalige Teilauszahlung zu Rentenbeginn und ihre Steuer */
+    bruttoEinmal: number;
+    steuerEinmal: number;
+  },
+  opt: { verheiratet: boolean; bundesland: string; kirchensteuerpflichtig: boolean },
+  p: LegalParameters,
+): AvdProfitabilitaet {
+  const hinweise: string[] = [];
+
+  // Jahr fuer Jahr, weil Zulage und Bonus vom Alter und vom Beitrag DIESES
+  // Jahres abhaengen.
+  let eigenSumme = 0, zulagenSumme = 0, ersparnisSumme = 0;
+  let bonusVerbraucht = false;
+  const einzahlungenJeJahr: number[] = [];
+  let erstesJahr = { eigen: 0, zulage: 0, ersparnis: 0, netto: 0 };
+
+  for (let j = 0; j < Math.max(0, args.jahre); j++) {
+    const eigen = args.beitragMonat * 12;
+    const z = avdZulagen(
+      { eigenbeitragJahr: eigen, kinder: args.kinder, alter: args.alterHeute + j, jahr: args.startjahr + j },
+      p.avd,
+    );
+    const bonus = bonusVerbraucht ? 0 : z.bonus;
+    if (bonus > 0) bonusVerbraucht = true;
+    const zulage = z.grundzulage + z.kinderzulage + bonus;
+
+    const vorteil = avdSteuervorteil(
+      { eigenbeitragJahr: eigen, zulagenJahr: zulage, zveHeute: args.zveHeute }, opt, p,
+    );
+
+    eigenSumme += eigen;
+    zulagenSumme += zulage;
+    ersparnisSumme += vorteil.ueberZulagen;
+    einzahlungenJeJahr.push(vorteil.eigenaufwandNetto);
+
+    if (j === 0) {
+      erstesJahr = {
+        eigen, zulage, ersparnis: vorteil.ueberZulagen, netto: vorteil.eigenaufwandNetto,
+      };
+      hinweise.push(...z.hinweise);
+    }
+  }
+
+  const nettoRenteJahr = Math.max(0, args.bruttoRenteJahr - args.steuerRenteJahr);
+  const nettoEinmal = Math.max(0, args.bruttoEinmal - args.steuerEinmal);
+
+  const kz = kennzahlen({
+    einzahlungenJeJahr,
+    auszahlungJeJahr: nettoRenteJahr,
+    jahreAuszahlung: args.jahreAuszahlung,
+    kapitalEinmalig: nettoEinmal,
+  });
+
+  if (kz.nettoHebel > 0 && kz.nettoHebel < 1) {
+    hinweise.push(
+      'Über die gesamte Laufzeit kommt weniger heraus, als eingezahlt wurde — ' +
+      'und das schon ohne Berücksichtigung der Inflation.',
+    );
+  }
+  if (kz.amortisationsJahre > args.jahreAuszahlung) {
+    hinweise.push(
+      `Die Einzahlungen sind erst nach ${kz.amortisationsJahre.toFixed(0)} Rentenjahren ` +
+      `zurückgeflossen — der Auszahlplan läuft aber nur ${args.jahreAuszahlung} Jahre.`,
+    );
+  }
+
+  return {
+    eigenbeitraegeGesamt: eigenSumme,
+    zulagenGesamt: zulagenSumme,
+    zuflussInsDepotGesamt: eigenSumme + zulagenSumme,
+    steuerersparnisGesamt: ersparnisSumme,
+    eigenaufwandNettoGesamt: kz.summeEinzahlung,
+    eigenbeitragMonat: erstesJahr.eigen / 12,
+    zulageMonat: erstesJahr.zulage / 12,
+    steuerersparnisMonat: erstesJahr.ersparnis / 12,
+    eigenaufwandNettoMonat: erstesJahr.netto / 12,
+
+    bruttoRenteMonat: args.bruttoRenteJahr / 12,
+    steuerRenteMonat: args.steuerRenteJahr / 12,
+    nettoRenteMonat: nettoRenteJahr / 12,
+    bruttoEinmal: args.bruttoEinmal,
+    steuerEinmal: args.steuerEinmal,
+    nettoEinmal,
+    jahreAuszahlung: args.jahreAuszahlung,
+
+    summeEinzahlung: kz.summeEinzahlung,
+    summeAuszahlung: kz.summeAuszahlung,
+    nettoHebel: kz.nettoHebel,
+    rendite: kz.rendite,
+    echterGewinn: kz.echterGewinn,
+    amortisationsJahre: kz.amortisationsJahre,
+    hinweise,
+  };
 }

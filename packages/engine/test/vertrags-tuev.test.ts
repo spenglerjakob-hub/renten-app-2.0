@@ -250,10 +250,14 @@ describe('Vertrags-TUEV: Altersvorsorgedepot', () => {
     expect(r.zulageMonat).toBeCloseTo(540 / 12, 6);
   });
 
-  it('senkt den Aufwand unter den Bruttobeitrag', () => {
+  it('senkt den Aufwand um die Steuerersparnis — nicht um die Zulagen', () => {
+    // Die Zulagen fliessen in den Vertrag, nicht aus der eigenen Tasche. Der
+    // Aufwand sinkt deshalb nur um die Steuerersparnis, genau wie im
+    // Riester-Zweig direkt darueber.
     const r = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
     expect(r.echterAufwandMonat).toBeLessThan(150);
-    expect(r.echterAufwandMonat).toBeCloseTo(150 - r.zulageMonat - r.steuerersparnisMonat, 6);
+    expect(r.echterAufwandMonat).toBeCloseTo(150 - r.steuerersparnisMonat, 6);
+    expect(r.zulageMonat).toBeGreaterThan(0);
   });
 
   it('gibt den Steuervorteil nur, soweit er die Zulagen uebersteigt', () => {
