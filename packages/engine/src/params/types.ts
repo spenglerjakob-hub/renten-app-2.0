@@ -111,4 +111,50 @@ export interface LegalParameters {
 
   /** Abgeltungsteuer § 32d */
   abgeltungsteuersatz: number;
+
+  /** Altersvorsorgedepot ab 2027 */
+  avd: AvdParameter;
+}
+
+/**
+ * Altersvorsorgedepot (gefoerdertes Altersvorsorgedepot ab 01.01.2027).
+ *
+ * Gesetzgebungsstand: Bundestag 27.03.2026, Bundesrat 08.05.2026, Anwendung
+ * ab dem 01.01.2027. Die Zulagenlogik ist damit final. Die Betraege nennt das
+ * Gesetz als FESTE Euro-Werte ohne Indexierungsmechanismus — sie werden
+ * deshalb bei der Fortschreibung bewusst NICHT hochgeschrieben, anders als
+ * Tarifeckwerte und Beitragsbemessungsgrenzen.
+ */
+export interface AvdParameter {
+  /** Erstes Jahr, in dem das Depot gefoerdert werden kann */
+  abJahr: number;
+  /** Ohne diesen Eigenbeitrag im Jahr entfaellt die Foerderung vollstaendig */
+  mindesteigenbeitragJahr: number;
+  /** Erste Stufe: 50 % auf die ersten 360 EUR */
+  stufe1Grenze: number;
+  stufe1Satz: number;
+  /** Zweite Stufe: 25 % auf die weiteren 1 440 EUR */
+  stufe2Grenze: number;
+  stufe2Satz: number;
+  /** Zulage je kindergeldberechtigtem Kind */
+  kinderzulage: number;
+  /** Einmaliger Berufseinsteigerbonus */
+  berufseinsteigerbonus: number;
+  /** Hoechstalter fuer den Bonus (Vollendung) */
+  berufseinsteigerAlterMax: number;
+  /** Fruehestes Auszahlungsalter */
+  auszahlungAbAlter: number;
+  /** Ein Auszahlplan muss mindestens bis zu diesem Alter laufen */
+  auszahlplanBisAlter: number;
+  /**
+   * Sonderausgaben-Hoechstbetrag § 10a.
+   *
+   * ANNAHME, nicht belegt: Die zugaenglichen Quellen widersprechen sich
+   * (3 000 EUR gegenueber 6 840 EUR). Angesetzt wird der unstrittige Teil —
+   * Eigenbeitrag bis zur oberen Stufengrenze zuzueglich Zulagen. Sobald der
+   * amtliche Wert vorliegt, ist es genau diese eine Zahl.
+   */
+  hoechstbetragAnnahme: number;
+  /** true, solange der Hoechstbetrag nicht amtlich belegt ist */
+  hoechstbetragUnsicher: boolean;
 }

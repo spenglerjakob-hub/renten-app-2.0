@@ -26,6 +26,27 @@ const riesterStandard = {
   sockelbetrag: 60,
 };
 
+/**
+ * Altersvorsorgedepot. Feste Betraege aus dem am 08.05.2026 verabschiedeten
+ * Gesetz; in allen Jahrgaengen identisch, weil das Gesetz keine Indexierung
+ * vorsieht. Vor 2027 gibt es das Produkt nicht — das steuert `abJahr`.
+ */
+const avdStandard = {
+  abJahr: 2027,
+  mindesteigenbeitragJahr: 120,
+  stufe1Grenze: 360,
+  stufe1Satz: 0.5,
+  stufe2Grenze: 1800,
+  stufe2Satz: 0.25,
+  kinderzulage: 300,
+  berufseinsteigerbonus: 200,
+  berufseinsteigerAlterMax: 25,
+  auszahlungAbAlter: 65,
+  auszahlplanBisAlter: 85,
+  hoechstbetragAnnahme: 1800,
+  hoechstbetragUnsicher: true,
+};
+
 export const PARAMETER_2024: LegalParameters = {
   jahr: 2024,
   extrapoliert: false,
@@ -44,6 +65,7 @@ export const PARAMETER_2024: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  avd: avdStandard,
 };
 
 export const PARAMETER_2025: LegalParameters = {
@@ -64,6 +86,7 @@ export const PARAMETER_2025: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  avd: avdStandard,
 };
 
 export const PARAMETER_2026: LegalParameters = {
@@ -84,6 +107,7 @@ export const PARAMETER_2026: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  avd: avdStandard,
 };
 
 export const BELEGTE_JAHRE: readonly LegalParameters[] = [

@@ -62,6 +62,9 @@ function skaliere(basis: LegalParameters, jahr: number, indexRate: number): Lega
       sparer: r(basis.pauschbetraege.sparer),
     },
     riester: { ...basis.riester },
+    // Die Zulagen des Altersvorsorgedepots sind feste Euro-Betraege ohne
+    // gesetzliche Indexierung — sie werden bewusst nicht fortgeschrieben.
+    avd: { ...basis.avd },
   };
 }
 
