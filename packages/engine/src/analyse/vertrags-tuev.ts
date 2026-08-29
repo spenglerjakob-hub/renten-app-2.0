@@ -51,8 +51,25 @@ export interface TuevKontext {
   rentenbeginnJahr: number;
   /** Alter bei Rentenbeginn */
   alterBeiRentenbeginn: number;
+  /**
+   * Die Auszahlseite VOLLSTAENDIG aus der Projektion — Brutto und Abzuege,
+   * nicht nur das Netto. Sonst laesst sich in der Oberflaeche nicht zeigen,
+   * wie aus der Bruttorente die Nettorente wird; genau diese Herleitung war
+   * im urspruenglichen Entwurf vorhanden und beim Nachbau verloren gegangen.
+   */
+  /** Monatliche BRUTTO-Rente; 0 bei Kapitalauszahlung */
+  bruttoRenteMonat: number;
+  /** Monatlicher KV/PV-Abzug auf die Rente */
+  kvPvMonat: number;
+  /** Monatlicher Steuerabzug auf die Rente */
+  steuerMonat: number;
   /** Monatliche NETTO-Rente aus der Projektion; 0 bei Kapitalauszahlung */
   nettoRenteMonat: number;
+
+  /** BRUTTO-Kapital bei Kapitalauszahlung; 0 bei laufender Rente */
+  bruttoKapital: number;
+  /** Steuer auf die Kapitalauszahlung */
+  steuerKapital: number;
   /** NETTO-Kapital bei Kapitalauszahlung; 0 bei laufender Rente */
   nettoKapital: number;
 }
@@ -72,6 +89,15 @@ export interface TuevErgebnis {
   svErsparnisMonat: number;
   /** Was der Vertrag Sie im ersten Jahr wirklich kostet */
   echterAufwandMonat: number;
+
+  /** --- Auszahlseite, monatlich (bei Kapital: einmalig) --- */
+  bruttoRenteMonat: number;
+  kvPvMonat: number;
+  steuerMonat: number;
+  nettoRenteMonat: number;
+  bruttoKapital: number;
+  steuerKapital: number;
+  nettoKapital: number;
 
   /** --- Summen ueber die gesamte Laufzeit --- */
   summeEinzahlung: number;
@@ -266,6 +292,14 @@ export function vertragsTuev(
     vertragId: v.id,
     jahreEinzahlung,
     jahreAuszahlung,
+
+    bruttoRenteMonat: k.bruttoRenteMonat,
+    kvPvMonat: k.kvPvMonat,
+    steuerMonat: k.steuerMonat,
+    nettoRenteMonat: k.nettoRenteMonat,
+    bruttoKapital: k.bruttoKapital,
+    steuerKapital: k.steuerKapital,
+    nettoKapital: k.nettoKapital,
     beitragMonat,
     agZuschussMonat,
     zulageMonat,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { vertragsTuev, renteOderKapital, type TuevAnnahmen, type TuevKontext } from '../src/analyse/vertrags-tuev.js';
 import { parameterFuer } from '../src/params/registry.js';
+import { projiziere } from '../src/projection/timeline.js';
 import type { Szenario, Vertrag } from '../src/model.js';
 
 const p = parameterFuer(2026, { indexRate: 0 });
@@ -49,7 +50,12 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
     zveHeute: 40_000,
     rentenbeginnJahr: 2042,
     alterBeiRentenbeginn: 67,
+    bruttoRenteMonat: 400,
+    kvPvMonat: 50,
+    steuerMonat: 50,
     nettoRenteMonat: 300,
+    bruttoKapital: 0,
+    steuerKapital: 0,
     nettoKapital: 0,
     ...over,
   };
@@ -192,5 +198,43 @@ describe('Rente oder Kapital', () => {
     const r = renteOderKapital(800, 600_000, 67);
     expect(r.kapitalTraegtSichSelbst).toBe(true);
     expect(r.breakEvenMitZins).toBe(Infinity);
+  });
+});
+
+describe('Vertrags-TUEV: Auszahlseite stimmt mit dem Kassenbon ueberein', () => {
+  // Befund: Der TUEV kannte frueher nur das fertige Netto. Die Herleitung
+  // Brutto minus KV/PV minus Steuer fehlte, und damit die Gegenueberstellung
+  // von Netto-Aufwand und Netto-Rente. Jetzt kommt die ganze Auszahlseite aus
+  // demselben Projektionsposten, den auch der Kassenbon anzeigt — dieser Test
+  // haelt fest, dass beide Stellen der App nicht auseinanderlaufen koennen.
+  const prv: Vertrag = {
+    id: 'v1', inhaber: 'A', schicht: 3, typ: 'prvRente', name: 'Rente',
+    brutto: 500, strategie: 'rente', altvertrag: false,
+  };
+  const mitVertrag: Szenario = { ...szenario, vertraege: [prv] };
+
+  const proj = projiziere(mitVertrag);
+  const zeile = proj.zeilen.find((z) => z.jahr === 2042)!;
+  const posten = zeile.posten.find((x) => x.id === 'v1')!;
+
+  const k = kontext({
+    bruttoRenteMonat: posten.bruttoJahr / 12,
+    kvPvMonat: posten.kvPvJahr / 12,
+    steuerMonat: posten.steuerJahr / 12,
+    nettoRenteMonat: posten.nettoJahr / 12,
+  });
+
+  it('reicht Brutto, KV/PV und Steuer unveraendert durch', () => {
+    const r = vertragsTuev(prv, annahmen(), k, mitVertrag, p);
+    expect(r.bruttoRenteMonat).toBeCloseTo(posten.bruttoJahr / 12, 6);
+    expect(r.kvPvMonat).toBeCloseTo(posten.kvPvJahr / 12, 6);
+    expect(r.steuerMonat).toBeCloseTo(posten.steuerJahr / 12, 6);
+    expect(r.nettoRenteMonat).toBeCloseTo(posten.nettoJahr / 12, 6);
+  });
+
+  it('die angezeigte Herleitung geht auf: Brutto minus Abzuege ergibt das Netto', () => {
+    const r = vertragsTuev(prv, annahmen(), k, mitVertrag, p);
+    expect(r.bruttoRenteMonat - r.kvPvMonat - r.steuerMonat).toBeCloseTo(r.nettoRenteMonat, 6);
+    expect(r.bruttoRenteMonat).toBeGreaterThan(r.nettoRenteMonat);
   });
 });

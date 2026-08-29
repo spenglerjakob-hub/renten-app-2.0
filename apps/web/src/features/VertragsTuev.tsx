@@ -126,8 +126,19 @@ export function VertragsTuev({
 
             const posten = zeile?.posten.find((x) => x.id === v.id);
             const istKapital = v.typ === 'bavKapital' || v.typ === 'prvKapital';
+
+            // Die Auszahlseite kommt VOLLSTAENDIG aus der Projektion — Brutto
+            // und Abzuege, nicht nur das Netto. Nur so laesst sich unten
+            // zeigen, wie aus der Bruttorente die Nettorente wird, und beide
+            // Stellen der App koennen nicht auseinanderlaufen.
             const nettoRenteMonat = !istKapital && posten ? posten.nettoJahr / 12 : 0;
+            const bruttoRenteMonat = !istKapital && posten ? posten.bruttoJahr / 12 : 0;
+            const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
+            const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
+
             const nettoKapital = istKapital && posten ? posten.nettoJahr : 0;
+            const bruttoKapital = istKapital && posten ? posten.bruttoJahr : 0;
+            const steuerKapital = istKapital && posten ? posten.steuerJahr + posten.kvPvJahr : 0;
 
             const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
             const rentenbeginnJahr = Number(person.rentenbeginn.slice(-4)) || new Date().getFullYear() + 20;
@@ -149,8 +160,8 @@ export function VertragsTuev({
                 zveHeute: basis.zve,
                 rentenbeginnJahr,
                 alterBeiRentenbeginn,
-                nettoRenteMonat,
-                nettoKapital,
+                bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
+                bruttoKapital, steuerKapital, nettoKapital,
               },
               szenario,
               basis.p,
@@ -306,7 +317,7 @@ export function VertragsTuev({
 
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Im ersten Jahr, monatlich
+                        Ihre Belastung (Ansparphase)
                       </div>
                       <div className="space-y-1.5">
                         <GegenueberZeile text="Beitrag" wert={euro(r.beitragMonat)} />
@@ -326,6 +337,43 @@ export function VertragsTuev({
                           <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
                           <span className="text-base font-black tabular-nums text-slate-900">
                             {euro(r.echterAufwandMonat)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/*
+                      Der Gegenpol zum Kasten darueber: dort geht der BRUTTO-
+                      Beitrag nach Netto, hier die BRUTTO-Rente. Erst so steht
+                      nebeneinander, was der Vertrag monatlich netto kostet und
+                      was er monatlich netto bringt.
+                    */}
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                        Ihr Ertrag (Auszahlungsphase)
+                      </div>
+                      <div className="space-y-1.5">
+                        <GegenueberZeile
+                          text={istKapital ? 'Brutto-Kapital' : 'Brutto-Rente'}
+                          wert={euro(istKapital ? r.bruttoKapital : r.bruttoRenteMonat)}
+                        />
+                        {!istKapital && r.kvPvMonat > 0 && (
+                          <GegenueberZeile text="− KV/PV-Abzug" wert={euro(r.kvPvMonat)} farbe="text-rose-500" />
+                        )}
+                        {!istKapital && r.steuerMonat > 0 && (
+                          <GegenueberZeile text="− Steuer-Abzug" wert={euro(r.steuerMonat)} farbe="text-rose-500" />
+                        )}
+                        {istKapital && r.steuerKapital > 0 && (
+                          <GegenueberZeile text="− Steuern und Abgaben" wert={euro(r.steuerKapital)} farbe="text-rose-500" />
+                        )}
+
+                        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-amber-200 pt-2">
+                          <span className="text-xs font-bold text-amber-900">
+                            {istKapital ? 'Echtes Netto-Kapital' : 'Echte Netto-Rente'}
+                          </span>
+                          <span className="text-base font-black tabular-nums text-amber-700">
+                            {euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)}
+                            {!istKapital && <span className="text-xs font-normal"> / Monat</span>}
                           </span>
                         </div>
                       </div>
