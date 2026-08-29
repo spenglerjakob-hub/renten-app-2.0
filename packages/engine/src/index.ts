@@ -55,8 +55,9 @@ export {
   entnahmeRate, entnahmeplanBewerten, type EntnahmeErgebnis,
 } from './products/entnahmeplaner.js';
 export {
-  avdZulagen, avdAnsparphase, avdAuszahlung,
-  type AvdZulagen, type AvdAnsparErgebnis,
+  avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+  type AvdZulagen, type AvdAnsparErgebnis, type AvdJahr,
+  type AvdSteuervorteil, type DepotSeite,
 } from './products/altersvorsorgedepot.js';
 
 // Analyse

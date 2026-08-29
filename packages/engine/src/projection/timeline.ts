@@ -21,13 +21,6 @@ import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
 import { avdAnsparphase, avdAuszahlung } from '../products/altersvorsorgedepot.js';
 import { parseDatum, alterExakt, heute, type Datum } from '../util/datum.js';
 
-/**
- * Basiszins § 203 Abs. 2 BewG fuer die Vorabpauschale. Das BMF setzt ihn
- * jaehrlich neu fest; fuer kuenftige Jahre ist er nicht bekannt, deshalb
- * eine konservative Annahme statt eines Scheinwertes.
- */
-const BASISZINS = 0.0253;
-
 export interface JahresPosten {
   id: string;
   bezeichnung: string;
@@ -757,7 +750,7 @@ function etfVerlauf(
     sonderzahlung: v.sonderzahlung,
     sonderzahlungInJahr: v.sonderzahlungJahr,
     teilfreistellung,
-    basiszins: BASISZINS,
+    basiszins: p.basiszins,
     sparerpauschbetrag,
     abgeltungsteuerSatzEffektiv: p.abgeltungsteuersatz,
   });

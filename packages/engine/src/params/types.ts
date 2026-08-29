@@ -112,6 +112,16 @@ export interface LegalParameters {
   /** Abgeltungsteuer § 32d */
   abgeltungsteuersatz: number;
 
+  /**
+   * Basiszins fuer die Vorabpauschale (§ 18 Abs. 4 InvStG, abgeleitet aus
+   * § 203 Abs. 2 BewG).
+   *
+   * Das BMF setzt ihn jaehrlich neu fest; er gehoert damit zum Rechtsstand und
+   * nicht — wie frueher — als Konstante in die Zeitachse. Fuer kuenftige Jahre
+   * ist er nicht bekannt, die Fortschreibung haelt ihn deshalb konstant.
+   */
+  basiszins: number;
+
   /** Altersvorsorgedepot ab 2027 */
   avd: AvdParameter;
 }
@@ -147,14 +157,14 @@ export interface AvdParameter {
   /** Ein Auszahlplan muss mindestens bis zu diesem Alter laufen */
   auszahlplanBisAlter: number;
   /**
-   * Sonderausgaben-Hoechstbetrag § 10a.
-   *
-   * ANNAHME, nicht belegt: Die zugaenglichen Quellen widersprechen sich
-   * (3 000 EUR gegenueber 6 840 EUR). Angesetzt wird der unstrittige Teil —
-   * Eigenbeitrag bis zur oberen Stufengrenze zuzueglich Zulagen. Sobald der
-   * amtliche Wert vorliegt, ist es genau diese eine Zahl.
+   * Anteil des Kapitals, der zu Rentenbeginn foerderunschaedlich auf einen
+   * Schlag entnommen werden darf. Der Rest muss verrentet werden.
    */
-  hoechstbetragAnnahme: number;
-  /** true, solange der Hoechstbetrag nicht amtlich belegt ist */
-  hoechstbetragUnsicher: boolean;
+  teilauszahlungMax: number;
+  /**
+   * Sonderausgabenabzug § 10a: abziehbar ist der Eigenbeitrag bis zu diesem
+   * Betrag ZUZUEGLICH des individuellen Zulagenanspruchs. Fuer Alleinstehende
+   * ohne Kinder sind das 1 800 + 540 = 2 340 EUR.
+   */
+  hoechstbetragEigenbeitrag: number;
 }

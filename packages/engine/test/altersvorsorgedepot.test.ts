@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { avdZulagen, avdAnsparphase, avdAuszahlung } from '../src/products/altersvorsorgedepot.js';
+import {
+  avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+} from '../src/products/altersvorsorgedepot.js';
 import { ansparphase } from '../src/products/kapitalanlage.js';
 import { parameterFuer } from '../src/params/registry.js';
 import { projiziere } from '../src/projection/timeline.js';
@@ -49,10 +51,33 @@ describe('Altersvorsorgedepot: Zulagenstufen', () => {
   });
 
   it('zahlt 300 EUR je Kind zusaetzlich', () => {
-    const ohne = avdZulagen({ eigenbeitragJahr: 1800, kinder: 0, alter: 40 }, a);
+    const ohne = avdZulagen({ eigenbeitragJahr: 1800, kinder: 2, alter: 40 }, a);
     const mit = avdZulagen({ eigenbeitragJahr: 1800, kinder: 2, alter: 40 }, a);
     expect(mit.kinderzulage).toBeCloseTo(600, 6);
-    expect(mit.gesamt - ohne.gesamt).toBeCloseTo(600, 6);
+    expect(mit.gesamt - avdZulagen({ eigenbeitragJahr: 1800, kinder: 0, alter: 40 }, a).gesamt)
+      .toBeCloseTo(600, 6);
+    expect(ohne.kinderzulage).toBeCloseTo(600, 6);
+  });
+
+  it('KORREKTUR: die Kinderzulage haengt am Eigenbeitrag, sie ist keine Pauschale', () => {
+    // Je Kind ein Euro fuer jeden eigenen Euro, hoechstens 300 EUR. Die vollen
+    // 300 EUR je Kind gibt es deshalb ab 300 EUR Eigenbeitrag — unabhaengig
+    // davon, wie viele Kinder es sind. Vorher wurden pauschal 300 EUR je Kind
+    // gezahlt; bei 120 EUR Beitrag und drei Kindern waren das 900 EUR Zulage
+    // auf 120 EUR Einzahlung.
+    expect(avdZulagen({ eigenbeitragJahr: 300, kinder: 2, alter: 40 }, a).kinderzulage)
+      .toBeCloseTo(600, 6);
+    expect(avdZulagen({ eigenbeitragJahr: 150, kinder: 2, alter: 40 }, a).kinderzulage)
+      .toBeCloseTo(300, 6);
+    expect(avdZulagen({ eigenbeitragJahr: 120, kinder: 3, alter: 40 }, a).kinderzulage)
+      .toBeCloseTo(360, 6);
+  });
+
+  it('weist auf die gekuerzte Kinderzulage hin, statt sie still zu kuerzen', () => {
+    const knapp = avdZulagen({ eigenbeitragJahr: 150, kinder: 1, alter: 40 }, a);
+    expect(knapp.hinweise.join(' ')).toMatch(/volle Kinderzulage/);
+    const voll = avdZulagen({ eigenbeitragJahr: 300, kinder: 1, alter: 40 }, a);
+    expect(voll.hinweise.join(' ')).not.toMatch(/volle Kinderzulage/);
   });
 
   it('gibt den Berufseinsteigerbonus nur unter 25', () => {
@@ -311,5 +336,129 @@ describe('KV/PV-Verteilung im Kassenbon', () => {
     const frei = projiziere({ ...basis, haushalt: { ...basis.haushalt, kvStatus: 'freiwillig' } });
     const riester = frei.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'x')!;
     expect(riester.kvPvJahr).toBeGreaterThan(0);
+  });
+});
+
+describe('Altersvorsorgedepot: Sonderausgabenabzug', () => {
+  const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
+
+  it('zieht Eigenbeitrag bis zum Hoechstbetrag PLUS Zulagen ab', () => {
+    // Alleinstehend ohne Kinder: 1 800 + 540 = 2 340 EUR.
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 1800, zulagenJahr: 540, zveHeute: 60_000 }, opt, p,
+    );
+    expect(r.abzugsfaehig).toBeCloseTo(2340, 6);
+  });
+
+  it('deckelt den Eigenbeitrag, nicht aber die Zulagen', () => {
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 5000, zulagenJahr: 1140, zveHeute: 60_000 }, opt, p,
+    );
+    expect(r.abzugsfaehig).toBeCloseTo(1800 + 1140, 6);
+  });
+
+  it('GUENSTIGERPRUEFUNG: bei hohem Einkommen bringt der Abzug mehr als die Zulage', () => {
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 1800, zulagenJahr: 540, zveHeute: 90_000 }, opt, p,
+    );
+    expect(r.guenstigerAlsZulage).toBe(true);
+    expect(r.ueberZulagen).toBeGreaterThan(0);
+    expect(r.eigenaufwandNetto).toBeLessThan(1800 - 540);
+  });
+
+  it('GUENSTIGERPRUEFUNG: bei kleinem Einkommen bleibt es bei der Zulage', () => {
+    // Unter dem Grundfreibetrag faellt gar keine Steuer an, die Ersparnis ist
+    // also 0 — der Abzug bringt dann nichts UEBER die Zulage hinaus.
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 1800, zulagenJahr: 540, zveHeute: 8_000 }, opt, p,
+    );
+    expect(r.guenstigerAlsZulage).toBe(false);
+    expect(r.ueberZulagen).toBe(0);
+    expect(r.eigenaufwandNetto).toBeCloseTo(1800 - 540, 6);
+  });
+
+  it('der Netto-Aufwand faellt nie unter null', () => {
+    const r = avdSteuervorteil(
+      { eigenbeitragJahr: 200, zulagenJahr: 1140, zveHeute: 120_000 }, opt, p,
+    );
+    expect(r.eigenaufwandNetto).toBe(0);
+  });
+});
+
+describe('Altersvorsorgedepot: Teilauszahlung zu Rentenbeginn', () => {
+  const basis = { kapital: 200_000, alterBeiBeginn: 67, dauerJahre: 20, rendite: 0 };
+
+  it('entnimmt 30 Prozent auf einen Schlag und verrentet den Rest', () => {
+    const r = avdAuszahlung({ ...basis, teilauszahlungQuote: 0.3 }, a);
+    expect(r.teilauszahlung).toBeCloseTo(60_000, 6);
+    expect(r.bruttoJahr).toBeCloseTo(140_000 / 20, 6);
+  });
+
+  it('verteilt insgesamt genau dasselbe Kapital wie ohne Teilauszahlung', () => {
+    const ohne = avdAuszahlung(basis, a);
+    const mit = avdAuszahlung({ ...basis, teilauszahlungQuote: 0.3 }, a);
+    expect(mit.teilauszahlung + mit.bruttoJahr * mit.dauerJahre)
+      .toBeCloseTo(ohne.bruttoJahr * ohne.dauerJahre, 4);
+  });
+
+  it('kappt oberhalb von 30 Prozent, mit Hinweis', () => {
+    const r = avdAuszahlung({ ...basis, teilauszahlungQuote: 0.6 }, a);
+    expect(r.teilauszahlung).toBeCloseTo(60_000, 6);
+    expect(r.hinweise.join(' ')).toMatch(/höchstens 30 %/);
+  });
+
+  it('laesst ohne Angabe alles im Auszahlplan', () => {
+    const r = avdAuszahlung(basis, a);
+    expect(r.teilauszahlung).toBe(0);
+    expect(r.hinweise).toHaveLength(0);
+  });
+});
+
+describe('Gefoerdertes gegen freies Depot', () => {
+  const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
+  const basis = {
+    beitragMonat: 150, jahre: 30, renditeBrutto: 0.06, kosten: 0.01,
+    kinder: 0, alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
+    auszahldauer: 25, renditeAuszahlung: 0, zveHeute: 50_000,
+    steuersatzImAlter: 0.25,
+  };
+
+  it('das gefoerderte Depot baut mehr Kapital auf', () => {
+    // Zulagen fliessen mit ein und es faellt keine Vorabpauschale an.
+    const r = avdGegenFreiesDepot(basis, opt, p);
+    expect(r.gefoerdert.endkapital).toBeGreaterThan(r.frei.endkapital);
+  });
+
+  it('kostet bei gleichem Bruttobeitrag netto deutlich weniger', () => {
+    const r = avdGegenFreiesDepot(basis, opt, p);
+    expect(r.gefoerdert.eigenbeitraege).toBeCloseTo(r.frei.eigenbeitraege, 2);
+    expect(r.gefoerdert.eigenaufwandNetto).toBeLessThan(r.frei.eigenaufwandNetto);
+  });
+
+  it('wird dafuer in der Auszahlung haerter besteuert', () => {
+    // Das ist die Kehrseite: voller Betrag zum persoenlichen Satz gegen
+    // 25 % nur auf den Gewinn. Der Test haelt BEIDE Richtungen fest, damit
+    // der Vergleich nicht versehentlich einseitig wird.
+    const r = avdGegenFreiesDepot(basis, opt, p);
+    const quote = (s: { steuerJahr: number; bruttoJahr: number }) => s.steuerJahr / s.bruttoJahr;
+    expect(quote(r.gefoerdert)).toBeGreaterThan(quote(r.frei));
+  });
+
+  it('kippt bei einem hohen Steuersatz im Alter zugunsten des freien Depots', () => {
+    const niedrig = avdGegenFreiesDepot({ ...basis, steuersatzImAlter: 0.15 }, opt, p);
+    const hoch = avdGegenFreiesDepot({ ...basis, steuersatzImAlter: 0.42 }, opt, p);
+
+    const vorsprung = (r: ReturnType<typeof avdGegenFreiesDepot>) =>
+      r.gefoerdert.nettoMonat - r.frei.nettoMonat;
+    expect(vorsprung(niedrig)).toBeGreaterThan(vorsprung(hoch));
+  });
+
+  it('weist die Teilauszahlung getrennt aus, statt sie einzurechnen', () => {
+    const r = avdGegenFreiesDepot({ ...basis, teilauszahlungQuote: 0.3 }, opt, p);
+    expect(r.gefoerdert.nettoEinmal).toBeGreaterThan(0);
+    expect(r.frei.nettoEinmal).toBe(0);
+
+    const ohne = avdGegenFreiesDepot(basis, opt, p);
+    expect(r.gefoerdert.nettoMonat).toBeLessThan(ohne.gefoerdert.nettoMonat);
   });
 });

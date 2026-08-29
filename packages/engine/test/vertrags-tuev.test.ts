@@ -238,3 +238,46 @@ describe('Vertrags-TUEV: Auszahlseite stimmt mit dem Kassenbon ueberein', () => 
     expect(r.bruttoRenteMonat).toBeGreaterThan(r.nettoRenteMonat);
   });
 });
+
+describe('Vertrags-TUEV: Altersvorsorgedepot', () => {
+  // Befund: Ein Altersvorsorgedepot fiel im TUEV in den Zweig "aus
+  // versteuertem Geld" — ohne Zulagen und ohne Steuervorteil. Der Vertrag
+  // stand damit erheblich zu schlecht da.
+  const avd = vertrag({ typ: 'avd', schicht: 2, name: 'Altersvorsorgedepot' });
+
+  it('rechnet die Zulagen an', () => {
+    const r = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    expect(r.zulageMonat).toBeCloseTo(540 / 12, 6);
+  });
+
+  it('senkt den Aufwand unter den Bruttobeitrag', () => {
+    const r = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    expect(r.echterAufwandMonat).toBeLessThan(150);
+    expect(r.echterAufwandMonat).toBeCloseTo(150 - r.zulageMonat - r.steuerersparnisMonat, 6);
+  });
+
+  it('gibt den Steuervorteil nur, soweit er die Zulagen uebersteigt', () => {
+    // Guenstigerpruefung: bei kleinem zvE bleibt es bei der blossen Zulage.
+    const klein = vertragsTuev(
+      avd, annahmen({ beitragMonat: 150 }), kontext({ zveHeute: 8_000 }), szenario, p,
+    );
+    expect(klein.steuerersparnisMonat).toBe(0);
+
+    const gross = vertragsTuev(
+      avd, annahmen({ beitragMonat: 150 }), kontext({ zveHeute: 90_000 }), szenario, p,
+    );
+    expect(gross.steuerersparnisMonat).toBeGreaterThan(0);
+  });
+
+  it('zahlt den Berufseinsteigerbonus nur einmal ueber die Laufzeit', () => {
+    // Rentenbeginn 2042, Beginn 2026, Alter dort 51 — kein Bonus.
+    const alt = vertragsTuev(avd, annahmen({ beitragMonat: 150 }), kontext(), szenario, p);
+    // Dieselbe Person 30 Jahre juenger: Bonus genau im ersten Jahr.
+    const jung = vertragsTuev(
+      avd, annahmen({ beitragMonat: 150 }),
+      kontext({ alterBeiRentenbeginn: 37 }), szenario, p,
+    );
+    expect(alt.zulageMonat).toBeCloseTo(540 / 12, 6);
+    expect(jung.zulageMonat).toBeCloseTo((540 + 200) / 12, 6);
+  });
+});

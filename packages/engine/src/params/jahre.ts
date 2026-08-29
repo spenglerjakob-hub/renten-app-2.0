@@ -43,8 +43,8 @@ const avdStandard = {
   berufseinsteigerAlterMax: 25,
   auszahlungAbAlter: 65,
   auszahlplanBisAlter: 85,
-  hoechstbetragAnnahme: 1800,
-  hoechstbetragUnsicher: true,
+  teilauszahlungMax: 0.3,
+  hoechstbetragEigenbeitrag: 1800,
 };
 
 export const PARAMETER_2024: LegalParameters = {
@@ -65,6 +65,7 @@ export const PARAMETER_2024: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  basiszins: 0.0253,
   avd: avdStandard,
 };
 
@@ -86,6 +87,7 @@ export const PARAMETER_2025: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  basiszins: 0.0253,
   avd: avdStandard,
 };
 
@@ -107,6 +109,7 @@ export const PARAMETER_2026: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  basiszins: 0.0253,
   avd: avdStandard,
 };
 

@@ -2,6 +2,7 @@ import type { LegalParameters } from '../params/types.js';
 import type { Szenario, Vertrag } from '../model.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
 import { riesterZulagen, riesterZulagenkuerzung } from '../products/bav.js';
+import { avdZulagen, avdSteuervorteil } from '../products/altersvorsorgedepot.js';
 
 /**
  * VERTRAGS-TUEV
@@ -201,6 +202,10 @@ export function vertragsTuev(
   const einzahlungenJeJahr: number[] = [];
   let summeEinzahlung = 0;
   let zulagenGekuerzt = false;
+  let bonusVerbraucht = false;
+  // Alter der Person im Beitragsjahr — aus Rentenbeginn und Alter dort
+  // zurueckgerechnet, damit der Berufseinsteigerbonus im richtigen Jahr faellt.
+  const alterImJahr = (jahr: number) => k.alterBeiRentenbeginn - (k.rentenbeginnJahr - jahr);
 
   // Momentaufnahme des ersten Jahres
   let beitragMonat = 0, agZuschussMonat = 0, zulageMonat = 0;
@@ -227,6 +232,30 @@ export function vertragsTuev(
       const abzugsfaehig = Math.min(beitragJahr + zulageJahr, p.riester.hoechstbetrag);
       steuerJahr = Math.max(0, zusatzsteuer(k.zveHeute - abzugsfaehig, abzugsfaehig, steuerOpt, p) - zulageJahr);
       aufwandJahr = Math.max(0, beitragJahr - steuerJahr);
+    } else if (v.typ === 'avd') {
+      // Altersvorsorgedepot: erst die Zulagen, dann der Sonderausgabenabzug
+      // ABZUEGLICH der Zulagen — dieselbe Guenstigerpruefung wie bei Riester,
+      // der Gesetzgeber hat die Mechanik unveraendert uebernommen.
+      //
+      // Ohne diesen Zweig fiel der Vertrag in den Fall "aus versteuertem Geld"
+      // und wurde damit erheblich zu schlecht gezeigt: ohne Zulagen und ohne
+      // Steuervorteil.
+      const z = avdZulagen(
+        { eigenbeitragJahr: beitragJahr, kinder: a.kinder.length, alter: alterImJahr(jahr) },
+        p.avd,
+      );
+      // Der Berufseinsteigerbonus faellt nur einmal an.
+      const bonus = bonusVerbraucht ? 0 : z.bonus;
+      if (bonus > 0) bonusVerbraucht = true;
+      zulageJahr = z.grundzulage + z.kinderzulage + bonus;
+
+      const vorteil = avdSteuervorteil(
+        { eigenbeitragJahr: beitragJahr, zulagenJahr: zulageJahr, zveHeute: k.zveHeute },
+        steuerOpt,
+        p,
+      );
+      steuerJahr = vorteil.ueberZulagen;
+      aufwandJahr = vorteil.eigenaufwandNetto;
     } else if (v.typ.startsWith('bav')) {
       // Der Arbeitgeberzuschuss mindert den eigenen Aufwand; er waechst mit
       // dem Beitrag mit.
