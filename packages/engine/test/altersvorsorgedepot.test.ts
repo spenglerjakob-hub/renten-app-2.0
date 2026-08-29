@@ -462,3 +462,29 @@ describe('Gefoerdertes gegen freies Depot', () => {
     expect(r.gefoerdert.nettoMonat).toBeLessThan(ohne.gefoerdert.nettoMonat);
   });
 });
+
+describe('Vergleich: Besteuerung des freien Depots', () => {
+  const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
+
+  it('mittelt den Gewinnanteil ueber die Auszahlungsjahre', () => {
+    // Der Gewinnanteil steigt von Jahr zu Jahr (FIFO). Wuerde nur das erste
+    // Jahr angesetzt, kaeme das freie Depot zu guenstig weg — und der
+    // Vergleich waere zugunsten der falschen Seite verzerrt.
+    const r = avdGegenFreiesDepot(
+      {
+        beitragMonat: 150, jahre: 30, renditeBrutto: 0.06, kosten: 0.01,
+        kinder: 0, alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
+        auszahldauer: 18, renditeAuszahlung: 0, zveHeute: 50_000,
+        steuersatzImAlter: 0.25,
+      },
+      opt, p,
+    );
+
+    // Ueber die Laufzeit sind rund zwei Drittel des Depots Gewinn; die Steuer
+    // muss deutlich ueber dem liegen, was der Gewinnanteil des ersten Jahres
+    // ergaebe (dort ist er am kleinsten).
+    expect(r.frei.steuerJahr).toBeGreaterThan(0);
+    expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeGreaterThan(0.05);
+    expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeLessThan(0.25);
+  });
+});

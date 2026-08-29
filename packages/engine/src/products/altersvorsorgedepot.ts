@@ -458,7 +458,14 @@ export function avdGegenFreiesDepot(
     Math.max(1, Math.round(args.auszahldauer)),
     Math.max(0, args.renditeAuszahlung),
   );
-  const gewinnanteil = plan.gewinnanteilJeJahr[0] ?? 0;
+  // Der Gewinnanteil STEIGT ueber die Auszahlungsjahre, weil zuerst die
+  // guenstig eingekauften Anteile veraeussert werden. Das erste Jahr allein
+  // wuerde das freie Depot zu guenstig zeigen; gemittelt wird deshalb ueber
+  // die ganze Laufzeit.
+  const anteile = plan.gewinnanteilJeJahr;
+  const gewinnanteil = anteile.length > 0
+    ? anteile.reduce((sum, x) => sum + x, 0) / anteile.length
+    : 0;
   const { steuer: freiSteuer } = abgeltungsteuer(
     plan.bruttoProJahr * gewinnanteil,
     {
