@@ -69,6 +69,7 @@ export {
 export {
   projiziere,
   type Jahreszeile, type JahresPosten, type ProjektionsErgebnis, type PlanerErgebnis,
+  type AvdLauf,
 } from './projection/timeline.js';
 
 // Datum

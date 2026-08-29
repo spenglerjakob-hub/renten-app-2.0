@@ -18,6 +18,7 @@ import { bruttoZuNetto, nettoZuBrutto, erwerbHaushalt } from '../erwerb/netto.js
 import { bavKapitalMonatswert, bavKapitalSteuer } from '../products/bav.js';
 import { kapitalversicherungErtrag, ansparphase, entnahmeplan } from '../products/kapitalanlage.js';
 import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
+import { avdAnsparphase, avdAuszahlung } from '../products/altersvorsorgedepot.js';
 import { parseDatum, alterExakt, heute, type Datum } from '../util/datum.js';
 
 /**
@@ -108,6 +109,12 @@ export interface ProjektionsErgebnis {
     vertragId: string; bezeichnung: string; jahr: number;
     bruttoKapital: number; steuer: number; nettoKapital: number;
   }[];
+  /**
+   * Je Altersvorsorgedepot Endkapital, Eigenbeitraege und vereinnahmte
+   * Zulagen. Ohne diese Angabe bliebe die Foerderung unsichtbar — und genau
+   * sie ist der Grund, ueberhaupt ein gefoerdertes Depot zu waehlen.
+   */
+  avd: AvdLauf[];
   hinweise: string[];
 }
 
@@ -183,7 +190,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   if (personen.length === 0) {
     return {
       zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
-      kapitalauszahlungen: [],
+      kapitalauszahlungen: [], avd: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
       hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
@@ -295,6 +302,23 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     depots.set(v.id, etfVerlauf(v, s, pRuhestand, jahreBis));
   }
 
+  // --- Altersvorsorgedepots (ab 2027) ---
+  // Wie beim freien Depot haengt die Auszahlung vom Endkapital ab, also
+  // einmal VOR der Schleife. Anders als beim freien Depot ist die Auszahlung
+  // aber voll TARIFLICH zu versteuern — sie laeuft deshalb spaeter ueber
+  // `quellen` und nicht als fertig versteuerter Posten.
+  const avdLaeufe = new Map<string, AvdLauf>();
+  for (const v of s.vertraege) {
+    if (v.typ !== 'avd') continue;
+    const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+    const jahreBis = Math.max(0, k.rentenbeginnJahr - jetzt.jahr);
+    const lauf = avdLauf(v, k, jahreBis, jetzt.jahr, s, pRuhestand);
+    avdLaeufe.set(v.id, lauf);
+    for (const h of lauf.hinweise) {
+      hinweise.push(`${v.name || 'Altersvorsorgedepot'}: ${h}`);
+    }
+  }
+
   // --- Einmalige Kapitalauszahlungen ---
   const kapitalauszahlungen: ProjektionsErgebnis['kapitalauszahlungen'] = [];
   for (const v of s.vertraege) {
@@ -320,6 +344,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
     const quellen: Einkunftsquelle[] = [];
     const beitragspflichtig: Beitragspflichtig[] = [];
+    // Je Quelle der Betrag, der ueberhaupt KV/PV-pflichtig ist. Ohne diese
+    // Spur wuerde die Beitragslast unten nach BRUTTO verteilt — und damit
+    // auch beitragsfreien Bezuegen (Riester und Altersvorsorgedepot in der
+    // KVdR) Beitraege zugeschrieben, die sie nicht ausloesen.
+    const kvBasis = new Map<string, number>();
     const posten: JahresPosten[] = [];
 
     let nochErwerbstaetig = false;
@@ -349,6 +378,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         art: k.istVersorgungsbezug ? 'versorgungsbezug' : 'gesetzlicheRente',
         monatsbetrag: brutto / 12,
       });
+      kvBasis.set(`person-${k.person.id}`, brutto);
     }
 
     // --- Erwerbseinkommen der noch arbeitenden Personen ---
@@ -381,17 +411,22 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       if (jahr < k.rentenbeginnJahr) continue;
       if (v.strategie === 'ignorieren') continue;
 
-      const r = vertragImJahr(v, k, jahr, s, p);
+      const r = vertragImJahr(v, k, jahr, s, p, avdLaeufe);
       if (!r) continue;
       // Vertraege mit Strategie "planer" werden weiter unten als Kapital in
       // den Auszahlungs-Planer uebertragen; ihr Brutto darf hier nicht
       // zusaetzlich als laufendes Einkommen erscheinen. Die Beitragspflicht
       // in der KV/PV bleibt davon unberuehrt.
       if (v.strategie !== 'planer') {
-        quellen.push({ id: v.id, bezeichnung: v.name || v.typ, brutto: r.brutto, zveBeitrag: r.zveBeitrag, kvPv: 0 });
+        // "avd" waere als Ersatzbezeichnung im Kassenbon nicht lesbar; die
+        // uebrigen Kuerzel sind wenigstens Woerter.
+        const bezeichnung = v.name || (v.typ === 'avd' ? 'Altersvorsorgedepot' : v.typ);
+        quellen.push({ id: v.id, bezeichnung, brutto: r.brutto, zveBeitrag: r.zveBeitrag, kvPv: 0 });
       }
       if (r.kvArt) {
-        beitragspflichtig.push({ art: r.kvArt, monatsbetrag: r.kvMonatsbetrag ?? r.brutto / 12 });
+        const monatsbetrag = r.kvMonatsbetrag ?? r.brutto / 12;
+        beitragspflichtig.push({ art: r.kvArt, monatsbetrag });
+        kvBasis.set(v.id, monatsbetrag * 12);
       }
     }
 
@@ -425,10 +460,19 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       p,
     );
 
-    // KV/PV verursachungsgerecht auf die Quellen verteilen
+    // KV/PV verursachungsgerecht auf die Quellen verteilen: nach dem
+    // BEITRAGSPFLICHTIGEN Betrag, nicht nach dem Brutto. Sonst truege etwa
+    // eine Riester-Rente in der KVdR im Kassenbon Beitraege, die sie gar
+    // nicht ausloest — und der gesetzlichen Rente fehlten sie.
+    // Rueckfall auf das Brutto, wenn keine Quelle beitragspflichtig ist,
+    // die Kasse aber trotzdem etwas kostet (privat Versicherte zahlen eine
+    // Praemie unabhaengig vom Bezug).
     const bruttoSumme = quellen.reduce((sum, q) => sum + q.brutto, 0);
+    const kvBasisSumme = quellen.reduce((sum, q) => sum + (kvBasis.get(q.id) ?? 0), 0);
     for (const q of quellen) {
-      const anteilKv = bruttoSumme > 0 ? (q.brutto / bruttoSumme) * kvPvJahr : 0;
+      const anteilKv = kvBasisSumme > 0
+        ? ((kvBasis.get(q.id) ?? 0) / kvBasisSumme) * kvPvJahr
+        : bruttoSumme > 0 ? (q.brutto / bruttoSumme) * kvPvJahr : 0;
       const steuer = st.aufteilung.find((a) => a.id === q.id)?.gesamt ?? 0;
       const vertrag = s.vertraege.find((v) => v.id === q.id);
       posten.push({
@@ -546,6 +590,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       bruttoMonat: e.bruttoProJahr / 12,
     })),
     kapitalauszahlungen,
+    avd: [...avdLaeufe.values()],
     hinweise,
   };
 }
@@ -738,6 +783,78 @@ function etfVerlauf(
   };
 }
 
+export interface AvdLauf {
+  vertragId: string;
+  /** Depotwert zum Rentenbeginn, einschliesslich verzinster Zulagen */
+  endkapital: number;
+  /** Summe der Eigenbeitraege ohne Zulagen */
+  eigenbeitraege: number;
+  /** Summe der vereinnahmten Zulagen */
+  zulagenGesamt: number;
+  /** Zulagen des ersten Beitragsjahres */
+  grundzulageJahr1: number;
+  kinderzulageJahr1: number;
+  /** Jaehrliche Bruttoauszahlung */
+  bruttoJahr: number;
+  dauerJahre: number;
+  hinweise: string[];
+}
+
+/**
+ * Ansparen und Auszahlen eines Altersvorsorgedepots.
+ *
+ * Buendelt beide Phasen an einer Stelle, damit die Zeitachse und die
+ * Landingpage dieselbe Rechnung sehen. Die Kinderzahl kommt aus dem Haushalt
+ * und wird nicht am Vertrag erfasst — sonst haette man zwei Wahrheiten.
+ */
+function avdLauf(
+  v: Vertrag,
+  k: PersonKontext,
+  jahreBisRente: number,
+  startjahr: number,
+  s: Szenario,
+  p: ReturnType<typeof parameterFuer>,
+): AvdLauf {
+  const anspar = avdAnsparphase(
+    {
+      beitragMonat: v.monatsbeitrag ?? 0,
+      dynamik: v.dynamik ?? 0,
+      startkapital: v.kapitalHeute ?? 0,
+      jahre: jahreBisRente,
+      renditeBrutto: v.renditeAnsparphase ?? 0.06,
+      ter: v.ter ?? 0.002,
+      kinder: s.haushalt.kinderUnter25,
+      alterHeute: k.alterBeiRentenbeginn - jahreBisRente,
+      startjahr: Math.max(startjahr, p.avd.abJahr),
+    },
+    p,
+  );
+
+  // In der Auszahlphase wird ueblicherweise vorsichtiger angelegt.
+  const renditeEntnahme = Math.max(0, (v.renditeEntnahme ?? 0.02) - (v.ter ?? 0.002));
+  const aus = avdAuszahlung(
+    {
+      kapital: anspar.endkapital,
+      alterBeiBeginn: k.alterBeiRentenbeginn,
+      dauerJahre: v.entnahmedauer ?? 25,
+      rendite: renditeEntnahme,
+    },
+    p.avd,
+  );
+
+  return {
+    vertragId: v.id,
+    endkapital: anspar.endkapital,
+    eigenbeitraege: anspar.eigenbeitraege,
+    zulagenGesamt: anspar.zulagenGesamt,
+    grundzulageJahr1: anspar.ersteZulagen.grundzulage,
+    kinderzulageJahr1: anspar.ersteZulagen.kinderzulage,
+    bruttoJahr: aus.bruttoJahr,
+    dauerJahre: aus.dauerJahre,
+    hinweise: [...anspar.hinweise, ...aus.hinweise],
+  };
+}
+
 /** Laufende Auszahlung eines Vertrags in einem Kalenderjahr. */
 function vertragImJahr(
   v: Vertrag,
@@ -745,6 +862,7 @@ function vertragImJahr(
   jahr: number,
   s: Szenario,
   p: ReturnType<typeof parameterFuer>,
+  avdLaeufe: ReadonlyMap<string, AvdLauf>,
 ): {
   brutto: number;
   zveBeitrag: number;
@@ -784,6 +902,24 @@ function vertragImJahr(
       // in der KVdR beitragsfrei (kein Versorgungsbezug).
       const brutto = v.brutto * 12;
       return { brutto, zveBeitrag: brutto, kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null };
+    }
+    case 'avd': {
+      // Altersvorsorgedepot ab 2027. Die Auszahlung ist VOLLSTAENDIG
+      // nachgelagert zu versteuern, und zwar tariflich — nicht mit
+      // Abgeltungsteuer wie das freie Depot. Deshalb steht dieser Zweig hier
+      // bei den tariflichen Quellen und nicht bei den Depotposten.
+      const lauf = avdLaeufe.get(v.id);
+      if (!lauf) return null;
+      if (jahreSeitRente < 0 || jahreSeitRente >= lauf.dauerJahre) return null;
+      if (lauf.bruttoJahr <= 0) return null;
+
+      // KV/PV wie bei Riester: in der KVdR beitragsfrei, bei freiwilliger
+      // Versicherung beitragspflichtig.
+      return {
+        brutto: lauf.bruttoJahr,
+        zveBeitrag: lauf.bruttoJahr,
+        kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
+      };
     }
     case 'prvRente': {
       const brutto = v.brutto * 12;

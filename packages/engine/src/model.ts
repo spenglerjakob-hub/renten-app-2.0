@@ -9,6 +9,7 @@ export type VertragsTyp =
   | 'bavUkasse'    // Unterstuetzungskasse/Direktzusage (§ 19 Versorgungsbezug)
   | 'bavKapital'
   | 'riester'
+  | 'avd'          // Altersvorsorgedepot ab 2027
   | 'prvRente'
   | 'prvKapital'
   | 'immobilie'

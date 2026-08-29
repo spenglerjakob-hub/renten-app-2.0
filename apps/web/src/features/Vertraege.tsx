@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Trash2, PlusCircle } from 'lucide-react';
-import type { Vertrag, VertragsTyp } from '@renten/engine';
+import type { Vertrag, VertragsTyp, AvdLauf } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 
@@ -11,6 +11,7 @@ const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
     { wert: 'bavUkasse', text: 'Unterstützungskasse / Direktzusage' },
     { wert: 'bavKapital', text: 'bAV (Kapitalauszahlung)' },
     { wert: 'riester', text: 'Riester-Rente' },
+    { wert: 'avd', text: 'Altersvorsorgedepot (ab 2027)' },
   ],
   3: [
     { wert: 'prvRente', text: 'Private Rente (monatlich)' },
@@ -33,11 +34,18 @@ function istKapital(t: VertragsTyp) { return t === 'bavKapital' || t === 'prvKap
  * gesetzlich ausgeschlossen (§ 10 EStG verlangt eine lebenslange Rente), bei
  * bAV und privater Rente gibt es dafuer eigene Vertragsarten.
  */
-const STRATEGIEN: Record<'etf' | 'sonst', { wert: Vertrag['strategie']; text: string }[]> = {
+const STRATEGIEN: Record<'etf' | 'avd' | 'sonst', { wert: Vertrag['strategie']; text: string }[]> = {
   etf: [
     { wert: 'rente', text: 'Als laufende Rente ins Netto' },
     { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
     { wert: 'kapital', text: 'Kapitalauszahlung (einmalig)' },
+  ],
+  // Beim Altersvorsorgedepot schreibt das Gesetz die Auszahlung als
+  // Leibrente oder Auszahlplan bis mindestens 85 vor. Eine freie
+  // Kapitalentnahme steht deshalb bewusst nicht zur Wahl.
+  avd: [
+    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
+    { wert: 'ignorieren', text: 'Nicht einrechnen' },
   ],
   sonst: [
     { wert: 'rente', text: 'Als laufende Rente ins Netto' },
@@ -46,7 +54,9 @@ const STRATEGIEN: Record<'etf' | 'sonst', { wert: Vertrag['strategie']; text: st
   ],
 };
 
-function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige }) {
+function VertragsKarte({ v, depot, auszahlung, avd }: {
+  v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;
+}) {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
@@ -78,7 +88,7 @@ function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnze
             optionen={[{ wert: 'A', text: 'Person A' }, { wert: 'B', text: 'Person B' }]} />
         )}
 
-        {v.typ !== 'etf' && (
+        {v.typ !== 'etf' && v.typ !== 'avd' && (
           <ZahlFeld
             label={istKapital(v.typ) ? 'Kapitalauszahlung (brutto)' : v.typ === 'immobilie' ? 'Kaltmiete monatlich' : 'Rente monatlich (brutto)'}
             wert={v.brutto} onChange={(n) => vertragAendern(v.id, { brutto: n })} einheit="€" />
@@ -116,6 +126,27 @@ function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnze
           </>
         )}
 
+        {v.typ === 'avd' && (
+          <>
+            <ZahlFeld label="Beitrag monatlich" wert={v.monatsbeitrag ?? 0}
+              onChange={(n) => vertragAendern(v.id, { monatsbeitrag: n })} einheit="€"
+              hilfe="Ab 120 € im Jahr (10 € im Monat) gibt es Zulagen, ab 150 € im Monat die volle Grundzulage." />
+            <ProzentFeld label="Beitragsdynamik p. a." wert={v.dynamik ?? 0}
+              onChange={(n) => vertragAendern(v.id, { dynamik: n })} />
+            <ZahlFeld label="Bereits vorhandenes Kapital" wert={v.kapitalHeute ?? 0}
+              onChange={(n) => vertragAendern(v.id, { kapitalHeute: n })} einheit="€" />
+            <ProzentFeld label="Rendite Ansparphase" wert={v.renditeAnsparphase ?? 0.06}
+              onChange={(n) => vertragAendern(v.id, { renditeAnsparphase: n })} />
+            <ProzentFeld label="Rendite Auszahlphase" wert={v.renditeEntnahme ?? 0.02}
+              onChange={(n) => vertragAendern(v.id, { renditeEntnahme: n })} />
+            <ProzentFeld label="Laufende Kosten (TER)" wert={v.ter ?? 0.002}
+              onChange={(n) => vertragAendern(v.id, { ter: n })} max={5} />
+            <ZahlFeld label="Auszahlungsdauer" wert={v.entnahmedauer ?? 25}
+              onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })} min={1} max={60} einheit="Jahre"
+              hilfe="Ein Auszahlplan muss mindestens bis zum 85. Lebensjahr laufen." />
+          </>
+        )}
+
         {v.typ === 'prvKapital' && (
           <>
             <ZahlFeld label="Vertragsbeginn (Jahr)" wert={v.beginnJahr ?? 2010}
@@ -128,7 +159,7 @@ function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnze
 
         <AuswahlFeld label="Auszahlungsstrategie" wert={v.strategie}
           onChange={(st) => vertragAendern(v.id, { strategie: st })}
-          optionen={STRATEGIEN[v.typ === 'etf' ? 'etf' : 'sonst']} />
+          optionen={STRATEGIEN[v.typ === 'etf' ? 'etf' : v.typ === 'avd' ? 'avd' : 'sonst']} />
       </div>
 
       {(v.typ === 'bav' || v.typ === 'bavKapital' || v.typ === 'prvRente' || v.typ === 'prvKapital') && (
@@ -174,6 +205,41 @@ function VertragsKarte({ v, depot, auszahlung }: { v: Vertrag; depot?: DepotAnze
         </div>
       )}
 
+      {v.typ === 'avd' && avd && avd.endkapital > 0 && (
+        <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Zulagen im 1. Jahr</div>
+              <div className="text-sm font-black tabular-nums text-emerald-800">
+                {euro(avd.grundzulageJahr1 + avd.kinderzulageJahr1)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Zulagen gesamt</div>
+              <div className="text-sm font-black tabular-nums text-emerald-800">{euro(avd.zulagenGesamt)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kapital bei Rentenbeginn</div>
+              <div className="text-sm font-black tabular-nums text-emerald-800">{euro(avd.endkapital)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Auszahlung brutto</div>
+              <div className="text-sm font-black tabular-nums text-emerald-800">
+                {euro(avd.bruttoJahr / 12)} <span className="text-xs font-normal">/ Monat</span>
+              </div>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+            Eigenbeitrag {euro(avd.eigenbeitraege)} über die Laufzeit, dazu {euro(avd.zulagenGesamt)} Zulagen
+            vom Staat. Die Auszahlung ist voll mit Ihrem persönlichen Steuersatz zu versteuern —
+            nicht mit der Abgeltungsteuer.
+          </p>
+          {avd.hinweise.map((h) => (
+            <p key={h} className="mt-2 rounded bg-amber-50 px-2 py-1 text-[10px] text-amber-900">{h}</p>
+          ))}
+        </div>
+      )}
+
       {v.typ === 'bavKapital' && !v.altvertrag && (
         <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600">
           Kapitalauszahlungen aus Direktversicherung, Pensionskasse und Pensionsfonds sind im
@@ -192,8 +258,13 @@ export interface AuszahlungAnzeige {
 }
 
 export function Vertraege({
-  schicht, depots = [], auszahlungen = [],
-}: { schicht: 1 | 2 | 3; depots?: DepotAnzeige[]; auszahlungen?: AuszahlungAnzeige[] }) {
+  schicht, depots = [], auszahlungen = [], avdLaeufe = [],
+}: {
+  schicht: 1 | 2 | 3;
+  depots?: DepotAnzeige[];
+  auszahlungen?: AuszahlungAnzeige[];
+  avdLaeufe?: readonly AvdLauf[];
+}) {
   // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
   // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
   // deshalb fuer eine Aenderung und rendert endlos neu (React-Fehler #185).
@@ -216,6 +287,7 @@ export function Vertraege({
             v={v}
             depot={depots.find((d) => d.vertragId === v.id)}
             auszahlung={auszahlungen.find((a) => a.vertragId === v.id)}
+            avd={avdLaeufe.find((a) => a.vertragId === v.id)}
           />
         ))}
         <button

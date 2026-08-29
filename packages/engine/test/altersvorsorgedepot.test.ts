@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { avdZulagen, avdAnsparphase, avdAuszahlung } from '../src/products/altersvorsorgedepot.js';
 import { ansparphase } from '../src/products/kapitalanlage.js';
 import { parameterFuer } from '../src/params/registry.js';
+import { projiziere } from '../src/projection/timeline.js';
+import type { Szenario, Vertrag } from '../src/model.js';
 
 const p = parameterFuer(2027, { indexRate: 0 });
 const a = p.avd;
@@ -153,5 +155,161 @@ describe('Altersvorsorgedepot: Auszahlung', () => {
     let rest = 200_000;
     for (let j = 0; j < r.dauerJahre; j++) rest = rest * 1.03 - r.bruttoJahr;
     expect(rest).toBeCloseTo(0, 4);
+  });
+});
+
+describe('Altersvorsorgedepot als Vertragsart in der Zeitachse', () => {
+  const jetztJahr = new Date().getFullYear();
+  const rentenbeginn = `${jetztJahr + 25}-01-01`;
+
+  function szenario(over: Partial<Vertrag> = {}): Szenario {
+    return {
+      schemaVersion: 1,
+      haushalt: {
+        verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
+        hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        zielNettoHeute: 2000,
+      },
+      annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
+      einkommenHeute: {
+        modus: 'brutto', betrag: 4500, auszahlungen: 12,
+        besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+      },
+      personen: [{
+        id: 'A', name: 'Test',
+        geburtsdatum: `${jetztJahr - 42}-01-01`, rentenbeginn,
+        art: 'grv', grvBruttoHeute: 1800,
+        besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+        dienstbeginn: '2005-01-01', teilzeitphasen: [],
+      }],
+      vertraege: [{
+        id: 'avd1', inhaber: 'A', schicht: 2, typ: 'avd', name: 'Altersvorsorgedepot',
+        brutto: 0, strategie: 'rente', altvertrag: false,
+        monatsbeitrag: 150, dynamik: 0, renditeAnsparphase: 0.06, ter: 0.002,
+        renditeEntnahme: 0.02, entnahmedauer: 25,
+        ...over,
+      }],
+      planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
+    };
+  }
+
+  it('erscheint als Posten im ersten Rentenjahr', () => {
+    const r = projiziere(szenario());
+    const zeile = r.zeilen.find((z) => z.jahr === jetztJahr + 25)!;
+    const posten = zeile.posten.find((x) => x.id === 'avd1');
+    expect(posten).toBeDefined();
+    expect(posten!.bruttoJahr).toBeGreaterThan(0);
+    expect(posten!.schicht).toBe(2);
+  });
+
+  it('wird TARIFLICH besteuert, nicht mit Abgeltungsteuer', () => {
+    // Der entscheidende Unterschied zum freien Depot: das volle Brutto geht
+    // ins zu versteuernde Einkommen. Beim ETF-Depot ist zveBeitrag 0, weil
+    // dort die Abgeltungsteuer schon abgezogen ist.
+    const r = projiziere(szenario());
+    const zeile = r.zeilen.find((z) => z.jahr === jetztJahr + 25)!;
+    const posten = zeile.posten.find((x) => x.id === 'avd1')!;
+    expect(posten.zveBeitrag).toBeCloseTo(posten.bruttoJahr, 6);
+    expect(posten.steuerJahr).toBeGreaterThan(0);
+  });
+
+  it('die Zulagen erhoehen die Auszahlung messbar', () => {
+    const mit = projiziere(szenario());
+    // Derselbe Vertrag, aber unter dem Mindesteigenbeitrag: keine Foerderung.
+    const ohne = projiziere(szenario({ monatsbeitrag: 5 }));
+
+    const j = jetztJahr + 25;
+    const bruttoMit = mit.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'avd1')!.bruttoJahr;
+    const bruttoOhne = ohne.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'avd1')!.bruttoJahr;
+
+    // 150 EUR gegen 5 EUR Beitrag sind 30-fach; mit Zulage muss der Abstand
+    // noch groesser sein.
+    expect(bruttoMit / bruttoOhne).toBeGreaterThan(30);
+    expect(ohne.hinweise.join(' ')).toMatch(/entfällt die Förderung/);
+  });
+
+  it('zahlt nur ueber die Auszahlungsdauer, danach nicht mehr', () => {
+    const r = projiziere(szenario({ entnahmedauer: 20 }));
+    const j = jetztJahr + 25;
+    const posten = (jahr: number) => r.zeilen.find((z) => z.jahr === jahr)?.posten.find((x) => x.id === 'avd1');
+    expect(posten(j + 19)).toBeDefined();
+    expect(posten(j + 20)).toBeUndefined();
+  });
+
+  it('bleibt in der KVdR beitragsfrei, in der freiwilligen Versicherung nicht', () => {
+    const j = jetztJahr + 25;
+    const kvdr = projiziere(szenario());
+    const frei = projiziere({
+      ...szenario(),
+      haushalt: { ...szenario().haushalt, kvStatus: 'freiwillig' },
+    });
+    const kvVon = (r: ReturnType<typeof projiziere>) =>
+      r.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'avd1')!.kvPvJahr;
+    expect(kvVon(frei)).toBeGreaterThan(kvVon(kvdr));
+  });
+});
+
+describe('KV/PV-Verteilung im Kassenbon', () => {
+  // Befund beim Einbau des Altersvorsorgedepots: die Beitragslast wurde nach
+  // BRUTTO auf die Quellen verteilt. Damit trug ein in der KVdR beitragsfreier
+  // Bezug im Kassenbon Beitraege, die er nicht ausloest — und der
+  // gesetzlichen Rente fehlten sie. Betroffen war auch die Riester-Rente.
+  const jetztJahr = new Date().getFullYear();
+  const j = jetztJahr + 25;
+
+  function mitVertrag(v: Partial<Vertrag>): Szenario {
+    return {
+      schemaVersion: 1,
+      haushalt: {
+        verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
+        hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        zielNettoHeute: 2000,
+      },
+      annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
+      einkommenHeute: {
+        modus: 'brutto', betrag: 4500, auszahlungen: 12,
+        besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+      },
+      personen: [{
+        id: 'A', name: 'Test',
+        geburtsdatum: `${jetztJahr - 42}-01-01`, rentenbeginn: `${j}-01-01`,
+        art: 'grv', grvBruttoHeute: 1800,
+        besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+        dienstbeginn: '2005-01-01', teilzeitphasen: [],
+      }],
+      vertraege: [{
+        id: 'x', inhaber: 'A', schicht: 2, typ: 'riester', name: 'Riester',
+        brutto: 0, strategie: 'rente', altvertrag: false,
+        ...v,
+      }],
+      planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
+    };
+  }
+
+  it('schreibt einem in der KVdR beitragsfreien Bezug KEINE Beitraege zu', () => {
+    const r = projiziere(mitVertrag({ typ: 'riester', brutto: 400 }));
+    const zeile = r.zeilen.find((z) => z.jahr === j)!;
+    const riester = zeile.posten.find((x) => x.id === 'x')!;
+    expect(riester.bruttoJahr).toBeCloseTo(4800, 6);
+    expect(riester.kvPvJahr).toBe(0);
+  });
+
+  it('laesst die Beitragssumme des Haushalts dabei unveraendert', () => {
+    // Die Beitraege verschwinden nicht, sie landen bei der Quelle, die sie
+    // ausloest — der gesetzlichen Rente.
+    const ohne = projiziere(mitVertrag({ typ: 'riester', brutto: 0 }));
+    const mit = projiziere(mitVertrag({ typ: 'riester', brutto: 400 }));
+    const kv = (r: ReturnType<typeof projiziere>) => r.zeilen.find((z) => z.jahr === j)!.kvPvGesamt;
+    expect(kv(mit)).toBeCloseTo(kv(ohne), 6);
+
+    const rente = mit.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'person-A')!;
+    expect(rente.kvPvJahr).toBeCloseTo(kv(mit), 6);
+  });
+
+  it('belastet denselben Bezug in der freiwilligen Versicherung sehr wohl', () => {
+    const basis = mitVertrag({ typ: 'riester', brutto: 400 });
+    const frei = projiziere({ ...basis, haushalt: { ...basis.haushalt, kvStatus: 'freiwillig' } });
+    const riester = frei.zeilen.find((z) => z.jahr === j)!.posten.find((x) => x.id === 'x')!;
+    expect(riester.kvPvJahr).toBeGreaterThan(0);
   });
 });

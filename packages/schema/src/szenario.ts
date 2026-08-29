@@ -62,7 +62,7 @@ export const vertragSchema = z.object({
   id: z.string(),
   inhaber: z.enum(['A', 'B']).default('A'),
   schicht: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  typ: z.enum(['basis', 'bav', 'bavUkasse', 'bavKapital', 'riester', 'prvRente', 'prvKapital', 'immobilie', 'etf']),
+  typ: z.enum(['basis', 'bav', 'bavUkasse', 'bavKapital', 'riester', 'avd', 'prvRente', 'prvKapital', 'immobilie', 'etf']),
   name: z.string().default(''),
   brutto: z.number().min(0).default(0),
   strategie: z.enum(['rente', 'planer', 'kapital', 'ignorieren']).default('rente'),
