@@ -512,7 +512,7 @@ describe('Altersvorsorgedepot: Profitabilitaet', () => {
   const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
   const basis = {
     beitragMonat: 150, jahre: 30, kinder: 0, alterHeute: 37, startjahr: 2027,
-    zveHeute: 50_000,
+    zveHeute: 50_000, endkapital: 180_000,
     bruttoRenteJahr: 10_000, steuerRenteJahr: 2_700, jahreAuszahlung: 18,
     bruttoEinmal: 0, steuerEinmal: 0,
   };
@@ -567,5 +567,46 @@ describe('Altersvorsorgedepot: Profitabilitaet', () => {
     );
     expect(r.nettoHebel).toBeLessThan(1);
     expect(r.hinweise.join(' ')).toMatch(/weniger heraus, als eingezahlt/);
+  });
+});
+
+describe('Berufseinsteigerbonus: einmalig, nicht dauerhaft', () => {
+  // Befund aus der Ansicht: Die Seite wies "Zulagen im Jahr 380 EUR" und
+  // "105,6 % obendrauf" aus. Darin steckten 200 EUR Bonus, den es EINMAL gibt.
+  // Dauerhaft sind es 180 EUR auf 360 EUR, also 50 %. Fuer eine Sparentscheidung
+  // ueber 30 Jahre ist das ein erheblicher Unterschied.
+  it('trennt die dauerhafte Zulage vom einmaligen Bonus', () => {
+    const jung = avdZulagen({ eigenbeitragJahr: 360, kinder: 0, alter: 24 }, a);
+    expect(jung.bonus).toBe(200);
+    expect(jung.gesamt).toBeCloseTo(380, 6);
+    expect(jung.dauerhaft).toBeCloseTo(180, 6);
+  });
+
+  it('weist beide Foerderquoten getrennt aus', () => {
+    const jung = avdZulagen({ eigenbeitragJahr: 360, kinder: 0, alter: 24 }, a);
+    expect(jung.foerderquote).toBeCloseTo(380 / 360, 6);        // 105,6 %
+    expect(jung.foerderquoteDauerhaft).toBeCloseTo(0.5, 6);     // 50 %
+  });
+
+  it('ab 25 sind beide Quoten gleich', () => {
+    const alt = avdZulagen({ eigenbeitragJahr: 360, kinder: 0, alter: 25 }, a);
+    expect(alt.bonus).toBe(0);
+    expect(alt.dauerhaft).toBeCloseTo(alt.gesamt, 6);
+    expect(alt.foerderquoteDauerhaft).toBeCloseTo(alt.foerderquote, 6);
+  });
+
+  it('die Trennung aendert die Summe ueber die Laufzeit NICHT', () => {
+    // Der Bonus darf beim Umbau weder verschwinden noch doppelt gezaehlt
+    // werden: 5 Jahre volle Grundzulage plus genau ein Bonus.
+    const r = avdAnsparphase(
+      {
+        beitragMonat: 150, dynamik: 0, startkapital: 0, jahre: 5,
+        renditeBrutto: 0.04, ter: 0.01, kinder: 0, alterHeute: 22, startjahr: 2027,
+      },
+      p,
+    );
+    expect(r.zulagenGesamt).toBeCloseTo(540 * 5 + 200, 4);
+    expect(r.ersteZulagen.dauerhaft).toBeCloseTo(540, 6);
+    expect(r.ersteZulagen.gesamt).toBeCloseTo(740, 6);
   });
 });

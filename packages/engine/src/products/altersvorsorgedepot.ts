@@ -30,9 +30,22 @@ export interface AvdZulagen {
   kinderzulage: number;
   /** Einmaliger Berufseinsteigerbonus */
   bonus: number;
+  /**
+   * Was es JEDES Jahr gibt: Grundzulage plus Kinderzulage, ohne den einmaligen
+   * Bonus.
+   *
+   * Getrennt gefuehrt, weil sonst die Foerderquote des ersten Jahres fuer die
+   * ganze Laufzeit versprochen wird. Bei 360 EUR Beitrag unter 25 waeren das
+   * 105,6 % statt der dauerhaft geltenden 50 % — ein Unterschied, an dem sich
+   * eine Sparentscheidung aufhaengen kann.
+   */
+  dauerhaft: number;
+  /** Zulagen dieses Jahres einschliesslich Bonus */
   gesamt: number;
-  /** Zulagen je Euro Eigenbeitrag */
+  /** Zulagen je Euro Eigenbeitrag, EINSCHLIESSLICH einmaligem Bonus */
   foerderquote: number;
+  /** Zulagen je Euro Eigenbeitrag, wie sie dauerhaft gelten */
+  foerderquoteDauerhaft: number;
   hinweise: string[];
 }
 
@@ -51,7 +64,7 @@ export function avdZulagen(
   const eigen = Math.max(0, args.eigenbeitragJahr);
   const leer: AvdZulagen = {
     stufe1: 0, stufe2: 0, grundzulage: 0, kinderzulage: 0, bonus: 0,
-    gesamt: 0, foerderquote: 0, hinweise,
+    dauerhaft: 0, gesamt: 0, foerderquote: 0, foerderquoteDauerhaft: 0, hinweise,
   };
 
   if (args.jahr !== undefined && args.jahr < p.abJahr) {
@@ -96,10 +109,12 @@ export function avdZulagen(
     );
   }
 
-  const gesamt = grundzulage + kinderzulage + bonus;
+  const dauerhaft = grundzulage + kinderzulage;
+  const gesamt = dauerhaft + bonus;
   return {
-    stufe1, stufe2, grundzulage, kinderzulage, bonus, gesamt,
+    stufe1, stufe2, grundzulage, kinderzulage, bonus, dauerhaft, gesamt,
     foerderquote: eigen > 0 ? gesamt / eigen : 0,
+    foerderquoteDauerhaft: eigen > 0 ? dauerhaft / eigen : 0,
     hinweise,
   };
 }
@@ -520,6 +535,8 @@ export interface AvdProfitabilitaet {
   eigenaufwandNettoMonat: number;
 
   /** --- Auszahlphase --- */
+  /** Angespartes Kapital zum Rentenbeginn */
+  endkapital: number;
   bruttoRenteMonat: number;
   steuerRenteMonat: number;
   nettoRenteMonat: number;
@@ -559,6 +576,8 @@ export function avdProfitabilitaet(
     alterHeute: number;
     startjahr: number;
     zveHeute: number;
+    /** Angespartes Kapital zum Rentenbeginn — uebergeben, nicht neu gerechnet */
+    endkapital: number;
     /** Aus der Projektion: laufende Bruttoauszahlung und ihre Steuer, je Jahr */
     bruttoRenteJahr: number;
     steuerRenteJahr: number;
@@ -640,6 +659,7 @@ export function avdProfitabilitaet(
     steuerersparnisMonat: erstesJahr.ersparnis / 12,
     eigenaufwandNettoMonat: erstesJahr.netto / 12,
 
+    endkapital: args.endkapital,
     bruttoRenteMonat: args.bruttoRenteJahr / 12,
     steuerRenteMonat: args.steuerRenteJahr / 12,
     nettoRenteMonat: nettoRenteJahr / 12,

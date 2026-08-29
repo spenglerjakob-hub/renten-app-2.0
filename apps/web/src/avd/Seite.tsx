@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, Calculator, Download, Info, Scale, TrendingUp } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import {
+  ArrowRight, CalendarClock, Calculator, ChevronDown, Download, Eraser, Gift, Info,
+  LineChart, Scale, SlidersHorizontal, TrendingUp,
+} from 'lucide-react';
 import {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
   avdProfitabilitaet,
@@ -9,7 +12,8 @@ import {
 import { importiere } from '@renten/schema';
 import { Logo } from '../components/Logo';
 import {
-  ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
+  ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, Kennzahl, GegenueberZeile,
+  euro, prozent,
 } from '../components/Feld';
 import { KapitalaufbauDiagramm, FoerderquoteDiagramm } from './Diagramme';
 
@@ -35,15 +39,52 @@ const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
  * ausdruecklich NICHT die Daten eines fremden oder eigenen Szenarios. Deshalb
  * startet die Seite mit leeren Feldern; uebernommen wird nur auf Knopfdruck.
  */
+/**
+ * Beispielwerte fuer den ersten Aufruf.
+ *
+ * Die Seite kommt per QR-Code aus einem Brief. Wer sie leer vorfindet, sieht
+ * vor allem Platzhalter und muss erst tippen, um zu verstehen, worum es geht.
+ * Mit einem Beispiel rechnet sie ab der ersten Sekunde und erklaert sich
+ * dadurch selbst.
+ *
+ * Das ist etwas anderes als die frueher verworfene Idee, das GESPEICHERTE
+ * Szenario zu laden: Diese Zahlen gehoeren niemandem, und die Seite sagt
+ * ausdruecklich, dass es ein Beispiel ist.
+ */
+const BEISPIEL = {
+  beitragMonat: 100,
+  kinder: 0,
+  geburtsdatum: '1985-01-01',
+  bruttoJahr: 45_000,
+} as const;
+
 export function Seite() {
-  const [beitragMonat, setBeitragMonat] = useState(0);
-  const [kinder, setKinder] = useState(0);
-  const [geburtsdatum, setGeburtsdatum] = useState('');
-  const [bruttoJahr, setBruttoJahr] = useState(0);
-  const [rendite, setRendite] = useState(0.06);
+  const [beitragMonat, setBeitragMonat] = useState<number>(BEISPIEL.beitragMonat);
+  const [kinder, setKinder] = useState<number>(BEISPIEL.kinder);
+  const [geburtsdatum, setGeburtsdatum] = useState<string>(BEISPIEL.geburtsdatum);
+  const [bruttoJahr, setBruttoJahr] = useState<number>(BEISPIEL.bruttoJahr);
+  const [rendite, setRendite] = useState(0.04);
   const [kosten, setKosten] = useState(0.01);
   const [teilauszahlung, setTeilauszahlung] = useState(false);
   const [uebernommen, setUebernommen] = useState<string | null>(null);
+  /** Solange nichts angefasst wurde, sind die Zahlen als Beispiel markiert. */
+  const [istBeispiel, setIstBeispiel] = useState(true);
+  const [feinOffen, setFeinOffen] = useState(false);
+  const [quoteOffen, setQuoteOffen] = useState(false);
+  const [vergleichOffen, setVergleichOffen] = useState(false);
+  const [wissenOffen, setWissenOffen] = useState(false);
+
+  /** Jede eigene Eingabe hebt die Beispiel-Kennzeichnung auf. */
+  const eigen = <T,>(setzen: (v: T) => void) => (v: T) => { setIstBeispiel(false); setzen(v); };
+
+  const leeren = () => {
+    setIstBeispiel(false);
+    setBeitragMonat(0);
+    setKinder(0);
+    setGeburtsdatum('');
+    setBruttoJahr(0);
+    setUebernommen(null);
+  };
 
   const jetzt = new Date().getFullYear();
   const p = parameterFuer(Math.max(jetzt, 2027), { indexRate: 0.01 });
@@ -118,7 +159,13 @@ export function Seite() {
   const foerderkurve = useMemo(() => {
     const punkte: { beitrag: number; quote: number }[] = [];
     for (let b = 0; b <= 3600; b += 60) {
-      punkte.push({ beitrag: b, quote: avdZulagen({ eigenbeitragJahr: b, kinder, alter: alterHeute }, a).foerderquote });
+      // Die DAUERHAFTE Quote, ohne den einmaligen Berufseinsteigerbonus. Sonst
+      // zeigte die Kurve fuer die ganze Laufzeit eine Foerderung, die es nur im
+      // ersten Jahr gibt — bei kleinen Beitraegen bis zu 243 % statt 150 %.
+      punkte.push({
+        beitrag: b,
+        quote: avdZulagen({ eigenbeitragJahr: b, kinder, alter: alterHeute }, a).foerderquoteDauerhaft,
+      });
     }
     return punkte;
   }, [kinder, alterHeute, a]);
@@ -239,6 +286,7 @@ export function Seite() {
       {
         beitragMonat, jahre: jahreBisRente, kinder, alterHeute, startjahr,
         zveHeute,
+        endkapital: lauf.anspar.endkapital,
         bruttoRenteJahr: lauf.aus.bruttoJahr,
         steuerRenteJahr: netto.steuer,
         jahreAuszahlung: lauf.aus.dauerJahre,
@@ -251,6 +299,7 @@ export function Seite() {
   }, [lauf, netto, bruttoJahr, beitragMonat, jahreBisRente, kinder, alterHeute, startjahr, zveHeute, p]);
 
   const uebernehmen = () => {
+    setIstBeispiel(false);
     try {
       const roh = localStorage.getItem(SPEICHER_SCHLUESSEL);
       if (!roh) { setUebernommen('Es ist noch keine Planung gespeichert.'); return; }
@@ -285,11 +334,29 @@ export function Seite() {
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
           Altersvorsorgedepot: Was Ihnen der Staat ab 2027 dazugibt
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
-          Ab dem <strong>1. Januar 2027</strong> löst das geförderte Altersvorsorgedepot die
-          Riester-Rente ab. Anders als dort gibt es keine Beitragsgarantie und keinen Zwang zur
-          Versicherung — Sie sparen in Fonds oder ETFs und bekommen trotzdem Zulagen. Rechnen Sie
-          hier aus, wie viel das in Ihrem Fall ist.
+        {/* Drei kurze Punkte statt eines Absatzes: Wer die Seite ueber einen
+            QR-Code auf dem Telefon oeffnet, ueberspringt einen Textblock — drei
+            Zeilen mit Symbol liest er. */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Punkt
+            symbol={<CalendarClock className="h-5 w-5 text-indigo-600" aria-hidden />}
+            titel={`Ab ${a.abJahr}`}
+            text="Das Altersvorsorgedepot löst die Riester-Rente ab. Gesetz beschlossen, Start am 1. Januar."
+          />
+          <Punkt
+            symbol={<Gift className="h-5 w-5 text-teal-600" aria-hidden />}
+            titel={`Bis zu ${euro(540)} im Jahr geschenkt`}
+            text={`Der Staat legt auf Ihren Beitrag drauf — mit Kindern ${euro(a.kinderzulage)} je Kind zusätzlich.`}
+          />
+          <Punkt
+            symbol={<LineChart className="h-5 w-5 text-orange-600" aria-hidden />}
+            titel="Sie sparen in ETFs"
+            text="Keine Versicherung, keine Beitragsgarantie. Dafür die Rendite des Kapitalmarkts."
+          />
+        </div>
+
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600">
+          Rechnen Sie hier aus, was das in Ihrem Fall bedeutet.
         </p>
 
         {/* Angaben links, Wirkung rechts: so sieht man beim Tippen sofort, was
@@ -300,47 +367,92 @@ export function Seite() {
 
         {/* --- Rechner --- */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
+            {istBeispiel && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Beispiel
+              </span>
+            )}
+          </div>
+          {istBeispiel && (
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Vorbelegt mit einem Beispiel, damit Sie gleich sehen, worum es geht.
+              Tragen Sie einfach Ihre eigenen Zahlen ein.
+            </p>
+          )}
+
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={setBeitragMonat} einheit="€"
+            <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€"
               hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
-            <ZahlFeld label="Kinder mit Kindergeldanspruch" wert={kinder} onChange={setKinder} max={15} />
-            <DatumFeld label="Geburtsdatum" wert={geburtsdatum} onChange={setGeburtsdatum}
+            <DatumFeld label="Geburtsdatum" wert={geburtsdatum} onChange={eigen(setGeburtsdatum)}
               hilfe="Acht Ziffern genügen — die Punkte setzt das Feld." />
-            <ZahlFeld label="Bruttoeinkommen im Jahr" wert={bruttoJahr} onChange={setBruttoJahr} einheit="€"
+            <ZahlFeld label="Kinder mit Kindergeldanspruch" wert={kinder} onChange={eigen(setKinder)} max={15} />
+            <ZahlFeld label="Bruttoeinkommen im Jahr" wert={bruttoJahr} onChange={eigen(setBruttoJahr)} einheit="€"
               hilfe="Die Zulagen hängen allein vom Beitrag ab. Das Einkommen dient der Schätzung Ihrer gesetzlichen Rente — und damit Ihres Steuersatzes im Alter." />
-            <ProzentFeld label="Erwartete Rendite p. a." wert={rendite} onChange={setRendite} />
-            <ProzentFeld label="Effektivkosten p. a." wert={kosten} onChange={setKosten} max={5}
-              hilfe="Alles zusammen: Fondskosten, Depotführung, Produktkosten." />
           </div>
 
+          {/* Stellschrauben fuer Fortgeschrittene. Eingeklappt, damit die Seite
+              beim ersten Blick nicht wie ein Fachwerkzeug wirkt; die
+              verwendeten Werte stehen weiterhin unter dem Ergebnis. */}
           <div className="mt-3">
-            <Schalter
-              label={`${Math.round(a.teilauszahlungMax * 100)} % zu Rentenbeginn auf einen Schlag auszahlen lassen`}
-              wert={teilauszahlung}
-              onChange={setTeilauszahlung}
-            />
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Bis zu {Math.round(a.teilauszahlungMax * 100)} % dürfen förderunschädlich auf einmal entnommen
-              werden. Der Rest läuft als Auszahlplan weiter. Achtung: Der Einmalbetrag ist im Jahr des
-              Zuflusses voll zu versteuern — auf einen Schlag landet er in den hohen Tarifzonen.
-            </p>
+            <button
+              type="button"
+              onClick={() => setFeinOffen((v) => !v)}
+              aria-expanded={feinOffen}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Feineinstellungen
+              </span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${feinOffen ? 'rotate-180' : ''}`} aria-hidden />
+            </button>
+
+            {feinOffen && (
+              <div className="mt-3 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <ProzentFeld label="Erwartete Rendite p. a." wert={rendite} onChange={eigen(setRendite)} />
+                  <ProzentFeld label="Effektivkosten p. a." wert={kosten} onChange={eigen(setKosten)} max={5}
+                    hilfe="Alles zusammen: Fondskosten, Depotführung, Produktkosten." />
+                </div>
+                <div>
+                  <Schalter
+                    label={`${Math.round(a.teilauszahlungMax * 100)} % zu Rentenbeginn auf einen Schlag auszahlen lassen`}
+                    wert={teilauszahlung}
+                    onChange={eigen(setTeilauszahlung)}
+                  />
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    Bis zu {Math.round(a.teilauszahlungMax * 100)} % dürfen förderunschädlich auf einmal
+                    entnommen werden. Der Rest läuft als Auszahlplan weiter. Achtung: Der Einmalbetrag ist
+                    im Jahr des Zuflusses voll zu versteuern — auf einen Schlag landet er in den hohen
+                    Tarifzonen.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={uebernehmen}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Download className="h-4 w-4" aria-hidden /> Daten aus meiner Planung übernehmen
-            </button>
             <a
               href="/"
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500"
             >
               Im Rentenplaner weiterrechnen <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
+            <button
+              type="button"
+              onClick={uebernehmen}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden /> Aus meiner Planung
+            </button>
+            <button
+              type="button"
+              onClick={leeren}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50"
+            >
+              <Eraser className="h-3.5 w-3.5" aria-hidden /> Felder leeren
+            </button>
           </div>
           {uebernommen && (
             <p className="mt-2 text-xs text-slate-600">{uebernommen}</p>
@@ -377,8 +489,10 @@ export function Seite() {
                     <GegenueberZeile text="= fließt ins Depot"
                       wert={euro(profit.zuflussInsDepotGesamt)} />
                   </div>
-                  <GegenueberZeile text="− Steuerersparnis"
-                    wert={euro(profit.steuerersparnisGesamt)} farbe="text-teal-700" />
+                  {profit.steuerersparnisGesamt > 0 && (
+                    <GegenueberZeile text="− Steuerersparnis"
+                      wert={euro(profit.steuerersparnisGesamt)} farbe="text-teal-700" />
+                  )}
                 </div>
                 <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
                   <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
@@ -387,9 +501,14 @@ export function Seite() {
                   </span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500">
-                  Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
-                  {euro(profit.eigenbeitragMonat)}. Die Zulagen mindern Ihre Kosten nicht — sie
-                  kommen vom Staat und stehen als höheres Kapital auf der anderen Seite.
+                  {profit.steuerersparnisGesamt > 0 && (
+                    <>
+                      Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
+                      {euro(profit.eigenbeitragMonat)}.{' '}
+                    </>
+                  )}
+                  Die Zulagen mindern Ihre Kosten nicht — sie kommen vom Staat und stehen als
+                  höheres Kapital auf der anderen Seite.
                 </p>
               </div>
 
@@ -397,6 +516,14 @@ export function Seite() {
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
                   Ihr Ertrag (Auszahlungsphase)
                 </h3>
+                <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-amber-200 pb-2">
+                  <span className="text-xs font-bold text-amber-900">
+                    Angespart bis {rentenbeginn!.jahr}
+                  </span>
+                  <span className="text-lg font-black tabular-nums text-amber-900">
+                    {euro(profit.endkapital)}
+                  </span>
+                </div>
                 <div className="space-y-1">
                   <GegenueberZeile text="Brutto-Rente / Monat" wert={euro(profit.bruttoRenteMonat)} />
                   <GegenueberZeile text="− Steuer" wert={euro(profit.steuerRenteMonat)} farbe="text-rose-600" />
@@ -479,18 +606,35 @@ export function Seite() {
                 {kinder > 0 && (
                   <Zeile text={`Kinderzulage — ${euro(a.kinderzulage)} je Kind`} wert={euro(zulagen.kinderzulage)} />
                 )}
-                {zulagen.bonus > 0 && (
-                  <Zeile text={`Berufseinsteigerbonus — einmalig unter ${a.berufseinsteigerAlterMax}`} wert={euro(zulagen.bonus)} />
-                )}
                 <div className="flex items-baseline justify-between gap-4 pt-3">
-                  <dt className="text-sm font-bold text-slate-800">Zulagen im Jahr</dt>
-                  <dd className="text-xl font-black tabular-nums text-emerald-700">{euro(zulagen.gesamt)}</dd>
+                  <dt className="text-sm font-bold text-slate-800">Zulagen jedes Jahr</dt>
+                  <dd className="text-xl font-black tabular-nums text-emerald-700">{euro(zulagen.dauerhaft)}</dd>
                 </div>
               </dl>
 
+              {/* Der Bonus steht BEWUSST unter dem Jahresbetrag und nicht darin:
+                  Er faellt einmal an. In die Jahressumme gerechnet verspraeche
+                  er fuer die ganze Laufzeit eine Foerderung, die es nur im
+                  ersten Jahr gibt. */}
+              {zulagen.bonus > 0 && (
+                <div className="mt-2 flex items-baseline justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="text-xs text-slate-600">
+                    Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus
+                    (unter {a.berufseinsteigerAlterMax})
+                  </span>
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-slate-800">
+                    {euro(zulagen.bonus)}
+                  </span>
+                </div>
+              )}
+
               <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                Auf {euro(beitragMonat * 12)} eigenen Beitrag kommen {euro(zulagen.gesamt)} vom Staat —
-                das sind <strong>{prozent(zulagen.foerderquote)}</strong> obendrauf.
+                Auf {euro(beitragMonat * 12)} eigenen Beitrag kommen jedes Jahr{' '}
+                {euro(zulagen.dauerhaft)} vom Staat — das sind{' '}
+                <strong>{prozent(zulagen.foerderquoteDauerhaft)}</strong> obendrauf.
+                {zulagen.bonus > 0 && (
+                  <> Im ersten Jahr einmalig {euro(zulagen.bonus)} mehr.</>
+                )}
               </p>
 
               {zulagen.hinweise.map((h) => (
@@ -509,10 +653,19 @@ export function Seite() {
                     Tragen Sie links Ihr Bruttoeinkommen ein — ob der Sonderausgabenabzug über die
                     Zulagen hinaus etwas bringt, hängt an Ihrem Steuersatz.
                   </p>
+                ) : steuervorteil.ueberZulagen <= 0 ? (
+                  // Ohne Wirkung braucht es keine vierzeilige Herleitung, die
+                  // am Ende null ergibt. Ein Satz sagt dasselbe.
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                    Bei Ihrem Einkommen bringt der Steuerabzug <strong>nichts über die Zulagen
+                    hinaus</strong> — die Zulage ist der günstigere Weg, und genau den wendet das
+                    Finanzamt automatisch an. Ihre {euro(beitragMonat * 12)} Beitrag kosten Sie
+                    damit auch nach Steuern {euro(steuervorteil.eigenaufwandNetto)} im Jahr.
+                  </p>
                 ) : (
                   <>
                     <dl className="mt-2 divide-y divide-slate-100">
-                      <Zeile text="Absetzbar (Beitrag bis 1.800 € plus Zulagen)"
+                      <Zeile text={`Absetzbar (Beitrag bis ${euro(a.hoechstbetragEigenbeitrag)} plus Zulagen)`}
                         wert={euro(steuervorteil.abzugsfaehig)} />
                       <Zeile text="Steuerersparnis daraus" wert={euro(steuervorteil.steuerersparnis)} />
                       <Zeile text="− bereits gewährte Zulagen" wert={`− ${euro(zulagen.gesamt)}`} />
@@ -524,32 +677,36 @@ export function Seite() {
                       </div>
                     </dl>
                     <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                      {steuervorteil.guenstigerAlsZulage ? (
-                        <>
-                          Bei Ihrem Einkommen ist der Abzug günstiger als die bloße Zulage. Das
-                          Finanzamt prüft das von Amts wegen — Sie müssen nichts beantragen.
-                          Unterm Strich kosten Sie {euro(beitragMonat * 12)} Beitrag nur{' '}
-                          <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
-                        </>
-                      ) : (
-                        <>
-                          Bei Ihrem Einkommen bringt der Abzug nichts über die Zulagen hinaus — die
-                          Zulage ist der günstigere Weg, und genau den wendet das Finanzamt an.
-                          Unterm Strich kosten Sie {euro(beitragMonat * 12)} Beitrag{' '}
-                          <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
-                        </>
-                      )}
+                      Bei Ihrem Einkommen ist der Abzug günstiger als die bloße Zulage. Das
+                      Finanzamt prüft das von Amts wegen — Sie müssen nichts beantragen.
+                      Unterm Strich kosten Sie {euro(beitragMonat * 12)} Beitrag nur{' '}
+                      <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
                     </p>
                   </>
                 )}
               </div>
 
-              <div className="mt-5 border-t border-slate-100 pt-4">
-                <FoerderquoteDiagramm
-                  punkte={foerderkurve}
-                  eigenbeitragJahr={beitragMonat * 12}
-                  quoteHier={zulagen.foerderquote}
-                />
+              {/* Eingeklappt: fuer Interessierte spannend, beim ersten Blick
+                  Beiwerk. */}
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setQuoteOffen((v) => !v)}
+                  aria-expanded={quoteOffen}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50"
+                >
+                  Wie stark wird welcher Beitrag gefördert?
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${quoteOffen ? 'rotate-180' : ''}`} aria-hidden />
+                </button>
+                {quoteOffen && (
+                  <div className="mt-3">
+                    <FoerderquoteDiagramm
+                      punkte={foerderkurve}
+                      eigenbeitragJahr={beitragMonat * 12}
+                      quoteHier={zulagen.foerderquoteDauerhaft}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -638,12 +795,15 @@ export function Seite() {
           )}
         </section>
 
-        {/* --- Vergleich mit einem freien Depot --- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <Scale className="h-4 w-4" aria-hidden /> Lohnt sich die Förderung?
-          </h2>
-
+        {/* --- Vergleich mit einem freien Depot ---
+            Eingeklappt: "lohnt es sich gegenueber einem normalen ETF-Sparplan"
+            ist eine Stufe tiefer als "was ist das ueberhaupt". */}
+        <AkkordeonKarte
+          titel="Lohnt sich die Förderung?"
+          symbol={<Scale className="h-4 w-4 text-slate-400" aria-hidden />}
+          offen={vergleichOffen}
+          onUmschalten={() => setVergleichOffen((v) => !v)}
+        >
           {!vergleich || !netto ? (
             <p className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
               Für den Vergleich brauche ich Beitrag, Geburtsdatum und Bruttoeinkommen. Der Steuersatz
@@ -707,7 +867,7 @@ export function Seite() {
               </p>
             </>
           )}
-        </section>
+        </AkkordeonKarte>
 
         </div>
         </div>
@@ -715,10 +875,13 @@ export function Seite() {
         {/* --- Einordnung ---
             Ueber die volle Breite: erklaerender Text, kein Ergebnis. Er
             braucht keine Spalte neben den Eingaben. */}
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Was Sie wissen sollten
-          </h2>
+        <AkkordeonKarte
+          titel="Was Sie wissen sollten"
+          symbol={<Info className="h-4 w-4 text-slate-400" aria-hidden />}
+          offen={wissenOffen}
+          onUmschalten={() => setWissenOffen((v) => !v)}
+          klasse="mt-4"
+        >
           <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-700">
             <li>
               <strong>Die Förderung ist gestaffelt.</strong> Auf die ersten {euro(a.stufe1Grenze)} im Jahr
@@ -761,7 +924,7 @@ export function Seite() {
             prüft von Amts wegen, ob der Abzug günstiger ist als die Zulage; wirksam wird davon nur,
             was über die Zulagen hinausgeht.
           </p>
-        </section>
+        </AkkordeonKarte>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Rechtsstand des
@@ -778,6 +941,18 @@ function Zeile({ text, wert }: { text: string; wert: string }) {
     <div className="flex items-baseline justify-between gap-4 py-2">
       <dt className="text-sm text-slate-600">{text}</dt>
       <dd className="shrink-0 text-sm font-bold tabular-nums text-slate-800">{wert}</dd>
+    </div>
+  );
+}
+
+function Punkt({ symbol, titel, text }: { symbol: ReactNode; titel: string; text: string }) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3">
+      <span className="mt-0.5 shrink-0">{symbol}</span>
+      <span>
+        <span className="block text-sm font-bold text-slate-800">{titel}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{text}</span>
+      </span>
     </div>
   );
 }

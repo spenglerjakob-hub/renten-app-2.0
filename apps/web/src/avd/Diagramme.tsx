@@ -297,12 +297,8 @@ export function FoerderquoteDiagramm({
 
   return (
     <figure className="m-0">
-      <figcaption className="mb-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Wie stark wird welcher Beitrag gefördert?
-        </h3>
-      </figcaption>
-
+      {/* Keine eigene Ueberschrift: Das Diagramm steht in einem aufklappbaren
+          Abschnitt, dessen Knopf bereits die Ueberschrift traegt. */}
       <div className="overflow-x-auto">
         <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full min-w-[560px]" role="img" aria-labelledby={titelId}>
           <title id={titelId}>{zusammenfassung}</title>
