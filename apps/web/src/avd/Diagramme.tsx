@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import type { AvdJahr } from '@renten/engine';
-import { euro, prozent } from '../components/Feld';
+import { euro } from '../components/Feld';
 
 /**
  * Diagramme der Altersvorsorgedepot-Seite.
@@ -40,7 +40,19 @@ function kurz(v: number) {
  * Zulagen Rendite erwirtschaften — der Staat legt nicht nur Geld dazu, das
  * Geld arbeitet ueber Jahrzehnte mit.
  */
-export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[] }) {
+export function KapitalaufbauDiagramm({
+  verlauf, steuerersparnisKumuliert = [],
+}: {
+  verlauf: readonly AvdJahr[];
+  /**
+   * Aufgelaufene Steuerersparnis, PARALLEL zum Verlauf (gleiche Laenge,
+   * gleiche Reihenfolge). Sie ist bewusst KEINE vierte Flaeche: sie liegt
+   * nicht im Depot, sondern in der Tasche des Sparers. Im Tooltip steht sie
+   * deshalb eingerueckt unter den Eigenbeitraegen — als Teil davon, der ueber
+   * die Steuer zurueckkommt.
+   */
+  steuerersparnisKumuliert?: readonly number[];
+}) {
   const [alsTabelle, setAlsTabelle] = useState(false);
   const [aktiv, setAktiv] = useState<number | null>(null);
   const titelId = useId();
@@ -80,6 +92,7 @@ export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[]
     `und ${euro(letzte.gewinnKumuliert)} Kursgewinne.`;
 
   const d = aktiv !== null ? verlauf[aktiv] : undefined;
+  const ersparnisHier = aktiv !== null ? (steuerersparnisKumuliert[aktiv] ?? 0) : 0;
 
   return (
     <figure className="m-0">
@@ -220,6 +233,16 @@ export function KapitalaufbauDiagramm({ verlauf }: { verlauf: readonly AvdJahr[]
               <div className="font-bold text-slate-800">{d.jahr} · Alter {d.alter}</div>
               <dl className="mt-1 space-y-0.5">
                 <Wert farbe={FARBE.eigen} text="Eigenbeiträge" wert={euro(d.eigenbeitraegeKumuliert)} />
+                {/* Eingerueckt und in Rot: gehoert zu den Eigenbeitraegen
+                    darueber, zaehlt aber NICHT zum Kapital — es ist der Teil,
+                    den die Steuer zurueckgibt. Nur die schwarzen Werte
+                    summieren sich unten zum Kapital. */}
+                {ersparnisHier > 0 && (
+                  <div className="flex items-center justify-between gap-4 pl-3.5">
+                    <dt className="text-rose-600">davon Steuerersparnis</dt>
+                    <dd className="tabular-nums text-rose-600">{euro(ersparnisHier)}</dd>
+                  </div>
+                )}
                 <Wert farbe={FARBE.zulagen} text="Zulagen" wert={euro(d.zulagenKumuliert)} />
                 <Wert farbe={FARBE.gewinn} text="Kursgewinne" wert={euro(d.gewinnKumuliert)} />
               </dl>
@@ -245,116 +268,5 @@ function Wert({ farbe, text, wert }: { farbe: string; text: string; wert: string
       </dt>
       <dd className="tabular-nums text-slate-800">{wert}</dd>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-/**
- * Foerderquote ueber den Eigenbeitrag, mit einer Marke an der eigenen Stelle.
- *
- * Macht in einem Bild begreiflich, was drei Absaetze Text nur behaupten
- * koennen: unter 120 EUR gibt es nichts, danach springt die Quote auf ihr
- * Maximum und faellt von da an stetig. Wer viel einzahlt, wird anteilig am
- * schwaechsten gefoerdert.
- */
-export function FoerderquoteDiagramm({
-  punkte, eigenbeitragJahr, quoteHier,
-}: {
-  punkte: readonly { beitrag: number; quote: number }[];
-  eigenbeitragJahr: number;
-  quoteHier: number;
-}) {
-  const titelId = useId();
-  if (punkte.length < 2) return null;
-
-  const maxBeitrag = punkte[punkte.length - 1]!.beitrag;
-  const maxQuote = Math.max(...punkte.map((d) => d.quote), 0.1) * 1.12;
-
-  const B = 720, H = 236, L = 54, R = 16, T = 14, U = 50;
-  const plotB = B - L - R, plotH = H - T - U;
-  const x = (b: number) => L + (b / maxBeitrag) * plotB;
-  const y = (q: number) => T + plotH - (q / maxQuote) * plotH;
-
-  // Der Sprung beim Mindesteigenbeitrag ist echt und darf nicht
-  // weggeglaettet werden. Die Nullstrecke davor wird eigens gezeichnet —
-  // dass es unterhalb GAR NICHTS gibt, ist die halbe Aussage des Diagramms.
-  const gefoerdert = punkte.filter((d) => d.quote > 0);
-  const ersterGefoerdert = gefoerdert[0];
-  const pfad = gefoerdert
-    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${x(d.beitrag).toFixed(1)} ${y(d.quote).toFixed(1)}`)
-    .join(' ');
-  const nullPfad = ersterGefoerdert
-    ? `M ${x(0).toFixed(1)} ${y(0).toFixed(1)} L ${x(ersterGefoerdert.beitrag).toFixed(1)} ${y(0).toFixed(1)}`
-    : '';
-
-  const imBild = eigenbeitragJahr > 0 && eigenbeitragJahr <= maxBeitrag;
-  const zusammenfassung =
-    `Förderquote über den Jahresbeitrag. Unter 120 € gibt es keine Förderung. ` +
-    (eigenbeitragJahr > 0
-      ? `Bei Ihren ${euro(eigenbeitragJahr)} im Jahr sind es ${prozent(quoteHier)}.`
-      : 'Tragen Sie einen Beitrag ein, um Ihre Stelle zu sehen.');
-
-  return (
-    <figure className="m-0">
-      {/* Keine eigene Ueberschrift: Das Diagramm steht in einem aufklappbaren
-          Abschnitt, dessen Knopf bereits die Ueberschrift traegt. */}
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full min-w-[560px]" role="img" aria-labelledby={titelId}>
-          <title id={titelId}>{zusammenfassung}</title>
-
-          {[0, 0.25, 0.5, 0.75, 1].map((q) => (
-            <g key={q}>
-              <line x1={L} y1={y(maxQuote * q)} x2={B - R} y2={y(maxQuote * q)} stroke={RASTER} strokeWidth="1" />
-              <text x={L - 8} y={y(maxQuote * q) + 4} textAnchor="end" fontSize="13" fill={BESCHRIFTUNG}>
-                {Math.round(maxQuote * q * 100)} %
-              </text>
-            </g>
-          ))}
-
-          {nullPfad && (
-            <>
-              <path d={nullPfad} fill="none" stroke={FARBE.zulagen} strokeWidth="2" />
-              {/* Der senkrechte Sprung an der Schwelle */}
-              <path
-                d={`M ${x(ersterGefoerdert!.beitrag).toFixed(1)} ${y(0).toFixed(1)} L ${x(ersterGefoerdert!.beitrag).toFixed(1)} ${y(ersterGefoerdert!.quote).toFixed(1)}`}
-                fill="none" stroke={FARBE.zulagen} strokeWidth="2" strokeDasharray="4 3"
-              />
-            </>
-          )}
-          <path d={pfad} fill="none" stroke={FARBE.zulagen} strokeWidth="2" strokeLinejoin="round" />
-
-          {imBild && (
-            <g>
-              <line x1={x(eigenbeitragJahr)} y1={T} x2={x(eigenbeitragJahr)} y2={T + plotH}
-                stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
-              <circle cx={x(eigenbeitragJahr)} cy={y(quoteHier)} r="5.5"
-                fill={FARBE.zulagen} stroke="#ffffff" strokeWidth="2" />
-              <text
-                x={Math.min(x(eigenbeitragJahr) + 10, B - R - 92)}
-                y={Math.max(y(quoteHier) - 10, T + 12)}
-                fontSize="13" fontWeight="700" fill="#0f172a"
-              >
-                Sie: {prozent(quoteHier)}
-              </text>
-            </g>
-          )}
-
-          <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke={ACHSE} strokeWidth="1.5" />
-          {[0, 900, 1800, 2700, 3600].map((b) =>
-            b <= maxBeitrag ? (
-              <text key={b} x={x(b)} y={H - 30} textAnchor="middle" fontSize="13" fill={BESCHRIFTUNG}>
-                {b.toLocaleString('de-DE')}
-              </text>
-            ) : null,
-          )}
-          <text x={B - R} y={H - 10} textAnchor="end" fontSize="12" fill={ACHSE}>
-            Eigenbeitrag im Jahr, €
-          </text>
-        </svg>
-      </div>
-
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">{zusammenfassung}</p>
-    </figure>
   );
 }

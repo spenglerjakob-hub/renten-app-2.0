@@ -577,6 +577,16 @@ export interface AvdProfitabilitaet {
   zulageMonat: number;
   steuerersparnisMonat: number;
   eigenaufwandNettoMonat: number;
+  /**
+   * Aufgelaufene Steuerersparnis je Beitragsjahr.
+   *
+   * PARALLEL zu `AvdAnsparErgebnis.verlauf` — gleiche Laenge, gleiche
+   * Reihenfolge, weil beide dieselbe Jahresschleife abbilden. Die Oberflaeche
+   * zippt sie fuer den Tooltip des Kapitaldiagramms zusammen. Sie gehoert
+   * NICHT in `verlauf` selbst: dort steht, was im Depot liegt, und die
+   * ersparte Steuer liegt in der Tasche des Sparers.
+   */
+  steuerersparnisKumuliert: number[];
 
   /** --- Auszahlphase --- */
   /** Angespartes Kapital zum Rentenbeginn */
@@ -623,13 +633,16 @@ export function avdProfitabilitaet(
     zveHeute: number;
     /** Angespartes Kapital zum Rentenbeginn — uebergeben, nicht neu gerechnet */
     endkapital: number;
-    /** Aus der Projektion: laufende Bruttoauszahlung und ihre Steuer, je Jahr */
-    bruttoRenteJahr: number;
-    steuerRenteJahr: number;
-    jahreAuszahlung: number;
-    /** Einmalige Teilauszahlung zu Rentenbeginn und ihre Steuer */
-    bruttoEinmal: number;
-    steuerEinmal: number;
+    /**
+     * Auszahlseite, alles optional: Wer nur wissen will, was das Ansparen
+     * kostet und welches Kapital dabei herauskommt, muss keine Rentenwerte
+     * erfinden. Ohne sie bleiben die Kennzahlen entsprechend bei null.
+     */
+    bruttoRenteJahr?: number;
+    steuerRenteJahr?: number;
+    jahreAuszahlung?: number;
+    bruttoEinmal?: number;
+    steuerEinmal?: number;
   },
   opt: { verheiratet: boolean; bundesland: string; kirchensteuerpflichtig: boolean },
   p: LegalParameters,
@@ -641,6 +654,7 @@ export function avdProfitabilitaet(
   let eigenSumme = 0, zulagenSumme = 0, ersparnisSumme = 0;
   let bonusVerbraucht = false;
   const einzahlungenJeJahr: number[] = [];
+  const steuerersparnisKumuliert: number[] = [];
   let erstesJahr = { eigen: 0, zulage: 0, ersparnis: 0, netto: 0 };
 
   for (let j = 0; j < Math.max(0, args.jahre); j++) {
@@ -667,6 +681,7 @@ export function avdProfitabilitaet(
     zulagenSumme += zulage;
     ersparnisSumme += vorteil.ueberZulagen;
     einzahlungenJeJahr.push(vorteil.eigenaufwandNetto);
+    steuerersparnisKumuliert.push(ersparnisSumme);
 
     if (j === 0) {
       erstesJahr = {
@@ -676,13 +691,18 @@ export function avdProfitabilitaet(
     }
   }
 
-  const nettoRenteJahr = Math.max(0, args.bruttoRenteJahr - args.steuerRenteJahr);
-  const nettoEinmal = Math.max(0, args.bruttoEinmal - args.steuerEinmal);
+  const bruttoRenteJahr = args.bruttoRenteJahr ?? 0;
+  const steuerRenteJahr = args.steuerRenteJahr ?? 0;
+  const jahreAuszahlung = args.jahreAuszahlung ?? 0;
+  const bruttoEinmal = args.bruttoEinmal ?? 0;
+
+  const nettoRenteJahr = Math.max(0, bruttoRenteJahr - steuerRenteJahr);
+  const nettoEinmal = Math.max(0, bruttoEinmal - (args.steuerEinmal ?? 0));
 
   const kz = kennzahlen({
     einzahlungenJeJahr,
     auszahlungJeJahr: nettoRenteJahr,
-    jahreAuszahlung: args.jahreAuszahlung,
+    jahreAuszahlung,
     kapitalEinmalig: nettoEinmal,
   });
 
@@ -692,10 +712,10 @@ export function avdProfitabilitaet(
       'und das schon ohne Berücksichtigung der Inflation.',
     );
   }
-  if (kz.amortisationsJahre > args.jahreAuszahlung) {
+  if (jahreAuszahlung > 0 && kz.amortisationsJahre > jahreAuszahlung) {
     hinweise.push(
       `Die Einzahlungen sind erst nach ${kz.amortisationsJahre.toFixed(0)} Rentenjahren ` +
-      `zurückgeflossen — der Auszahlplan läuft aber nur ${args.jahreAuszahlung} Jahre.`,
+      `zurückgeflossen — der Auszahlplan läuft aber nur ${jahreAuszahlung} Jahre.`,
     );
   }
 
@@ -709,15 +729,16 @@ export function avdProfitabilitaet(
     zulageMonat: erstesJahr.zulage / 12,
     steuerersparnisMonat: erstesJahr.ersparnis / 12,
     eigenaufwandNettoMonat: erstesJahr.netto / 12,
+    steuerersparnisKumuliert,
 
     endkapital: args.endkapital,
-    bruttoRenteMonat: args.bruttoRenteJahr / 12,
-    steuerRenteMonat: args.steuerRenteJahr / 12,
+    bruttoRenteMonat: bruttoRenteJahr / 12,
+    steuerRenteMonat: steuerRenteJahr / 12,
     nettoRenteMonat: nettoRenteJahr / 12,
-    bruttoEinmal: args.bruttoEinmal,
-    steuerEinmal: args.steuerEinmal,
+    bruttoEinmal,
+    steuerEinmal: args.steuerEinmal ?? 0,
     nettoEinmal,
-    jahreAuszahlung: args.jahreAuszahlung,
+    jahreAuszahlung,
 
     summeEinzahlung: kz.summeEinzahlung,
     summeAuszahlung: kz.summeAuszahlung,

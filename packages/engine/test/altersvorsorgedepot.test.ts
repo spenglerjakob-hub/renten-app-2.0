@@ -688,3 +688,51 @@ describe('Kinderzulage endet mit dem Kindergeldanspruch', () => {
     expect(mit.zulagenGesamt - ohne.zulagenGesamt).toBeCloseTo(300 * 7, 4);
   });
 });
+
+describe('Steuerersparnis als Jahresreihe', () => {
+  // Die Reihe laeuft PARALLEL zum Kapitalverlauf aus der Ansparphase — die
+  // Oberflaeche zippt beide fuer den Tooltip zusammen. Laufen sie in der
+  // Laenge auseinander, zeigt das Diagramm stillschweigend falsche Werte.
+  const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
+  const gemeinsam = {
+    beitragMonat: 150, jahre: 30, alterHeute: 37, startjahr: 2027,
+  };
+
+  const anspar = avdAnsparphase(
+    { ...gemeinsam, dynamik: 0, startkapital: 0, renditeBrutto: 0.04, ter: 0.01 },
+    p,
+  );
+  const profit = avdProfitabilitaet(
+    { ...gemeinsam, zveHeute: 60_000, endkapital: anspar.endkapital },
+    opt, p,
+  );
+
+  it('hat dieselbe Laenge wie der Kapitalverlauf', () => {
+    expect(profit.steuerersparnisKumuliert).toHaveLength(anspar.verlauf.length);
+    expect(profit.steuerersparnisKumuliert).toHaveLength(30);
+  });
+
+  it('waechst monoton und endet auf der Gesamtersparnis', () => {
+    const reihe = profit.steuerersparnisKumuliert;
+    for (let i = 1; i < reihe.length; i++) {
+      expect(reihe[i]!).toBeGreaterThanOrEqual(reihe[i - 1]!);
+    }
+    expect(reihe[reihe.length - 1]!).toBeCloseTo(profit.steuerersparnisGesamt, 6);
+  });
+
+  it('bleibt bei null, wenn der Abzug nichts ueber die Zulagen hinaus bringt', () => {
+    const ohne = avdProfitabilitaet(
+      { ...gemeinsam, zveHeute: 8_000, endkapital: 100_000 }, opt, p,
+    );
+    expect(ohne.steuerersparnisKumuliert.every((x) => x === 0)).toBe(true);
+  });
+
+  it('braucht keine Auszahlungsangaben mehr', () => {
+    // Die Seite zeigt nur noch Einzahlung und Kapital; Rentenwerte zu
+    // erfinden, nur damit die Funktion sie bekommt, waere unehrlich.
+    expect(profit.eigenbeitraegeGesamt).toBeCloseTo(150 * 12 * 30, 4);
+    expect(profit.endkapital).toBeCloseTo(anspar.endkapital, 6);
+    expect(profit.nettoRenteMonat).toBe(0);
+    expect(profit.jahreAuszahlung).toBe(0);
+  });
+});
