@@ -5,14 +5,17 @@ import {
 import {
   avdZulagen, avdAnsparphase, avdSteuervorteil, avdProfitabilitaet,
   parameterFuer, regelaltersrentenbeginn, parseDatum, bruttoZuNetto,
+  type AvdKind,
 } from '@renten/engine';
 import { Logo } from '../components/Logo';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile,
   euro, prozent,
 } from '../components/Feld';
+import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { KapitalaufbauDiagramm } from './Diagramme';
 import { BeratungDialog, type Eckdaten } from './Beratung';
+import { GeburtsdatumDialog } from './Geburtsdatum';
 
 /** Feste Effektivkosten. Bewusst nicht einstellbar — siehe Hinweis auf der Seite. */
 const KOSTEN = 0.01;
@@ -42,17 +45,15 @@ const BERATER_MAIL = 'karkossa@axa.de';
  */
 const BEISPIEL = {
   beitragMonat: 100,
-  kinderGeburtsjahre: [] as readonly number[],
+  kinder: [] as readonly AvdKind[],
   geburtsdatum: '1985-01-01',
   bruttoJahr: 45_000,
 } as const;
 
 export function Seite() {
   const [beitragMonat, setBeitragMonat] = useState<number>(BEISPIEL.beitragMonat);
-  const [kinderGeburtsjahre, setKinderGeburtsjahre] =
-    useState<readonly number[]>(BEISPIEL.kinderGeburtsjahre);
-  const [kinderInAusbildung, setKinderInAusbildung] = useState(false);
-  const kinder = kinderGeburtsjahre.length;
+  const [kinderListe, setKinderListe] = useState<readonly AvdKind[]>(BEISPIEL.kinder);
+  const kinder = kinderListe.length;
   const [geburtsdatum, setGeburtsdatum] = useState<string>(BEISPIEL.geburtsdatum);
   const [bruttoJahr, setBruttoJahr] = useState<number>(BEISPIEL.bruttoJahr);
   const [rendite, setRendite] = useState(0.04);
@@ -61,6 +62,14 @@ export function Seite() {
   const [istBeispiel, setIstBeispiel] = useState(true);
   const [wissenOffen, setWissenOffen] = useState(false);
   const [beratungOffen, setBeratungOffen] = useState(false);
+  /**
+   * Das Geburtsdatum wird beim Aufruf abgefragt, nicht erst irgendwo im
+   * Formular. Bewusst bei JEDEM Aufruf und nicht nur beim allerersten: die
+   * Seite speichert nichts im Browser, und das soll so bleiben — ein
+   * gespeichertes Geburtsdatum waere auf einem geteilten Geraet eine
+   * unangenehme Ueberraschung.
+   */
+  const [geburtsdatumGefragt, setGeburtsdatumGefragt] = useState(false);
 
   /** Jede eigene Eingabe hebt die Beispiel-Kennzeichnung auf. */
   const eigen = <T,>(setzen: (v: T) => void) => (v: T) => { setIstBeispiel(false); setzen(v); };
@@ -68,8 +77,7 @@ export function Seite() {
   const leeren = () => {
     setIstBeispiel(false);
     setBeitragMonat(0);
-    setKinderGeburtsjahre([]);
-    setKinderInAusbildung(false);
+    setKinderListe([]);
     setGeburtsdatum('');
     setBruttoJahr(0);
   };
@@ -98,12 +106,12 @@ export function Seite() {
   const zulagen = useMemo(
     () => avdZulagen(
       {
-        eigenbeitragJahr: beitragMonat * 12, kinderGeburtsjahre,
-        kinderInAusbildung, alter: alterHeute, jahr: startjahr,
+        eigenbeitragJahr: beitragMonat * 12, kinder: kinderListe,
+        alter: alterHeute, jahr: startjahr,
       },
       a,
     ),
-    [beitragMonat, kinderGeburtsjahre, kinderInAusbildung, alterHeute, startjahr, a],
+    [beitragMonat, kinderListe, alterHeute, startjahr, a],
   );
 
   const lauf = useMemo(() => {
@@ -112,12 +120,12 @@ export function Seite() {
       {
         beitragMonat, dynamik: 0, startkapital: 0, jahre: jahreBisRente,
         renditeBrutto: rendite, ter: KOSTEN,
-        kinderGeburtsjahre, kinderInAusbildung, alterHeute, startjahr,
+        kinder: kinderListe, alterHeute, startjahr,
       },
       p,
     );
-  }, [geburt, jahreBisRente, beitragMonat, rendite, kinderGeburtsjahre,
-      kinderInAusbildung, alterHeute, startjahr, p]);
+  }, [geburt, jahreBisRente, beitragMonat, rendite, kinderListe,
+      alterHeute, startjahr, p]);
 
   /**
    * Zu versteuerndes Einkommen von heute — Grundlage des
@@ -158,20 +166,20 @@ export function Seite() {
     if (!lauf || jahreBisRente <= 0) return null;
     return avdProfitabilitaet(
       {
-        beitragMonat, jahre: jahreBisRente, kinderGeburtsjahre, kinderInAusbildung,
+        beitragMonat, jahre: jahreBisRente, kinder: kinderListe,
         alterHeute, startjahr, zveHeute, endkapital: lauf.endkapital,
       },
       steuerOpt,
       p,
     );
-  }, [lauf, beitragMonat, jahreBisRente, kinderGeburtsjahre, kinderInAusbildung,
+  }, [lauf, beitragMonat, jahreBisRente, kinderListe,
       alterHeute, startjahr, zveHeute, steuerOpt, p]);
 
   /** Was in die Beratungsanfrage geschrieben wird. */
   const eckdaten: Eckdaten = {
     beitragMonat,
     geburtsdatum,
-    kinderGeburtsjahre,
+    kinder: kinderListe,
     verheiratet,
     zulagenJahr: zulagen.dauerhaft,
     bonus: zulagen.bonus,
@@ -286,11 +294,11 @@ export function Seite() {
                 wert={kinder}
                 onChange={(n) => {
                   setIstBeispiel(false);
-                  // Vorhandene Jahrgaenge behalten, fehlende mit einem
-                  // Vorschlag auffuellen.
-                  setKinderGeburtsjahre((bisher) =>
+                  // Vorhandene Kinder behalten, fehlende mit einem Vorschlag
+                  // auffuellen — sonst verliert man beim Vertippen alles.
+                  setKinderListe((bisher) =>
                     Array.from({ length: Math.max(0, Math.min(15, Math.round(n))) },
-                      (_, i) => bisher[i] ?? jetzt - 5),
+                      (_, i) => bisher[i] ?? { geburtsjahr: jetzt - 5 }),
                   );
                 }}
                 max={15}
@@ -298,48 +306,18 @@ export function Seite() {
               />
 
               {kinder > 0 && (
-                <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
-                  {kinderGeburtsjahre.map((gj, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`kind-${i}`}>
-                        {i + 1}. Kind, geb.
-                      </label>
-                      <input
-                        id={`kind-${i}`}
-                        type="number"
-                        value={gj}
-                        min={1900}
-                        max={2200}
-                        onChange={(e) => {
-                          setIstBeispiel(false);
-                          const wert = Number(e.target.value);
-                          setKinderGeburtsjahre((bisher) =>
-                            bisher.map((x, k) => (k === i ? wert : x)));
-                        }}
-                        className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
-                      />
-                      <span className="w-24 shrink-0 text-right text-[10px] text-slate-500">
-                        {(() => {
-                          const bis = gj + (kinderInAusbildung
-                            ? a.kinderzulageBisAlterAusbildung
-                            : a.kinderzulageBisAlter);
-                          const jahre = bis - Math.max(jetzt, a.abJahr);
-                          if (jahre <= 0) return 'kein Anspruch';
-                          return jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`;
-                        })()}
-                      </span>
-                    </div>
-                  ))}
-                  <Schalter
-                    label={`Ausbildung oder Studium — Zulage bis ${a.kinderzulageBisAlterAusbildung}`}
-                    wert={kinderInAusbildung}
-                    onChange={eigen(setKinderInAusbildung)}
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+                  <KinderZeilen
+                    kinder={kinderListe}
+                    onKind={(index, aenderung) => {
+                      setIstBeispiel(false);
+                      setKinderListe((bisher) =>
+                        bisher.map((k, i) => (i === index ? { ...k, ...aenderung } : k)));
+                    }}
+                    a={a}
+                    jetzt={jetzt}
                   />
-                  <p className="text-[10px] leading-relaxed text-slate-500">
-                    Der Kindergeldanspruch endet mit {a.kinderzulageBisAlter} — bei Ausbildung oder
-                    Studium spätestens mit {a.kinderzulageBisAlterAusbildung}. Genau so lange läuft
-                    auch die Kinderzulage.
-                  </p>
+                  <KinderHinweis a={a} />
                 </div>
               )}
             </div>
@@ -717,6 +695,19 @@ export function Seite() {
           vollständig in Ihrem Browser — Ihre Eingaben verlassen dieses Gerät nicht.
         </p>
       </main>
+
+      {/*
+        Die Beispielwerte fuer Beitrag und Brutto bleiben stehen: die Seite
+        soll unmittelbar nach dem Schliessen etwas rechnen und sich dadurch
+        selbst erklaeren. Nur das Geburtsdatum ist danach das eigene.
+      */}
+      <GeburtsdatumDialog
+        offen={!geburtsdatumGefragt}
+        onFertig={(datum) => {
+          setGeburtsdatum(datum);
+          setGeburtsdatumGefragt(true);
+        }}
+      />
 
       <BeratungDialog
         offen={beratungOffen}

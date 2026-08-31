@@ -8,6 +8,7 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
 } from '../components/Feld';
+import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 
 /**
  * VERTRAGS-TUEV
@@ -29,6 +30,14 @@ export function VertragsTuev({
   const tuevKindHinzufuegen = useSzenario((x) => x.tuevKindHinzufuegen);
   const tuevKindAendern = useSzenario((x) => x.tuevKindAendern);
   const tuevKindEntfernen = useSzenario((x) => x.tuevKindEntfernen);
+  const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
+  const setzeKind = useSzenario((x) => x.setzeKind);
+
+  // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
+  const jetzt = new Date().getFullYear();
+  const avdParam = parameterFuer(
+    Math.max(jetzt, 2027), { indexRate: szenario.annahmen.tarifIndex },
+  ).avd;
 
   // Bemessungsgrundlage: das TATSAECHLICHE Bruttogehalt und zvE.
   // Der Prototyp schaetzte hier aus dem Netto mit festen Faktoren (Befund B9).
@@ -226,7 +235,7 @@ export function VertragsTuev({
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            Kinder (Zulage)
+                            Kinder (Zulage) — für diesen Vertrag
                           </span>
                           <button
                             type="button"
@@ -270,6 +279,41 @@ export function VertragsTuev({
                       </div>
                     )}
 
+                    {/*
+                      Beim Altersvorsorgedepot kommen die Kinder aus dem
+                      HAUSHALT, nicht vom Vertrag — aus derselben Quelle, aus
+                      der auch die Zeitachse und das Vertragsblatt rechnen.
+                      Zwei Listen fuer dieselben Kinder hiessen zwei Wahrheiten,
+                      und der Nutzer glaubte zu Recht keiner von beiden. Dass
+                      Riester es anders macht, steht in beiden Ueberschriften.
+                    */}
+                    {v.typ === 'avd' && (
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
+                          Kinder (Zulage) — aus Ihren Basisdaten
+                        </span>
+                        <div className="mt-1.5">
+                          <ZahlFeld
+                            label="Kinder mit Kindergeldanspruch"
+                            wert={szenario.haushalt.kinder.length}
+                            onChange={setzeKinderAnzahl}
+                            max={15}
+                          />
+                        </div>
+                        <KinderZeilen
+                          kinder={szenario.haushalt.kinder}
+                          onKind={setzeKind}
+                          a={avdParam}
+                          jetzt={jetzt}
+                        />
+                        <KinderHinweis a={avdParam} />
+                        <p className="mt-1 text-[10px] leading-relaxed text-indigo-800">
+                          Gilt für den ganzen Haushalt: Änderungen wirken auch in den Basisdaten,
+                          auf der Zeitachse und im Vertragsblatt.
+                        </p>
+                      </div>
+                    )}
+
                     <Schalter
                       label="Rente gegen Kapital vergleichen"
                       wert={t.vergleichen}
@@ -301,9 +345,6 @@ export function VertragsTuev({
                         {r.agZuschussMonat > 0 && (
                           <GegenueberZeile text="− AG-Zuschuss" wert={euro(r.agZuschussMonat)} farbe="text-emerald-600" />
                         )}
-                        {r.zulageMonat > 0 && (
-                          <GegenueberZeile text="− Zulage" wert={euro(r.zulageMonat)} farbe="text-emerald-600" />
-                        )}
                         {r.svErsparnisMonat > 0 && (
                           <GegenueberZeile text="− SV-Ersparnis" wert={euro(r.svErsparnisMonat)} farbe="text-emerald-600" />
                         )}
@@ -318,6 +359,68 @@ export function VertragsTuev({
                         </div>
                       </div>
                     </div>
+
+                    {/*
+                      Die Zulagen stehen BEWUSST ausserhalb des Kastens darueber.
+                      Sie mindern den Eigenaufwand nicht: sie kommen nicht vom
+                      Sparer, sondern vom Staat, und stehen bereits als hoeheres
+                      Kapital auf der Habenseite (avdSteuervorteil.eigenaufwandNetto
+                      rechnet genau so). Als Minusposten in der Belastung gebucht
+                      zaehlten sie doppelt — und die Zeile "Kostet Sie wirklich"
+                      ging sichtbar nicht mehr auf. Das war sie vorher weder beim
+                      Altersvorsorgedepot noch bei Riester.
+                    */}
+                    {r.zulageMonat > 0 && (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                          Was der Staat dazugibt (1. Jahr)
+                        </div>
+                        <div className="space-y-1.5">
+                          {r.zulageDetail ? (
+                            <>
+                              <GegenueberZeile
+                                text="Grundzulage"
+                                wert={euro(r.zulageDetail.grundzulageMonat)}
+                              />
+                              <GegenueberZeile
+                                text={r.zulageDetail.kinderMitAnspruch > 0
+                                  ? `Kinderzulage — für ${r.zulageDetail.kinderMitAnspruch} Kind${r.zulageDetail.kinderMitAnspruch > 1 ? 'er' : ''}`
+                                  : 'Kinderzulage — kein Kind im Kindergeldalter'}
+                                wert={euro(r.zulageDetail.kinderzulageMonat)}
+                              />
+                              <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-emerald-200 pt-2">
+                                <span className="text-xs font-bold text-emerald-900">Jedes Jahr</span>
+                                <span className="text-base font-black tabular-nums text-emerald-700">
+                                  {euro(r.zulageDetail.grundzulageMonat + r.zulageDetail.kinderzulageMonat)}
+                                </span>
+                              </div>
+                              {/*
+                                Der Bonus faellt EINMAL an. Neben die laufenden
+                                Zulagen gestellt verspraeche er eine Foerderung
+                                fuer die ganze Laufzeit, die es nur im ersten
+                                Jahr gibt.
+                              */}
+                              {r.zulageDetail.bonusEinmalig > 0 && (
+                                <p className="mt-1 text-[10px] leading-relaxed text-emerald-800">
+                                  Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
+                                  {euro(r.zulageDetail.bonusEinmalig)}.
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <GegenueberZeile text="Zulage" wert={euro(r.zulageMonat)} />
+                          )}
+                        </div>
+                        <p className="mt-2 text-[10px] leading-relaxed text-emerald-800">
+                          Die Zulagen fließen zusätzlich in den Vertrag — sie senken Ihren Beitrag
+                          nicht. Deshalb stehen sie hier getrennt und nicht in der Rechnung darüber.
+                        </p>
+                        <p className="mt-1 text-[10px] text-emerald-800">
+                          Im Vertrag kommen an:{' '}
+                          <strong>{euro(r.beitragMonat + r.zulageMonat)}</strong> im Monat.
+                        </p>
+                      </div>
+                    )}
 
                     {/*
                       Der Gegenpol zum Kasten darueber: dort geht der BRUTTO-

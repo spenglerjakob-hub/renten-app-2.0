@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Mail, Copy, Check } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
+import type { AvdKind } from '@renten/engine';
 import { TextFeld, euro } from '../components/Feld';
 
 /** Die Eckdaten der Rechnung, die mit in die Anfrage gehen. */
 export interface Eckdaten {
   beitragMonat: number;
   geburtsdatum: string;
-  kinderGeburtsjahre: readonly number[];
+  kinder: readonly AvdKind[];
   verheiratet: boolean;
   /** Zulagen, die es jedes Jahr gibt */
   zulagenJahr: number;
@@ -34,8 +35,12 @@ function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): 
     `- Beitrag: ${euro(d.beitragMonat)} im Monat (${euro(d.beitragMonat * 12)} im Jahr)`,
     d.geburtsdatum ? `- Geburtsdatum: ${d.geburtsdatum}` : null,
     `- Familienstand: ${d.verheiratet ? 'verheiratet' : 'alleinstehend'}`,
-    d.kinderGeburtsjahre.length > 0
-      ? `- Kinder (Geburtsjahre): ${d.kinderGeburtsjahre.join(', ')}`
+    d.kinder.length > 0
+      ? `- Kinder (Geburtsjahre): ${d.kinder.map((k) => (
+          k.ausbildungBisJahr !== undefined
+            ? `${k.geburtsjahr} (Ausbildung bis ${k.ausbildungBisJahr})`
+            : String(k.geburtsjahr)
+        )).join(', ')}`
       : '- Kinder: keine',
     '',
     'Das Ergebnis der Rechnung:',

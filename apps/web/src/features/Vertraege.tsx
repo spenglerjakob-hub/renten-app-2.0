@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { Trash2, PlusCircle } from 'lucide-react';
-import type { Vertrag, VertragsTyp, AvdLauf } from '@renten/engine';
+import { parameterFuer, type Vertrag, type VertragsTyp, type AvdLauf } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 
 const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
   1: [{ wert: 'basis', text: 'Rürup / Basisrente' }],
@@ -60,6 +61,13 @@ function VertragsKarte({ v, depot, auszahlung, avd }: {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
+  const haushaltsKinder = useSzenario((x) => x.szenario.haushalt.kinder);
+  const tarifIndex = useSzenario((x) => x.szenario.annahmen.tarifIndex);
+  const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
+  const setzeKind = useSzenario((x) => x.setzeKind);
+
+  const jetzt = new Date().getFullYear();
+  const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: tarifIndex }).avd;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -144,6 +152,40 @@ function VertragsKarte({ v, depot, auszahlung, avd }: {
             <ZahlFeld label="Auszahlungsdauer" wert={v.entnahmedauer ?? 25}
               onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })} min={1} max={60} einheit="Jahre"
               hilfe="Ein Auszahlplan muss mindestens bis zum 85. Lebensjahr laufen." />
+
+            {/*
+              Ohne dieses Feld war die Kinderzulage hier stillschweigend null:
+              Sie haengt an den Kindern, und die wurden beim Vertrag nirgends
+              abgefragt. Erfasst werden sie am HAUSHALT — dieselbe Quelle, aus
+              der auch der Vertrags-TUEV und die Zeitachse rechnen. Zwei
+              Listen fuer dieselben Kinder waeren zwei Wahrheiten.
+            */}
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2.5 sm:col-span-2">
+              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
+                  Kinder — für die Kinderzulage
+                </span>
+                <span className="text-[10px] text-indigo-700">Aus Ihren Basisdaten</span>
+              </div>
+              <ZahlFeld
+                label="Kinder mit Kindergeldanspruch"
+                wert={haushaltsKinder.length}
+                onChange={setzeKinderAnzahl}
+                max={15}
+                hilfe="Je Kind ein Euro für jeden eigenen Euro, höchstens 300 € im Jahr."
+              />
+              <KinderZeilen
+                kinder={haushaltsKinder}
+                onKind={setzeKind}
+                a={avdParam}
+                jetzt={jetzt}
+              />
+              <KinderHinweis a={avdParam} />
+              <p className="mt-1 text-[10px] leading-relaxed text-indigo-800">
+                Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch
+                in den Basisdaten und im Vertrags-TÜV.
+              </p>
+            </div>
           </>
         )}
 

@@ -87,6 +87,23 @@ export const vertragSchema = z.object({
   einstandswert: z.number().min(0).optional(),
 });
 
+/**
+ * Die Kinderzulage des Altersvorsorgedepots endet spaetestens mit 25.
+ *
+ * Doppelt zum Rechenkern gefuehrt, weil @renten/schema bewusst NICHT von
+ * @renten/engine abhaengt. Die Zahl steht hier ausschliesslich fuer die
+ * Umschreibung alter Dateien; gerechnet wird allein mit dem Parameter aus
+ * params/jahre.ts.
+ */
+const KINDERZULAGE_BIS_ALTER_AUSBILDUNG = 25;
+
+/** Ein Kind mit Geburtsjahr und, falls zutreffend, Ende der Ausbildung. */
+export const kindSchema = z.object({
+  geburtsjahr: z.number().int().min(1900).max(2200),
+  /** Bis einschliesslich diesem Jahr in Ausbildung/Studium; fehlt = keine */
+  ausbildungBisJahr: z.number().int().min(1900).max(2200).optional(),
+});
+
 export const haushaltSchema = z.object({
   verheiratet: z.boolean().default(false),
   bundesland: z.string().default('Baden-Württemberg'),
@@ -94,18 +111,42 @@ export const haushaltSchema = z.object({
   hatKinder: z.boolean().default(false),
   kinderUnter25: z.number().int().min(0).max(15).default(0),
   /**
-   * Geburtsjahre der Kinder. Getrennt von kinderUnter25 gefuehrt: die Zahl
-   * steuert Pflegeversicherung und Besoldung, die Jahre entscheiden, wie lange
-   * die Kinderzulage laeuft. Alte Dateien haben sie nicht — dann gibt es keine
-   * Kinderzulage, statt eine Laufzeit zu erfinden.
+   * Die Kinder. Getrennt von kinderUnter25 gefuehrt: die ZAHL steuert
+   * Pflegeversicherung und Besoldung, die JAHRGAENGE entscheiden, wie lange
+   * die Kinderzulage laeuft.
    */
-  kinderGeburtsjahre: z.array(z.number().int().min(1900).max(2200)).default([]),
-  /** Kinder voraussichtlich in Ausbildung oder Studium — Zulage dann bis 25 */
-  kinderInAusbildung: z.boolean().default(false),
+  kinder: z.array(kindSchema).max(15).default([]),
+
+  /**
+   * ALTLASTEN. Werden nur noch GELESEN und unten nach `kinder` umgeschrieben.
+   *
+   * Bis 2026 standen die Kinder als blosse Liste von Geburtsjahren im
+   * Szenario, dazu EIN globaler Ausbildungsschalter fuer alle zusammen. Ein
+   * Versionsfeld gibt es nicht, gespeicherte Dateien (localStorage wie
+   * Supabase) tragen diese Form aber weiter. Geschrieben werden die beiden
+   * Felder nie wieder: `exportiere` gibt das GEPARSTE Objekt aus.
+   */
+  kinderGeburtsjahre: z.array(z.number().int().min(1900).max(2200)).optional(),
+  kinderInAusbildung: z.boolean().optional(),
+
   kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).default('kvdr'),
   pkvPraemieMonat: z.number().min(0).default(0),
   zielNettoHeute: z.number().min(0).default(2000),
-});
+}).transform(({ kinderGeburtsjahre, kinderInAusbildung, ...h }) => ({
+  ...h,
+  // Der alte Schalter bedeutete "ALLE Kinder bis 25". Genau das wird je Kind
+  // eingetragen, damit die Rechnung Zahl fuer Zahl dieselbe bleibt wie vor
+  // der Aenderung — eine stille Kuerzung beim Laden waere schlimmer als die
+  // zu grosszuegige Altregel. Korrigieren kann der Nutzer danach je Kind.
+  kinder: h.kinder.length > 0
+    ? h.kinder
+    : (kinderGeburtsjahre ?? []).map((geburtsjahr) => ({
+        geburtsjahr,
+        ausbildungBisJahr: kinderInAusbildung
+          ? geburtsjahr + KINDERZULAGE_BIS_ALTER_AUSBILDUNG
+          : undefined,
+      })),
+}));
 
 export const annahmenSchema = z.object({
   inflation: z.number().min(-0.1).max(0.2).default(0.02),

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
-  avdProfitabilitaet,
+  avdProfitabilitaet, avdKinderzulageBis,
 } from '../src/products/altersvorsorgedepot.js';
 import { ansparphase } from '../src/products/kapitalanlage.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -11,33 +11,33 @@ import type { Szenario, Vertrag } from '../src/model.js';
 const p = parameterFuer(2027, { indexRate: 0 });
 
 /** N junge Kinder — in den Testjahren durchweg kindergeldberechtigt. */
-const kinder = (n: number) => Array.from({ length: n }, () => 2025);
+const kinder = (n: number) => Array.from({ length: n }, () => ({ geburtsjahr: 2025 }));
 const a = p.avd;
 
 describe('Altersvorsorgedepot: Zulagenstufen', () => {
   it('gewaehrt auf die ersten 360 EUR die Haelfte', () => {
-    const z = avdZulagen({ eigenbeitragJahr: 360, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a);
+    const z = avdZulagen({ eigenbeitragJahr: 360, kinder: kinder(0), alter: 40, jahr: 2030 }, a);
     expect(z.stufe1).toBeCloseTo(180, 6);
     expect(z.stufe2).toBe(0);
     expect(z.grundzulage).toBeCloseTo(180, 6);
   });
 
   it('gewaehrt auf die weiteren 1 440 EUR ein Viertel', () => {
-    const z = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a);
+    const z = avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(0), alter: 40, jahr: 2030 }, a);
     expect(z.stufe1).toBeCloseTo(180, 6);
     expect(z.stufe2).toBeCloseTo(360, 6);
     expect(z.grundzulage).toBeCloseTo(540, 6);
   });
 
   it('deckelt die Grundzulage bei 540 EUR', () => {
-    const z = avdZulagen({ eigenbeitragJahr: 6000, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a);
+    const z = avdZulagen({ eigenbeitragJahr: 6000, kinder: kinder(0), alter: 40, jahr: 2030 }, a);
     expect(z.grundzulage).toBeCloseTo(540, 6);
     expect(z.hinweise.join(' ')).toMatch(/steigt die Grundzulage\s+nicht weiter/);
   });
 
   it('ist am Knickpunkt stetig', () => {
-    const links = avdZulagen({ eigenbeitragJahr: 359.99, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a).grundzulage;
-    const rechts = avdZulagen({ eigenbeitragJahr: 360.01, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a).grundzulage;
+    const links = avdZulagen({ eigenbeitragJahr: 359.99, kinder: kinder(0), alter: 40, jahr: 2030 }, a).grundzulage;
+    const rechts = avdZulagen({ eigenbeitragJahr: 360.01, kinder: kinder(0), alter: 40, jahr: 2030 }, a).grundzulage;
     expect(Math.abs(rechts - links)).toBeLessThan(0.02);
   });
 
@@ -45,20 +45,20 @@ describe('Altersvorsorgedepot: Zulagenstufen', () => {
     // Der Fallstrick, den schon Riester hatte: nicht anteilig weniger,
     // sondern gar nichts. 10 EUR im Monat sind 120 EUR im Jahr — genau die
     // Grenze; ein Cent darunter faellt alles weg.
-    const knapp = avdZulagen({ eigenbeitragJahr: 120, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a);
+    const knapp = avdZulagen({ eigenbeitragJahr: 120, kinder: kinder(2), alter: 40, jahr: 2030 }, a);
     expect(knapp.gesamt).toBeGreaterThan(0);
 
-    const darunter = avdZulagen({ eigenbeitragJahr: 119.99, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a);
+    const darunter = avdZulagen({ eigenbeitragJahr: 119.99, kinder: kinder(2), alter: 40, jahr: 2030 }, a);
     expect(darunter.gesamt).toBe(0);
     expect(darunter.kinderzulage).toBe(0);
     expect(darunter.hinweise.join(' ')).toMatch(/entfällt die Förderung/);
   });
 
   it('zahlt 300 EUR je Kind zusaetzlich', () => {
-    const ohne = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a);
-    const mit = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a);
+    const ohne = avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(2), alter: 40, jahr: 2030 }, a);
+    const mit = avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(2), alter: 40, jahr: 2030 }, a);
     expect(mit.kinderzulage).toBeCloseTo(600, 6);
-    expect(mit.gesamt - avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a).gesamt)
+    expect(mit.gesamt - avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(0), alter: 40, jahr: 2030 }, a).gesamt)
       .toBeCloseTo(600, 6);
     expect(ohne.kinderzulage).toBeCloseTo(600, 6);
   });
@@ -69,35 +69,35 @@ describe('Altersvorsorgedepot: Zulagenstufen', () => {
     // davon, wie viele Kinder es sind. Vorher wurden pauschal 300 EUR je Kind
     // gezahlt; bei 120 EUR Beitrag und drei Kindern waren das 900 EUR Zulage
     // auf 120 EUR Einzahlung.
-    expect(avdZulagen({ eigenbeitragJahr: 300, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a).kinderzulage)
+    expect(avdZulagen({ eigenbeitragJahr: 300, kinder: kinder(2), alter: 40, jahr: 2030 }, a).kinderzulage)
       .toBeCloseTo(600, 6);
-    expect(avdZulagen({ eigenbeitragJahr: 150, kinderGeburtsjahre: kinder(2), alter: 40, jahr: 2030 }, a).kinderzulage)
+    expect(avdZulagen({ eigenbeitragJahr: 150, kinder: kinder(2), alter: 40, jahr: 2030 }, a).kinderzulage)
       .toBeCloseTo(300, 6);
-    expect(avdZulagen({ eigenbeitragJahr: 120, kinderGeburtsjahre: kinder(3), alter: 40, jahr: 2030 }, a).kinderzulage)
+    expect(avdZulagen({ eigenbeitragJahr: 120, kinder: kinder(3), alter: 40, jahr: 2030 }, a).kinderzulage)
       .toBeCloseTo(360, 6);
   });
 
   it('weist auf die gekuerzte Kinderzulage hin, statt sie still zu kuerzen', () => {
-    const knapp = avdZulagen({ eigenbeitragJahr: 150, kinderGeburtsjahre: kinder(1), alter: 40, jahr: 2030 }, a);
+    const knapp = avdZulagen({ eigenbeitragJahr: 150, kinder: kinder(1), alter: 40, jahr: 2030 }, a);
     expect(knapp.hinweise.join(' ')).toMatch(/volle Kinderzulage/);
-    const voll = avdZulagen({ eigenbeitragJahr: 300, kinderGeburtsjahre: kinder(1), alter: 40, jahr: 2030 }, a);
+    const voll = avdZulagen({ eigenbeitragJahr: 300, kinder: kinder(1), alter: 40, jahr: 2030 }, a);
     expect(voll.hinweise.join(' ')).not.toMatch(/volle Kinderzulage/);
   });
 
   it('gibt den Berufseinsteigerbonus nur unter 25', () => {
-    expect(avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(0), alter: 24, jahr: 2030 }, a).bonus).toBe(200);
-    expect(avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(0), alter: 25, jahr: 2030 }, a).bonus).toBe(0);
+    expect(avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(0), alter: 24, jahr: 2030 }, a).bonus).toBe(200);
+    expect(avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(0), alter: 25, jahr: 2030 }, a).bonus).toBe(0);
   });
 
   it('kennt das Produkt vor 2027 nicht', () => {
-    const z = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2026 }, a);
+    const z = avdZulagen({ eigenbeitragJahr: 1800, kinder: kinder(0), alter: 40, jahr: 2026 }, a);
     expect(z.gesamt).toBe(0);
     expect(z.hinweise.join(' ')).toMatch(/erst ab 2027/);
   });
 
   it('foerdert kleine Beitraege anteilig deutlich staerker als grosse', () => {
-    const klein = avdZulagen({ eigenbeitragJahr: 360, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a);
-    const gross = avdZulagen({ eigenbeitragJahr: 3600, kinderGeburtsjahre: kinder(0), alter: 40, jahr: 2030 }, a);
+    const klein = avdZulagen({ eigenbeitragJahr: 360, kinder: kinder(0), alter: 40, jahr: 2030 }, a);
+    const gross = avdZulagen({ eigenbeitragJahr: 3600, kinder: kinder(0), alter: 40, jahr: 2030 }, a);
     expect(klein.foerderquote).toBeCloseTo(0.5, 6);
     expect(gross.foerderquote).toBeCloseTo(0.15, 6);
     expect(klein.foerderquote).toBeGreaterThan(gross.foerderquote);
@@ -107,7 +107,7 @@ describe('Altersvorsorgedepot: Zulagenstufen', () => {
 describe('Altersvorsorgedepot: Ansparphase', () => {
   const basis = {
     beitragMonat: 150, dynamik: 0, startkapital: 0, jahre: 30,
-    renditeBrutto: 0.06, ter: 0.002, kinderGeburtsjahre: kinder(0), alterHeute: 37, startjahr: 2027,
+    renditeBrutto: 0.06, ter: 0.002, kinder: kinder(0), alterHeute: 37, startjahr: 2027,
   };
 
   it('zaehlt nur den Eigenbeitrag als Eigenleistung, die Zulage kommt obendrauf', () => {
@@ -196,7 +196,7 @@ describe('Altersvorsorgedepot als Vertragsart in der Zeitachse', () => {
       schemaVersion: 1,
       haushalt: {
         verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-        hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
         zielNettoHeute: 2000,
       },
       annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
@@ -291,7 +291,7 @@ describe('KV/PV-Verteilung im Kassenbon', () => {
       schemaVersion: 1,
       haushalt: {
         verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-        hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
         zielNettoHeute: 2000,
       },
       annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
@@ -440,7 +440,7 @@ describe('Gefoerdertes gegen freies Depot', () => {
   const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
   const basis = {
     beitragMonat: 150, jahre: 30, renditeBrutto: 0.06, kosten: 0.01,
-    kinderGeburtsjahre: kinder(0), alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
+    kinder: kinder(0), alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
     auszahldauer: 25, renditeAuszahlung: 0, zveHeute: 50_000,
     steuersatzImAlter: 0.25,
   };
@@ -495,7 +495,7 @@ describe('Vergleich: Besteuerung des freien Depots', () => {
     const r = avdGegenFreiesDepot(
       {
         beitragMonat: 150, jahre: 30, renditeBrutto: 0.06, kosten: 0.01,
-        kinderGeburtsjahre: kinder(0), alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
+        kinder: kinder(0), alterHeute: 37, alterBeiRente: 67, startjahr: 2027,
         auszahldauer: 18, renditeAuszahlung: 0, zveHeute: 50_000,
         steuersatzImAlter: 0.25,
       },
@@ -514,7 +514,7 @@ describe('Vergleich: Besteuerung des freien Depots', () => {
 describe('Altersvorsorgedepot: Profitabilitaet', () => {
   const opt = { verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuerpflichtig: false };
   const basis = {
-    beitragMonat: 150, jahre: 30, kinderGeburtsjahre: kinder(0), alterHeute: 37, startjahr: 2027,
+    beitragMonat: 150, jahre: 30, kinder: kinder(0), alterHeute: 37, startjahr: 2027,
     zveHeute: 50_000, endkapital: 180_000,
     bruttoRenteJahr: 10_000, steuerRenteJahr: 2_700, jahreAuszahlung: 18,
     bruttoEinmal: 0, steuerEinmal: 0,
@@ -579,20 +579,20 @@ describe('Berufseinsteigerbonus: einmalig, nicht dauerhaft', () => {
   // Dauerhaft sind es 180 EUR auf 360 EUR, also 50 %. Fuer eine Sparentscheidung
   // ueber 30 Jahre ist das ein erheblicher Unterschied.
   it('trennt die dauerhafte Zulage vom einmaligen Bonus', () => {
-    const jung = avdZulagen({ eigenbeitragJahr: 360, kinderGeburtsjahre: kinder(0), alter: 24, jahr: 2030 }, a);
+    const jung = avdZulagen({ eigenbeitragJahr: 360, kinder: kinder(0), alter: 24, jahr: 2030 }, a);
     expect(jung.bonus).toBe(200);
     expect(jung.gesamt).toBeCloseTo(380, 6);
     expect(jung.dauerhaft).toBeCloseTo(180, 6);
   });
 
   it('weist beide Foerderquoten getrennt aus', () => {
-    const jung = avdZulagen({ eigenbeitragJahr: 360, kinderGeburtsjahre: kinder(0), alter: 24, jahr: 2030 }, a);
+    const jung = avdZulagen({ eigenbeitragJahr: 360, kinder: kinder(0), alter: 24, jahr: 2030 }, a);
     expect(jung.foerderquote).toBeCloseTo(380 / 360, 6);        // 105,6 %
     expect(jung.foerderquoteDauerhaft).toBeCloseTo(0.5, 6);     // 50 %
   });
 
   it('ab 25 sind beide Quoten gleich', () => {
-    const alt = avdZulagen({ eigenbeitragJahr: 360, kinderGeburtsjahre: kinder(0), alter: 25, jahr: 2030 }, a);
+    const alt = avdZulagen({ eigenbeitragJahr: 360, kinder: kinder(0), alter: 25, jahr: 2030 }, a);
     expect(alt.bonus).toBe(0);
     expect(alt.dauerhaft).toBeCloseTo(alt.gesamt, 6);
     expect(alt.foerderquoteDauerhaft).toBeCloseTo(alt.foerderquote, 6);
@@ -604,7 +604,7 @@ describe('Berufseinsteigerbonus: einmalig, nicht dauerhaft', () => {
     const r = avdAnsparphase(
       {
         beitragMonat: 150, dynamik: 0, startkapital: 0, jahre: 5,
-        renditeBrutto: 0.04, ter: 0.01, kinderGeburtsjahre: kinder(0), alterHeute: 22, startjahr: 2027,
+        renditeBrutto: 0.04, ter: 0.01, kinder: kinder(0), alterHeute: 22, startjahr: 2027,
       },
       p,
     );
@@ -619,16 +619,16 @@ describe('Kinderzulage endet mit dem Kindergeldanspruch', () => {
   // fuenfjaehriges Kind eintrug, bekam 32 Jahre lang 300 EUR statt der
   // tatsaechlichen 13. Sie haengt am Kindergeldanspruch — im Regelfall bis 18,
   // bei Ausbildung oder Studium bis 25.
-  const kind2020 = [2020];
+  const kind2020 = [{ geburtsjahr: 2020 }];
 
   it('zahlt, solange das Kind unter 18 ist', () => {
-    const drin = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kind2020, alter: 40, jahr: 2037 }, a);
+    const drin = avdZulagen({ eigenbeitragJahr: 1800, kinder: kind2020, alter: 40, jahr: 2037 }, a);
     expect(drin.kinderzulage).toBeCloseTo(300, 6);
     expect(drin.kinderMitAnspruch).toBe(1);
   });
 
   it('hoert im Jahr des 18. Geburtstags auf', () => {
-    const raus = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: kind2020, alter: 40, jahr: 2038 }, a);
+    const raus = avdZulagen({ eigenbeitragJahr: 1800, kinder: kind2020, alter: 40, jahr: 2038 }, a);
     expect(raus.kinderzulage).toBe(0);
     expect(raus.kinderMitAnspruch).toBe(0);
     // Die Grundzulage laeuft davon unberuehrt weiter.
@@ -636,18 +636,20 @@ describe('Kinderzulage endet mit dem Kindergeldanspruch', () => {
   });
 
   it('laeuft mit Ausbildung oder Studium bis 25', () => {
-    const args = { eigenbeitragJahr: 1800, kinderGeburtsjahre: kind2020, alter: 40 };
-    expect(avdZulagen({ ...args, jahr: 2044, kinderInAusbildung: true }, a).kinderzulage).toBeCloseTo(300, 6);
-    expect(avdZulagen({ ...args, jahr: 2045, kinderInAusbildung: true }, a).kinderzulage).toBe(0);
+    // Ausbildung bis 2045 — die Kappung bei 25 schneidet auf 2044 zurueck.
+    const inAusbildung = [{ geburtsjahr: 2020, ausbildungBisJahr: 2045 }];
+    const args = { eigenbeitragJahr: 1800, kinder: inAusbildung, alter: 40 };
+    expect(avdZulagen({ ...args, jahr: 2044 }, a).kinderzulage).toBeCloseTo(300, 6);
+    expect(avdZulagen({ ...args, jahr: 2045 }, a).kinderzulage).toBe(0);
   });
 
   it('ein bereits volljaehriges Kind bringt gar nichts mehr', () => {
-    const r = avdZulagen({ eigenbeitragJahr: 1800, kinderGeburtsjahre: [2000], alter: 45, jahr: 2030 }, a);
+    const r = avdZulagen({ eigenbeitragJahr: 1800, kinder: [{ geburtsjahr: 2000 }], alter: 45, jahr: 2030 }, a);
     expect(r.kinderzulage).toBe(0);
   });
 
   it('bei mehreren Kindern sinkt die Zulage in Stufen, nicht auf einen Schlag', () => {
-    const args = { eigenbeitragJahr: 1800, kinderGeburtsjahre: [2015, 2022], alter: 40 };
+    const args = { eigenbeitragJahr: 1800, kinder: [{ geburtsjahr: 2015 }, { geburtsjahr: 2022 }], alter: 40 };
     expect(avdZulagen({ ...args, jahr: 2030 }, a).kinderzulage).toBeCloseTo(600, 6);
     expect(avdZulagen({ ...args, jahr: 2035 }, a).kinderzulage).toBeCloseTo(300, 6);
     expect(avdZulagen({ ...args, jahr: 2041 }, a).kinderzulage).toBe(0);
@@ -664,7 +666,7 @@ describe('Kinderzulage endet mit dem Kindergeldanspruch', () => {
       {
         beitragMonat: 150, dynamik: 0, startkapital: 0, jahre: 30,
         renditeBrutto: 0.04, ter: 0.01,
-        kinderGeburtsjahre: [2022], alterHeute: 37, startjahr: 2027,
+        kinder: [{ geburtsjahr: 2022 }], alterHeute: 37, startjahr: 2027,
       },
       p,
     );
@@ -677,14 +679,85 @@ describe('Kinderzulage endet mit dem Kindergeldanspruch', () => {
     expect(frueherFalsch - lauf.zulagenGesamt).toBeCloseTo(300 * 17, 4);
   });
 
+  it('DER GEMELDETE FEHLER: mit 22 fertig heisst mit 22 Schluss', () => {
+    // Frueher galt EIN Schalter fuer alle Kinder und liess die Zulage
+    // pauschal bis 25 laufen. Wer 2042 mit 22 fertig war, bekam drei weitere
+    // Jahre gerechnet, die es nicht gibt — 900 EUR zu viel.
+    const kind = [{ geburtsjahr: 2020, ausbildungBisJahr: 2042 }];
+    const args = { eigenbeitragJahr: 1800, kinder: kind, alter: 40 };
+    expect(avdZulagen({ ...args, jahr: 2042 }, a).kinderzulage).toBeCloseTo(300, 6);
+    expect(avdZulagen({ ...args, jahr: 2043 }, a).kinderzulage).toBe(0);
+    // Zum Vergleich die Altregel: die haette bis 2044 gezahlt.
+    const altregel = [{ geburtsjahr: 2020, ausbildungBisJahr: 2045 }];
+    expect(avdZulagen({ ...args, kinder: altregel, jahr: 2044 }, a).kinderzulage)
+      .toBeCloseTo(300, 6);
+  });
+
+  it('kappt eine zu lange Ausbildungsangabe bei 25 — und sagt es', () => {
+    const kind = [{ geburtsjahr: 2020, ausbildungBisJahr: 2050 }];
+    const args = { eigenbeitragJahr: 1800, kinder: kind, alter: 40 };
+    expect(avdZulagen({ ...args, jahr: 2044 }, a).kinderzulage).toBeCloseTo(300, 6);
+    expect(avdZulagen({ ...args, jahr: 2045 }, a).kinderzulage).toBe(0);
+    // Eine stille Kuerzung laese sich als Rechenfehler.
+    expect(avdZulagen({ ...args, jahr: 2044 }, a).hinweise.join(' ')).toContain('2044');
+  });
+
+  it('ein Ausbildungsende vor 18 verkuerzt nichts — Kindergeld laeuft weiter', () => {
+    const kind = [{ geburtsjahr: 2020, ausbildungBisJahr: 2030 }];
+    const args = { eigenbeitragJahr: 1800, kinder: kind, alter: 40 };
+    // Bis einschliesslich 2037 (17. Lebensjahr) gibt es Kindergeld, egal was
+    // in der Ausbildungszeile steht.
+    expect(avdZulagen({ ...args, jahr: 2037 }, a).kinderzulage).toBeCloseTo(300, 6);
+    expect(avdZulagen({ ...args, jahr: 2038 }, a).kinderzulage).toBe(0);
+  });
+
+  it('zwei Kinder fallen zu ihrem je eigenen Zeitpunkt heraus', () => {
+    // Das kann die alte Fassung mit EINEM Schalter grundsaetzlich nicht.
+    const kinderListe = [
+      { geburtsjahr: 2010, ausbildungBisJahr: 2032 },
+      { geburtsjahr: 2012 },
+    ];
+    const args = { eigenbeitragJahr: 1800, kinder: kinderListe, alter: 40 };
+    expect(avdZulagen({ ...args, jahr: 2029 }, a).kinderzulage).toBeCloseTo(600, 6);
+    // 2030 wird das zweite Kind 18 — nur noch das erste zaehlt.
+    expect(avdZulagen({ ...args, jahr: 2030 }, a).kinderzulage).toBeCloseTo(300, 6);
+    expect(avdZulagen({ ...args, jahr: 2033 }, a).kinderzulage).toBe(0);
+  });
+
+  it('avdKinderzulageBis und avdZulagen sagen dasselbe', () => {
+    // Die Oberflaeche zeigt "noch N Jahre" aus avdKinderzulageBis an, gerechnet
+    // wird in avdZulagen. Laufen beide auseinander, zeigt die Seite eine
+    // andere Zahl, als sie rechnet.
+    for (const kind of [
+      { geburtsjahr: 2020 },
+      { geburtsjahr: 2020, ausbildungBisJahr: 2042 },
+      { geburtsjahr: 2020, ausbildungBisJahr: 2050 },
+      { geburtsjahr: 2005 },
+    ]) {
+      const bis = avdKinderzulageBis(kind, a);
+      for (let jahr = 2027; jahr <= 2060; jahr++) {
+        const zahlt = avdZulagen(
+          { eigenbeitragJahr: 1800, kinder: [kind], alter: 40, jahr }, a,
+        ).kinderMitAnspruch > 0;
+        expect(zahlt, `Jahr ${jahr}, Kind ${kind.geburtsjahr}`).toBe(jahr <= bis);
+      }
+    }
+  });
+
   it('die Ansparphase reicht die Ausbildungsannahme durch', () => {
     const basis = {
       beitragMonat: 150, dynamik: 0, startkapital: 0, jahre: 30,
       renditeBrutto: 0.04, ter: 0.01,
-      kinderGeburtsjahre: [2022], alterHeute: 37, startjahr: 2027,
+      kinder: [{ geburtsjahr: 2022 }], alterHeute: 37, startjahr: 2027,
     };
     const ohne = avdAnsparphase(basis, p);
-    const mit = avdAnsparphase({ ...basis, kinderInAusbildung: true }, p);
+    // Genau das, was die Umschreibung alter Dateien erzeugt: Ausbildung bis
+    // geburtsjahr + 25. Der Betrag muss dem alten Pauschalschalter
+    // entsprechen, sonst haetten gespeicherte Szenarien sich veraendert.
+    const mit = avdAnsparphase(
+      { ...basis, kinder: [{ geburtsjahr: 2022, ausbildungBisJahr: 2047 }] },
+      p,
+    );
     expect(mit.zulagenGesamt - ohne.zulagenGesamt).toBeCloseTo(300 * 7, 4);
   });
 });

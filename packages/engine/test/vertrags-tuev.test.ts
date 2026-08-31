@@ -11,7 +11,7 @@ const szenario: Szenario = {
   schemaVersion: 1,
   haushalt: {
     verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
-    hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+    hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
     zielNettoHeute: 2000,
   },
   annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0, gehaltsdynamik: 0.02 },
@@ -295,24 +295,24 @@ describe('Gegenprobe: TUEV und Landingpage rechnen dieselbe Zulage', () => {
   // Beide Stellen der Anwendung bewerten denselben Vertrag. Laufen sie
   // auseinander, glaubt der Nutzer zu Recht keiner von beiden.
   it('gleiche Kinder, gleicher Beitrag, gleiche Zulage im ersten Jahr', () => {
-    const kinderGeburtsjahre = [2015, 2022];
+    const kinderListe = [{ geburtsjahr: 2015 }, { geburtsjahr: 2022 }];
     const beitragMonat = 150;
 
+    // Die Kinder stehen im HAUSHALT, nicht an der TUEV-Position: das
+    // Altersvorsorgedepot liest sie aus derselben Quelle wie die Zeitachse.
+    // Stuende hier weiter `annahmen({ kinder })`, waere die Kinderzulage
+    // stillschweigend null — genau der Fehler, der gemeldet wurde.
     const ausTuev = vertragsTuev(
       vertrag({ typ: 'avd', schicht: 2 }),
-      annahmen({
-        beitragMonat,
-        beginnJahr: 2027,
-        kinder: kinderGeburtsjahre.map((geburtsjahr) => ({ geburtsjahr })),
-      }),
+      annahmen({ beitragMonat, beginnJahr: 2027 }),
       kontext(),
-      szenario,
+      { ...szenario, haushalt: { ...szenario.haushalt, kinder: kinderListe } },
       p,
     );
 
     const ausSeite = avdProfitabilitaet(
       {
-        beitragMonat, jahre: 15, kinderGeburtsjahre,
+        beitragMonat, jahre: 15, kinder: kinderListe,
         alterHeute: 40, startjahr: 2027, zveHeute: 40_000, endkapital: 50_000,
         bruttoRenteJahr: 3_000, steuerRenteJahr: 800, jahreAuszahlung: 18,
         bruttoEinmal: 0, steuerEinmal: 0,
@@ -324,5 +324,98 @@ describe('Gegenprobe: TUEV und Landingpage rechnen dieselbe Zulage', () => {
     expect(ausTuev.zulageMonat).toBeCloseTo(ausSeite.zulageMonat, 6);
     // 540 Grundzulage plus zweimal 300 Kinderzulage
     expect(ausTuev.zulageMonat * 12).toBeCloseTo(1140, 4);
+  });
+});
+
+describe('Zulagen: Aufschluesselung und gemeinsame Quelle', () => {
+  const kinderListe = [{ geburtsjahr: 2015 }, { geburtsjahr: 2022 }];
+  const mitKindern = {
+    ...szenario,
+    haushalt: { ...szenario.haushalt, kinder: kinderListe, hatKinder: true, kinderUnter25: 2 },
+  };
+
+  const tuevAvd = (s: Szenario) => vertragsTuev(
+    vertrag({ typ: 'avd', schicht: 2 }),
+    annahmen({ beitragMonat: 150, beginnJahr: 2027 }),
+    kontext(),
+    s,
+    p,
+  );
+
+  it('die Einzelposten ergeben genau die Summe — sonst luegt die Anzeige', () => {
+    // Die Oberflaeche zeigt Grundzulage und Kinderzulage getrennt und den
+    // Bonus als eigene Zeile. Ergeben sie zusammen nicht zulageMonat, steht
+    // auf dem Bildschirm eine Rechnung, die nicht aufgeht.
+    const r = tuevAvd(mitKindern);
+    const d = r.zulageDetail;
+    if (!d) throw new Error('zulageDetail fehlt');
+    expect(d.grundzulageMonat + d.kinderzulageMonat + d.bonusMonat)
+      .toBeCloseTo(r.zulageMonat, 8);
+  });
+
+  it('die Kinder kommen aus dem Haushalt, nicht von der TUEV-Position', () => {
+    // Ohne Kinder im Haushalt gibt es keine Kinderzulage — auch dann nicht,
+    // wenn an der Position welche eingetragen sind. Genau das war der
+    // gemeldete Fehler: im TUEV blieb die Kinderzulage immer null.
+    const ausHaushalt = tuevAvd(mitKindern).zulageDetail;
+    expect(ausHaushalt?.kinderzulageMonat).toBeGreaterThan(0);
+    expect(ausHaushalt?.kinderMitAnspruch).toBe(2);
+
+    const nurAnDerPosition = vertragsTuev(
+      vertrag({ typ: 'avd', schicht: 2 }),
+      annahmen({ beitragMonat: 150, beginnJahr: 2027, kinder: kinderListe }),
+      kontext(),
+      szenario,
+      p,
+    );
+    expect(nurAnDerPosition.zulageDetail?.kinderzulageMonat).toBe(0);
+  });
+
+  it('Riester liest weiter die Kinder der TUEV-Position', () => {
+    // Regressionsschutz: Riester wurde bewusst NICHT umgestellt.
+    const mit = vertragsTuev(
+      vertrag({ typ: 'riester', schicht: 2 }),
+      annahmen({ beitragMonat: 150, beginnJahr: 2027, kinder: kinderListe }),
+      kontext(),
+      szenario,
+      p,
+    );
+    const ohne = vertragsTuev(
+      vertrag({ typ: 'riester', schicht: 2 }),
+      annahmen({ beitragMonat: 150, beginnJahr: 2027 }),
+      kontext(),
+      szenario,
+      p,
+    );
+    expect(mit.zulageMonat).toBeGreaterThan(ohne.zulageMonat);
+    // Riester bekommt keine Aufschluesselung — Stufen und Bonus gibt es dort nicht.
+    expect(mit.zulageDetail).toBeUndefined();
+  });
+
+  it('TUEV und Vertragsblatt zeigen dieselbe Zulage', () => {
+    // Zwei Ansichten derselben Zahl. Laufen sie auseinander, glaubt der
+    // Nutzer zu Recht keiner von beiden.
+    const v = vertrag({ typ: 'avd', schicht: 2 });
+    const proj = projiziere({
+      ...mitKindern,
+      vertraege: [{ ...v, monatsbeitrag: 150, renditeAnsparphase: 0.06, ter: 0.002 }],
+    });
+    const lauf = proj.avd[0];
+    if (!lauf) throw new Error('kein AVD-Lauf');
+
+    const d = tuevAvd(mitKindern).zulageDetail;
+    if (!d) throw new Error('zulageDetail fehlt');
+    expect(d.grundzulageMonat * 12).toBeCloseTo(lauf.grundzulageJahr1, 4);
+    expect(d.kinderzulageMonat * 12).toBeCloseTo(lauf.kinderzulageJahr1, 4);
+  });
+
+  it('der echte Aufwand enthaelt die Zulage NICHT', () => {
+    // Bewusste Entscheidung: "Kostet Sie wirklich" ist, was aus der eigenen
+    // Tasche geht. Die Zulage kommt vom Staat und steht auf der Habenseite.
+    // Festgehalten, damit das nicht spaeter als Fehler "korrigiert" wird —
+    // deshalb steht sie in der Anzeige auch in einem eigenen Kasten.
+    const r = tuevAvd(mitKindern);
+    expect(r.zulageMonat).toBeGreaterThan(0);
+    expect(r.echterAufwandMonat).toBeGreaterThan(r.beitragMonat - r.zulageMonat);
   });
 });

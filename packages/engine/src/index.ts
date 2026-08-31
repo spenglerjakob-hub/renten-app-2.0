@@ -56,8 +56,8 @@ export {
 } from './products/entnahmeplaner.js';
 export {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
-  avdProfitabilitaet,
-  type AvdZulagen, type AvdAnsparErgebnis, type AvdJahr,
+  avdProfitabilitaet, avdKinderzulageBis,
+  type AvdKind, type AvdZulagen, type AvdAnsparErgebnis, type AvdJahr,
   type AvdSteuervorteil, type DepotSeite, type AvdProfitabilitaet,
 } from './products/altersvorsorgedepot.js';
 

@@ -1,5 +1,5 @@
 export {
-  szenarioSchema, personSchema, vertragSchema, haushaltSchema,
+  szenarioSchema, personSchema, vertragSchema, haushaltSchema, kindSchema,
   annahmenSchema, einkommenHeuteSchema, planerSchema, teilzeitphaseSchema,
   tuevPositionSchema,
   type SzenarioInput, type SzenarioParsed,

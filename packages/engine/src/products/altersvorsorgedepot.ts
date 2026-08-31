@@ -21,6 +21,51 @@ import { kennzahlen } from '../analyse/kennzahlen.js';
  *     25 % statt des Grenzsteuersatzes schoenen die Rechnung erheblich.
  */
 
+/**
+ * Ein Kind mit eigener Ausbildungsdauer.
+ *
+ * Frueher stand hier nur das Geburtsjahr, dazu EIN Schalter "in Ausbildung"
+ * fuer alle Kinder gemeinsam. Wer mit 22 fertig war, bekam die Zulage
+ * trotzdem bis 25 gerechnet — bei 300 EUR im Jahr drei Jahre zu viel.
+ */
+export interface AvdKind {
+  geburtsjahr: number;
+  /**
+   * Bis EINSCHLIESSLICH diesem Jahr in Ausbildung oder Studium; fehlt das
+   * Feld, gibt es keine.
+   *
+   * Ein Jahr und kein Alter: der Rechenkern prueft jahrweise. Ein Alter
+   * muesste an jeder Stelle erst in ein Jahr zurueckgerechnet werden, und
+   * `jahr - geburtsjahr` ist das Alter, das im Jahr ERREICHT wird — nicht das
+   * an einem Stichtag. Diese Verwechslung soll hier gar nicht erst moeglich
+   * sein. Ausserdem beantwortet ein Mensch die Frage "bis wann?" mit einer
+   * Jahreszahl, nicht mit einem Alter.
+   */
+  ausbildungBisJahr?: number;
+}
+
+/**
+ * Letztes Beitragsjahr, in dem dieses Kind noch Kinderzulage bringt.
+ *
+ * Steht bewusst als eigene, exportierte Funktion da: die Oberflaeche zeigt
+ * denselben Wert an ("noch 3 Jahre"). Zwei Fassungen derselben Regel laufen
+ * frueher oder spaeter auseinander — und dann zeigt die Seite eine andere
+ * Zahl, als sie rechnet.
+ */
+export function avdKinderzulageBis(kind: AvdKind, p: AvdParameter): number {
+  // Kindergeld laeuft immer bis 18. Daran aendert eine Ausbildung nichts,
+  // und ein frueheres Ausbildungsende verkuerzt diesen Teil auch nicht.
+  const ohneAusbildung = kind.geburtsjahr + p.kinderzulageBisAlter - 1;
+  if (kind.ausbildungBisJahr === undefined) return ohneAusbildung;
+
+  // Darueber hinaus nur, solange die Ausbildung LAEUFT und das Kind unter 25
+  // ist. Beide Grenzen wirken; frueher wirkte nur die zweite.
+  return Math.max(
+    ohneAusbildung,
+    Math.min(kind.ausbildungBisJahr, kind.geburtsjahr + p.kinderzulageBisAlterAusbildung - 1),
+  );
+}
+
 export interface AvdZulagen {
   /** Stufe 1: 50 % auf die ersten 360 EUR */
   stufe1: number;
@@ -62,14 +107,14 @@ export function avdZulagen(
   args: {
     eigenbeitragJahr: number;
     /**
-     * Geburtsjahre der Kinder — NICHT ihre Anzahl.
+     * Die Kinder — NICHT ihre Anzahl.
      *
      * Die Kinderzulage haengt am Kindergeldanspruch und endet mit ihm. Mit
      * einer blossen Anzahl liesse sie sich ueber die ganze Ansparphase
      * rechnen; bei 30 Jahren Laufzeit waeren das leicht 5 000 EUR zu viel.
      * Riester macht es in `products/bav.ts` seit jeher ueber die Geburtsjahre.
      */
-    kinderGeburtsjahre?: readonly number[];
+    kinder?: readonly AvdKind[];
     /** Alter des SPARERS — entscheidet ueber den Berufseinsteigerbonus */
     alter: number;
     /**
@@ -78,8 +123,6 @@ export function avdZulagen(
      * genau der Fehler waere, den diese Aenderung behebt.
      */
     jahr: number;
-    /** true, wenn die Kinder voraussichtlich Ausbildung oder Studium machen */
-    kinderInAusbildung?: boolean;
   },
   p: AvdParameter,
 ): AvdZulagen {
@@ -114,14 +157,25 @@ export function avdZulagen(
   // unabhaengig davon, wie viele Kinder es sind.
   //
   // Und sie laeuft nur, solange Kindergeld fliesst: im Regelfall bis 18, bei
-  // Ausbildung oder Studium bis 25.
-  const bisAlter = args.kinderInAusbildung
-    ? p.kinderzulageBisAlterAusbildung
-    : p.kinderzulageBisAlter;
-  const kinder = (args.kinderGeburtsjahre ?? []).filter((gj) => {
-    const alterDesKindes = args.jahr - gj;
-    return alterDesKindes >= 0 && alterDesKindes < bisAlter;
-  }).length;
+  // Ausbildung oder Studium hoechstens bis 25 — und dort auch nur so lange,
+  // wie die Ausbildung tatsaechlich dauert (siehe avdKinderzulageBis).
+  const kinder = (args.kinder ?? []).filter(
+    (kind) => args.jahr >= kind.geburtsjahr && args.jahr <= avdKinderzulageBis(kind, p),
+  ).length;
+
+  // Wer "Ausbildung bis 2050" eintraegt, soll nicht stillschweigend mit 2044
+  // gerechnet bekommen. Eine gekappte Angabe ohne Hinweis liest sich als
+  // Rechenfehler.
+  for (const kind of args.kinder ?? []) {
+    const gedeckelt = kind.geburtsjahr + p.kinderzulageBisAlterAusbildung - 1;
+    if (kind.ausbildungBisJahr !== undefined && kind.ausbildungBisJahr > gedeckelt) {
+      hinweise.push(
+        `Für das ${kind.geburtsjahr} geborene Kind ist Ausbildung bis ${kind.ausbildungBisJahr} ` +
+        `angegeben. Die Kinderzulage endet aber spätestens mit ` +
+        `${p.kinderzulageBisAlterAusbildung} — hier also ${gedeckelt}.`,
+      );
+    }
+  }
 
   const jeKind = Math.min(p.kinderzulage, eigen);
   const kinderzulage = kinder * jeKind;
@@ -199,8 +253,7 @@ export function avdAnsparphase(
     jahre: number;
     renditeBrutto: number;
     ter: number;
-    kinderGeburtsjahre?: readonly number[];
-    kinderInAusbildung?: boolean;
+    kinder?: readonly AvdKind[];
     alterHeute: number;
     startjahr: number;
   },
@@ -221,8 +274,7 @@ export function avdAnsparphase(
     const z = avdZulagen(
       {
         eigenbeitragJahr: eigen,
-        kinderGeburtsjahre: args.kinderGeburtsjahre,
-        kinderInAusbildung: args.kinderInAusbildung,
+        kinder: args.kinder,
         alter: args.alterHeute + j,
         jahr: args.startjahr + j,
       },
@@ -274,8 +326,7 @@ export function avdAnsparphase(
     zulagenGesamt: zulagenSumme,
     ersteZulagen: ersteZulagen ?? avdZulagen(
       {
-        eigenbeitragJahr: 0, kinderGeburtsjahre: args.kinderGeburtsjahre,
-        kinderInAusbildung: args.kinderInAusbildung, alter: args.alterHeute,
+        eigenbeitragJahr: 0, kinder: args.kinder, alter: args.alterHeute,
         jahr: args.startjahr,
       },
       p.avd,
@@ -452,8 +503,7 @@ export function avdGegenFreiesDepot(
     renditeBrutto: number;
     /** Effektivkosten p. a., auf beiden Seiten gleich angesetzt */
     kosten: number;
-    kinderGeburtsjahre?: readonly number[];
-    kinderInAusbildung?: boolean;
+    kinder?: readonly AvdKind[];
     alterHeute: number;
     alterBeiRente: number;
     startjahr: number;
@@ -472,8 +522,7 @@ export function avdGegenFreiesDepot(
     {
       beitragMonat: args.beitragMonat, dynamik: 0, startkapital: 0, jahre: args.jahre,
       renditeBrutto: args.renditeBrutto, ter: args.kosten,
-      kinderGeburtsjahre: args.kinderGeburtsjahre,
-      kinderInAusbildung: args.kinderInAusbildung,
+      kinder: args.kinder,
       alterHeute: args.alterHeute, startjahr: args.startjahr,
     },
     p,
@@ -626,8 +675,7 @@ export function avdProfitabilitaet(
   args: {
     beitragMonat: number;
     jahre: number;
-    kinderGeburtsjahre?: readonly number[];
-    kinderInAusbildung?: boolean;
+    kinder?: readonly AvdKind[];
     alterHeute: number;
     startjahr: number;
     zveHeute: number;
@@ -662,8 +710,7 @@ export function avdProfitabilitaet(
     const z = avdZulagen(
       {
         eigenbeitragJahr: eigen,
-        kinderGeburtsjahre: args.kinderGeburtsjahre,
-        kinderInAusbildung: args.kinderInAusbildung,
+        kinder: args.kinder,
         alter: args.alterHeute + j,
         jahr: args.startjahr + j,
       },

@@ -241,3 +241,65 @@ describe('Migration aus dem Prototyp-Format', () => {
     expect(r.szenario.personen[0]!.geburtsdatum).toBe('12.05.1980');
   });
 });
+
+describe('Kinder: Umschreibung des alten Formats', () => {
+  // Bis 2026 standen die Kinder als blosse Liste von Geburtsjahren im
+  // Szenario, dazu EIN globaler Schalter "in Ausbildung" fuer alle zusammen.
+  // Gespeicherte Dateien tragen diese Form weiter — sie muessen ohne
+  // Fehlermeldung und vor allem OHNE Zahlenaenderung lesbar bleiben.
+  const mitAltformat = (kinderGeburtsjahre: number[], kinderInAusbildung: boolean) =>
+    szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kinderGeburtsjahre, kinderInAusbildung },
+    }).haushalt;
+
+  it('ohne Ausbildungsschalter bleibt das Ende bei 18', () => {
+    const h = mitAltformat([2010, 2015], false);
+    expect(h.kinder).toEqual([{ geburtsjahr: 2010 }, { geburtsjahr: 2015 }]);
+  });
+
+  it('mit Ausbildungsschalter bekommt JEDES Kind das damals geltende Ende', () => {
+    // Der Schalter hiess "alle bis 25". Genau das wird je Kind eingetragen,
+    // damit die Rechnung Zahl fuer Zahl dieselbe bleibt. Eine stille
+    // Kuerzung beim Laden waere schlimmer als die zu grosszuegige Altregel.
+    const h = mitAltformat([2010, 2015], true);
+    expect(h.kinder).toEqual([
+      { geburtsjahr: 2010, ausbildungBisJahr: 2035 },
+      { geburtsjahr: 2015, ausbildungBisJahr: 2040 },
+    ]);
+  });
+
+  it('die Altfelder verschwinden beim Lesen — geschrieben werden sie nie wieder', () => {
+    const h = mitAltformat([2010], true) as Record<string, unknown>;
+    expect(h.kinderGeburtsjahre).toBeUndefined();
+    expect(h.kinderInAusbildung).toBeUndefined();
+  });
+
+  it('eine neue Datei mit kinder ignoriert die Altfelder', () => {
+    const h = szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: {
+        ...vollstaendig.haushalt,
+        kinder: [{ geburtsjahr: 2018, ausbildungBisJahr: 2039 }],
+        kinderGeburtsjahre: [1999],
+        kinderInAusbildung: true,
+      },
+    }).haushalt;
+    expect(h.kinder).toEqual([{ geburtsjahr: 2018, ausbildungBisJahr: 2039 }]);
+  });
+
+  it('ohne jede Kinderangabe bleibt die Liste leer — geraten wird nicht', () => {
+    const h = szenarioSchema.parse(vollstaendig).haushalt;
+    expect(h.kinder).toEqual([]);
+  });
+
+  it('Export und erneuter Import sind stabil', () => {
+    const einmal = szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kinderGeburtsjahre: [2010], kinderInAusbildung: true },
+    });
+    const r = importiere(exportiere(einmal));
+    if (!r.ok) throw new Error('fehlgeschlagen');
+    expect(r.szenario.haushalt.kinder).toEqual([{ geburtsjahr: 2010, ausbildungBisJahr: 2035 }]);
+  });
+});

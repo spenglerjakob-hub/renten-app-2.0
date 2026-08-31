@@ -11,12 +11,19 @@ import { X } from 'lucide-react';
  * zurueck.
  */
 export function Dialog({
-  offen, titel, beschreibung, onSchliessen, children,
+  offen, titel, beschreibung, onSchliessen, schliessbar = true, children,
 }: {
   offen: boolean;
   titel: string;
   beschreibung?: string;
   onSchliessen: () => void;
+  /**
+   * Ist das falsch, entfallen Kreuz, Escape und der Klick auf den
+   * Hintergrund. Fuer die wenigen Faelle, in denen eine Angabe wirklich
+   * gebraucht wird, bevor es weitergeht — der Dialog muss dann selbst einen
+   * Weg nach vorn anbieten, sonst sitzt man fest.
+   */
+  schliessbar?: boolean;
   children: ReactNode;
 }) {
   const kastenRef = useRef<HTMLDivElement>(null);
@@ -32,7 +39,7 @@ export function Dialog({
     )?.focus();
 
     const beiTaste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onSchliessen(); return; }
+      if (e.key === 'Escape') { if (schliessbar) onSchliessen(); return; }
       if (e.key !== 'Tab' || !kasten) return;
 
       const ziele = [...kasten.querySelectorAll<HTMLElement>(
@@ -56,14 +63,16 @@ export function Dialog({
       document.body.style.overflow = vorherigesOverflow;
       vorherRef.current?.focus();
     };
-  }, [offen, onSchliessen]);
+  }, [offen, onSchliessen, schliessbar]);
 
   if (!offen) return null;
 
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4 print:hidden"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onSchliessen(); }}
+      onMouseDown={(e) => {
+        if (schliessbar && e.target === e.currentTarget) onSchliessen();
+      }}
     >
       <div
         ref={kastenRef}
@@ -82,14 +91,16 @@ export function Dialog({
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onSchliessen}
-            aria-label="Schließen"
-            className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-5 w-5" aria-hidden />
-          </button>
+          {schliessbar && (
+            <button
+              type="button"
+              onClick={onSchliessen}
+              aria-label="Schließen"
+              className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          )}
         </header>
         <div className="px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </div>

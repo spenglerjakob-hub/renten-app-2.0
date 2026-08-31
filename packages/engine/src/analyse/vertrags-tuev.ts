@@ -36,14 +36,41 @@ export interface TuevAnnahmen {
   dynamik: number;
   /** bAV: monatlicher Arbeitgeberzuschuss (mindert den eigenen Aufwand) */
   agZuschussMonat: number;
-  /** Riester und Altersvorsorgedepot: Geburtsjahre der Kinder */
+  /**
+   * RIESTER: Geburtsjahre der Kinder, am Vertrag erfasst.
+   *
+   * Beim Altersvorsorgedepot wird dieses Feld NICHT gelesen — dort kommen die
+   * Kinder aus dem Haushalt, aus derselben Quelle wie die Zeitachse. Sonst
+   * zeigten TUEV und Vertragsblatt fuer denselben Vertrag verschiedene
+   * Kinderzulagen, und der Nutzer glaubte zu Recht keinem von beiden.
+   * Riester behaelt seine vertragseigene Liste, weil gespeicherte Szenarien
+   * sie tragen.
+   */
   kinder: { geburtsjahr: number }[];
-  /** Kinder voraussichtlich in Ausbildung oder Studium — Zulage dann bis 25 */
-  kinderInAusbildung?: boolean;
   /** Jahr, ab dem eingezahlt wird */
   beginnJahr: number;
   /** Angenommene Lebenserwartung — bestimmt die Dauer der Auszahlphase */
   lebenserwartung: number;
+}
+
+/**
+ * Woraus sich die Zulage zusammensetzt.
+ *
+ * `zulageMonat` bleibt die eine Summe, an der alles andere haengt; das Detail
+ * ist eine ZUSAETZLICHE Sicht darauf, keine zweite Rechnung. Die drei
+ * Monatswerte ergeben deshalb exakt `zulageMonat` — dafuer gibt es einen Test.
+ */
+export interface TuevZulageDetail {
+  /** Monatswerte des ERSTEN Jahres */
+  grundzulageMonat: number;
+  kinderzulageMonat: number;
+  /** Berufseinsteigerbonus auf den Monat umgelegt — er faellt EINMALIG an */
+  bonusMonat: number;
+  /** Derselbe Bonus als Jahresbetrag, denn nur so ist er richtig beschriftet */
+  bonusEinmalig: number;
+  kinderMitAnspruch: number;
+  /** Zulagen je Euro Eigenbeitrag, wie sie DAUERHAFT gelten (ohne Bonus) */
+  foerderquoteDauerhaft: number;
 }
 
 export interface TuevKontext {
@@ -89,6 +116,12 @@ export interface TuevErgebnis {
   beitragMonat: number;
   agZuschussMonat: number;
   zulageMonat: number;
+  /**
+   * Aufschluesselung der Zulage — nur beim Altersvorsorgedepot gefuellt.
+   * Riester kennt keinen Berufseinsteigerbonus und keine Stufen, dort waere
+   * die Aufteilung eine Erfindung.
+   */
+  zulageDetail?: TuevZulageDetail;
   steuerersparnisMonat: number;
   svErsparnisMonat: number;
   /** Was der Vertrag Sie im ersten Jahr wirklich kostet */
@@ -173,6 +206,7 @@ export function vertragsTuev(
 
   // Momentaufnahme des ersten Jahres
   let beitragMonat = 0, agZuschussMonat = 0, zulageMonat = 0;
+  let zulageDetail: TuevZulageDetail | undefined;
   let steuerersparnisMonat = 0, svErsparnisMonat = 0, echterAufwandMonat = 0;
 
   let beitragJahr = Math.max(0, a.beitragMonat) * 12;
@@ -204,14 +238,14 @@ export function vertragsTuev(
       // Ohne diesen Zweig fiel der Vertrag in den Fall "aus versteuertem Geld"
       // und wurde damit erheblich zu schlecht gezeigt: ohne Zulagen und ohne
       // Steuervorteil.
-      // a.kinder traegt die Geburtsjahre; frueher stand hier .length, womit
-      // die Kinderzulage bis zum Rentenbeginn weiterlief statt mit dem
-      // Kindergeldanspruch zu enden.
+      // Die Kinder kommen aus dem HAUSHALT — derselben Quelle, aus der auch
+      // die Zeitachse rechnet (timeline.ts, avdLauf). Waeren sie zusaetzlich
+      // am Vertrag erfassbar, zeigten TUEV und Vertragsblatt fuer denselben
+      // Vertrag verschiedene Kinderzulagen.
       const z = avdZulagen(
         {
           eigenbeitragJahr: beitragJahr,
-          kinderGeburtsjahre: a.kinder.map((kind) => kind.geburtsjahr),
-          kinderInAusbildung: a.kinderInAusbildung,
+          kinder: s.haushalt.kinder,
           alter: alterImJahr(jahr),
           jahr,
         },
@@ -221,6 +255,16 @@ export function vertragsTuev(
       const bonus = bonusVerbraucht ? 0 : z.bonus;
       if (bonus > 0) bonusVerbraucht = true;
       zulageJahr = z.grundzulage + z.kinderzulage + bonus;
+      if (t === 0) {
+        zulageDetail = {
+          grundzulageMonat: z.grundzulage / 12,
+          kinderzulageMonat: z.kinderzulage / 12,
+          bonusMonat: bonus / 12,
+          bonusEinmalig: bonus,
+          kinderMitAnspruch: z.kinderMitAnspruch,
+          foerderquoteDauerhaft: z.foerderquoteDauerhaft,
+        };
+      }
 
       // Sonst bliebe unerklaert, warum ein vor 2027 beginnender Vertrag in
       // den ersten Jahren ohne Zulage dasteht.
@@ -307,6 +351,7 @@ export function vertragsTuev(
     beitragMonat,
     agZuschussMonat,
     zulageMonat,
+    zulageDetail,
     steuerersparnisMonat,
     svErsparnisMonat,
     echterAufwandMonat,

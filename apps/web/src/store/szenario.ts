@@ -3,9 +3,16 @@ import {
   szenarioSchema, importiere, exportiere, annahmenKoppeln, type SzenarioParsed,
 } from '@renten/schema';
 import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze } from '@renten/engine';
-import type { Szenario, Vertrag, Person } from '@renten/engine';
+import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 
 const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
+
+/**
+ * Erstes Jahr des Altersvorsorgedepots. Steht hier nur, um den Beginn eines
+ * neuen TUEV-Eintrags sinnvoll vorzubelegen; gerechnet wird ausschliesslich
+ * mit dem Parameter aus dem Rechtsstand.
+ */
+const AVD_AB_JAHR = 2027;
 
 function standardSzenario(): SzenarioParsed {
   const jahr = new Date().getFullYear();
@@ -46,6 +53,18 @@ export interface SzenarioStore {
 
   setze: (fn: (s: SzenarioParsed) => SzenarioParsed) => void;
   setzeHaushalt: (p: Partial<SzenarioParsed['haushalt']>) => void;
+  /**
+   * Anzahl der Kinder setzen und die Liste daran angleichen.
+   *
+   * Zieht `kinderUnter25` und `hatKinder` mit: die ANZAHL steuert
+   * Pflegeversicherung und Kinderfreibetrag, die JAHRGAENGE die Kinderzulage.
+   * Beides sind Aussagen ueber dieselben Kinder und muessen zusammenpassen.
+   * Als Aktion im Store und nicht in der Oberflaeche, weil es DREI Stellen
+   * gibt, an denen Kinder erfasst werden — dieselbe Logik dreimal kopiert
+   * laeuft sicher auseinander.
+   */
+  setzeKinderAnzahl: (n: number) => void;
+  setzeKind: (index: number, p: Partial<AvdKind>) => void;
   setzeAnnahmen: (p: Partial<SzenarioParsed['annahmen']>) => void;
   setzeEinkommen: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
   setzeEinkommenPartner: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
@@ -105,6 +124,28 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   setze: (fn) => set((st) => { const s = fn(st.szenario); speichere(s); return { szenario: s }; }),
 
   setzeHaushalt: (p) => get().setze((s) => ({ ...s, haushalt: { ...s.haushalt, ...p } })),
+
+  setzeKinderAnzahl: (n) => get().setze((s) => {
+    const anzahl = Math.max(0, Math.min(15, Math.round(n)));
+    // Vorhandene Kinder behalten, fehlende mit einem Vorschlag auffuellen —
+    // sonst verliert man beim Vertippen alle eingetragenen Jahrgaenge.
+    const kinder = Array.from(
+      { length: anzahl },
+      (_, i) => s.haushalt.kinder[i] ?? { geburtsjahr: new Date().getFullYear() - 5 },
+    );
+    return {
+      ...s,
+      haushalt: { ...s.haushalt, kinder, kinderUnter25: anzahl, hatKinder: anzahl > 0 },
+    };
+  }),
+
+  setzeKind: (index, p) => get().setze((s) => ({
+    ...s,
+    haushalt: {
+      ...s.haushalt,
+      kinder: s.haushalt.kinder.map((k, i) => (i === index ? { ...k, ...p } : k)),
+    },
+  })),
   // Die Oberflaeche kennt nur Inflation und Rentendynamik; Gehaltsdynamik und
   // Steuertarif-Index folgen ihnen. Wird der Tarif-Index ausdruecklich gesetzt
   // (Regler in der Rechtsstand-Karte), bleibt er davon unberuehrt.
@@ -172,7 +213,14 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
         dynamik: v?.dynamik ?? 0,
         agZuschussMonat: 0,
         kinder: [],
-        beginnJahr: v?.beginnJahr ?? new Date().getFullYear(),
+        // Das Altersvorsorgedepot gibt es erst ab 2027. Mit dem laufenden
+        // Jahr als Beginn stuende die Momentaufnahme des ersten Jahres ohne
+        // jede Zulage da — und die Foerderung, um die es bei diesem Produkt
+        // geht, waere unsichtbar. Aendern kann der Nutzer das Jahr weiterhin.
+        beginnJahr: v?.beginnJahr
+          ?? (v?.typ === 'avd'
+            ? Math.max(new Date().getFullYear(), AVD_AB_JAHR)
+            : new Date().getFullYear()),
         lebenserwartung: 85,
         vergleichen: false,
         vergleichKapitalNetto: 0,

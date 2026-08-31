@@ -1,9 +1,10 @@
-import { BUNDESLAENDER, BESOLDUNGSGRUPPEN } from '@renten/engine';
+import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer } from '@renten/engine';
 import { RotateCcw } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { EinkommenFelder } from './EinkommenFelder';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -13,6 +14,12 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
   const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
   const setzeEinkommenGetrennt = useSzenario((x) => x.setzeEinkommenGetrennt);
   const rentenbeginnZuruecksetzen = useSzenario((x) => x.rentenbeginnZuruecksetzen);
+  const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
+  const setzeKind = useSzenario((x) => x.setzeKind);
+
+  // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
+  const jetzt = new Date().getFullYear();
+  const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: s.annahmen.tarifIndex }).avd;
 
   return (
     <div className="space-y-4">
@@ -51,55 +58,24 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
           <ZahlFeld
             label="Kinder unter 25"
             wert={s.haushalt.kinderUnter25}
-            onChange={(n) => setzeHaushalt({
-              kinderUnter25: n,
-              hatKinder: n > 0,
-              // Geburtsjahre mitfuehren: die Anzahl steuert die
-              // Pflegeversicherung, die Jahre entscheiden, wie lange die
-              // Kinderzulage des Altersvorsorgedepots laeuft.
-              kinderGeburtsjahre: Array.from(
-                { length: Math.max(0, Math.min(15, Math.round(n))) },
-                (_, i) => s.haushalt.kinderGeburtsjahre[i] ?? new Date().getFullYear() - 5,
-              ),
-            })}
+            onChange={setzeKinderAnzahl}
             max={15}
             hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag."
           />
         </div>
 
-        {s.haushalt.kinderUnter25 > 0 && (
-          <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+        {s.haushalt.kinder.length > 0 && (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Geburtsjahre — für die Kinderzulage des Altersvorsorgedepots
+              Für die Kinderzulage des Altersvorsorgedepots
             </p>
-            {s.haushalt.kinderGeburtsjahre.map((gj, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`hh-kind-${i}`}>
-                  {i + 1}. Kind, geb.
-                </label>
-                <input
-                  id={`hh-kind-${i}`}
-                  type="number"
-                  value={gj}
-                  min={1900}
-                  max={2200}
-                  onChange={(e) => {
-                    const wert = Number(e.target.value);
-                    setzeHaushalt({
-                      kinderGeburtsjahre: s.haushalt.kinderGeburtsjahre.map(
-                        (x, k) => (k === i ? wert : x),
-                      ),
-                    });
-                  }}
-                  className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
-                />
-              </div>
-            ))}
-            <Schalter
-              label="Ausbildung oder Studium — Kinderzulage bis 25"
-              wert={s.haushalt.kinderInAusbildung}
-              onChange={(b) => setzeHaushalt({ kinderInAusbildung: b })}
+            <KinderZeilen
+              kinder={s.haushalt.kinder}
+              onKind={setzeKind}
+              a={avdParam}
+              jetzt={jetzt}
             />
+            <KinderHinweis a={avdParam} />
           </div>
         )}
         <div className="mt-3 flex flex-wrap gap-4">
@@ -138,7 +114,14 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
         </Abschnitt>
       )}
 
-      {s.personen.map((p) => (
+      {/*
+        Person B nur zeigen, solange sie auch gerechnet wird. Der Rechenkern
+        filtert seit jeher genauso (timeline.ts, projiziere); die Karte blieb
+        aber stehen, wenn man auf "Single" zurueckschaltete — mit Feldern, die
+        nichts mehr bewirkten. Geloescht wird nichts: schaltet man wieder auf
+        "Verheiratet", sind alle Eingaben von Person B noch da.
+      */}
+      {s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
         <Abschnitt key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
@@ -189,7 +172,7 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
         </Abschnitt>
       ))}
 
-      {!s.haushalt.verheiratet && s.personen.length === 1 && (
+      {!s.haushalt.verheiratet && (
         <p className="text-xs text-slate-500">
           Für einen zweiten Haushaltspartner oben &bdquo;Verheiratet&ldquo; aktivieren.
         </p>

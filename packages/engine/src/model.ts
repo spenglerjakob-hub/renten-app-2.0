@@ -1,4 +1,5 @@
 import type { KvStatus } from './social/kv-pv.js';
+import type { AvdKind } from './products/altersvorsorgedepot.js';
 
 export type PersonId = 'A' | 'B';
 export type Versorgungsart = 'grv' | 'pension';
@@ -106,10 +107,12 @@ export interface Haushalt {
   kirchensteuer: boolean;
   hatKinder: boolean;
   kinderUnter25: number;
-  /** Geburtsjahre der Kinder — massgeblich fuer die Dauer der Kinderzulage */
-  kinderGeburtsjahre: number[];
-  /** Kinder voraussichtlich in Ausbildung oder Studium */
-  kinderInAusbildung: boolean;
+  /**
+   * Die Kinder mit Geburtsjahr und Ausbildungsdauer — massgeblich dafuer, wie
+   * lange die Kinderzulage laeuft. `kinderUnter25` daneben steuert
+   * Pflegeversicherung und Kinderfreibetrag; beide muessen zusammenpassen.
+   */
+  kinder: AvdKind[];
   kvStatus: KvStatus;
   pkvPraemieMonat: number;
   /** Zielnetto in heutiger Kaufkraft */

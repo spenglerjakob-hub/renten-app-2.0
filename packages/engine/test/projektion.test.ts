@@ -7,7 +7,7 @@ function szenario(over: Partial<Szenario> = {}): Szenario {
     schemaVersion: 1,
     haushalt: {
       verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kinderGeburtsjahre: [], kinderInAusbildung: false, kvStatus: 'kvdr', pkvPraemieMonat: 0,
+      hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
       zielNettoHeute: 2000,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
