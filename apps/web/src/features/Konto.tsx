@@ -1,26 +1,29 @@
 import { useEffect, useState } from 'react';
-import { LogIn, LogOut, Save, FolderOpen, Trash2, RefreshCw } from 'lucide-react';
+import { LogOut, Save, FolderOpen, Trash2, RefreshCw } from 'lucide-react';
 import { useFernSzenarien, supabaseKonfiguriert } from '../store/szenarien-fern';
 import { useSzenario } from '../store/szenario';
+import { useAuth } from '../store/auth';
 
 /**
- * Anmeldung und gespeicherte Szenarien.
+ * Gespeicherte Szenarien des angemeldeten Kontos.
  *
- * Die Anmeldung laeuft ueber einen Magic Link — es gibt kein Passwort, das
- * gestohlen werden koennte. Ohne Anmeldung bleibt die Anwendung vollstaendig
- * nutzbar; dieser Bereich blendet sich dann als Hinweis aus.
+ * Die Anmeldung selbst liegt seit der Zugangsschranke davor
+ * (`Zugangsschranke.tsx`) — wer diesen Bereich sieht, ist bereits angemeldet.
+ * Hier bleiben die Szenarienliste und der Weg hinaus.
  */
 export function Konto() {
   const {
-    angemeldetAls, liste, laedt, meldung,
-    initialisieren, anmelden, abmelden, listeLaden,
+    liste, laedt, meldung,
+    initialisieren, listeLaden,
     speichern, aktualisieren, laden, loeschen, meldungLoeschen,
   } = useFernSzenarien();
+
+  const angemeldetAls = useAuth((s) => s.email);
+  const abmelden = useAuth((s) => s.abmelden);
 
   const szenario = useSzenario((s) => s.szenario);
   const setze = useSzenario((s) => s.setze);
 
-  const [email, setEmail] = useState('');
   const [name, setName] = useState('Mein Plan');
 
   useEffect(() => { void initialisieren(); }, [initialisieren]);
@@ -62,33 +65,7 @@ export function Konto() {
         </div>
       )}
 
-      {!angemeldetAls ? (
-        <form
-          onSubmit={(e) => { e.preventDefault(); if (email) void anmelden(email); }}
-          className="space-y-3"
-        >
-          <p className="text-sm text-slate-600">
-            Melden Sie sich an, um Szenarien geräteübergreifend zu speichern. Sie erhalten
-            einen Anmeldelink per E-Mail — ein Passwort wird nicht benötigt.
-          </p>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label htmlFor="konto-email" className="sr-only">E-Mail-Adresse</label>
-              <input
-                id="konto-email" type="email" required value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ihre@adresse.de"
-                className="w-full rounded-md border border-slate-300 p-2 text-sm"
-              />
-            </div>
-            <button type="submit" disabled={laedt}
-              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
-              <LogIn className="h-4 w-4" aria-hidden /> Link senden
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div className="flex gap-2">
             <div className="flex-1">
               <label htmlFor="szenario-name" className="sr-only">Name des Szenarios</label>
@@ -152,8 +129,7 @@ export function Konto() {
               </ul>
             )}
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

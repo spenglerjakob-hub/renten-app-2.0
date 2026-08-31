@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { szenarioSchema, type SzenarioParsed } from '@renten/schema';
 import { supabase, supabaseKonfiguriert, type SzenarioZeile } from '../lib/supabase';
+import { useAuth } from './auth';
 
 /**
  * Gespeicherte Szenarien eines angemeldeten Kontos.
@@ -12,6 +13,10 @@ import { supabase, supabaseKonfiguriert, type SzenarioZeile } from '../lib/supab
  * Validiert wird mit demselben Schema wie beim Datei-Import. Das ist Komfort
  * und schuetzt vor kaputten Datensaetzen — die Sicherheitsgrenze liegt in den
  * Row-Level-Security-Policies der Datenbank, nicht hier.
+ *
+ * Die ANMELDUNG liegt seit der Zugangsschranke in `store/auth.ts`. Dieser
+ * Store haelt nur noch, wer angemeldet ist, damit die Liste im richtigen
+ * Moment geladen und beim Abmelden geleert wird.
  */
 
 export interface GespeichertesSzenario {
@@ -27,8 +32,6 @@ export interface FernStore {
   meldung: { art: 'ok' | 'fehler'; text: string } | null;
 
   initialisieren: () => Promise<void>;
-  anmelden: (email: string) => Promise<void>;
-  abmelden: () => Promise<void>;
 
   listeLaden: () => Promise<void>;
   speichern: (name: string, szenario: SzenarioParsed) => Promise<string | null>;
@@ -59,37 +62,19 @@ export const useFernSzenarien = create<FernStore>((set, get) => ({
 
   initialisieren: async () => {
     if (!supabase) return;
-    const { data } = await supabase.auth.getSession();
-    set({ angemeldetAls: data.session?.user.email ?? null });
 
-    supabase.auth.onAuthStateChange((_ereignis, sitzung) => {
-      set({ angemeldetAls: sitzung?.user.email ?? null });
-      if (sitzung) void get().listeLaden();
+    // Die Sitzung gehoert dem Auth-Store; hier wird nur mitgehoert, um die
+    // Liste zur richtigen Zeit zu laden und beim Abmelden zu leeren.
+    const uebernehmen = (email: string | null) => {
+      const vorher = get().angemeldetAls;
+      if (email === vorher) return;
+      set({ angemeldetAls: email });
+      if (email) void get().listeLaden();
       else set({ liste: [] });
-    });
+    };
 
-    if (data.session) await get().listeLaden();
-  },
-
-  anmelden: async (email) => {
-    if (!supabase) return;
-    set({ laedt: true, meldung: null });
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    set({
-      laedt: false,
-      meldung: error
-        ? { art: 'fehler', text: fehlertext(error) }
-        : { art: 'ok', text: `Anmeldelink an ${email} gesendet. Bitte den Link in der E-Mail öffnen.` },
-    });
-  },
-
-  abmelden: async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    set({ angemeldetAls: null, liste: [], meldung: null });
+    uebernehmen(useAuth.getState().email);
+    useAuth.subscribe((s) => uebernehmen(s.email));
   },
 
   listeLaden: async () => {

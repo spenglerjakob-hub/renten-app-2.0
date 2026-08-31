@@ -64,8 +64,13 @@ jobs:
           # landet /altersvorsorgedepot im Rechner statt auf der Landingpage.
           awk '/altersvorsorgedepot\.html/ { a=NR } /RewriteRule \. \/index\.html/ { b=NR } END { exit !(a && b && a < b) }' apps/web/dist/.htaccess \
             || { echo "Umschreibungsregel fuer /altersvorsorgedepot fehlt oder steht hinter dem Auffangmuster"; exit 1; }
+          # Seit der Zugangsschranke ist das kein Schoenheitsfehler mehr: Fehlt
+          # die Konfiguration, laesst die Schranke den Rechner ungeschuetzt
+          # durch (mit Warnband). Lieber gar nicht ausliefern als offen.
           if ! grep -rq "supabase.co" apps/web/dist/assets/*.js; then
-            echo "Warnung: Keine Supabase-URL im Bundle. Sind die Secrets gesetzt?"
+            echo "Keine Supabase-URL im Bundle — die Anmeldung waere ausser Kraft."
+            echo "Bitte VITE_SUPABASE_URL und VITE_SUPABASE_PUBLISHABLE_KEY als Secrets setzen."
+            exit 1
           fi
           echo "Bundle in Ordnung:"; du -sh apps/web/dist
 
