@@ -259,11 +259,13 @@ export function Seite() {
             <div>
               <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€"
                 hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
-              {/* Schnellwahl: die drei Betraege, an denen sich die Foerderung
-                  entscheidet. Einen Knopf "Maximum" gibt es bewusst nicht —
-                  oberhalb der Foerdergrenze kommt keine Zulage mehr dazu, er
-                  verspraeche also mehr, als es gibt. */}
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              {/* Schnellwahl: die Betraege, an denen sich die Foerderung
+                  entscheidet, dazu 100 EUR als runder Mittelweg. Einen Knopf
+                  "Maximum" gibt es bewusst nicht — oberhalb der Foerdergrenze
+                  kommt keine Zulage mehr dazu, er verspraeche also mehr, als
+                  es gibt. Zwei Spalten auf dem Telefon: vier Knoepfe
+                  nebeneinander waeren dort zu schmal zum Treffen. */}
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <SchnellWahl
                   betragJahr={a.mindesteigenbeitragJahr}
                   text="Mindestbeitrag"
@@ -275,6 +277,12 @@ export function Seite() {
                   text="Volle Kinderzulage"
                   aktiv={beitragMonat * 12 === a.kinderzulage}
                   onWaehlen={() => eigen(setBeitragMonat)(a.kinderzulage / 12)}
+                />
+                <SchnellWahl
+                  betragJahr={1200}
+                  text="Mittelweg"
+                  aktiv={beitragMonat * 12 === 1200}
+                  onWaehlen={() => eigen(setBeitragMonat)(100)}
                 />
                 <SchnellWahl
                   betragJahr={a.stufe2Grenze}

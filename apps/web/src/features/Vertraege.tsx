@@ -4,56 +4,8 @@ import { parameterFuer, type Vertrag, type VertragsTyp, type AvdLauf } from '@re
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital } from './vertragsarten';
 
-const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
-  1: [{ wert: 'basis', text: 'Rürup / Basisrente' }],
-  2: [
-    { wert: 'bav', text: 'bAV (laufende Rente)' },
-    { wert: 'bavUkasse', text: 'Unterstützungskasse / Direktzusage' },
-    { wert: 'bavKapital', text: 'bAV (Kapitalauszahlung)' },
-    { wert: 'riester', text: 'Riester-Rente' },
-    { wert: 'avd', text: 'Altersvorsorgedepot (ab 2027)' },
-  ],
-  3: [
-    { wert: 'prvRente', text: 'Private Rente (monatlich)' },
-    { wert: 'prvKapital', text: 'Private Rente (Kapitalwahl)' },
-    { wert: 'immobilie', text: 'Vermietete Immobilie' },
-    { wert: 'etf', text: 'Wertpapierdepot (ETF)' },
-  ],
-};
-
-const SCHICHT_TITEL: Record<1 | 2 | 3, string> = {
-  1: 'Schicht 1 — Basisversorgung',
-  2: 'Schicht 2 — Betrieblich und gefördert',
-  3: 'Schicht 3 — Privat',
-};
-
-function istKapital(t: VertragsTyp) { return t === 'bavKapital' || t === 'prvKapital'; }
-
-/**
- * "Kapitalauszahlung" gibt es nur beim Depot. Bei Ruerup ist eine Kapitalwahl
- * gesetzlich ausgeschlossen (§ 10 EStG verlangt eine lebenslange Rente), bei
- * bAV und privater Rente gibt es dafuer eigene Vertragsarten.
- */
-const STRATEGIEN: Record<'etf' | 'avd' | 'sonst', { wert: Vertrag['strategie']; text: string }[]> = {
-  etf: [
-    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
-    { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
-    { wert: 'kapital', text: 'Kapitalauszahlung (einmalig)' },
-  ],
-  // Beim Altersvorsorgedepot schreibt das Gesetz die Auszahlung als
-  // Leibrente oder Auszahlplan bis mindestens 85 vor. Eine freie
-  // Kapitalentnahme steht deshalb bewusst nicht zur Wahl.
-  avd: [
-    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
-    { wert: 'ignorieren', text: 'Nicht einrechnen' },
-  ],
-  sonst: [
-    { wert: 'rente', text: 'Als laufende Rente ins Netto' },
-    { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
-    { wert: 'ignorieren', text: 'Nicht einrechnen' },
-  ],
-};
 
 function VertragsKarte({ v, depot, auszahlung, avd }: {
   v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;

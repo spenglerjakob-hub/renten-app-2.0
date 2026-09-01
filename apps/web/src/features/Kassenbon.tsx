@@ -69,10 +69,30 @@ function SchichtBlock({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, kaufkraftHeute,
-}: { ergebnis: ProjektionsErgebnis; zeile: Jahreszeile; kaufkraftHeute: boolean }) {
+  ergebnis, zeile, kaufkraftHeute, ohneTitel = false,
+}: {
+  ergebnis: ProjektionsErgebnis;
+  zeile: Jahreszeile;
+  kaufkraftHeute: boolean;
+  /** Im Gutachten steht die Ueberschrift schon im Seitenkopf. */
+  ohneTitel?: boolean;
+}) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
+
+  /**
+   * Abzinsung fuer ein BELIEBIGES Jahr.
+   *
+   * Die Einmalzahlungen fallen in ihrem eigenen Jahr an, nicht im
+   * Ruhestandsjahr. Sie standen bisher immer nominal da — auch bei
+   * eingeschaltetem Kaufkraft-Schalter, also nominale Betraege mitten
+   * zwischen abgezinsten.
+   */
+  const kaufkraft = (jahr: number) => {
+    if (!kaufkraftHeute) return 1;
+    const z = ergebnis.zeilen.find((x) => x.jahr === jahr);
+    return z ? 1 / z.kaufkraftfaktor : f;
+  };
 
   const nachSchicht = ([1, 2, 3] as const).map((sch) => ({
     schicht: sch,
@@ -86,12 +106,14 @@ export function Kassenbon({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
-      <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
-        Ihr Haushalts-Netto im Jahr {zeile.jahr}
-        <span className="ml-2 font-normal text-slate-500">
-          {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
-        </span>
-      </h2>
+      {!ohneTitel && (
+        <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
+          Ihr Haushalts-Netto im Jahr {zeile.jahr}
+          <span className="ml-2 font-normal text-slate-500">
+            {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
+          </span>
+        </h2>
+      )}
 
       {/* Gestapelter Fortschrittsbalken */}
       <div className="mb-5 sm:mb-6">
@@ -164,12 +186,14 @@ export function Kassenbon({
                     {a.bezeichnung} <span className="font-normal text-slate-500">({a.jahr})</span>
                   </span>
                   <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
-                    {euro(a.nettoKapital)}
+                    {euro(a.nettoKapital * kaufkraft(a.jahr))}
                   </span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[9px] text-slate-500 sm:text-[10px]">
-                  <span>Brutto: {euro(a.bruttoKapital)}</span>
-                  <span className="text-rose-500">Abgeltungsteuer: {euro(a.steuer)}</span>
+                  <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
+                  <span className="text-rose-500">
+                    Abgeltungsteuer: {euro(a.steuer * kaufkraft(a.jahr))}
+                  </span>
                 </div>
               </div>
             ))}

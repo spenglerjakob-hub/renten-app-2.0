@@ -15,6 +15,7 @@ import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
 import { Konto } from './features/Konto';
 import { VertragsTuev } from './features/VertragsTuev';
+import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
@@ -270,33 +271,19 @@ export default function App() {
         </div>
       </header>
 
-      {/* DRUCKKOPF */}
-      <div className="mx-auto mb-8 mt-4 hidden max-w-6xl items-center justify-between rounded-t-2xl border-b-4 border-emerald-500 bg-white p-8 print:flex">
-        <div className="flex items-center gap-6">
-          <Logo klasse="h-24 w-24" />
-          <div>
-            <h2 className="mb-1 text-4xl font-extrabold tracking-tight text-slate-900">JS-Rentenplaner</h2>
-            <p className="text-xl font-medium text-slate-500">Ihre Zukunft. Heute smart geplant.</p>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Auswertung für</p>
-          <p className="text-lg font-black text-slate-800">
-            {verheiratet
-              ? `${szenario.personen[0]?.name || 'Person A'} & ${szenario.personen[1]?.name || 'Person B'} (Haushalt)`
-              : szenario.personen[0]?.name || 'Person A'}
-          </p>
-          <p className="mt-2 flex justify-between gap-4 border-t border-slate-200 pt-2 text-xs font-medium text-slate-500">
-            <span>Datum:</span>
-            <span className="font-bold text-slate-700">{new Date().toLocaleDateString('de-DE')}</span>
-          </p>
-        </div>
-      </div>
+      {/*
+        DAS GEDRUCKTE GUTACHTEN.
+        Eigenes Dokument statt Druck-CSS auf der Bedienoberflaeche: die
+        besteht aus Formularfeldern, Reitern und Scrollbereichen und ergibt
+        auf Papier leere Eingabekaesten, fehlende Vertraege und
+        abgeschnittene Tabellen. Alles darunter ist deshalb print:hidden.
+      */}
+      <Gutachten szenario={szenario} ergebnis={ergebnis ?? null} zeile={zeile} />
 
       {importMeldung && (
         <div
           role="status"
-          className={`mx-auto mt-3 max-w-6xl rounded-lg px-4 py-3 text-sm ${
+          className={`mx-auto mt-3 max-w-6xl rounded-lg px-4 py-3 text-sm print:hidden ${
             importMeldung.art === 'ok' ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'
           }`}
         >
@@ -307,7 +294,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 p-2 sm:gap-8 sm:p-6 lg:grid-cols-12 print:block">
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 p-2 sm:gap-8 sm:p-6 lg:grid-cols-12 print:hidden">
         {/* LINKE SPALTE: EINGABEN */}
         <div className="space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-5 print:hidden">
           <AkkordeonKarte
@@ -410,10 +397,10 @@ export default function App() {
                 </button>
               </div>
 
-              <div className={ansicht === 'kassenbon' ? 'block' : 'hidden print:block'}>
+              <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
                 <Kassenbon ergebnis={ergebnis} zeile={zeile} kaufkraftHeute={kaufkraftHeute} />
               </div>
-              <div className={ansicht === 'verlauf' ? 'block' : 'hidden print:block'}>
+              <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                 <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
               </div>
 
@@ -438,9 +425,11 @@ export default function App() {
 
       <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
 
-      <VertragsTuev ergebnis={ergebnis ?? null} szenario={szenario} />
+      <div className="print:hidden">
+        <VertragsTuev ergebnis={ergebnis ?? null} szenario={szenario} />
+      </div>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500">
+      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500 print:hidden">
         <p>
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Berechnung läuft
           vollständig in Ihrem Browser — ohne Anmeldung verlassen Ihre Eingaben dieses Gerät nicht.

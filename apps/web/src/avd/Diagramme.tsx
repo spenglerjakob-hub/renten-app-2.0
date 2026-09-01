@@ -246,8 +246,12 @@ export function KapitalaufbauDiagramm({
                 <Wert farbe={FARBE.zulagen} text="Zulagen" wert={euro(d.zulagenKumuliert)} />
                 <Wert farbe={FARBE.gewinn} text="Kursgewinne" wert={euro(d.gewinnKumuliert)} />
               </dl>
-              <div className="mt-1 border-t border-slate-100 pt-1 font-bold tabular-nums text-slate-800">
-                {euro(d.kapital)}
+              {/* Die Summe steht in derselben Flucht wie die Posten darueber:
+                  linksbuendig unter einer Trennlinie musste man die Augen
+                  bewegen, um sie mit den Einzelbetraegen zu vergleichen. */}
+              <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-slate-100 pt-1">
+                <span className="font-bold text-slate-800">Kapital gesamt</span>
+                <span className="font-bold tabular-nums text-slate-800">{euro(d.kapital)}</span>
               </div>
             </div>
           )}

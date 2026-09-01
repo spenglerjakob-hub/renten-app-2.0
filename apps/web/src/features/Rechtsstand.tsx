@@ -12,12 +12,14 @@ import { ProzentFeld, prozent } from '../components/Feld';
  * nachvollziehbar ist, worauf die Zahlen beruhen.
  */
 export function Rechtsstand({
-  ergebnis, tarifIndex, rentendynamik, inflation,
+  ergebnis, tarifIndex, rentendynamik, inflation, ohneTitel = false,
 }: {
   ergebnis: ProjektionsErgebnis;
   tarifIndex: number;
   rentendynamik: number;
   inflation: number;
+  /** Im Gutachten steht die Ueberschrift schon im Seitenkopf. */
+  ohneTitel?: boolean;
 }) {
   const setzeAnnahmen = useSzenario((s) => s.setzeAnnahmen);
   const [reglerOffen, setReglerOffen] = useState(false);
@@ -28,7 +30,9 @@ export function Rechtsstand({
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm druckbereich">
-      <h2 className="mb-2 text-sm font-bold text-slate-700">Rechtsstand und Annahmen</h2>
+      {!ohneTitel && (
+        <h2 className="mb-2 text-sm font-bold text-slate-700">Rechtsstand und Annahmen</h2>
+      )}
 
       <p className="text-slate-600">
         Berechnet nach <strong>Rechtsstand {r.basisjahr}</strong>
@@ -38,7 +42,7 @@ export function Rechtsstand({
       </p>
 
       {/* Ausfuehrliche Fassung nur im Druck */}
-      <div className="mt-3 hidden space-y-3 text-[13px] leading-relaxed text-slate-700 print:block">
+      <div className="mt-3 hidden space-y-2 text-[11px] leading-relaxed text-slate-700 print:block">
         <h3 className="font-bold text-slate-800">Wie die Zahlen zustande kommen</h3>
 
         <p>

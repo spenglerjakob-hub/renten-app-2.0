@@ -66,6 +66,7 @@ export {
   internerZins, kennzahlen,
   type Zahlungsreihe, type Kennzahlen,
 } from './analyse/kennzahlen.js';
+export { ruhestandsfenster } from './analyse/ruhestandsfenster.js';
 export {
   vertragsTuev, renteOderKapital,
   type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,

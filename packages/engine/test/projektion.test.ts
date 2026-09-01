@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { projiziere } from '../src/projection/timeline.js';
+import { ruhestandsfenster } from '../src/analyse/ruhestandsfenster.js';
 import type { Szenario } from '../src/model.js';
 
 function szenario(over: Partial<Szenario> = {}): Szenario {
@@ -126,5 +127,49 @@ describe('Projektion', () => {
     }));
     expect(r.zeilen).toHaveLength(0);
     expect(r.hinweise[0]).toContain('gueltiges');
+  });
+});
+
+describe('Ruhestandsfenster fuer das Gutachten', () => {
+  // Auf Papier ist die ganze Zeitachse unbrauchbar: rund 60 Balken werden zu
+  // Haarstrichen. Gezeigt wird deshalb nur der Ruhestand.
+  const mitRentenbeginn = (geburtsjahr: number, rentenjahr: number) => projiziere(szenario({
+    personen: [{
+      id: 'A', name: 'Test',
+      geburtsdatum: `${geburtsjahr}-01-01`,
+      rentenbeginn: `${rentenjahr}-01-01`,
+      art: 'grv', grvBruttoHeute: 1800,
+      besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+      dienstbeginn: '2000-01-01', teilzeitphasen: [],
+    }],
+  }));
+
+  it('beginnt bei 65, wenn die Rente spaeter anfaengt', () => {
+    const e = (mitRentenbeginn(1990, 1990 + 67));
+    const f = ruhestandsfenster(e);
+    expect(f[0]!.alterA).toBe(65);
+    expect(f[f.length - 1]!.alterA).toBe(95);
+  });
+
+  it('beginnt frueher, wenn die Rente frueher anfaengt', () => {
+    // Genau der Fall, um den es bei einem vorgezogenen Rentenbeginn geht:
+    // faengt das Fenster stur bei 65 an, fehlen die entscheidenden Jahre.
+    const e = (mitRentenbeginn(1990, 1990 + 63));
+    const f = ruhestandsfenster(e);
+    expect(f[0]!.alterA).toBe(63);
+  });
+
+  it('zeigt keine Jahre, die es in der Zeitachse nicht gibt', () => {
+    // Wer heute schon 70 ist, hat keine Zeile mit 65 — erfunden wird keine.
+    const jetzt = new Date().getFullYear();
+    const e = (mitRentenbeginn(jetzt - 70, jetzt - 3));
+    const f = ruhestandsfenster(e);
+    expect(f[0]!.alterA).toBe(e.zeilen[0]!.alterA);
+    expect(f.every((z) => e.zeilen.includes(z))).toBe(true);
+  });
+
+  it('das Endalter laesst sich verschieben', () => {
+    const e = (mitRentenbeginn(1990, 1990 + 67));
+    expect(ruhestandsfenster(e, 85).at(-1)!.alterA).toBe(85);
   });
 });

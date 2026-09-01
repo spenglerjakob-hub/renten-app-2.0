@@ -23,6 +23,10 @@
 }
 
 @media print {
+  /* A4 mit ordentlichem Rand. Ohne @page-Regel gelten die Browservorgaben,
+     und der Satzspiegel wechselt je nach Rechner. */
+  @page { size: A4; margin: 18mm 16mm 20mm; }
+
   /*
    * Bedienelemente verschwinden im Druck — ABER nicht die Koepfe der
    * einklappbaren Karten: dort steht die Ueberschrift im Knopf. Ohne diese
@@ -35,7 +39,31 @@
   .druck-inhalt { display: block !important; }
 
   body { @apply bg-white; }
-  .druckbereich { break-inside: avoid; }
+
+  /*
+   * KEIN pauschales break-inside: avoid mehr.
+   *
+   * Es lag auf Bloecken, die LAENGER als eine Seite sind (Rechtsstand,
+   * Kassenbon, jede TUEV-Karte). Der Browser schiebt sie dann erst auf eine
+   * neue Seite und bricht sie doch um — daher die grossen weissen Loecher,
+   * ueber die sich niemand zu Recht gefreut hat. Zusammengehalten wird jetzt
+   * nur noch, was auch auf eine Seite passt (break-inside-avoid im Markup).
+   */
+
+  /* Ueberschriften bleiben bei ihrem Text, keine einzelnen Restzeilen. */
+  h1, h2, h3 { break-after: avoid; }
+  p, li { orphans: 3; widows: 3; }
+
+  /* Tabellenkopf auf jeder Folgeseite wiederholen. */
+  thead { display: table-header-group; }
+  tr, img, svg { break-inside: avoid; }
+
+  /* Scrollrahmen gibt es auf Papier nicht: sie schneiden ab, statt
+     umzubrechen. */
+  .overflow-auto, .overflow-y-auto, .overflow-x-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
 
   /* Farbflaechen (Fortschrittsbalken, Schichtfarben) muessen erhalten bleiben. */
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
