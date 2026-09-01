@@ -92,6 +92,16 @@ export interface LegalParameters {
   /** Beitragsbemessungsgrenzen, JAHRESwerte */
   bbgKvJahr: number;
   bbgRvJahr: number;
+  /**
+   * Hoechstbetrag fuer Altersvorsorgeaufwendungen (§ 10 Abs. 3 EStG),
+   * Grundtabelle. Bei Zusammenveranlagung der doppelte Betrag.
+   *
+   * Er entspricht dem Hoechstbeitrag zur knappschaftlichen Rentenversicherung
+   * und ist ZUERST durch die Beitraege zur gesetzlichen Rentenversicherung
+   * verbraucht — Arbeitnehmer- UND Arbeitgeberanteil. Was uebrig bleibt, ist
+   * der Rahmen fuer eine Basisrente (Ruerup).
+   */
+  hoechstbetragAltersvorsorge: number;
 
   /** Monatliche Bezugsgroesse (West) — Basis fuer Freibetrag/Freigrenze bAV */
   bezugsgroesseMonat: number;

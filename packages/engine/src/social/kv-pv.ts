@@ -9,6 +9,15 @@ export type BeitragsArt =
   | 'sonstiges';         // nur bei freiwillig Versicherten beitragspflichtig
 
 export interface Beitragspflichtig {
+  /**
+   * Kennung der Quelle (Vertrag oder Person).
+   *
+   * Nur dafuer da, den berechneten Beitrag wieder der richtigen Quelle
+   * zuzuordnen. Ohne sie musste der Aufrufer die Summe nach einem Schluessel
+   * verteilen, und jeder Schluessel ist falsch: eine gesetzliche Rente kostet
+   * 12,95 %, ein Versorgungsbezug 21,7 %, eine private Rente gar nichts.
+   */
+  id: string;
   art: BeitragsArt;
   /** Monatsbetrag in EUR */
   monatsbetrag: number;
@@ -30,6 +39,14 @@ export interface KvPvErgebnis {
   gesamt: number;
   /** Als Sonderausgabe abzugsfaehiger Anteil (Basisabsicherung), monatlich */
   abzugsfaehig: number;
+  /**
+   * Was jede einzelne Quelle ausloest, monatlich.
+   *
+   * Die Summe ergibt `gesamt`. Wer den Gesamtbetrag stattdessen nach einem
+   * Schluessel verteilt, weist Beitraege dort aus, wo keine anfallen — beim
+   * Ruerup zum Beispiel, der in der KVdR beitragsfrei ist.
+   */
+  jeQuelle: { id: string; kv: number; pv: number }[];
 }
 
 /** Pflegeversicherungssatz des Mitglieds unter Beruecksichtigung der Kinder. */
@@ -86,20 +103,38 @@ export function kvPvImAlter(
   let kv = 0;
   let pv = 0;
   let restBbg = bbgMonat;
+  const jeQuelle: { id: string; kv: number; pv: number }[] = [];
+  /** Beitrag buchen und zugleich der Quelle zuordnen. */
+  const buche = (id: string, kvBetrag: number, pvBetrag: number) => {
+    kv += kvBetrag;
+    pv += pvBetrag;
+    const vorhanden = jeQuelle.find((x) => x.id === id);
+    if (vorhanden) { vorhanden.kv += kvBetrag; vorhanden.pv += pvBetrag; }
+    else jeQuelle.push({ id, kv: kvBetrag, pv: pvBetrag });
+  };
 
   if (status === 'pkv') {
-    // Zuschuss des Rentenversicherungstraegers: halber ALLGEMEINER Satz ohne
-    // Zusatzbeitrag (§ 106 SGB VI), begrenzt auf die Haelfte der Praemie.
+    // Zuschuss des Rentenversicherungstraegers: halber allgemeiner Satz ZZGL.
+    // des halben durchschnittlichen Zusatzbeitrags (§ 106 Abs. 2 SGB VI in der
+    // Fassung seit dem GKV-Versichertenentlastungsgesetz 2019), begrenzt auf
+    // die Haelfte der Praemie. Ohne den Zusatzbeitrag fiel der Zuschuss 2026
+    // um 1,45 % der Rente zu niedrig aus — bei 2.000 EUR Rente rund 29 EUR.
     const praemie = opts.pkvPraemieMonat ?? 0;
     const rentenSumme = sortiert
       .filter((e) => e.art === 'gesetzlicheRente')
       .reduce((s, e) => s + e.monatsbetrag, 0);
     const bemessung = Math.min(rentenSumme, bbgMonat);
-    const zuschuss = Math.min(bemessung * (p.kv.allgemeinerSatz / 2), praemie / 2);
+    const zuschuss = Math.min(bemessung * (kvVoll / 2), praemie / 2);
     kv = Math.max(0, praemie - zuschuss);
     pv = 0; // in der Praemie enthalten
     const basisanteil = opts.pkvBasisanteil ?? 0.8;
-    return { kv, pv, gesamt: kv, abzugsfaehig: praemie * basisanteil };
+    // Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
+    // gesetzlichen Rente zugeordnet, aus der der Zuschuss stammt.
+    const traeger = sortiert.find((e) => e.art === 'gesetzlicheRente')?.id;
+    return {
+      kv, pv, gesamt: kv, abzugsfaehig: praemie * basisanteil,
+      jeQuelle: traeger ? [{ id: traeger, kv, pv: 0 }] : [],
+    };
   }
 
   for (const e of sortiert) {
@@ -109,27 +144,30 @@ export function kvPvImAlter(
     if (e.art === 'gesetzlicheRente') {
       const anrechenbar = Math.min(betrag, restBbg);
       restBbg -= anrechenbar;
-      kv += anrechenbar * kvHalb;   // DRV traegt die andere Haelfte
-      pv += anrechenbar * pvSatz;   // PV traegt das Mitglied allein
+      buche(e.id,
+        anrechenbar * kvHalb,   // DRV traegt die andere Haelfte
+        anrechenbar * pvSatz);  // PV traegt das Mitglied allein
       continue;
     }
 
     if (e.art === 'versorgungsbezug') {
       const anrechenbar = Math.min(betrag, restBbg);
       restBbg -= anrechenbar;
-      // KV: Freibetrag mindert die Bemessungsgrundlage.
-      kv += Math.max(0, anrechenbar - freibetrag) * kvVoll;
-      // PV: Freigrenze — oberhalb ist der volle Betrag beitragspflichtig.
-      pv += anrechenbar > freibetrag ? anrechenbar * pvSatz : 0;
+      buche(e.id,
+        // KV: Freibetrag mindert die Bemessungsgrundlage.
+        Math.max(0, anrechenbar - freibetrag) * kvVoll,
+        // PV: Freigrenze — oberhalb ist der volle Betrag beitragspflichtig.
+        anrechenbar > freibetrag ? anrechenbar * pvSatz : 0);
       continue;
     }
 
     // Sonstige Einkuenfte: nur freiwillig Versicherte zahlen darauf Beitraege.
+    // Fuer Pflichtversicherte in der KVdR sind Ruerup, private Renten und
+    // Mieteinkuenfte beitragsfrei — hier faellt bewusst gar nichts an.
     if (status === 'freiwillig') {
       const anrechenbar = Math.min(betrag, restBbg);
       restBbg -= anrechenbar;
-      kv += anrechenbar * kvVoll;
-      pv += anrechenbar * pvSatz;
+      buche(e.id, anrechenbar * kvVoll, anrechenbar * pvSatz);
     }
   }
 
@@ -140,13 +178,16 @@ export function kvPvImAlter(
     const bemessen = bbgMonat - restBbg;
     if (bemessen < mindestBemessung) {
       const fehlend = mindestBemessung - bemessen;
-      kv += fehlend * kvVoll;
-      pv += fehlend * pvSatz;
+      // Der Mindestbeitrag haengt an keiner Einkunft. Er wird der groessten
+      // zugeordnet, damit die Einzelbetraege in der Summe aufgehen.
+      const groesste = [...sortiert].sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0];
+      if (groesste) buche(groesste.id, fehlend * kvVoll, fehlend * pvSatz);
+      else { kv += fehlend * kvVoll; pv += fehlend * pvSatz; }
     }
   }
 
   const gesamt = kv + pv;
-  return { kv, pv, gesamt, abzugsfaehig: gesamt };
+  return { kv, pv, gesamt, abzugsfaehig: gesamt, jeQuelle };
 }
 
 /**

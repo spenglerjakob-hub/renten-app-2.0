@@ -90,6 +90,7 @@ export function tuevPositionen(
       {
         jahresbrutto: basis.jahresbrutto,
         zveHeute: basis.zve,
+        beamter: szenario.einkommenHeute.modus === 'besoldung',
         rentenbeginnJahr,
         alterBeiRentenbeginn,
         bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,

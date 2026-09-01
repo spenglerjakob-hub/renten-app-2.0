@@ -49,6 +49,7 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
   return {
     jahresbrutto: 54_000,
     zveHeute: 40_000,
+    beamter: false,
     rentenbeginnJahr: 2042,
     alterBeiRentenbeginn: 67,
     bruttoRenteMonat: 400,
@@ -417,5 +418,108 @@ describe('Zulagen: Aufschluesselung und gemeinsame Quelle', () => {
     const r = tuevAvd(mitKindern);
     expect(r.zulageMonat).toBeGreaterThan(0);
     expect(r.echterAufwandMonat).toBeGreaterThan(r.beitragMonat - r.zulageMonat);
+  });
+});
+
+describe('Ansparphase: die gesetzlichen Grenzen', () => {
+  // BEFUND: Der TUEV rechnete Steuer- und SV-Ersparnis auf den vollen
+  // Beitrag. Bei 1.000 EUR im Monat wies er dadurch einen um rund 280 EUR zu
+  // niedrigen Aufwand aus — die bAV sah deutlich besser aus, als sie ist.
+  const bav = (beitragMonat: number, typ: 'bav' | 'bavUkasse' = 'bav', k = kontext()) =>
+    vertragsTuev(
+      vertrag({ typ, schicht: 2 }),
+      annahmen({ beitragMonat }),
+      k,
+      szenario,
+      p,
+    );
+
+  const svGrenzeMonat = (0.04 * p.bbgRvJahr) / 12;   // 338 EUR
+  const stGrenzeMonat = (0.08 * p.bbgRvJahr) / 12;   // 676 EUR
+
+  it('§ 3 Nr. 63: die SV-Ersparnis endet bei 4 % der Beitragsbemessungsgrenze', () => {
+    const drunter = bav(200);
+    const genau = bav(Math.floor(svGrenzeMonat));
+    const drueber = bav(1000);
+
+    // Unterhalb der Grenze waechst sie mit dem Beitrag …
+    expect(genau.svErsparnisMonat).toBeGreaterThan(drunter.svErsparnisMonat);
+    // … darueber nicht mehr. Das war der Fehler.
+    expect(drueber.svErsparnisMonat).toBeCloseTo(genau.svErsparnisMonat, 0);
+  });
+
+  it('§ 3 Nr. 63: die Steuerersparnis endet bei 8 % der Beitragsbemessungsgrenze', () => {
+    const anDerGrenze = bav(Math.floor(stGrenzeMonat));
+    const weitDarueber = bav(2000);
+    expect(weitDarueber.steuerersparnisMonat).toBeCloseTo(anDerGrenze.steuerersparnisMonat, 0);
+  });
+
+  it('der Aufwand steigt oberhalb der Grenzen fast im Gleichschritt mit dem Beitrag', () => {
+    // Von 1.000 auf 2.000 EUR kommt keine Foerderung mehr dazu: die zweiten
+    // 1.000 EUR kosten praktisch voll. Vorher stieg der Aufwand nur um 362.
+    const tausend = bav(1000);
+    const zweitausend = bav(2000);
+    expect(zweitausend.echterAufwandMonat - tausend.echterAufwandMonat)
+      .toBeGreaterThan(950);
+  });
+
+  it('warnt, wenn der Beitrag ueber den Grenzen liegt', () => {
+    const text = bav(1000).hinweise.join(' ');
+    expect(text).toContain('beitragsfrei');
+    expect(text).toContain('Steuerfrei');
+  });
+
+  it('Unterstuetzungskasse: steuerfrei ohne Grenze, beitragsfrei nur bis 4 %', () => {
+    // § 3 Nr. 63 gilt nur fuer Direktversicherung, Pensionskasse und
+    // Pensionsfonds. Die U-Kasse ist unbegrenzt lohnsteuerfrei.
+    const direkt = bav(1000, 'bav');
+    const ukasse = bav(1000, 'bavUkasse');
+    expect(ukasse.steuerersparnisMonat).toBeGreaterThan(direkt.steuerersparnisMonat);
+    expect(ukasse.svErsparnisMonat).toBeCloseTo(direkt.svErsparnisMonat, 6);
+  });
+
+  it('Beamte sparen mit einer Entgeltumwandlung keine Sozialabgaben', () => {
+    const r = bav(200, 'bav', kontext({ beamter: true }));
+    expect(r.svErsparnisMonat).toBe(0);
+    expect(r.hinweise.join(' ')).toContain('Beamter');
+  });
+
+  it('§ 10 Abs. 3: der Ruerup-Abzug endet am Hoechstbetrag', () => {
+    // Der Hoechstbetrag ist zuerst durch die Beitraege zur gesetzlichen
+    // Rentenversicherung verbraucht — Arbeitnehmer- UND Arbeitgeberanteil.
+    const verbraucht = Math.min(54_000, p.bbgRvJahr) * p.rvSatzGesamt;
+    const rahmenMonat = (p.hoechstbetragAltersvorsorge - verbraucht) / 12;
+
+    const ruerup = (beitragMonat: number) => vertragsTuev(
+      vertrag({ typ: 'basis', schicht: 1 }),
+      annahmen({ beitragMonat }),
+      kontext(),
+      szenario,
+      p,
+    );
+
+    // Unterhalb des Rahmens wirkt der volle Beitrag.
+    const drunter = ruerup(Math.floor(rahmenMonat * 0.5));
+    expect(drunter.steuerersparnisMonat).toBeGreaterThan(0);
+
+    // Darueber kommt nichts mehr dazu.
+    const anDerGrenze = ruerup(Math.floor(rahmenMonat));
+    const weitDarueber = ruerup(Math.floor(rahmenMonat * 2));
+    expect(weitDarueber.steuerersparnisMonat).toBeCloseTo(anDerGrenze.steuerersparnisMonat, 0);
+    expect(weitDarueber.hinweise.join(' ')).toContain('Höchstbetrag');
+  });
+
+  it('Ruerup: kleine Beitraege bleiben unveraendert voll abziehbar', () => {
+    // Schutz gegen eine Ueberkorrektur: wer 200 EUR im Monat einzahlt, liegt
+    // weit unter dem Rahmen und darf nichts verlieren.
+    const r = vertragsTuev(
+      vertrag({ typ: 'basis', schicht: 1 }),
+      annahmen({ beitragMonat: 200 }),
+      kontext(),
+      szenario,
+      p,
+    );
+    expect(r.echterAufwandMonat).toBeLessThan(200);
+    expect(r.hinweise.join(' ')).not.toContain('Höchstbetrag');
   });
 });

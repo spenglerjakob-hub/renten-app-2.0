@@ -51,6 +51,9 @@ function skaliere(basis: LegalParameters, jahr: number, indexRate: number): Lega
     },
     bbgKvJahr: r(basis.bbgKvJahr),
     bbgRvJahr: r(basis.bbgRvJahr),
+    // Folgt gesetzlich der knappschaftlichen Beitragsbemessungsgrenze und
+    // damit derselben Entwicklung wie die uebrigen Grenzbetraege.
+    hoechstbetragAltersvorsorge: r(basis.hoechstbetragAltersvorsorge),
     bezugsgroesseMonat: basis.bezugsgroesseMonat * f,
     rentenwert: basis.rentenwert * f,
     durchschnittsentgelt: basis.durchschnittsentgelt * f,

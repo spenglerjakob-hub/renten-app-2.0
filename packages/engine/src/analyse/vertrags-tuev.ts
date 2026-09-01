@@ -74,6 +74,16 @@ export interface TuevZulageDetail {
 }
 
 export interface TuevKontext {
+  /**
+   * Beamter oder Besoldungsempfaenger.
+   *
+   * Entscheidet zweierlei: eine Entgeltumwandlung spart ihm keine
+   * Sozialabgaben (er zahlt keine), und sein Hoechstbetrag nach § 10 Abs. 3
+   * EStG ist um den FIKTIVEN Gesamtbeitrag zur Rentenversicherung gekuerzt
+   * (§ 10 Abs. 3 S. 3). Ohne diese Angabe bekam er 21 % Ersparnis
+   * gutgeschrieben, die es nicht geben kann.
+   */
+  beamter: boolean;
   /** Jahresbruttogehalt heute — Basis fuer die SV-Ersparnis */
   jahresbrutto: number;
   /** Zu versteuerndes Einkommen heute — Basis fuer die Steuerersparnis */
@@ -154,8 +164,40 @@ export interface TuevErgebnis {
   hinweise: string[];
 }
 
+/**
+ * Grenzen des § 3 Nr. 63 EStG, als Anteil der Beitragsbemessungsgrenze der
+ * allgemeinen Rentenversicherung: 8 % steuerfrei, 4 % beitragsfrei.
+ */
+const STEUER_FREI_QUOTE = 0.08;
+const SV_FREI_QUOTE = 0.04;
+
+/** Betrag als Text fuer die Hinweise — die Oberflaeche formatiert sonst selbst. */
+function euroText(n: number): string {
+  return `${Math.round(n).toLocaleString('de-DE')} €`;
+}
+
+/**
+ * Je Euro umgewandeltem Entgelt: um wie viel der abziehbare Vorsorgeaufwand
+ * sinkt (§ 10 Abs. 1 Nr. 2 und 3 EStG).
+ *
+ * Ein SATZ, kein Verhaeltnis. Rentenversicherung voll, Krankenversicherung zu
+ * 96 % (der Rest entfaellt auf Krankengeld), Pflegeversicherung voll — je
+ * Arbeitnehmeranteil. Die Arbeitslosenversicherung bleibt aussen vor, sie ist
+ * kein Vorsorgeaufwand im Sinne der Vorschrift.
+ */
+function abzugsfaehigeSvQuote(beamter: boolean, p: LegalParameters): number {
+  if (beamter) return 0;
+  return p.rvSatzGesamt / 2
+    + (p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2) * 0.96
+    + p.pv.satz / 2;
+}
+
 /** Sozialversicherungsersparnis je Euro Entgeltumwandlung. */
-function svErsparnisQuote(jahresbrutto: number, p: LegalParameters): number {
+function svErsparnisQuote(jahresbrutto: number, beamter: boolean, p: LegalParameters): number {
+  // Beamte zahlen weder Renten- noch Arbeitslosenversicherung und sind ueber
+  // die Beihilfe abgesichert. Bei ihnen spart eine Entgeltumwandlung nichts.
+  if (beamter) return 0;
+
   // Entgeltumwandlung spart nur, soweit das Gehalt UNTER der jeweiligen
   // Beitragsbemessungsgrenze liegt. Oberhalb der BBG entsteht keine
   // Ersparnis — der Prototyp rechnete sie dort trotzdem an.
@@ -188,12 +230,13 @@ export function vertragsTuev(
     Math.round(a.lebenserwartung - k.alterBeiRentenbeginn),
   );
 
-  const svQuote = svErsparnisQuote(k.jahresbrutto, p);
+  const svQuote = svErsparnisQuote(k.jahresbrutto, k.beamter, p);
   if (svQuote === 0 && v.typ.startsWith('bav')) {
-    hinweise.push(
-      'Das Gehalt liegt ueber beiden Beitragsbemessungsgrenzen. Eine Entgeltumwandlung ' +
-      'spart hier keine Sozialabgaben mehr.',
-    );
+    hinweise.push(k.beamter
+      ? 'Als Beamter zahlen Sie keine Sozialabgaben. Eine Entgeltumwandlung spart hier '
+        + 'nur Steuern, keine Beiträge.'
+      : 'Das Gehalt liegt über beiden Beitragsbemessungsgrenzen. Eine Entgeltumwandlung '
+        + 'spart hier keine Sozialabgaben mehr.');
   }
 
   const einzahlungenJeJahr: number[] = [];
@@ -284,15 +327,73 @@ export function vertragsTuev(
       agJahr = Math.min(beitragJahr, Math.max(0, a.agZuschussMonat) * 12 * skala);
       const eigenanteil = Math.max(0, beitragJahr - agJahr);
 
-      svJahr = eigenanteil * svQuote;
-      // Die Entgeltumwandlung mindert das zvE um den Eigenanteil; die
-      // ersparten SV-Beitraege erhoehen es wieder (sie waren abzugsfaehig).
-      steuerJahr = zusatzsteuer(k.zveHeute - eigenanteil, eigenanteil, steuerOpt, p);
+      // GRENZEN DES § 3 Nr. 63 EStG. Entgeltumwandlung ist nur bis 8 % der
+      // Beitragsbemessungsgrenze steuerfrei und nur bis 4 % beitragsfrei.
+      // Was darueber liegt, ist normales Gehalt — der Vertrag kostet dann
+      // fast den vollen Beitrag. Ohne diese Deckelung wies der TUEV bei
+      // 1.000 EUR im Monat einen um 280 EUR zu niedrigen Aufwand aus.
+      const svFrei = Math.min(eigenanteil, SV_FREI_QUOTE * p.bbgRvJahr);
+      // Unterstuetzungskasse und Direktzusage fallen NICHT unter § 3 Nr. 63:
+      // sie sind ohne Grenze lohnsteuerfrei (Zuflussprinzip), aber
+      // beitragsfrei ebenfalls nur bis 4 %.
+      const steuerFrei = v.typ === 'bavUkasse'
+        ? eigenanteil
+        : Math.min(eigenanteil, STEUER_FREI_QUOTE * p.bbgRvJahr);
+
+      svJahr = svFrei * svQuote;
+
+      // Die Entgeltumwandlung mindert das zvE nicht um den vollen Betrag: mit
+      // dem Bruttolohn sinken auch die abzugsfaehigen Vorsorgeaufwendungen.
+      // Naeherung — der genaue Wert haengt davon ab, welche Beitraege im
+      // Einzelfall unter den Hoechstbetrag des § 10 Abs. 3 EStG passen.
+      const wegfallenderVorsorgeabzug = svFrei * abzugsfaehigeSvQuote(k.beamter, p);
+      const zveMinderung = Math.max(0, steuerFrei - wegfallenderVorsorgeabzug);
+
+      steuerJahr = zusatzsteuer(k.zveHeute - zveMinderung, zveMinderung, steuerOpt, p);
       aufwandJahr = Math.max(0, eigenanteil - steuerJahr - svJahr);
+
+      if (t === 0) {
+        if (eigenanteil > svFrei + 0.5) {
+          hinweise.push(
+            `Nur ${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat sind beitragsfrei `
+            + `(4 % der Beitragsbemessungsgrenze). Auf die darüber liegenden `
+            + `${euroText((eigenanteil - svFrei) / 12)} zahlen Sie volle Sozialabgaben.`,
+          );
+        }
+        if (eigenanteil > steuerFrei + 0.5) {
+          hinweise.push(
+            `Steuerfrei sind nur ${euroText(STEUER_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat `
+            + `(8 % der Beitragsbemessungsgrenze). Die darüber liegenden `
+            + `${euroText((eigenanteil - steuerFrei) / 12)} zahlen Sie aus versteuertem `
+            + 'Gehalt — der Vertrag lohnt sich insoweit nur noch wegen der Rendite.',
+          );
+        }
+      }
     } else if (v.typ === 'basis') {
-      // Ruerup: Sonderausgabenabzug in voller Hoehe.
-      steuerJahr = zusatzsteuer(k.zveHeute - beitragJahr, beitragJahr, steuerOpt, p);
+      // HOECHSTBETRAG DES § 10 Abs. 3 EStG. Der Rahmen ist ZUERST durch die
+      // Beitraege zur gesetzlichen Rentenversicherung verbraucht —
+      // Arbeitnehmer- UND Arbeitgeberanteil. Bei Beamten tritt an deren
+      // Stelle der fiktive Gesamtbeitrag (§ 10 Abs. 3 S. 3); beide Male
+      // dieselbe Formel. Ohne diese Deckelung zog der TUEV auch Beitraege
+      // ab, die das Finanzamt gar nicht anerkennt.
+      const verbraucht = Math.min(k.jahresbrutto, p.bbgRvJahr) * p.rvSatzGesamt;
+      const rahmen = Math.max(0,
+        p.hoechstbetragAltersvorsorge * (steuerOpt.verheiratet ? 2 : 1) - verbraucht);
+      const abziehbar = Math.min(beitragJahr, rahmen);
+
+      steuerJahr = zusatzsteuer(k.zveHeute - abziehbar, abziehbar, steuerOpt, p);
       aufwandJahr = Math.max(0, beitragJahr - steuerJahr);
+
+      if (t === 0 && beitragJahr > abziehbar + 0.5) {
+        hinweise.push(
+          `Absetzbar sind hier nur ${euroText(rahmen / 12)} im Monat: der Höchstbetrag von `
+          + `${euroText(p.hoechstbetragAltersvorsorge * (steuerOpt.verheiratet ? 2 : 1))} im Jahr `
+          + `ist bereits durch ${euroText(verbraucht)} Beiträge zur gesetzlichen `
+          + 'Rentenversicherung belegt (Arbeitnehmer- und Arbeitgeberanteil). Die darüber '
+          + `liegenden ${euroText((beitragJahr - abziehbar) / 12)} im Monat bringen keine `
+          + 'Steuerersparnis.',
+        );
+      }
     } else {
       // Private Vertraege und Depots werden aus versteuertem Geld bespart.
       aufwandJahr = beitragJahr;

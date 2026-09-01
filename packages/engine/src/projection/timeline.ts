@@ -337,12 +337,25 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
     const quellen: Einkunftsquelle[] = [];
     const beitragspflichtig: Beitragspflichtig[] = [];
-    // Je Quelle der Betrag, der ueberhaupt KV/PV-pflichtig ist. Ohne diese
-    // Spur wuerde die Beitragslast unten nach BRUTTO verteilt — und damit
-    // auch beitragsfreien Bezuegen (Riester und Altersvorsorgedepot in der
-    // KVdR) Beitraege zugeschrieben, die sie nicht ausloesen.
-    const kvBasis = new Map<string, number>();
     const posten: JahresPosten[] = [];
+
+    /**
+     * Werbungskosten-Pauschbetrag, je Person und Einkunftsart EINMAL:
+     * 102 EUR fuer alle Versorgungsbezuege (§ 9a S. 1 Nr. 1b) und 102 EUR fuer
+     * alle sonstigen Einkuenfte (§ 9a S. 1 Nr. 3).
+     *
+     * Vorher bekam ihn jeder Vertrag einzeln — wer zwei Unterstuetzungskassen
+     * hatte, zog ihn doppelt ab. Und wer nur einen Ruerup und keine
+     * gesetzliche Rente hat, bekam ihn gar nicht.
+     */
+    const pauschRest = new Map<string, number>();
+    const nimmPauschbetrag = (personId: string, art: 'versorgung' | 'sonstige', betrag: number) => {
+      const schluessel = `${personId}|${art}`;
+      const rest = pauschRest.get(schluessel) ?? 0;
+      const genutzt = Math.min(rest, betrag);
+      pauschRest.set(schluessel, rest - genutzt);
+      return genutzt;
+    };
 
     let nochErwerbstaetig = false;
 
@@ -368,10 +381,17 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         brutto, zveBeitrag, kvPv: 0,
       });
       beitragspflichtig.push({
+        id: `person-${k.person.id}`,
         art: k.istVersorgungsbezug ? 'versorgungsbezug' : 'gesetzlicheRente',
         monatsbetrag: brutto / 12,
       });
-      kvBasis.set(`person-${k.person.id}`, brutto);
+
+      // Die Person hat ihren Pauschbetrag fuer DIESE Einkunftsart oben schon
+      // verbraucht; der jeweils andere bleibt fuer ihre Vertraege offen.
+      pauschRest.set(`${k.person.id}|versorgung`,
+        k.istVersorgungsbezug ? 0 : p.pauschbetraege.versorgungsbezuege);
+      pauschRest.set(`${k.person.id}|sonstige`,
+        k.istVersorgungsbezug ? p.pauschbetraege.renten : 0);
     }
 
     // --- Erwerbseinkommen der noch arbeitenden Personen ---
@@ -414,12 +434,18 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         // "avd" waere als Ersatzbezeichnung im Kassenbon nicht lesbar; die
         // uebrigen Kuerzel sind wenigstens Woerter.
         const bezeichnung = v.name || (v.typ === 'avd' ? 'Altersvorsorgedepot' : v.typ);
-        quellen.push({ id: v.id, bezeichnung, brutto: r.brutto, zveBeitrag: r.zveBeitrag, kvPv: 0 });
+        // Was vom Werbungskosten-Pauschbetrag der Person noch uebrig ist.
+        const pausch = r.pauschbetragArt
+          ? nimmPauschbetrag(v.inhaber, r.pauschbetragArt, r.zveBeitrag)
+          : 0;
+        quellen.push({
+          id: v.id, bezeichnung, brutto: r.brutto,
+          zveBeitrag: Math.max(0, r.zveBeitrag - pausch), kvPv: 0,
+        });
       }
       if (r.kvArt) {
         const monatsbetrag = r.kvMonatsbetrag ?? r.brutto / 12;
-        beitragspflichtig.push({ art: r.kvArt, monatsbetrag });
-        kvBasis.set(v.id, monatsbetrag * 12);
+        beitragspflichtig.push({ id: v.id, art: r.kvArt, monatsbetrag });
       }
     }
 
@@ -430,9 +456,24 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     });
     const kvPvJahr = kv.gesamt * 12;
 
-    // --- Altersentlastungsbetrag auf nicht-Renten-Einkuenfte ---
+    // --- Altersentlastungsbetrag ---
+    //
+    // § 24a Satz 2 EStG nimmt ausdruecklich AUS: Versorgungsbezuege (§ 19
+    // Abs. 2), Leibrenten nach § 22 Nr. 1 S. 3 Buchst. a — also gesetzliche
+    // Rente UND Ruerup — sowie Leistungen aus gefoerderten Vertraegen nach
+    // § 22 Nr. 5 (Riester, bAV, Altersvorsorgedepot). Beguenstigt bleiben
+    // Ertragsanteilsrenten, Mieteinkuenfte und Kapitalertraege.
+    //
+    // Vorher lief die Summe ueber ALLE Nicht-Personen-Quellen; der Betrag
+    // fiel dadurch zu hoch aus.
+    const beguenstigt = new Set(['prvRente', 'immobilie', 'etf', 'prvKapital']);
     const sonstigeEinkuenfte = quellen
-      .filter((q) => q.id !== 'erwerb' && !q.id.startsWith('person-'))
+      .filter((q) => {
+        if (q.id === 'erwerb' || q.id.startsWith('person-')) return false;
+        const vertrag = s.vertraege.find((x) => x.id === q.id);
+        // Der Entnahmeplaner traegt Kapitalertraege — ebenfalls beguenstigt.
+        return vertrag ? beguenstigt.has(vertrag.typ) : true;
+      })
       .reduce((sum, q) => sum + q.zveBeitrag, 0);
     const alterA = alterExakt(personA.geburt, { jahr, monat: 7, tag: 1 });
     let aeb = 0;
@@ -453,19 +494,25 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       p,
     );
 
-    // KV/PV verursachungsgerecht auf die Quellen verteilen: nach dem
-    // BEITRAGSPFLICHTIGEN Betrag, nicht nach dem Brutto. Sonst truege etwa
-    // eine Riester-Rente in der KVdR im Kassenbon Beitraege, die sie gar
-    // nicht ausloest — und der gesetzlichen Rente fehlten sie.
-    // Rueckfall auf das Brutto, wenn keine Quelle beitragspflichtig ist,
-    // die Kasse aber trotzdem etwas kostet (privat Versicherte zahlen eine
-    // Praemie unabhaengig vom Bezug).
+    // KV/PV je Quelle: der Rechenkern hat die Beitraege einzeln ermittelt,
+    // sie werden hier NICHT mehr aus einer Summe verteilt.
+    //
+    // Jeder Verteilungsschluessel ist falsch, weil die Saetze verschieden
+    // sind: eine gesetzliche Rente kostet 12,95 %, ein Versorgungsbezug
+    // 21,7 % nach Freibetrag, ein Ruerup in der KVdR gar nichts. Nach Brutto
+    // verteilt stand beim Ruerup ein Beitrag, den es nicht gibt, und der
+    // gesetzlichen Rente fehlte er.
+    //
+    // Rueckfall auf das Brutto nur, wenn Beitraege anfallen, die keiner
+    // Quelle zugeordnet sind — privat Versicherte ohne gesetzliche Rente
+    // zahlen eine Praemie unabhaengig vom Bezug.
+    const jeQuelle = new Map(kv.jeQuelle.map((x) => [x.id, (x.kv + x.pv) * 12]));
+    const zugeordnet = [...jeQuelle.values()].reduce((sum, x) => sum + x, 0);
+    const offen = kvPvJahr - zugeordnet;
     const bruttoSumme = quellen.reduce((sum, q) => sum + q.brutto, 0);
-    const kvBasisSumme = quellen.reduce((sum, q) => sum + (kvBasis.get(q.id) ?? 0), 0);
     for (const q of quellen) {
-      const anteilKv = kvBasisSumme > 0
-        ? ((kvBasis.get(q.id) ?? 0) / kvBasisSumme) * kvPvJahr
-        : bruttoSumme > 0 ? (q.brutto / bruttoSumme) * kvPvJahr : 0;
+      const anteilKv = (jeQuelle.get(q.id) ?? 0)
+        + (offen > 0.005 && bruttoSumme > 0 ? (q.brutto / bruttoSumme) * offen : 0);
       const steuer = st.aufteilung.find((a) => a.id === q.id)?.gesamt ?? 0;
       const vertrag = s.vertraege.find((v) => v.id === q.id);
       posten.push({
@@ -866,6 +913,12 @@ function vertragImJahr(
    * Beitragspflicht laeuft aber ueber 120 Monate auf je 1/120 (§ 229 SGB V).
    */
   kvMonatsbetrag?: number;
+  /**
+   * Welchen Werbungskosten-Pauschbetrag diese Einkunft beansprucht. Er steht
+   * der PERSON einmal zu, nicht jedem Vertrag — deshalb entscheidet der
+   * Aufrufer, wie viel davon noch uebrig ist.
+   */
+  pauschbetragArt?: 'versorgung' | 'sonstige';
 } | null {
   const jahreSeitRente = jahr - k.rentenbeginnJahr;
 
@@ -874,27 +927,33 @@ function vertragImJahr(
       // Ruerup unterliegt demselben Kohortenprinzip wie die gesetzliche Rente.
       const anteil = rentenfreibetrag(k.rentenbeginnJahr, 1).besteuerungsanteil ?? 1;
       const brutto = v.brutto * 12;
-      return { brutto, zveBeitrag: brutto * anteil, kvArt: 'sonstiges' };
+      return { brutto, zveBeitrag: brutto * anteil, kvArt: 'sonstiges', pauschbetragArt: 'sonstige' };
     }
     case 'bav': {
       const brutto = v.brutto * 12;
       const zve = v.altvertrag ? brutto * ertragsanteil(k.alterBeiRentenbeginn) : brutto;
-      return { brutto, zveBeitrag: zve, kvArt: 'versorgungsbezug' };
+      return { brutto, zveBeitrag: zve, kvArt: 'versorgungsbezug', pauschbetragArt: 'sonstige' };
     }
     case 'bavUkasse': {
+      // Der Werbungskosten-Pauschbetrag wird NICHT hier abgezogen: er steht
+      // der Person einmal zu, nicht jedem Vertrag. Der Aufrufer verteilt ihn.
       const brutto = v.brutto * 12;
       const fb = versorgungsfreibetrag(k.rentenbeginnJahr, brutto);
       return {
         brutto,
-        zveBeitrag: Math.max(0, brutto - fb.jahresbetrag - p.pauschbetraege.versorgungsbezuege),
+        zveBeitrag: Math.max(0, brutto - fb.jahresbetrag),
         kvArt: 'versorgungsbezug',
+        pauschbetragArt: 'versorgung',
       };
     }
     case 'riester': {
       // Riester-Renten sind voll steuerpflichtig, aber fuer Pflichtversicherte
       // in der KVdR beitragsfrei (kein Versorgungsbezug).
       const brutto = v.brutto * 12;
-      return { brutto, zveBeitrag: brutto, kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null };
+      return {
+        brutto, zveBeitrag: brutto, pauschbetragArt: 'sonstige',
+        kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
+      };
     }
     case 'avd': {
       // Altersvorsorgedepot ab 2027. Die Auszahlung ist VOLLSTAENDIG
@@ -911,12 +970,16 @@ function vertragImJahr(
       return {
         brutto: lauf.bruttoJahr,
         zveBeitrag: lauf.bruttoJahr,
+        pauschbetragArt: 'sonstige',
         kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
       };
     }
     case 'prvRente': {
       const brutto = v.brutto * 12;
-      return { brutto, zveBeitrag: brutto * ertragsanteil(k.alterBeiRentenbeginn), kvArt: 'sonstiges' };
+      return {
+        brutto, zveBeitrag: brutto * ertragsanteil(k.alterBeiRentenbeginn),
+        kvArt: 'sonstiges', pauschbetragArt: 'sonstige',
+      };
     }
     case 'bavKapital': {
       // Einmalige Kapitalleistung aus der bAV. Sie floss bisher UEBERHAUPT

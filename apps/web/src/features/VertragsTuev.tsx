@@ -1,9 +1,7 @@
 import { useMemo } from 'react';
 import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
-import {
-  vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer,
-  type ProjektionsErgebnis,
-} from '@renten/engine';
+import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
+import { tuevPositionen, tuevBasis } from './tuev-berechnung';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
@@ -41,24 +39,18 @@ export function VertragsTuev({
 
   // Bemessungsgrundlage: das TATSAECHLICHE Bruttogehalt und zvE.
   // Der Prototyp schaetzte hier aus dem Netto mit festen Faktoren (Befund B9).
-  const basis = useMemo(() => {
-    const jahr = new Date().getFullYear();
-    const p = parameterFuer(jahr, { indexRate: szenario.annahmen.tarifIndex });
-    const brutto = szenario.einkommenHeute.betrag * szenario.einkommenHeute.auszahlungen;
-    const n = bruttoZuNetto(brutto, {
-      verheiratet: szenario.haushalt.verheiratet,
-      bundesland: szenario.haushalt.bundesland,
-      kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
-      kinder: { hatKinder: szenario.haushalt.hatKinder, kinderUnter25: szenario.haushalt.kinderUnter25 },
-      beamter: szenario.einkommenHeute.modus === 'besoldung',
-      pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv' ? szenario.haushalt.pkvPraemieMonat : 0,
-    }, p);
-    return { p, jahresbrutto: n.jahresbrutto, zve: n.zve, monatsbrutto: n.monatsbrutto };
-  }, [szenario]);
+  // Dieselbe Bemessungsgrundlage wie die Rechnung selbst — sie stand hier
+  // frueher ein zweites Mal im Code.
+  const basis = useMemo(() => tuevBasis(szenario), [szenario]);
 
   const nichtGeprueft = vertraege.filter((v) => !tuev.some((t) => t.vertragId === v.id));
 
   const zeile = ergebnis?.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr);
+
+  const positionen = useMemo(
+    () => tuevPositionen(szenario, zeile ?? null),
+    [szenario, zeile],
+  );
 
   return (
     <section className="mx-auto mb-24 max-w-6xl p-2 sm:p-6 print:break-before-page">
@@ -110,56 +102,14 @@ export function VertragsTuev({
             const v = vertraege.find((x) => x.id === t.vertragId);
             if (!v) return null;
 
-            const posten = zeile?.posten.find((x) => x.id === v.id);
-            const istKapital = v.typ === 'bavKapital' || v.typ === 'prvKapital';
-
-            // Die Auszahlseite kommt VOLLSTAENDIG aus der Projektion — Brutto
-            // und Abzuege, nicht nur das Netto. Nur so laesst sich unten
-            // zeigen, wie aus der Bruttorente die Nettorente wird, und beide
-            // Stellen der App koennen nicht auseinanderlaufen.
-            const nettoRenteMonat = !istKapital && posten ? posten.nettoJahr / 12 : 0;
-            const bruttoRenteMonat = !istKapital && posten ? posten.bruttoJahr / 12 : 0;
-            const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
-            const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
-
-            const nettoKapital = istKapital && posten ? posten.nettoJahr : 0;
-            const bruttoKapital = istKapital && posten ? posten.bruttoJahr : 0;
-            const steuerKapital = istKapital && posten ? posten.steuerJahr + posten.kvPvJahr : 0;
-
-            const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
-            const rentenbeginnJahr = Number(person.rentenbeginn.slice(-4)) || new Date().getFullYear() + 20;
-            const geburtsjahr = Number(person.geburtsdatum.slice(-4)) || 1980;
-            const alterBeiRentenbeginn = rentenbeginnJahr - geburtsjahr;
-
-            const r = vertragsTuev(
-              v,
-              {
-                beitragMonat: t.beitragMonat,
-                dynamik: t.dynamik,
-                agZuschussMonat: t.agZuschussMonat,
-                kinder: t.kinder,
-                beginnJahr: t.beginnJahr,
-                lebenserwartung: t.lebenserwartung,
-              },
-              {
-                jahresbrutto: basis.jahresbrutto,
-                zveHeute: basis.zve,
-                rentenbeginnJahr,
-                alterBeiRentenbeginn,
-                bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
-                bruttoKapital, steuerKapital, nettoKapital,
-              },
-              szenario,
-              basis.p,
-            );
-
-            // Der Vergleich braucht eine ECHTE Kapitalalternative. Ohne sie
-            // verglichen wir die Rente mit ihrer eigenen Auszahlungssumme —
-            // das ergibt immer wieder die Lebenserwartung, also nichts.
-            const vergleichsKapital = nettoKapital > 0 ? nettoKapital : t.vergleichKapitalNetto;
-            const vergleich = t.vergleichen && vergleichsKapital > 0 && nettoRenteMonat > 0
-              ? renteOderKapital(nettoRenteMonat, vergleichsKapital, alterBeiRentenbeginn)
-              : null;
+            // Gerechnet wird in `tuevPositionen` — DERSELBEN Funktion, die auch
+            // das gedruckte Gutachten benutzt. Vorher stand die Verdrahtung
+            // hier ein zweites Mal; zwei Kopien derselben Rechnung laufen
+            // frueher oder spaeter auseinander, und dann zeigt der Bildschirm
+            // andere Zahlen als der Ausdruck.
+            const pos = positionen.find((x) => x.vertrag.id === v.id);
+            if (!pos) return null;
+            const { ergebnis: r, vergleich, istKapital } = pos;
 
             const gut = r.nettoHebel >= 1;
 
@@ -319,7 +269,7 @@ export function VertragsTuev({
                       wert={t.vergleichen}
                       onChange={(b) => tuevAendern(t.id, { vergleichen: b })}
                     />
-                    {t.vergleichen && nettoKapital === 0 && (
+                    {t.vergleichen && r.nettoKapital === 0 && (
                       <ZahlFeld
                         label="Alternative Kapitalauszahlung (netto)"
                         wert={t.vergleichKapitalNetto}
