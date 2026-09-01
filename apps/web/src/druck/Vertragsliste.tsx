@@ -1,7 +1,7 @@
 import type { Vertrag } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
-import { SCHICHT_TITEL, typText, strategieText } from '../features/vertragsarten';
+import { SCHICHT_TITEL, typText, strategieText, istKapital } from '../features/vertragsarten';
 import { Seite, Untertitel, Tabelle, Zeile, Gruppenzeile, Text } from './Bausteine';
 
 /**
@@ -13,6 +13,9 @@ import { Seite, Untertitel, Tabelle, Zeile, Gruppenzeile, Text } from './Baustei
  * bleibt, waere schlechter als eine, die sagt, worum es sich handelt.
  */
 function betragText(v: Vertrag): string {
+  // Bei einer Kapitalauszahlung steht in `brutto` ein EINMALbetrag. Ihn als
+  // "Rente" zu beschriften macht aus 300.000 EUR Kapital eine 300.000-EUR-Rente.
+  if (istKapital(v.typ) && v.brutto) return `${euro(v.brutto)} Kapital`;
   if (v.monatsbeitrag) return `${euro(v.monatsbeitrag)} Beitrag`;
   if (v.sparrate) return `${euro(v.sparrate)} Sparrate`;
   if (v.brutto) return `${euro(v.brutto)} Rente`;

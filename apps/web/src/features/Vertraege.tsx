@@ -1,14 +1,36 @@
-import { useMemo } from 'react';
-import { Trash2, PlusCircle } from 'lucide-react';
-import { parameterFuer, type Vertrag, type VertragsTyp, type AvdLauf } from '@renten/engine';
+import { useMemo, useState } from 'react';
+import { Trash2, PlusCircle, ChevronDown } from 'lucide-react';
+import {
+  parameterFuer,
+  type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
+} from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
-import { TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital } from './vertragsarten';
+import {
+  TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, strategieGruppe, typText,
+  VERRENTUNG_JAHRE, VERRENTUNG_RENDITE,
+} from './vertragsarten';
 
+/**
+ * Die eine Zahl, die eine zugeklappte Karte kenntlich macht.
+ *
+ * Welches Feld sie traegt, haengt an der Vertragsart: laufende Renten stehen
+ * in `brutto`, Sparvertraege in `monatsbeitrag` oder `sparrate`. Eine Karte
+ * ohne Zahl waere nicht wiederzuerkennen.
+ */
+function kopfBetrag(v: Vertrag): string | null {
+  if (istKapital(v.typ) && v.brutto) return `${euro(v.brutto)} Kapital`;
+  if (v.brutto) return `${euro(v.brutto)} im Monat`;
+  if (v.monatsbeitrag) return `${euro(v.monatsbeitrag)} Beitrag`;
+  if (v.sparrate) return `${euro(v.sparrate)} Sparrate`;
+  if (v.kapitalHeute) return `${euro(v.kapitalHeute)} vorhanden`;
+  return null;
+}
 
-function VertragsKarte({ v, depot, auszahlung, avd }: {
+function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;
+  verrentung?: KapitalVerrentung;
 }) {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
@@ -21,24 +43,60 @@ function VertragsKarte({ v, depot, auszahlung, avd }: {
   const jetzt = new Date().getFullYear();
   const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: tarifIndex }).avd;
 
+  /*
+    Ein FRISCH angelegter Vertrag steht offen, ein bereits ausgefuellter
+    geschlossen. Die Karte haengt an `key={v.id}`, der Anfangswert gilt also
+    genau einmal beim Einhaengen: wer einen Vertrag hinzufuegt, kann sofort
+    tippen; wer ein gespeichertes Szenario laedt, sieht eine kurze Liste
+    statt einer Bildschirmlaenge Formularfelder.
+  */
+  const [offen, setOffen] = useState(
+    () => !v.name && !v.brutto && !v.monatsbeitrag && !v.sparrate && !v.kapitalHeute,
+  );
+  const betrag = kopfBetrag(v);
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2">
-          <AuswahlFeld label="Vertragsart" wert={v.typ}
-            onChange={(t) => vertragAendern(v.id, { typ: t })}
-            optionen={TYPEN[v.schicht]} />
-          <TextFeld label="Bezeichnung" wert={v.name}
-            onChange={(n) => vertragAendern(v.id, { name: n })} platzhalter="z. B. Allianz" />
-        </div>
+    <div className="rounded-lg border border-slate-200 bg-slate-50/60">
+      <div className="flex items-center gap-1 p-2 sm:p-3">
+        <button
+          type="button"
+          onClick={() => setOffen((x) => !x)}
+          aria-expanded={offen}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-100"
+        >
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-800">
+              {v.name || 'Ohne Bezeichnung'}
+            </span>
+            <span className="block truncate text-[11px] text-slate-500">{typText(v.typ)}</span>
+          </span>
+          {betrag && (
+            <span className="shrink-0 whitespace-nowrap text-xs font-bold tabular-nums text-slate-700">
+              {betrag}
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={() => vertragEntfernen(v.id)}
           aria-label={`Vertrag ${v.name || 'ohne Namen'} entfernen`}
-          className="mt-5 rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+          className="shrink-0 rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
         >
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
+      </div>
+
+      <div className={`border-t border-slate-200 p-3 ${offen ? 'block' : 'hidden'}`}>
+      <div className="mb-3 grid gap-3 sm:grid-cols-2">
+        <AuswahlFeld label="Vertragsart" wert={v.typ}
+          onChange={(t) => vertragAendern(v.id, { typ: t })}
+          optionen={TYPEN[v.schicht]} />
+        <TextFeld label="Bezeichnung" wert={v.name}
+          onChange={(n) => vertragAendern(v.id, { name: n })} platzhalter="z. B. Allianz" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -153,13 +211,68 @@ function VertragsKarte({ v, depot, auszahlung, avd }: {
 
         <AuswahlFeld label="Auszahlungsstrategie" wert={v.strategie}
           onChange={(st) => vertragAendern(v.id, { strategie: st })}
-          optionen={STRATEGIEN[v.typ === 'etf' ? 'etf' : v.typ === 'avd' ? 'avd' : 'sonst']} />
+          optionen={STRATEGIEN[strategieGruppe(v.typ)]} />
+
+        {/*
+          Ohne diese beiden Felder gab es fuer eine Kapitalauszahlung keinen
+          Verrentungsweg: der gesamte Betrag wurde als Einkommen EINES Jahres
+          gebucht, und aus 300.000 € Kapital wurden 25.000 € "Rente im Monat".
+        */}
+        {istKapital(v.typ) && v.strategie === 'rente' && (
+          <>
+            <ZahlFeld label="Verrentungsdauer" wert={v.entnahmedauer ?? VERRENTUNG_JAHRE}
+              onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })}
+              min={1} max={60} einheit="Jahre"
+              hilfe="Über wie viele Jahre das ausgezahlte Kapital verbraucht wird." />
+            <ProzentFeld label="Rendite in der Auszahlphase"
+              wert={v.renditeEntnahme ?? VERRENTUNG_RENDITE}
+              onChange={(n) => vertragAendern(v.id, { renditeEntnahme: n })}
+              hilfe="Das noch nicht verbrauchte Kapital wird weiter angelegt." />
+          </>
+        )}
       </div>
 
       {(v.typ === 'bav' || v.typ === 'bavKapital' || v.typ === 'prvRente' || v.typ === 'prvKapital') && (
         <div className="mt-3">
           <Schalter label="Vertrag vor 2005 abgeschlossen (Steuerprivileg)"
             wert={v.altvertrag} onChange={(b) => vertragAendern(v.id, { altvertrag: b })} />
+        </div>
+      )}
+
+      {/*
+        Die Steuer auf die Kapitalleistung faellt IM ZUFLUSSJAHR an und in
+        voller Hoehe (§ 22 Nr. 5 EStG bzw. § 20 Abs. 1 Nr. 6 EStG). Sie ist
+        der Grund, warum aus dem Kapital eine deutlich kleinere Monatsrente
+        wird — und muss deshalb sichtbar sein, nicht im Ergebnis verschwinden.
+      */}
+      {istKapital(v.typ) && v.strategie === 'rente' && verrentung && (
+        <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Verrentung über {verrentung.dauerJahre} Jahre ab {verrentung.startjahr}
+          </div>
+          <div className="text-sm font-black tabular-nums text-emerald-800">
+            {euro(verrentung.bruttoMonat)} <span className="text-xs font-normal">brutto / Monat</span>
+          </div>
+          <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+            Kapital {euro(verrentung.bruttoKapital)} − Steuer im Auszahlungsjahr{' '}
+            {euro(verrentung.steuerEinmal)} = {euro(verrentung.nettoKapital)}, verteilt auf{' '}
+            {verrentung.dauerJahre} Jahre.
+          </div>
+        </div>
+      )}
+
+      {istKapital(v.typ) && v.strategie === 'kapital' && auszahlung && (
+        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Einmalige Kapitalauszahlung {auszahlung.jahr}
+          </div>
+          <div className="text-sm font-black tabular-nums text-indigo-900">
+            {euro(auszahlung.nettoKapital)} netto
+          </div>
+          <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+            Brutto {euro(auszahlung.bruttoKapital)} − Steuer {euro(auszahlung.steuer)}.
+            Zählt nicht zum monatlichen Netto.
+          </div>
         </div>
       )}
 
@@ -242,6 +355,7 @@ function VertragsKarte({ v, depot, auszahlung, avd }: {
           über 120 Monate volle KV/PV-Beiträge auf je 1/120 des Betrags an.
         </p>
       )}
+      </div>
     </div>
   );
 }
@@ -252,12 +366,13 @@ export interface AuszahlungAnzeige {
 }
 
 export function Vertraege({
-  schicht, depots = [], auszahlungen = [], avdLaeufe = [],
+  schicht, depots = [], auszahlungen = [], avdLaeufe = [], verrentungen = [],
 }: {
   schicht: 1 | 2 | 3;
   depots?: DepotAnzeige[];
   auszahlungen?: AuszahlungAnzeige[];
   avdLaeufe?: readonly AvdLauf[];
+  verrentungen?: readonly KapitalVerrentung[];
 }) {
   // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
   // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
@@ -282,6 +397,7 @@ export function Vertraege({
             depot={depots.find((d) => d.vertragId === v.id)}
             auszahlung={auszahlungen.find((a) => a.vertragId === v.id)}
             avd={avdLaeufe.find((a) => a.vertragId === v.id)}
+            verrentung={verrentungen.find((x) => x.vertragId === v.id)}
           />
         ))}
         <button

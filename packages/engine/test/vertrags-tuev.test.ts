@@ -523,3 +523,43 @@ describe('Ansparphase: die gesetzlichen Grenzen', () => {
     expect(r.hinweise.join(' ')).not.toContain('Höchstbetrag');
   });
 });
+
+describe('Auszahldauer: Auszahlplan gegen lebenslange Rente', () => {
+  it('eine lebenslange Rente laeuft bis zur Lebenserwartung', () => {
+    const r = vertragsTuev(vertrag({ typ: 'prvRente' }), annahmen(), kontext(), szenario, p);
+    expect(r.jahreAuszahlung).toBe(18);   // 85 − 67
+  });
+
+  it('ein Auszahlplan endet mit seiner Laufzeit, nicht mit dem Leben', () => {
+    // Zehn Jahre Verrentung sind nach zehn Jahren zu Ende. Wer bis 85 rechnet,
+    // schreibt dem Vertrag acht Jahre Zahlungen zu, die es nicht gibt — und
+    // die Rendite faellt entsprechend zu hoch aus.
+    const bei = (entnahmedauer: number) => vertragsTuev(
+      vertrag({ typ: 'bavKapital', entnahmedauer }), annahmen(), kontext(), szenario, p,
+    );
+    const kurz = bei(10);
+    const lang = bei(18);
+
+    expect(kurz.jahreAuszahlung).toBe(10);
+    expect(lang.jahreAuszahlung).toBe(18);
+    expect(kurz.summeAuszahlung).toBeLessThan(lang.summeAuszahlung);
+    expect(kurz.rendite).toBeLessThan(lang.rendite);
+  });
+
+  it('ein Auszahlplan ueber die Lebenserwartung hinaus zaehlt nur bis dorthin', () => {
+    // Was nach dem Tod ausgezahlt wuerde, kommt beim Vertragsinhaber nicht an.
+    const r = vertragsTuev(
+      vertrag({ typ: 'bavKapital', entnahmedauer: 30 }), annahmen(), kontext(), szenario, p,
+    );
+    expect(r.jahreAuszahlung).toBe(18);
+  });
+
+  it('gilt auch fuer Depot und Altersvorsorgedepot', () => {
+    for (const typ of ['etf', 'avd'] as const) {
+      const r = vertragsTuev(
+        vertrag({ typ, entnahmedauer: 12 }), annahmen(), kontext(), szenario, p,
+      );
+      expect(r.jahreAuszahlung, typ).toBe(12);
+    }
+  });
+});

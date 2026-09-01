@@ -99,9 +99,10 @@ describe('Entnahmeplan mit Besteuerung', () => {
 });
 
 describe('Kapitalvertraege in der Zeitachse', () => {
-  it('fuehrt eine bAV-Kapitalauszahlung im Zuflussjahr auf', () => {
-    // Regression: Vor der Korrektur gab es fuer bavKapital keinen Zweig in
-    // vertragImJahr. Der Betrag verschwand vollstaendig aus der Rechnung.
+  it('verrentet eine bAV-Kapitalauszahlung, statt sie in EIN Jahr zu buchen', () => {
+    // DER GEMELDETE FEHLER: Der gesamte Betrag stand als Jahresbrutto EINES
+    // Jahres in der Zeile. Jede Anzeige teilt ein Jahresbrutto durch zwoelf —
+    // aus 100.000 EUR Kapital wurden 8.333 EUR "Rente im Monat".
     const r = projiziere(szenario({
       vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
     }));
@@ -109,10 +110,72 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     const posten = zeile.posten.find((x) => x.id === 'bav1');
 
     expect(posten).toBeDefined();
-    expect(posten!.bruttoJahr).toBe(100_000);
-    // Voll steuerpflichtig (§ 22 Nr. 5 EStG), also faellt Steuer an.
-    expect(posten!.steuerJahr).toBeGreaterThan(0);
-    expect(posten!.nettoJahr).toBeLessThan(100_000);
+    expect(posten!.bruttoJahr).not.toBe(100_000);
+    // Voll steuerpflichtig im Zuflussjahr (§ 22 Nr. 5 EStG) — die Steuer
+    // faellt EINMAL an und mindert das Kapital, das verrentet wird.
+    const v = r.verrentungen.find((x) => x.vertragId === 'bav1')!;
+    expect(v.steuerEinmal).toBeGreaterThan(0);
+    expect(v.nettoKapital).toBeLessThan(100_000);
+    expect(v.dauerJahre).toBe(25);
+
+    // Die Monatsrate muss zum Kapital passen: ohne Verzinsung waeren es
+    // nettoKapital / 300 Monate, mit 2 % Rendite etwas mehr.
+    expect(v.bruttoMonat).toBeGreaterThan(v.nettoKapital / (25 * 12));
+    expect(posten!.bruttoJahr).toBeCloseTo(v.bruttoMonat * 12, 6);
+  });
+
+  it('laesst die Verrentung genau die Entnahmedauer laufen', () => {
+    const r = projiziere(szenario({
+      vertraege: [vertrag({
+        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, entnahmedauer: 15,
+      })],
+    }));
+    const brutto = (versatz: number) =>
+      r.zeilen.find((z) => z.jahr === r.ruhestandsjahr + versatz)
+        ?.posten.find((x) => x.id === 'bav1')?.bruttoJahr ?? 0;
+
+    expect(brutto(0)).toBeGreaterThan(0);
+    expect(brutto(14)).toBeGreaterThan(0);
+    expect(brutto(15)).toBe(0);
+  });
+
+  it('haelt eine einmalige Kapitalauszahlung aus dem Monatsnetto heraus', () => {
+    const rente = projiziere(szenario({
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
+    }));
+    const einmal = projiziere(szenario({
+      vertraege: [vertrag({
+        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'kapital',
+      })],
+    }));
+
+    // Der Einmalbetrag steht in kapitalauszahlungen, nicht im Monatsnetto —
+    // sonst spraenge die Kurve im Rentenjahr sinnlos nach oben.
+    expect(einmal.kapitalauszahlungen).toHaveLength(1);
+    expect(einmal.kapitalauszahlungen[0]!.bruttoKapital).toBe(100_000);
+    expect(rente.kapitalauszahlungen).toHaveLength(0);
+
+    const netto = (x: ReturnType<typeof projiziere>) =>
+      x.zeilen.find((z) => z.jahr === x.ruhestandsjahr)!.nettoMonat;
+    expect(netto(einmal)).toBeLessThan(netto(rente));
+  });
+
+  it('haelt die Summe der Posten mit der Jahreszeile im Gleichklang', () => {
+    // Die KV/PV auf das Kapital laeuft 120 Monate — auch dann, wenn der
+    // Vertrag gar kein laufendes Einkommen liefert. Ohne einen Posten dafuer
+    // verschwaende sie lautlos aus der Summe.
+    for (const strategie of ['rente', 'kapital', 'planer'] as const) {
+      const r = projiziere(szenario({
+        vertraege: [vertrag({
+          id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie,
+        })],
+      }));
+      const z = r.zeilen.find((x) => x.jahr === r.ruhestandsjahr)!;
+      const kv = z.posten.reduce((s, x) => s + x.kvPvJahr, 0);
+      const netto = z.posten.reduce((s, x) => s + x.nettoJahr, 0);
+      expect(kv, strategie).toBeCloseTo(z.kvPvGesamt, 4);
+      expect(netto, strategie).toBeCloseTo(z.nettoGesamt, 4);
+    }
   });
 
   it('haelt die KV-Beitragspflicht auf bAV-Kapital ueber 120 Monate aufrecht', () => {
@@ -148,12 +211,16 @@ describe('Kapitalvertraege in der Zeitachse', () => {
       })],
     }));
 
-    const zve = (r: ReturnType<typeof projiziere>) =>
-      r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!.posten.find((x) => x.id === 'prv1')!.zveBeitrag;
+    // Die Steuer faellt im Zuflussjahr an und mindert das Kapital, das
+    // verrentet wird. Sie steht deshalb in `verrentungen`, nicht mehr als
+    // zvE-Beitrag am Posten.
+    const steuer = (r: ReturnType<typeof projiziere>) =>
+      r.verrentungen.find((x) => x.vertragId === 'prv1')!.steuerEinmal;
 
-    // Ertrag = 100 000 - 50 400 = 49 600
-    expect(zve(kurz)).toBeCloseTo(49_600, 0);
-    expect(zve(lang)).toBeCloseTo(49_600 / 2, 0);
+    // Ertrag = 100 000 - 50 400 = 49 600, davon beim langen Vertrag nur die
+    // Haelfte steuerpflichtig — also spuerbar weniger Steuer.
+    expect(steuer(kurz)).toBeGreaterThan(0);
+    expect(steuer(lang)).toBeLessThan(steuer(kurz) * 0.75);
   });
 });
 
@@ -199,13 +266,16 @@ describe('Auszahlungs-Planer in der Projektion', () => {
   });
 
   it('zaehlt ein Vertrag mit Strategie planer nicht doppelt', () => {
-    // Das Brutto darf nicht zusaetzlich als laufendes Einkommen erscheinen.
+    // Das Brutto darf nicht zusaetzlich als laufendes Einkommen erscheinen —
+    // der Posten traegt nur noch die Beitraege auf die Kapitalleistung.
     const r = projiziere(szenario({
       vertraege: [vertrag({
         id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'planer',
       })],
     }));
     const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;
-    expect(zeile.posten.some((x) => x.id === 'bav1')).toBe(false);
+    const posten = zeile.posten.find((x) => x.id === 'bav1');
+    expect(posten?.bruttoJahr ?? 0).toBe(0);
+    expect(posten!.kvPvJahr).toBeGreaterThan(0);
   });
 });

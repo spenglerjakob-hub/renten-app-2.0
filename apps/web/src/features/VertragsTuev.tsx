@@ -48,8 +48,8 @@ export function VertragsTuev({
   const zeile = ergebnis?.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr);
 
   const positionen = useMemo(
-    () => tuevPositionen(szenario, zeile ?? null),
-    [szenario, zeile],
+    () => tuevPositionen(szenario, zeile ?? null, ergebnis?.kapitalauszahlungen ?? []),
+    [szenario, zeile, ergebnis],
   );
 
   return (

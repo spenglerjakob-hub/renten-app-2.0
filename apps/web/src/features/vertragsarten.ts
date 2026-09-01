@@ -33,12 +33,21 @@ export function istKapital(t: VertragsTyp) {
   return t === 'bavKapital' || t === 'prvKapital';
 }
 
+/** Vorgaben der Verrentung, wenn am Vertrag nichts anderes eingetragen ist. */
+export const VERRENTUNG_JAHRE = 25;
+export const VERRENTUNG_RENDITE = 0.02;
+
 /**
- * "Kapitalauszahlung" gibt es nur beim Depot. Bei Ruerup ist eine Kapitalwahl
- * gesetzlich ausgeschlossen (§ 10 EStG verlangt eine lebenslange Rente), bei
- * bAV und privater Rente gibt es dafuer eigene Vertragsarten.
+ * Bei Ruerup ist eine Kapitalwahl gesetzlich ausgeschlossen (§ 10 EStG
+ * verlangt eine lebenslange Rente); laufende Renten haben keinen Kapitalstock
+ * zu verteilen. Deshalb gibt es "Kapitalauszahlung (einmalig)" nur dort, wo
+ * tatsaechlich ein Betrag auf einmal faellig wird: beim Depot und bei den
+ * beiden Kapitalvertragsarten.
  */
-export const STRATEGIEN: Record<'etf' | 'avd' | 'sonst', { wert: Vertrag['strategie']; text: string }[]> = {
+export const STRATEGIEN: Record<
+  'etf' | 'avd' | 'kapital' | 'sonst',
+  { wert: Vertrag['strategie']; text: string }[]
+> = {
   etf: [
     { wert: 'rente', text: 'Als laufende Rente ins Netto' },
     { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
@@ -48,12 +57,25 @@ export const STRATEGIEN: Record<'etf' | 'avd' | 'sonst', { wert: Vertrag['strate
     { wert: 'rente', text: 'Als laufende Rente ins Netto' },
     { wert: 'ignorieren', text: 'Nicht einrechnen' },
   ],
+  kapital: [
+    { wert: 'rente', text: 'Verrentung über feste Jahre' },
+    { wert: 'kapital', text: 'Kapitalauszahlung (einmalig)' },
+    { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
+  ],
   sonst: [
     { wert: 'rente', text: 'Als laufende Rente ins Netto' },
     { wert: 'planer', text: 'Kapital in den Entnahmeplaner' },
     { wert: 'ignorieren', text: 'Nicht einrechnen' },
   ],
 };
+
+/** Welche Strategieliste zu einer Vertragsart gehoert. */
+export function strategieGruppe(t: VertragsTyp): keyof typeof STRATEGIEN {
+  if (t === 'etf') return 'etf';
+  if (t === 'avd') return 'avd';
+  if (istKapital(t)) return 'kapital';
+  return 'sonst';
+}
 
 /** Klartext fuer eine Vertragsart, unabhaengig von der Schicht. */
 export function typText(t: VertragsTyp): string {
@@ -66,6 +88,10 @@ export function typText(t: VertragsTyp): string {
 
 /** Klartext fuer die gewaehlte Verwendung. */
 export function strategieText(v: Vertrag): string {
-  const gruppe = v.typ === 'etf' ? 'etf' : v.typ === 'avd' ? 'avd' : 'sonst';
-  return STRATEGIEN[gruppe].find((x) => x.wert === v.strategie)?.text ?? v.strategie;
+  const treffer = STRATEGIEN[strategieGruppe(v.typ)].find((x) => x.wert === v.strategie);
+  if (!treffer) return v.strategie;
+  if (istKapital(v.typ) && v.strategie === 'rente') {
+    return `Verrentung über ${v.entnahmedauer ?? VERRENTUNG_JAHRE} Jahre`;
+  }
+  return treffer.text;
 }

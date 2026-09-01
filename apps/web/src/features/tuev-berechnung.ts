@@ -1,6 +1,7 @@
 import {
   vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
+  type ProjektionsErgebnis,
   type LegalParameters,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
@@ -50,6 +51,12 @@ function jahrAus(datum: string, ersatz: number): number {
 export function tuevPositionen(
   szenario: SzenarioParsed,
   zeile: Jahreszeile | null,
+  /**
+   * Einmalige Kapitalauszahlungen. Sie stehen BEWUSST nicht in der
+   * Jahreszeile — eine Einmalzahlung ist keine laufende Rente. Der TUEV
+   * braucht sie trotzdem, sonst zeigt er bei genau diesen Vertraegen null.
+   */
+  kapitalauszahlungen: ProjektionsErgebnis['kapitalauszahlungen'] = [],
 ): TuevPosition[] {
   const basis = tuevBasis(szenario);
   const jetzt = new Date().getFullYear();
@@ -59,7 +66,12 @@ export function tuevPositionen(
     if (!v) return [];
 
     const posten = zeile?.posten.find((x) => x.id === v.id);
-    const istKapital = v.typ === 'bavKapital' || v.typ === 'prvKapital';
+    // Nicht die Vertragsart entscheidet, sondern die gewaehlte Verwendung:
+    // eine Kapitalauszahlung, die ueber 25 Jahre verrentet wird, liefert in
+    // der Zeitachse eine MONATSRENTE. Wer hier nach der Art fragt, sucht
+    // einen Einmalbetrag, den es nicht gibt, und zeigt 0 EUR an.
+    const einmal = kapitalauszahlungen.find((x) => x.vertragId === v.id);
+    const istKapital = einmal !== undefined;
 
     // Die Auszahlseite kommt VOLLSTAENDIG aus der Projektion — Brutto und
     // Abzuege, nicht nur das Netto. Nur so koennen Bildschirm, Gutachten und
@@ -69,9 +81,12 @@ export function tuevPositionen(
     const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
     const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
 
-    const nettoKapital = istKapital && posten ? posten.nettoJahr : 0;
-    const bruttoKapital = istKapital && posten ? posten.bruttoJahr : 0;
-    const steuerKapital = istKapital && posten ? posten.steuerJahr + posten.kvPvJahr : 0;
+    // Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
+    // Zuflussjahr und die KV/PV auf die Kapitalleistung (§ 229 SGB V, 1/120
+    // ueber 120 Monate). Beide kommen fertig aus dem Rechenkern.
+    const bruttoKapital = einmal?.bruttoKapital ?? 0;
+    const steuerKapital = einmal ? einmal.steuer + einmal.kvPvGesamt : 0;
+    const nettoKapital = einmal ? Math.max(0, einmal.nettoKapital - einmal.kvPvGesamt) : 0;
 
     const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);

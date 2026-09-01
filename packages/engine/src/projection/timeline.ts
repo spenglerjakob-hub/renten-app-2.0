@@ -20,6 +20,7 @@ import { kapitalversicherungErtrag, ansparphase, entnahmeplan } from '../product
 import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
 import { avdAnsparphase, avdAuszahlung } from '../products/altersvorsorgedepot.js';
 import { parseDatum, alterExakt, heute, type Datum } from '../util/datum.js';
+import { euroText } from '../util/text.js';
 
 export interface JahresPosten {
   id: string;
@@ -101,7 +102,19 @@ export interface ProjektionsErgebnis {
   kapitalauszahlungen: {
     vertragId: string; bezeichnung: string; jahr: number;
     bruttoKapital: number; steuer: number; nettoKapital: number;
+    /**
+     * Kranken- und Pflegeversicherung auf die Kapitalleistung ueber die
+     * gesamten 120 Monate (§ 229 Abs. 1 S. 3 SGB V). Sie faellt an, obwohl
+     * der Betrag kein laufendes Einkommen liefert — beim Depot ist sie 0.
+     */
+    kvPvGesamt: number;
   }[];
+  /**
+   * Je Kapitalvertrag mit Strategie "rente": Steuer im Zuflussjahr und die
+   * daraus abgeleitete Monatsrente. Ohne diese Angabe bliebe unsichtbar,
+   * warum aus 300.000 EUR Kapital rund 1.000 EUR im Monat werden.
+   */
+  verrentungen: KapitalVerrentung[];
   /**
    * Je Altersvorsorgedepot Endkapital, Eigenbeitraege und vereinnahmte
    * Zulagen. Ohne diese Angabe bliebe die Foerderung unsichtbar — und genau
@@ -183,7 +196,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   if (personen.length === 0) {
     return {
       zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
-      kapitalauszahlungen: [], avd: [],
+      kapitalauszahlungen: [], verrentungen: [], avd: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
       hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
@@ -257,7 +270,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   // Zirkularitaet vermieden, die entstuende, wenn die Planerentnahme ihre
   // eigene Steuerbemessung mitbestimmte.
   const pRuhestand = parameterFuer(ruhestandsjahr, { indexRate: s.annahmen.tarifIndex });
-  const uebertragenesKapital = planerKapital(s, personen, ruhestandsjahr, pRuhestand);
+  const uebertragenesKapital = planerKapital(s, personen, pRuhestand);
   const planerGesamt = Math.max(0, s.planer.startkapital) + uebertragenesKapital;
 
   const planerBewertung = entnahmeplanBewerten(
@@ -312,11 +325,46 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     }
   }
 
+  // --- Kapitalvertraege als Rente ueber eine feste Zahl von Jahren ---
+  // Wie beim Depot haengt die Rate am Endkapital, also einmal VOR der
+  // Schleife. Die Entnahme ist bereits versteuert und laeuft deshalb nicht
+  // ueber `quellen`, sondern als fertiger Posten in die Jahreszeile.
+  const verrentungen = new Map<string, KapitalVerrentung>();
+  for (const v of s.vertraege) {
+    if (!istKapitalvertrag(v.typ) || v.strategie !== 'rente') continue;
+    const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+    const r = kapitalVerrentung(v, k, personen, s, pRuhestand);
+    if (!r) continue;
+    verrentungen.set(v.id, r);
+    hinweise.push(
+      `${v.name || 'Kapitalauszahlung'}: Von ${euroText(r.bruttoKapital)} Kapital bleiben nach `
+      + `Steuer im Auszahlungsjahr ${euroText(r.nettoKapital)}. Verteilt auf ${r.dauerJahre} Jahre `
+      + `ergibt das bei ${(r.rendite * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} % `
+      + `Rendite ${euroText(r.bruttoMonat)} brutto im Monat.`,
+    );
+  }
+
   // --- Einmalige Kapitalauszahlungen ---
   const kapitalauszahlungen: ProjektionsErgebnis['kapitalauszahlungen'] = [];
   for (const v of s.vertraege) {
-    if (v.typ !== 'etf' || v.strategie !== 'kapital') continue;
+    if (v.strategie !== 'kapital') continue;
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+
+    if (istKapitalvertrag(v.typ)) {
+      const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, pRuhestand);
+      const r = kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, pRuhestand);
+      if (r.bruttoKapital <= 0) continue;
+      kapitalauszahlungen.push({
+        vertragId: v.id,
+        bezeichnung: v.name || 'Kapitalauszahlung',
+        jahr: k.rentenbeginnJahr,
+        ...r,
+        kvPvGesamt: 0,   // wird nach der Jahresschleife aus den Posten gefuellt
+      });
+      continue;
+    }
+
+    if (v.typ !== 'etf') continue;
     const jahreBis = Math.max(0, k.rentenbeginnJahr - jetzt.jahr);
     const r = etfNettoKapital(v, s, pRuhestand, jahreBis);
     if (r.bruttoKapital <= 0) continue;
@@ -325,6 +373,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       bezeichnung: v.name || 'Wertpapierdepot',
       jahr: k.rentenbeginnJahr,
       ...r,
+      kvPvGesamt: 0,   // Depotentnahmen loesen keine Beitraege aus
     });
   }
 
@@ -426,11 +475,19 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
       const r = vertragImJahr(v, k, jahr, s, p, avdLaeufe);
       if (!r) continue;
-      // Vertraege mit Strategie "planer" werden weiter unten als Kapital in
-      // den Auszahlungs-Planer uebertragen; ihr Brutto darf hier nicht
-      // zusaetzlich als laufendes Einkommen erscheinen. Die Beitragspflicht
-      // in der KV/PV bleibt davon unberuehrt.
-      if (v.strategie !== 'planer') {
+      // Zwei Gruppen erscheinen hier NICHT als laufendes Einkommen, sondern
+      // weiter unten als eigener, fertig versteuerter Posten:
+      //
+      //  - Strategie "planer": das Kapital geht in den Auszahlungs-Planer.
+      //  - Kapitalvertraege ueberhaupt: ihr Einmalbetrag wird verrentet,
+      //    einmalig ausgezahlt oder uebertragen — nie als Jahreseinkommen
+      //    gebucht. Genau das war der Fehler, aus dem 25.000 EUR "Rente im
+      //    Monat" wurden.
+      //
+      // Die Beitragspflicht in der KV/PV bleibt davon unberuehrt: § 229
+      // Abs. 1 S. 3 SGB V belastet 1/120 des Betrags ueber 120 Monate,
+      // unabhaengig davon, was der Empfaenger mit dem Geld macht.
+      if (v.strategie !== 'planer' && !istKapitalvertrag(v.typ)) {
         // "avd" waere als Ersatzbezeichnung im Kassenbon nicht lesbar; die
         // uebrigen Kuerzel sind wenigstens Woerter.
         const bezeichnung = v.name || (v.typ === 'avd' ? 'Altersvorsorgedepot' : v.typ);
@@ -568,6 +625,52 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       });
     }
 
+    // --- Kapitalvertraege als eigene Posten ---
+    //
+    // Das Kapital ist im Zuflussjahr bereits tariflich versteuert; die
+    // laufende Entnahme traegt nur noch die Abgeltungsteuer auf ihren
+    // Ertragsanteil. Sie laeuft deshalb nicht ueber `quellen`.
+    //
+    // Die KV/PV kommt aus `kv.jeQuelle` — NICHT aus dem Restbetrag `offen`.
+    // Sonst wuerde sie nach Bruttoanteil auf die uebrigen Einkuenfte verteilt,
+    // und der gerade beseitigte Verteilungsschluessel kaeme durch die
+    // Hintertuer zurueck.
+    // Auch Vertraege mit Strategie "planer" und "kapital" kommen hier vorbei:
+    // sie liefern kein laufendes Einkommen, tragen aber ihre Beitraege. Ohne
+    // einen Posten dafuer stimmte die Summe der Posten nicht mehr mit
+    // `kvPvGesamt` ueberein, und zehn Jahre Beitragspflicht verschwaenden
+    // lautlos aus der Rechnung.
+    for (const v of s.vertraege) {
+      if (!istKapitalvertrag(v.typ) || v.strategie === 'ignorieren') continue;
+      const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
+      if (jahr < k.rentenbeginnJahr) continue;
+
+      const kvPvVertrag = jeQuelle.get(v.id) ?? 0;
+      const e = verrentungen.get(v.id);
+      const jahreSeitRente = jahr - k.rentenbeginnJahr;
+      const laeuft = e !== undefined && jahreSeitRente < e.dauerJahre;
+
+      // Nach dem Ende der Verrentung kann noch Beitragspflicht bestehen: die
+      // 120 Monate des § 229 SGB V laufen unabhaengig von der Entnahmedauer.
+      if (!laeuft && kvPvVertrag <= 0) continue;
+
+      const bruttoJahr = laeuft ? e.bruttoMonat * 12 : 0;
+      const steuerJahr = laeuft ? e.steuerJahr : 0;
+      const name = v.name || 'Kapitalauszahlung';
+      posten.push({
+        id: v.id,
+        // Ohne den Zusatz staende eine Zeile mit 0 EUR Brutto und einem
+        // Beitragsabzug da, ohne dass erkennbar waere warum.
+        bezeichnung: laeuft ? name : `${name} (Beiträge auf die Kapitalleistung)`,
+        schicht: v.schicht,
+        bruttoJahr,
+        zveBeitrag: 0,
+        kvPvJahr: kvPvVertrag,
+        steuerJahr,
+        nettoJahr: bruttoJahr - steuerJahr - kvPvVertrag,
+      });
+    }
+
     // --- Auszahlungs-Planer als eigener Posten in Schicht 3 ---
     // Die Entnahme unterliegt der Abgeltungsteuer und wird deshalb NICHT in
     // den Tarif des Haushalts eingerechnet, sondern fertig versteuert
@@ -614,6 +717,19 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     });
   }
 
+  // Beitraege auf eine Kapitalleistung ueber alle Jahre aufsummieren.
+  //
+  // Sie fallen zehn Jahre lang an, obwohl der Betrag kein laufendes Einkommen
+  // liefert. Ohne diese Summe zeigte der Vertrags-TUEV einen Einmalbetrag,
+  // von dem nur die Steuer abgezogen waere — bei 300.000 EUR sind das mehrere
+  // zehntausend Euro Unterschied.
+  for (const a of kapitalauszahlungen) {
+    a.kvPvGesamt = zeilen.reduce(
+      (sum, z) => sum + (z.posten.find((x) => x.id === a.vertragId)?.kvPvJahr ?? 0),
+      0,
+    );
+  }
+
   return {
     zeilen,
     ruhestandsjahr,
@@ -630,93 +746,203 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       bruttoMonat: e.bruttoProJahr / 12,
     })),
     kapitalauszahlungen,
+    verrentungen: [...verrentungen.values()],
     avd: [...avdLaeufe.values()],
     hinweise,
   };
 }
 
+/** Vertragsarten, die als Einmalbetrag faellig werden statt als laufende Rente. */
+export function istKapitalvertrag(typ: Vertrag['typ']): boolean {
+  return typ === 'bavKapital' || typ === 'prvKapital';
+}
+
 /**
- * NETTO-Kapital, das aus Vertraegen mit Strategie "planer" in den
- * Auszahlungs-Planer fliesst.
+ * Uebriges zu versteuerndes Einkommen eines Jahres aus Schicht 1.
  *
- * Die Steuer wird auf Basis des uebrigen Renteneinkommens des
- * Ruhestandsjahres ermittelt — ohne die Planerentnahme selbst, weil diese
- * sonst ihre eigene Bemessungsgrundlage mitbestimmen wuerde.
+ * Dient als Bemessungsgrundlage fuer die Steuer auf eine Kapitalauszahlung —
+ * ohne die Auszahlung selbst und ohne die daraus gespeiste Entnahme, weil
+ * diese sonst ihre eigene Bemessungsgrundlage mitbestimmten.
  */
-function planerKapital(
+function zveBasisImJahr(
   s: Szenario,
   personen: PersonKontext[],
-  ruhestandsjahr: number,
+  jahr: number,
   p: ReturnType<typeof parameterFuer>,
 ): number {
-  const kandidaten = s.vertraege.filter((v) => v.strategie === 'planer');
-  if (kandidaten.length === 0) return 0;
-
-  // Uebriges zvE des Ruhestandsjahres aus Schicht 1.
-  const zveBasis = personen.reduce((sum, k) => {
-    if (ruhestandsjahr < k.rentenbeginnJahr) return sum;
-    const brutto = bezugImJahr(k, ruhestandsjahr, s.annahmen.rentendynamik);
+  return personen.reduce((sum, k) => {
+    if (jahr < k.rentenbeginnJahr) return sum;
+    const brutto = bezugImJahr(k, jahr, s.annahmen.rentendynamik);
     const wk = k.istVersorgungsbezug
       ? p.pauschbetraege.versorgungsbezuege
       : p.pauschbetraege.renten;
     return sum + Math.max(0, brutto - k.freibetrag.jahresbetrag - wk);
   }, 0);
+}
 
-  const kistSatz = s.haushalt.kirchensteuer ? kirchensteuersatz(s.haushalt.bundesland) : 0;
+/**
+ * Was von einer Kapitalauszahlung nach Steuer uebrig bleibt.
+ *
+ * Die Steuer faellt IM ZUFLUSSJAHR an: bei der bAV auf den vollen Betrag
+ * (§ 22 Nr. 5 EStG), bei der Kapitalwahl einer privaten Rentenversicherung
+ * auf den Unterschiedsbetrag (§ 20 Abs. 1 Nr. 6 EStG). Sie laesst sich nicht
+ * dadurch strecken, dass man das Geld ueber Jahre ausgibt. Verrentet,
+ * uebertragen oder ausgezahlt wird deshalb immer der NETTObetrag.
+ *
+ * Diese Rechnung stand bisher nur in planerKapital. Verrentung und
+ * Einmalauszahlung brauchen dieselbe — drei Kopien liefen unweigerlich
+ * auseinander.
+ */
+function kapitalNachSteuer(
+  v: Vertrag,
+  k: PersonKontext,
+  s: Szenario,
+  zveBasis: number,
+  jahr: number,
+  p: ReturnType<typeof parameterFuer>,
+): { bruttoKapital: number; steuer: number; nettoKapital: number } {
+  const brutto = Math.max(0, v.brutto);
+  const leer = { bruttoKapital: 0, steuer: 0, nettoKapital: 0 };
+  if (brutto === 0) return leer;
+
+  if (v.typ === 'bavKapital') {
+    const { steuer } = bavKapitalSteuer(
+      {
+        kapital: brutto,
+        zveBasis,
+        verheiratet: s.haushalt.verheiratet,
+        kirchensteuersatz: s.haushalt.kirchensteuer ? kirchensteuersatz(s.haushalt.bundesland) : 0,
+        altzusageVor2005: v.altvertrag,
+        fuenftelregelungAnwenden: false,
+      },
+      p,
+    );
+    return { bruttoKapital: brutto, steuer, nettoKapital: Math.max(0, brutto - steuer) };
+  }
+
+  if (v.typ === 'prvKapital') {
+    const beginnJahr = v.beginnJahr ?? jahr - 12;
+    const e = kapitalversicherungErtrag({
+      auszahlung: brutto,
+      eingezahlteBeitraege: (v.monatsbeitrag ?? 0) * 12 * Math.max(0, jahr - beginnJahr),
+      vertragsbeginnJahr: beginnJahr,
+      auszahlungsJahr: jahr,
+      alterBeiAuszahlung: k.alterBeiRentenbeginn,
+      fondsgebunden: false,
+      altvertragVor2005: v.altvertrag,
+    });
+    const steuer = zusatzsteuer(
+      zveBasis,
+      e.steuerpflichtigerAnteil,
+      {
+        verheiratet: s.haushalt.verheiratet,
+        bundesland: s.haushalt.bundesland,
+        kirchensteuerpflichtig: s.haushalt.kirchensteuer,
+      },
+      p,
+    );
+    return { bruttoKapital: brutto, steuer, nettoKapital: Math.max(0, brutto - steuer) };
+  }
+
+  return leer;
+}
+
+/**
+ * NETTO-Kapital, das aus Vertraegen mit Strategie "planer" in den
+ * Auszahlungs-Planer fliesst.
+ */
+function planerKapital(
+  s: Szenario,
+  personen: PersonKontext[],
+  p: ReturnType<typeof parameterFuer>,
+): number {
+  const kandidaten = s.vertraege.filter((v) => v.strategie === 'planer');
+  if (kandidaten.length === 0) return 0;
 
   let summe = 0;
   for (const v of kandidaten) {
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personen[0]!;
 
-    if (v.typ === 'bavKapital') {
-      const { steuer } = bavKapitalSteuer(
-        {
-          kapital: Math.max(0, v.brutto),
-          zveBasis,
-          verheiratet: s.haushalt.verheiratet,
-          kirchensteuersatz: kistSatz,
-          altzusageVor2005: v.altvertrag,
-          fuenftelregelungAnwenden: false,
-        },
-        p,
-      );
-      summe += Math.max(0, v.brutto - steuer);
-      continue;
-    }
-
-    if (v.typ === 'prvKapital') {
-      const auszahlung = Math.max(0, v.brutto);
-      if (auszahlung === 0) continue;
-      const beginnJahr = v.beginnJahr ?? ruhestandsjahr - 12;
-      const e = kapitalversicherungErtrag({
-        auszahlung,
-        eingezahlteBeitraege: (v.monatsbeitrag ?? 0) * 12 * Math.max(0, ruhestandsjahr - beginnJahr),
-        vertragsbeginnJahr: beginnJahr,
-        auszahlungsJahr: ruhestandsjahr,
-        alterBeiAuszahlung: k.alterBeiRentenbeginn,
-        fondsgebunden: false,
-        altvertragVor2005: v.altvertrag,
-      });
-      const steuer = zusatzsteuer(
-        zveBasis,
-        e.steuerpflichtigerAnteil,
-        {
-          verheiratet: s.haushalt.verheiratet,
-          bundesland: s.haushalt.bundesland,
-          kirchensteuerpflichtig: s.haushalt.kirchensteuer,
-        },
-        p,
-      );
-      summe += Math.max(0, auszahlung - steuer);
+    if (istKapitalvertrag(v.typ)) {
+      const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, p);
+      summe += kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, p).nettoKapital;
       continue;
     }
 
     if (v.typ === 'etf') {
-      const jahreBis = Math.max(0, ruhestandsjahr - new Date().getFullYear());
+      const jahreBis = Math.max(0, k.rentenbeginnJahr - new Date().getFullYear());
       summe += etfNettoKapital(v, s, p, jahreBis).nettoKapital;
     }
   }
   return summe;
+}
+
+export interface KapitalVerrentung {
+  vertragId: string;
+  /** Erstes Jahr der Verrentung — das Rentenjahr des Inhabers */
+  startjahr: number;
+  bruttoKapital: number;
+  /** Steuer im Zuflussjahr. Faellt EINMAL an, nicht in jedem Rentenjahr. */
+  steuerEinmal: number;
+  nettoKapital: number;
+  dauerJahre: number;
+  rendite: number;
+  /** Monatliche Bruttoentnahme aus dem versteuerten Kapital */
+  bruttoMonat: number;
+  /** Abgeltungsteuer auf den Ertragsanteil der Jahresentnahme */
+  steuerJahr: number;
+}
+
+/**
+ * Kapitalauszahlung als Rente ueber eine feste Zahl von Jahren.
+ *
+ * BEFUND: Bis hierher gab es diesen Weg ueberhaupt nicht. Ein Vertrag mit
+ * Kapitalauszahlung und Strategie "rente" buchte den GESAMTEN Betrag als
+ * Jahresbrutto eines einzigen Jahres. Jede Anzeige teilt einen Jahresbetrag
+ * durch zwoelf — aus 300.000 EUR Kapital wurden 25.000 EUR "Rente im Monat".
+ *
+ * Richtig ist: das Kapital wird im Zuflussjahr versteuert, und was uebrig
+ * bleibt, wird ueber `entnahmedauer` Jahre aufgezehrt. Die Rechnung dafuer
+ * liegt seit dem ersten Commit im Rechenkern (`entnahmeplanBewerten`), war
+ * aber nur ueber den globalen Auszahlungs-Planer erreichbar.
+ */
+function kapitalVerrentung(
+  v: Vertrag,
+  k: PersonKontext,
+  personen: PersonKontext[],
+  s: Szenario,
+  p: ReturnType<typeof parameterFuer>,
+): KapitalVerrentung | null {
+  const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, p);
+  const kapital = kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, p);
+  if (kapital.nettoKapital <= 0) return null;
+
+  const dauerJahre = Math.max(1, Math.round(v.entnahmedauer ?? 25));
+  const rendite = v.renditeEntnahme ?? 0.02;
+  const e = entnahmeplanBewerten(
+    {
+      kapital: kapital.nettoKapital,
+      dauerJahre,
+      rendite,
+      dynamik: 0,
+      kirchensteuerpflichtig: s.haushalt.kirchensteuer,
+      bundesland: s.haushalt.bundesland,
+    },
+    p,
+  );
+  if (e.bruttoMonat <= 0) return null;
+
+  return {
+    vertragId: v.id,
+    startjahr: k.rentenbeginnJahr,
+    bruttoKapital: kapital.bruttoKapital,
+    steuerEinmal: kapital.steuer,
+    nettoKapital: kapital.nettoKapital,
+    dauerJahre,
+    rendite,
+    bruttoMonat: e.bruttoMonat,
+    steuerJahr: e.steuerJahr,
+  };
 }
 
 /**

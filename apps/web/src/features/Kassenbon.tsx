@@ -69,13 +69,11 @@ function SchichtBlock({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, kaufkraftHeute, ohneTitel = false,
+  ergebnis, zeile, kaufkraftHeute,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
   kaufkraftHeute: boolean;
-  /** Im Gutachten steht die Ueberschrift schon im Seitenkopf. */
-  ohneTitel?: boolean;
 }) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
@@ -106,14 +104,12 @@ export function Kassenbon({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
-      {!ohneTitel && (
-        <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
-          Ihr Haushalts-Netto im Jahr {zeile.jahr}
-          <span className="ml-2 font-normal text-slate-500">
-            {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
-          </span>
-        </h2>
-      )}
+      <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
+        Ihr Haushalts-Netto im Jahr {zeile.jahr}
+        <span className="ml-2 font-normal text-slate-500">
+          {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
+        </span>
+      </h2>
 
       {/* Gestapelter Fortschrittsbalken */}
       <div className="mb-5 sm:mb-6">
@@ -191,8 +187,14 @@ export function Kassenbon({
                 </div>
                 <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[9px] text-slate-500 sm:text-[10px]">
                   <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
+                  {/*
+                    NICHT "Abgeltungsteuer": beim Depot stimmt das, bei einer
+                    bAV-Kapitalleistung faellt die tarifliche Einkommensteuer
+                    an (§ 22 Nr. 5 EStG), bei der privaten Kapitalwahl je nach
+                    Laufzeit das eine oder das andere.
+                  */}
                   <span className="text-rose-500">
-                    Abgeltungsteuer: {euro(a.steuer * kaufkraft(a.jahr))}
+                    Steuer: {euro(a.steuer * kaufkraft(a.jahr))}
                   </span>
                 </div>
               </div>

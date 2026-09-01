@@ -6,11 +6,11 @@ import {
 import type { SzenarioParsed } from '../store/szenario';
 import { euro } from '../components/Feld';
 import { Logo } from '../components/Logo';
-import { Kassenbon } from '../features/Kassenbon';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
+import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
 import { RuhestandVerlauf } from './RuhestandVerlauf';
 import { Kaufkraft } from './Kaufkraft';
@@ -53,7 +53,7 @@ export function Gutachten({
   );
 
   const positionen = useMemo(
-    () => tuevPositionen(szenario, ergebnis ? zeile : null),
+    () => tuevPositionen(szenario, ergebnis ? zeile : null, ergebnis?.kapitalauszahlungen ?? []),
     [szenario, ergebnis, zeile],
   );
 
@@ -176,9 +176,12 @@ export function Gutachten({
       <Vertragsliste szenario={szenario} />
 
       {ergebnis && (
-        <Seite titel={`Ihre Renteneinkünfte im Jahr ${zeile.jahr}`} nummer="Woraus sich das Netto zusammensetzt">
-          <Kassenbon ergebnis={ergebnis} zeile={zeile} kaufkraftHeute={false} ohneTitel />
-        </Seite>
+        <Renteneinkuenfte
+          ergebnis={ergebnis}
+          zeile={zeile}
+          zielNettoHeute={h.zielNettoHeute}
+          inflation={szenario.annahmen.inflation}
+        />
       )}
 
       <RuhestandVerlauf zeilen={fenster} />

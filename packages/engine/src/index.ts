@@ -74,9 +74,9 @@ export {
 
 // Projektion
 export {
-  projiziere,
+  projiziere, istKapitalvertrag,
   type Jahreszeile, type JahresPosten, type ProjektionsErgebnis, type PlanerErgebnis,
-  type AvdLauf,
+  type AvdLauf, type KapitalVerrentung,
 } from './projection/timeline.js';
 
 // Datum

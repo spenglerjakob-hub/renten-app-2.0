@@ -4,6 +4,7 @@ import { zusatzsteuer } from '../tax/haushalt.js';
 import { riesterZulagen, riesterZulagenkuerzung } from '../products/bav.js';
 import { avdZulagen, avdSteuervorteil } from '../products/altersvorsorgedepot.js';
 import { kennzahlen } from './kennzahlen.js';
+import { euroText } from '../util/text.js';
 
 /**
  * VERTRAGS-TUEV
@@ -171,9 +172,36 @@ export interface TuevErgebnis {
 const STEUER_FREI_QUOTE = 0.08;
 const SV_FREI_QUOTE = 0.04;
 
-/** Betrag als Text fuer die Hinweise — die Oberflaeche formatiert sonst selbst. */
-function euroText(n: number): string {
-  return `${Math.round(n).toLocaleString('de-DE')} €`;
+/** Vorgabe der Auszahldauer, wenn am Vertrag nichts eingetragen ist. */
+const AUSZAHLDAUER_VORGABE = 25;
+
+/**
+ * Vertragsarten, deren Auszahlung ein AUSZAHLPLAN ist und keine lebenslange
+ * Rente: Depot, Altersvorsorgedepot und die verrentete Kapitalauszahlung.
+ */
+function istAuszahlplan(typ: Vertrag['typ']): boolean {
+  return typ === 'etf' || typ === 'avd' || typ === 'bavKapital' || typ === 'prvKapital';
+}
+
+/**
+ * Wie viele Jahre lang gezahlt wird.
+ *
+ * Eine lebenslange Rente laeuft bis zur angenommenen Lebenserwartung. Ein
+ * Auszahlplan laeuft eine FESTE Zahl von Jahren und ist danach zu Ende — wer
+ * ihn ueber die Lebenserwartung rechnet, schreibt ihm Zahlungen zu, die es
+ * nicht mehr gibt, und die Rendite faellt zu hoch aus. Umgekehrt zaehlt ein
+ * Plan, der ueber die Lebenserwartung hinausreicht, nur bis dorthin: was nach
+ * dem Tod ausgezahlt wuerde, kommt beim Vertragsinhaber nicht mehr an.
+ */
+function auszahlungsdauer(
+  v: Vertrag,
+  a: TuevAnnahmen,
+  k: TuevKontext,
+): number {
+  const bisLebensende = Math.max(1, Math.round(a.lebenserwartung - k.alterBeiRentenbeginn));
+  if (!istAuszahlplan(v.typ)) return bisLebensende;
+  const fest = Math.max(1, Math.round(v.entnahmedauer ?? AUSZAHLDAUER_VORGABE));
+  return Math.min(bisLebensende, fest);
 }
 
 /**
@@ -225,10 +253,7 @@ export function vertragsTuev(
   };
 
   const jahreEinzahlung = Math.max(1, k.rentenbeginnJahr - a.beginnJahr);
-  const jahreAuszahlung = Math.max(
-    1,
-    Math.round(a.lebenserwartung - k.alterBeiRentenbeginn),
-  );
+  const jahreAuszahlung = auszahlungsdauer(v, a, k);
 
   const svQuote = svErsparnisQuote(k.jahresbrutto, k.beamter, p);
   if (svQuote === 0 && v.typ.startsWith('bav')) {
