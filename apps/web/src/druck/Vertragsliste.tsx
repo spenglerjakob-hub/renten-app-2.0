@@ -2,6 +2,7 @@ import type { ProjektionsErgebnis, Vertrag } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { SCHICHT_TITEL, typText, strategieText, istKapital } from '../features/vertragsarten';
+import { personNameAus } from '../features/personen';
 import { Untertitel, Tabelle, Zeile, Gruppenzeile, Hinweiszeile, Text } from './Bausteine';
 
 /**
@@ -82,7 +83,7 @@ export function Vertragsliste({
           'Eckdaten',
           'Verwendung',
         ]}
-        spalten={verheiratet ? [24, 8, 15, 30, 23] : [26, 16, 32, 26]}
+        spalten={verheiratet ? [22, 14, 14, 27, 23] : [26, 16, 32, 26]}
         textSpalten={verheiratet ? [1, 2, 3, 4] : [1, 2, 3]}
       >
         {([1, 2, 3] as const).flatMap((schicht) => {
@@ -98,7 +99,7 @@ export function Vertragsliste({
                     <span className="font-semibold">{v.name || 'ohne Bezeichnung'}</span>
                     <span className="block text-slate-500">{typText(v.typ)}</span>
                   </>,
-                  ...(verheiratet ? [v.inhaber] : []),
+                  ...(verheiratet ? [personNameAus(szenario.personen, v.inhaber)] : []),
                   betragText(v),
                   detailText(v),
                   strategieText(v),

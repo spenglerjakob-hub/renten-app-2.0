@@ -2,6 +2,7 @@ import { avdKinderzulageBis, type AvdParameter } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Untertitel, Angabe, Zweispaltig, Text } from './Bausteine';
+import { personName, personNameAus } from '../features/personen';
 
 const KV_TEXT = {
   kvdr: 'Pflichtversichert (KVdR)',
@@ -79,7 +80,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         .map((p) => (
           <div key={p.id} className="mb-3 break-inside-avoid">
             <div className="mb-1 text-[11px] font-bold text-slate-800">
-              Person {p.id}{p.name ? ` — ${p.name}` : ''}
+              {personName(p)}
             </div>
             <Zweispaltig>
               <Angabe feld="Geburtsdatum" wert={p.geburtsdatum || '—'} />
@@ -97,14 +98,31 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
           </div>
         ))}
 
+      {/*
+        Name UEBER dem Betrag, nicht daneben: ein Name und ein Satz wie
+        "4.000 € Brutto im Monat, 12 Zahlungen" passen in einer halbbreiten
+        Spalte nicht nebeneinander — beide brechen dann um, und aus "Jakob
+        Spengler" werden zwei Zeilen.
+      */}
       <Untertitel>Heutiges Einkommen</Untertitel>
       <Zweispaltig>
-        <Angabe
-          feld={szenario.einkommenGetrennt ? 'Person A' : 'Haushalt'}
-          wert={einkommen(szenario.einkommenHeute)}
-        />
+        <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
+          <div className="text-[11px] text-slate-600">
+            {szenario.einkommenGetrennt ? personNameAus(szenario.personen, 'A') : 'Haushalt'}
+          </div>
+          <div className="text-[11px] font-semibold tabular-nums text-slate-900">
+            {einkommen(szenario.einkommenHeute)}
+          </div>
+        </div>
         {h.verheiratet && szenario.einkommenGetrennt && (
-          <Angabe feld="Person B" wert={einkommen(szenario.einkommenPartner)} />
+          <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
+            <div className="text-[11px] text-slate-600">
+              {personNameAus(szenario.personen, 'B')}
+            </div>
+            <div className="text-[11px] font-semibold tabular-nums text-slate-900">
+              {einkommen(szenario.einkommenPartner)}
+            </div>
+          </div>
         )}
       </Zweispaltig>
 

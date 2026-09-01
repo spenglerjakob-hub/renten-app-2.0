@@ -8,6 +8,7 @@ import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
+import { personNameAus } from '../features/personen';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
@@ -59,8 +60,8 @@ export function Gutachten({
 
   const h = szenario.haushalt;
   const name = h.verheiratet
-    ? `${szenario.personen[0]?.name || 'Person A'} und ${szenario.personen[1]?.name || 'Person B'}`
-    : szenario.personen[0]?.name || 'Person A';
+    ? `${personNameAus(szenario.personen, 'A')} und ${personNameAus(szenario.personen, 'B')}`
+    : personNameAus(szenario.personen, 'A');
 
   const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
   const gedeckt = zeile.zielNettoMonat > 0

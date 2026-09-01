@@ -1,6 +1,7 @@
 import type { TuevPosition } from '../features/tuev-berechnung';
 import { euro, prozent } from '../components/Feld';
 import { typText } from '../features/vertragsarten';
+import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
 import { Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Text } from './Bausteine';
 
@@ -50,7 +51,7 @@ export function TuevBogen({
 
       <Untertitel>Zugrunde gelegt</Untertitel>
       <Zweispaltig>
-        <Angabe feld="Inhaber" wert={`Person ${v.inhaber}`} />
+        <Angabe feld="Inhaber" wert={personNameAus(szenario.personen, v.inhaber)} />
         <Angabe feld="Beitrag im Monat" wert={euro(r.beitragMonat)} />
         {t && t.dynamik !== 0 && (
           <Angabe feld="Beitragsdynamik" wert={`${prozent(t.dynamik)} pro Jahr`} />

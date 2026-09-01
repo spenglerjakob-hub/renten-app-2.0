@@ -11,6 +11,7 @@ import {
   TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, strategieGruppe, typText,
   VERRENTUNG_JAHRE, VERRENTUNG_RENDITE,
 } from './vertragsarten';
+import { personNameAus } from './personen';
 
 /**
  * Die eine Zahl, die eine zugeklappte Karte kenntlich macht.
@@ -36,6 +37,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
   const haushaltsKinder = useSzenario((x) => x.szenario.haushalt.kinder);
+  const personen = useSzenario((x) => x.szenario.personen);
   const tarifIndex = useSzenario((x) => x.szenario.annahmen.tarifIndex);
   const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
   const setzeKind = useSzenario((x) => x.setzeKind);
@@ -103,7 +105,10 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         {verheiratet && (
           <AuswahlFeld label="Inhaber" wert={v.inhaber}
             onChange={(i) => vertragAendern(v.id, { inhaber: i })}
-            optionen={[{ wert: 'A', text: 'Person A' }, { wert: 'B', text: 'Person B' }]} />
+            optionen={[
+              { wert: 'A', text: personNameAus(personen, 'A') },
+              { wert: 'B', text: personNameAus(personen, 'B') },
+            ]} />
         )}
 
         {v.typ !== 'etf' && v.typ !== 'avd' && (

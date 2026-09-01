@@ -5,6 +5,7 @@ import { Rentenschaetzer } from './Rentenschaetzer';
 import { EinkommenFelder } from './EinkommenFelder';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { personName, personNameAus } from './personen';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -20,6 +21,8 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
   // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
   const jetzt = new Date().getFullYear();
   const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: s.annahmen.tarifIndex }).avd;
+
+  const nameVon = (id: string) => personNameAus(s.personen, id);
 
   return (
     <div className="space-y-4">
@@ -89,7 +92,7 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
         </div>
       </Abschnitt>
 
-      <Abschnitt titel={s.einkommenGetrennt ? 'Einkommen — Person A' : 'Heutiges Einkommen'}>
+      <Abschnitt titel={s.einkommenGetrennt ? `Einkommen — ${nameVon('A')}` : 'Heutiges Einkommen'}>
         <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} />
 
         {s.haushalt.verheiratet && (
@@ -109,7 +112,7 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
       </Abschnitt>
 
       {s.haushalt.verheiratet && s.einkommenGetrennt && (
-        <Abschnitt titel="Einkommen — Person B">
+        <Abschnitt titel={`Einkommen — ${nameVon('B')}`}>
           <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} />
         </Abschnitt>
       )}
@@ -122,7 +125,7 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
         "Verheiratet", sind alle Eingaben von Person B noch da.
       */}
       {s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
-        <Abschnitt key={p.id} titel={`Person ${p.id}${p.name ? ` — ${p.name}` : ''}`}>
+        <Abschnitt key={p.id} titel={personName(p)}>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
               platzhalter={`Person ${p.id}`} />

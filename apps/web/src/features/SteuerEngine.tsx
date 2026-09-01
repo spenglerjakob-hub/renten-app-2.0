@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Calculator, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ProjektionsErgebnis, Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
+import { useSzenario } from '../store/szenario';
+import { personNameAus } from './personen';
 
 function Kachel({
   titel, wert, erklaerung, akzent, farbe,
@@ -30,6 +32,10 @@ export function SteuerEngine({
   faktor: number;
 }) {
   const [offen, setOffen] = useState(false);
+  // Der Selektor darf NICHTS erzeugen: `personen` ist eine stabile Referenz,
+  // ein neues Array bei jedem Aufruf hielte zustand fuer eine Aenderung und
+  // rendert endlos (React-Fehler #185, siehe Vertraege.tsx).
+  const personen = useSzenario((x) => x.szenario.personen);
 
   const steuerfrei = ergebnis.freibetraege.reduce((s, x) => s + x.wert.jahresbetrag, 0);
 
@@ -122,7 +128,7 @@ export function SteuerEngine({
             <div className="space-y-2 border-t border-slate-700 pt-3">
               {ergebnis.freibetraege.map((fb) => (
                 <p key={fb.personId} className="text-[10px] leading-relaxed text-slate-400">
-                  <strong className="text-slate-200">Person {fb.personId}:</strong>{' '}
+                  <strong className="text-slate-200">{personNameAus(personen, fb.personId)}:</strong>{' '}
                   {fb.art === 'rente'
                     ? `Rentenfreibetrag ${euro(fb.wert.jahresbetrag)} pro Jahr (Besteuerungsanteil ${prozent(fb.wert.besteuerungsanteil ?? 0, 1)}, Kohorte ${fb.wert.kohortenjahr}).`
                     : `Versorgungsfreibetrag ${euro(fb.wert.jahresbetrag)} pro Jahr inkl. Zuschlag (Kohorte ${fb.wert.kohortenjahr}).`}{' '}
