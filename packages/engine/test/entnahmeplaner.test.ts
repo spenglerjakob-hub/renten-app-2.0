@@ -124,6 +124,19 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     expect(posten!.bruttoJahr).toBeCloseTo(v.bruttoMonat * 12, 6);
   });
 
+  it('haengt den Hinweis an den Vertrag, nicht in den Sammeltopf', () => {
+    // Er erklaert, wo die Differenz zwischen Kapital und Monatsrente
+    // geblieben ist. Im allgemeinen Hinweiskasten waere nicht zu erkennen,
+    // auf welchen Vertrag er sich bezieht.
+    const r = projiziere(szenario({
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
+    }));
+    const zum = r.vertragsHinweise.filter((x) => x.vertragId === 'bav1');
+    expect(zum).toHaveLength(1);
+    expect(zum[0]!.text).toMatch(/Verteilt auf 25 Jahre/);
+    expect(r.hinweise.join(' ')).not.toMatch(/Verteilt auf/);
+  });
+
   it('laesst die Verrentung genau die Entnahmedauer laufen', () => {
     const r = projiziere(szenario({
       vertraege: [vertrag({

@@ -99,9 +99,11 @@ export function Renteneinkuenfte({
           />
         </Zweispaltig>
         <div className="mt-3 flex items-center gap-2">
+          {/* Blau wie auf dem Deckblatt — zwei Farben fuer dieselbe Zahl
+              waeren zwei Aussagen ueber denselben Sachverhalt. */}
           <div className="h-2.5 flex-1 overflow-hidden rounded-full border border-slate-300 bg-white">
             <div
-              className={`h-full ${luecke > 0 ? 'bg-rose-400' : 'bg-emerald-500'}`}
+              className="h-full bg-blue-500"
               style={{ width: `${Math.min(100, Math.max(0, gedeckt))}%` }}
             />
           </div>

@@ -254,7 +254,12 @@ describe('Altersvorsorgedepot als Vertragsart in der Zeitachse', () => {
     // 150 EUR gegen 5 EUR Beitrag sind 30-fach; mit Zulage muss der Abstand
     // noch groesser sein.
     expect(bruttoMit / bruttoOhne).toBeGreaterThan(30);
-    expect(ohne.hinweise.join(' ')).toMatch(/entfällt die Förderung/);
+
+    // Der Hinweis gehoert zu genau DIESEM Vertrag und steht deshalb in
+    // vertragsHinweise, nicht im allgemeinen Sammeltopf.
+    const zumVertrag = ohne.vertragsHinweise.filter((x) => x.vertragId === 'avd1');
+    expect(zumVertrag.map((x) => x.text).join(' ')).toMatch(/entfällt die Förderung/);
+    expect(ohne.hinweise.join(' ')).not.toMatch(/entfällt die Förderung/);
   });
 
   it('zahlt nur ueber die Auszahlungsdauer, danach nicht mehr', () => {

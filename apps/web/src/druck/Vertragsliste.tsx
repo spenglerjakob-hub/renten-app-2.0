@@ -1,8 +1,8 @@
-import type { Vertrag } from '@renten/engine';
+import type { ProjektionsErgebnis, Vertrag } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { SCHICHT_TITEL, typText, strategieText, istKapital } from '../features/vertragsarten';
-import { Seite, Untertitel, Tabelle, Zeile, Gruppenzeile, Text } from './Bausteine';
+import { Untertitel, Tabelle, Zeile, Gruppenzeile, Hinweiszeile, Text } from './Bausteine';
 
 /**
  * Was der Vertrag im Monat kostet bzw. einbringt.
@@ -33,26 +33,42 @@ function detailText(v: Vertrag): string {
 }
 
 /**
- * "Ihre Verträge" — alle drei Schichten in EINER Liste.
+ * "Ihre Vertraege" — alle drei Schichten in EINER Liste.
  *
  * Auf dem Bildschirm liegen sie hinter Reitern, im Dokument steht deshalb
  * immer nur eine Schicht. Fuer das Gutachten wird direkt aus dem Szenario
  * gelesen, nicht aus der Oberflaeche.
+ *
+ * Gibt nur den INHALT zurueck; die Seite baut `Gutachten.tsx` gemeinsam mit
+ * den Angaben.
  */
-export function Vertragsliste({ szenario }: { szenario: SzenarioParsed }) {
+export function Vertragsliste({
+  szenario, hinweise = [],
+}: {
+  szenario: SzenarioParsed;
+  /**
+   * Hinweise je Vertrag aus der Projektion. Sie standen frueher in einem
+   * Sammelkasten auf dem Deckblatt, wo nicht zu erkennen war, worauf sie sich
+   * beziehen.
+   */
+  hinweise?: ProjektionsErgebnis['vertragsHinweise'];
+}) {
   const verheiratet = szenario.haushalt.verheiratet;
+  const spaltenzahl = verheiratet ? 5 : 4;
 
   if (szenario.vertraege.length === 0) {
     return (
-      <Seite titel="Ihre Verträge" nummer="Vorhandene Altersvorsorge">
+      <>
+        <Untertitel>Verträge</Untertitel>
         <Text>Es wurden keine Verträge erfasst. Die Berechnung beruht allein auf der
           gesetzlichen Versorgung.</Text>
-      </Seite>
+      </>
     );
   }
 
   return (
-    <Seite titel="Ihre Verträge" nummer="Vorhandene Altersvorsorge">
+    <>
+      <Untertitel>Verträge</Untertitel>
       {/*
         EINE Tabelle mit Zwischenueberschriften statt drei Tabellen: drei
         Tabellen richten ihre Spalten unabhaengig voneinander aus, und das
@@ -67,18 +83,14 @@ export function Vertragsliste({ szenario }: { szenario: SzenarioParsed }) {
           'Verwendung',
         ]}
         spalten={verheiratet ? [24, 8, 15, 30, 23] : [26, 16, 32, 26]}
-        textSpalten={verheiratet ? [1, 3, 4] : [2, 3]}
+        textSpalten={verheiratet ? [1, 2, 3, 4] : [1, 2, 3]}
       >
         {([1, 2, 3] as const).flatMap((schicht) => {
           const dieser = szenario.vertraege.filter((v) => v.schicht === schicht);
           if (dieser.length === 0) return [];
           return [
-            <Gruppenzeile
-              key={`s${schicht}`}
-              text={SCHICHT_TITEL[schicht]}
-              spalten={verheiratet ? 5 : 4}
-            />,
-            ...dieser.map((v) => (
+            <Gruppenzeile key={`s${schicht}`} text={SCHICHT_TITEL[schicht]} spalten={spaltenzahl} />,
+            ...dieser.flatMap((v) => [
               <Zeile
                 key={v.id}
                 zellen={[
@@ -91,9 +103,14 @@ export function Vertragsliste({ szenario }: { szenario: SzenarioParsed }) {
                   detailText(v),
                   strategieText(v),
                 ]}
-                textSpalten={verheiratet ? [1, 3, 4] : [2, 3]}
-              />
-            )),
+                textSpalten={verheiratet ? [1, 2, 3, 4] : [1, 2, 3]}
+              />,
+              ...hinweise
+                .filter((h) => h.vertragId === v.id)
+                .map((h, i) => (
+                  <Hinweiszeile key={`${v.id}-h${i}`} text={h.text} spalten={spaltenzahl} />
+                )),
+            ]),
           ];
         })}
       </Tabelle>
@@ -114,10 +131,9 @@ export function Vertragsliste({ szenario }: { szenario: SzenarioParsed }) {
       )}
 
       <Text>
-        Angegeben sind die erfassten Vertragsdaten. Renditen und Kosten sind Annahmen; sie sind
-        keine Zusage des Anbieters. Verträge mit der Verwendung „Nicht einrechnen“ bleiben im
-        Ergebnis unberücksichtigt.
+        Renditen und Kosten sind Annahmen, keine Zusage des Anbieters. Verträge mit der Verwendung
+        „Nicht einrechnen“ bleiben im Ergebnis unberücksichtigt.
       </Text>
-    </Seite>
+    </>
   );
 }

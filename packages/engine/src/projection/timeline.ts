@@ -121,7 +121,17 @@ export interface ProjektionsErgebnis {
    * sie ist der Grund, ueberhaupt ein gefoerdertes Depot zu waehlen.
    */
   avd: AvdLauf[];
+  /**
+   * Allgemeine Hinweise zur Rechnung — genaeherte Besoldung, fehlendes Datum.
+   * Sie gehoeren zu keinem einzelnen Vertrag.
+   */
   hinweise: string[];
+  /**
+   * Hinweise, die zu genau EINEM Vertrag gehoeren. Getrennt gefuehrt, damit
+   * sie im Gutachten unter dem betreffenden Vertrag stehen koennen statt in
+   * einem Sammelkasten, in dem niemand erkennt, worauf sie sich beziehen.
+   */
+  vertragsHinweise: { vertragId: string; text: string }[];
 }
 
 interface PersonKontext {
@@ -187,6 +197,7 @@ function bezugImJahr(k: PersonKontext, jahr: number, dynamik: number): number {
 export function projiziere(s: Szenario): ProjektionsErgebnis {
   const jetzt = heute();
   const hinweise: string[] = [];
+  const vertragsHinweise: ProjektionsErgebnis['vertragsHinweise'] = [];
 
   const personen = s.personen
     .filter((p) => p.id === 'A' || s.haushalt.verheiratet)
@@ -196,7 +207,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   if (personen.length === 0) {
     return {
       zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
-      kapitalauszahlungen: [], verrentungen: [], avd: [],
+      kapitalauszahlungen: [], verrentungen: [], avd: [], vertragsHinweise: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
       hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
@@ -321,7 +332,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const lauf = avdLauf(v, k, jahreBis, jetzt.jahr, s, pRuhestand);
     avdLaeufe.set(v.id, lauf);
     for (const h of lauf.hinweise) {
-      hinweise.push(`${v.name || 'Altersvorsorgedepot'}: ${h}`);
+      vertragsHinweise.push({ vertragId: v.id, text: h });
     }
   }
 
@@ -336,12 +347,13 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const r = kapitalVerrentung(v, k, personen, s, pRuhestand);
     if (!r) continue;
     verrentungen.set(v.id, r);
-    hinweise.push(
-      `${v.name || 'Kapitalauszahlung'}: Von ${euroText(r.bruttoKapital)} Kapital bleiben nach `
-      + `Steuer im Auszahlungsjahr ${euroText(r.nettoKapital)}. Verteilt auf ${r.dauerJahre} Jahre `
-      + `ergibt das bei ${(r.rendite * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} % `
-      + `Rendite ${euroText(r.bruttoMonat)} brutto im Monat.`,
-    );
+    vertragsHinweise.push({
+      vertragId: v.id,
+      text: `Von ${euroText(r.bruttoKapital)} Kapital bleiben nach Steuer im Auszahlungsjahr `
+        + `${euroText(r.nettoKapital)}. Verteilt auf ${r.dauerJahre} Jahre ergibt das bei `
+        + `${(r.rendite * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} % Rendite `
+        + `${euroText(r.bruttoMonat)} brutto im Monat.`,
+    });
   }
 
   // --- Einmalige Kapitalauszahlungen ---
@@ -749,6 +761,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     verrentungen: [...verrentungen.values()],
     avd: [...avdLaeufe.values()],
     hinweise,
+    vertragsHinweise,
   };
 }
 

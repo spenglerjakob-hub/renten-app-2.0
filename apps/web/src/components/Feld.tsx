@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
 
@@ -22,7 +22,15 @@ export function ZahlFeld(props: {
   id?: string;
 }) {
   const { label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe } = props;
-  const id = props.id ?? `f-${label.replace(/\W+/g, '-').toLowerCase()}`;
+  /*
+    Die Kennung kam frueher aus der BESCHRIFTUNG. Steht dieselbe Beschriftung
+    zweimal auf der Seite — zwei Vertragskarten, Person A und Person B —,
+    tragen zwei Bedienelemente dieselbe id; `label for` zeigt dann auf das
+    erste, und ein Klick auf die zweite Beschriftung springt in das falsche
+    Feld. `useId` gibt jeder Einbindung ihre eigene.
+  */
+  const eigen = useId();
+  const id = props.id ?? `f${eigen}`;
   const [text, setText] = useState(String(wert).replace('.', ','));
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -87,7 +95,7 @@ export function TextFeld(props: {
   label: string; wert: string; onChange: (s: string) => void;
   platzhalter?: string; fehler?: string | null;
 }) {
-  const id = `t-${props.label.replace(/\W+/g, '-').toLowerCase()}`;
+  const id = `t${useId()}`;
   return (
     <div>
       <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
@@ -130,7 +138,7 @@ export function DatumFeld(props: {
   hilfe?: ReactNode;
   zusatz?: ReactNode;
 }) {
-  const id = `d-${props.label.replace(/\W+/g, '-').toLowerCase()}`;
+  const id = `d${useId()}`;
 
   const anzeige = (roh: string) => {
     const d = parseDatum(roh);
@@ -205,7 +213,7 @@ export function AuswahlFeld<T extends string>(props: {
   label: string; wert: T; onChange: (v: T) => void;
   optionen: readonly { wert: T; text: string }[];
 }) {
-  const id = `s-${props.label.replace(/\W+/g, '-').toLowerCase()}`;
+  const id = `s${useId()}`;
   return (
     <div>
       <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
@@ -222,7 +230,7 @@ export function AuswahlFeld<T extends string>(props: {
 }
 
 export function Schalter(props: { label: string; wert: boolean; onChange: (b: boolean) => void }) {
-  const id = `c-${props.label.replace(/\W+/g, '-').toLowerCase()}`;
+  const id = `c${useId()}`;
   return (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
       <input

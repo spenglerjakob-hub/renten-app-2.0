@@ -1,7 +1,7 @@
 import { avdKinderzulageBis, type AvdParameter } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
-import { Seite, Untertitel, Angabe, Zweispaltig, Text } from './Bausteine';
+import { Untertitel, Angabe, Zweispaltig, Text } from './Bausteine';
 
 const KV_TEXT = {
   kvdr: 'Pflichtversichert (KVdR)',
@@ -15,6 +15,10 @@ const EINKOMMEN_TEXT = { brutto: 'Brutto', netto: 'Netto', besoldung: 'Besoldung
 
 /**
  * "Ihre Angaben" — die Eingaben, mit denen gerechnet wurde.
+ *
+ * Gibt nur den INHALT zurueck, keine eigene Seite: Angaben und Vertraege
+ * fuellen je fuer sich keine A4-Seite und stehen deshalb gemeinsam auf einer.
+ * Die Seite baut `Gutachten.tsx`.
  *
  * Das fehlte dem Ausdruck bisher vollstaendig: die Eingabespalte ist im Druck
  * ausgeblendet, und die Vertraege stecken zusaetzlich hinter Reitern, sodass
@@ -32,7 +36,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
       : `${euro(e.betrag)} ${EINKOMMEN_TEXT[e.modus]} im Monat, ${e.auszahlungen} Zahlungen`;
 
   return (
-    <Seite titel="Ihre Angaben" nummer="Grundlage der Berechnung">
+    <>
       <Untertitel>Haushalt</Untertitel>
       <Zweispaltig>
         <Angabe feld="Familienstand" wert={h.verheiratet ? 'Verheiratet (Splitting)' : 'Alleinstehend'} />
@@ -42,7 +46,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         {h.kvStatus === 'pkv' && (
           <Angabe feld="PKV-Beitrag" wert={`${euro(h.pkvPraemieMonat)} im Monat`} />
         )}
-        <Angabe feld="Gewünschtes Netto (heutige Kaufkraft)" wert={`${euro(h.zielNettoHeute)} im Monat`} />
+        <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
       </Zweispaltig>
 
       {h.kinder.length > 0 && (
@@ -117,6 +121,6 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         halbiert die Kaufkraft rund 25 Jahre früher. Erstellt am{' '}
         {new Date().toLocaleDateString('de-DE')}; die Rechtslage ist die von {jetzt}.
       </Text>
-    </Seite>
+    </>
   );
 }

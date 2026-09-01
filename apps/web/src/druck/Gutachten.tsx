@@ -4,7 +4,7 @@ import {
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
-import { euro } from '../components/Feld';
+import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
@@ -67,9 +67,16 @@ export function Gutachten({
     ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
     : 100;
 
+  // Dieselben drei Groessen in heutiger Kaufkraft. Der Kaufkraftfaktor der
+  // Zeile rechnet einen Betrag des Rentenjahres auf das heutige Preisniveau
+  // zurueck; gerechnet wird also nichts Neues.
+  const heute = (n: number) => n / zeile.kaufkraftfaktor;
+  const bedarfHeute = h.zielNettoHeute;
+  const nettoHeute = heute(zeile.nettoMonat);
+  const lueckeHeute = Math.max(0, bedarfHeute - nettoHeute);
+
   const abschnitte = [
-    'Ihre Angaben',
-    'Ihre Verträge',
+    'Ihre Angaben und Verträge',
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
     'Ihre Einkünfte im Ruhestand',
     'Dieselben Zahlen in heutiger Kaufkraft',
@@ -97,11 +104,47 @@ export function Gutachten({
           Erstellt am {new Date().toLocaleDateString('de-DE')}
         </p>
 
-        <div className="mt-6 grid grid-cols-3 gap-4">
+        {/*
+          ZUERST ohne, dann mit Inflation.
+          Wer nur die hochgerechneten Betraege sieht, hat keinen Bezugspunkt:
+          4.594 EUR Bedarf im Jahr 2068 wirken willkuerlich hoch, solange
+          daneben nicht stehen, dass es dieselben 2.000 EUR von heute sind.
+        */}
+        <Untertitel>Heute — in der Kaufkraft, die Sie kennen</Untertitel>
+        <div className="grid grid-cols-3 gap-4 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+          {[
+            { titel: 'Gewünschtes Netto', wert: bedarfHeute },
+            { titel: 'Erwartetes Netto', wert: nettoHeute },
+            {
+              titel: lueckeHeute > 0 ? 'Es fehlen' : 'Darüber hinaus',
+              wert: lueckeHeute > 0 ? lueckeHeute : nettoHeute - bedarfHeute,
+            },
+          ].map((x) => (
+            <div key={x.titel}>
+              <div className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                {x.titel}
+              </div>
+              <div className="text-base font-black tabular-nums text-slate-900">
+                {euro(Math.abs(x.wert))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Text>
+          Bis zu Ihrem Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}
+          <strong>{prozent(szenario.annahmen.inflation)}</strong> Inflation im Jahr. Deshalb stehen
+          in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
+          Rentenjahres statt im Geld von heute. Wie sich beide Maßstäbe über den ganzen Ruhestand
+          entwickeln, zeigt die Seite „Dieselben Zahlen in heutiger Kaufkraft“.
+        </Text>
+
+        <Untertitel>Im Jahr {zeile.jahr} — mit Inflation gerechnet</Untertitel>
+        <div className="grid grid-cols-3 gap-4">
           <GrosseZahl
-            titel={`Bedarf im Jahr ${zeile.jahr}`}
+            titel="Bedarf"
             wert={euro(zeile.zielNettoMonat)}
-            hinweis="monatlich, Betrag des Jahres"
+            hinweis={`monatlich, Betrag des Jahres ${zeile.jahr}`}
           />
           <GrosseZahl
             titel="Erwartetes Netto"
@@ -116,44 +159,18 @@ export function Gutachten({
           />
         </div>
 
-        <div className="mt-3 h-3 w-full overflow-hidden rounded-full border border-slate-300 bg-slate-100">
-          <div
-            className={`h-full ${luecke > 0 ? 'bg-rose-400' : 'bg-emerald-500'}`}
-            style={{ width: `${gedeckt}%` }}
-          />
-        </div>
-
-        <Text>
-          {luecke > 0 ? (
-            <>
-              Nach heutigem Stand fehlen Ihnen im Jahr {zeile.jahr} monatlich{' '}
-              <strong>{euro(luecke)}</strong>, um Ihr gewünschtes Netto zu erreichen. Über die
-              Jahre {fenster[0]?.alterA ?? 65} bis {fenster[fenster.length - 1]?.alterA ?? 95}{' '}
-              summiert sich das auf etwa{' '}
-              <strong>
-                {euro(fenster.reduce((s, z) => s + Math.max(0, z.zielNettoMonat - z.nettoMonat) * 12, 0))}
-              </strong>
-              . Alle Beträge sind Beträge des jeweiligen Jahres; was sie in heutigem Geld wert
-              sind, steht auf der Seite „Dieselben Zahlen in heutiger Kaufkraft“.
-            </>
-          ) : (
-            <>
-              Nach heutigem Stand ist Ihr gewünschtes Netto im Jahr {zeile.jahr} gedeckt — unter
-              den auf der Seite „Ihre Angaben“ genannten Annahmen, insbesondere zur Inflation.
-            </>
-          )}
-        </Text>
-
-        {ergebnis && ergebnis.hinweise.length > 0 && (
-          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2">
-            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-amber-800">
-              Hinweise zur Berechnung
-            </div>
-            <ul className="list-inside list-disc space-y-0.5 text-[10px] text-amber-900">
-              {ergebnis.hinweise.map((x, i) => <li key={i}>{x}</li>)}
-            </ul>
+        {/*
+          Der Balken misst den Fortschritt und bewertet ihn nicht: ob eine
+          Luecke bleibt, sagt schon die Kachel darueber ueber ihre Farbe.
+        */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-3 flex-1 overflow-hidden rounded-full border border-slate-300 bg-slate-100">
+            <div className="h-full bg-blue-500" style={{ width: `${gedeckt}%` }} />
           </div>
-        )}
+          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+            {gedeckt.toFixed(0)} % erreicht
+          </span>
+        </div>
 
         <div className="mt-6">
           <Untertitel>Inhalt</Untertitel>
@@ -172,8 +189,16 @@ export function Gutachten({
         </div>
       </Seite>
 
-      <Angaben szenario={szenario} avd={avd} />
-      <Vertragsliste szenario={szenario} />
+      {/*
+        Angaben und Vertraege auf EINER Seite: einzeln fuellte keiner der
+        beiden Bloecke auch nur die halbe Seite. Passt es bei vielen
+        Vertraegen doch nicht, bricht der Browser zwischen ihnen um — also
+        genau das alte Bild, aber nur dann, wenn es noetig ist.
+      */}
+      <Seite titel="Ihre Angaben und Verträge" nummer="Grundlage der Berechnung">
+        <Angaben szenario={szenario} avd={avd} />
+        <Vertragsliste szenario={szenario} hinweise={ergebnis?.vertragsHinweise ?? []} />
+      </Seite>
 
       {ergebnis && (
         <Renteneinkuenfte

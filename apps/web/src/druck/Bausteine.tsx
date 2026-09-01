@@ -100,7 +100,9 @@ export function Tabelle({
           {kopf.map((k, i) => (
             <th
               key={i}
-              className={`py-1 font-bold text-slate-700 ${links(i) ? 'text-left' : 'text-right'}`}
+              className={`py-1 font-bold text-slate-700 ${
+                i < kopf.length - 1 ? 'pr-3' : ''
+              } ${links(i) ? 'text-left' : 'text-right'}`}
             >
               {k}
             </th>
@@ -125,7 +127,12 @@ export function Zeile({
       {zellen.map((z, i) => (
         <td
           key={i}
-          className={`py-1 align-top ${links(i) ? 'text-left' : 'text-right tabular-nums'} text-slate-800`}
+          // pr-3 ausser in der letzten Spalte: ohne Abstand stossen eine
+          // rechtsbuendige und die folgende linksbuendige Spalte aneinander,
+          // und "5 € Beitrag" und "—" lesen sich als ein Wert.
+          className={`py-1 align-top ${i < zellen.length - 1 ? 'pr-3' : ''} ${
+            links(i) ? 'text-left' : 'text-right tabular-nums'
+          } text-slate-800`}
         >
           {z}
         </td>
@@ -140,6 +147,25 @@ export function Gruppenzeile({ text, spalten }: { text: string; spalten: number 
     <tr className="break-inside-avoid break-after-avoid">
       <td colSpan={spalten} className="pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
         {text}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Hinweis unmittelbar unter der Zeile, zu der er gehoert.
+ *
+ * Als Tabellenzeile ueber alle Spalten und nicht als Kasten daneben: nur so
+ * bleibt die Spaltenflucht erhalten, und der Hinweis steht dort, wo man ihn
+ * sucht — beim Vertrag, statt in einem Sammelkasten auf einer anderen Seite.
+ */
+export function Hinweiszeile({ text, spalten }: { text: string; spalten: number }) {
+  return (
+    <tr className="break-inside-avoid">
+      <td colSpan={spalten} className="pb-1">
+        <span className="block rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] leading-relaxed text-amber-900">
+          {text}
+        </span>
       </td>
     </tr>
   );
