@@ -1,3 +1,4 @@
+import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import { entnahmeRate, entnahmeplanBewerten } from '../src/products/entnahmeplaner.js';
 import { projiziere } from '../src/projection/timeline.js';
@@ -11,7 +12,7 @@ function szenario(over: Partial<Szenario> = {}): Szenario {
     schemaVersion: 1,
     haushalt: {
       verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
+      hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkv: PKV_VORGABE,
       zielNettoHeute: 2000,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },

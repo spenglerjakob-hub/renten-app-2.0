@@ -10,6 +10,7 @@ import { Basisdaten } from './features/Basisdaten';
 import { Vertraege } from './features/Vertraege';
 import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
+import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
@@ -401,6 +402,14 @@ export default function App() {
                 stellt sich die Frage, was zu tun waere.
               */}
               <Sparrechner zeile={zeile} />
+
+              {/*
+                Direkt darunter, weil die Praemie im Ruhestand fuer einen
+                privat Versicherten oft der groesste einzelne Posten der
+                Luecke ist. Bei gesetzlich Versicherten faellt der Block
+                stillschweigend weg.
+              */}
+              <PkvRechner zeile={zeile} />
 
               <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                 <button

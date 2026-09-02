@@ -1,4 +1,5 @@
 import type { LegalParameters } from '../params/types.js';
+import { PKV_BASISANTEIL } from './pkv.js';
 
 export type KvStatus = 'kvdr' | 'freiwillig' | 'pkv';
 
@@ -127,7 +128,7 @@ export function kvPvImAlter(
     const zuschuss = Math.min(bemessung * (kvVoll / 2), praemie / 2);
     kv = Math.max(0, praemie - zuschuss);
     pv = 0; // in der Praemie enthalten
-    const basisanteil = opts.pkvBasisanteil ?? 0.8;
+    const basisanteil = opts.pkvBasisanteil ?? PKV_BASISANTEIL;
     // Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
     // gesetzlichen Rente zugeordnet, aus der der Zuschuss stammt.
     const traeger = sortiert.find((e) => e.art === 'gesetzlicheRente')?.id;

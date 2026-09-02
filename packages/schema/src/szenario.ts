@@ -104,6 +104,37 @@ export const kindSchema = z.object({
   ausbildungBisJahr: z.number().int().min(1900).max(2200).optional(),
 });
 
+/**
+ * Beitragsentlastungstarif: ein Beitrag heute, eine feste Entlastung spaeter.
+ *
+ * `aktiv` statt eines optionalen Blocks, damit eingetragene Betraege beim
+ * Abschalten erhalten bleiben — dieselbe Ueberlegung wie bei Person B, die
+ * beim Umschalten auf "Single" ebenfalls nicht geloescht wird.
+ */
+export const betSchema = z.object({
+  aktiv: z.boolean().default(false),
+  beitragMonat: z.number().min(0).default(0),
+  entlastungMonat: z.number().min(0).default(0),
+  abAlter: z.number().int().min(50).max(90).default(67),
+});
+
+/**
+ * Die private Krankenversicherung.
+ *
+ * Die beiden Steigerungssaetze sind ANNAHMEN und deshalb Eingaben: § 150
+ * Abs. 3 VAG schreibt vor, dass die angesparten Mittel ab 65 Erhoehungen
+ * daempfen — nicht, um wie viel. Der Wegfall des gesetzlichen Zuschlags mit
+ * 61 ist dagegen Rechtsstand (§ 149 VAG) und keine Stellschraube; nur ob er
+ * in der eingetragenen Praemie ueberhaupt steckt, muss der Nutzer wissen.
+ */
+export const pkvSchema = z.object({
+  praemieMonat: z.number().min(0).default(0),
+  steigerung: z.number().min(-0.1).max(0.2).default(0.03),
+  steigerungAb65: z.number().min(-0.1).max(0.2).default(0.015),
+  zuschlagEnthalten: z.boolean().default(true),
+  bet: betSchema.default({}),
+});
+
 export const haushaltSchema = z.object({
   verheiratet: z.boolean().default(false),
   bundesland: z.string().default('Baden-Württemberg'),
@@ -130,10 +161,22 @@ export const haushaltSchema = z.object({
   kinderInAusbildung: z.boolean().optional(),
 
   kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).default('kvdr'),
-  pkvPraemieMonat: z.number().min(0).default(0),
+  /**
+   * ALTLAST. Wird nur noch GELESEN und unten nach `pkv.praemieMonat`
+   * umgeschrieben — dasselbe Vorgehen wie bei `kinderGeburtsjahre`.
+   * Gespeicherte Dateien tragen die Praemie noch an dieser Stelle.
+   */
+  pkvPraemieMonat: z.number().min(0).optional(),
+  pkv: pkvSchema.default({}),
   zielNettoHeute: z.number().min(0).default(2000),
-}).transform(({ kinderGeburtsjahre, kinderInAusbildung, ...h }) => ({
+}).transform(({ kinderGeburtsjahre, kinderInAusbildung, pkvPraemieMonat, ...h }) => ({
   ...h,
+  // Die Praemie stand bis 2026 unmittelbar im Haushalt. Steht im neuen Block
+  // noch nichts, wandert der alte Wert dorthin — sonst faende ein
+  // gespeichertes PKV-Szenario seine Praemie nicht wieder.
+  pkv: h.pkv.praemieMonat > 0 || !pkvPraemieMonat
+    ? h.pkv
+    : { ...h.pkv, praemieMonat: pkvPraemieMonat },
   // Der alte Schalter bedeutete "ALLE Kinder bis 25". Genau das wird je Kind
   // eingetragen, damit die Rechnung Zahl fuer Zahl dieselbe bleibt wie vor
   // der Aenderung — eine stille Kuerzung beim Laden waere schlimmer als die

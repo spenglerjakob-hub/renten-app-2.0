@@ -8,6 +8,7 @@ import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied,
   type Beitragspflichtig, type KinderStatus,
 } from '../social/kv-pv.js';
+import { pkvImJahr, type PkvAnnahmen } from '../social/pkv.js';
 import {
   versorgungsfreibetrag, rentenfreibetrag, ertragsanteil,
   altersentlastungsbetrag, type EingefrorenerFreibetrag,
@@ -217,15 +218,41 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   const kinder: KinderStatus = { hatKinder: s.haushalt.hatKinder, kinderUnter25: s.haushalt.kinderUnter25 };
   const personA = personen[0]!;
   const letztesJahr = personA.geburt.jahr + 100;
+  /*
+    Das Alter von Person A steuert den Praemienverlauf: den Wegfall des
+    gesetzlichen Zuschlags (§ 149 VAG) und die Daempfung ab 65
+    (§ 150 Abs. 3 VAG). Die Praemie ist ein HAUSHALTSbetrag; bei zwei Personen
+    ist das eine Naeherung, und zwar eine bewusste — ein zweites Alter haette
+    zwei Praemien gebraucht, die es im Szenario nicht gibt.
+  */
+  const alterHeuteA = alterExakt(personA.geburt, { jahr: jetzt.jahr, monat: 7, tag: 1 });
 
   // --- Erwerbseinkommen heute ---
   const pHeute = parameterFuer(jetzt.jahr, { indexRate: s.annahmen.tarifIndex });
+  /*
+    `privatVersichert` steuert die Krankenversicherung in BEIDEN Phasen.
+
+    Bisher hing sie allein an `beamter` — also daran, ob das Einkommen als
+    Besoldung erfasst ist. Ein privat versicherter Angestellter zahlte
+    dadurch bis zum Rentenbeginn GKV-Beitraege, obwohl er aus der PKV gar
+    nicht mehr zurueckkann; und ein Beamter ohne gesetzten PKV-Status zahlte
+    gar nichts. Der Ruhestandsstatus steuert die Erwerbsphase mit und nicht
+    umgekehrt, weil der Weg nur in eine Richtung fuehrt: wer im Alter privat
+    versichert ist, war es vorher schon.
+  */
+  const privatVersichert = s.haushalt.kvStatus === 'pkv';
+  const pkv: PkvAnnahmen = privatVersichert
+    ? s.haushalt.pkv
+    // Ohne PKV-Status ist die Praemie null — und der Entlastungstarif dazu:
+    // er senkt eine Praemie, die es dann nicht gibt.
+    : { ...s.haushalt.pkv, praemieMonat: 0, bet: { ...s.haushalt.pkv.bet, aktiv: false } };
+
   const erwerbsOpt = {
     verheiratet: s.haushalt.verheiratet,
     bundesland: s.haushalt.bundesland,
     kirchensteuerpflichtig: s.haushalt.kirchensteuer,
     kinder,
-    pkvPraemieMonat: s.haushalt.kvStatus === 'pkv' ? s.haushalt.pkvPraemieMonat : 0,
+    privatVersichert,
   };
 
   /** Jahresbrutto aus einer Einkommensangabe, egal in welcher Form erfasst. */
@@ -246,6 +273,9 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     if (e.modus === 'netto') {
       return nettoZuBrutto(e.betrag * e.auszahlungen, {
         ...erwerbsOpt, beamter: false,
+        // Beim Umkehren zaehlt die Praemie von HEUTE: das eingegebene Netto
+        // ist ein heutiges.
+        pkvPraemieMonat: pkvImJahr(pkv, alterHeuteA, 0).gesamtMonat,
       }, pHeute).jahresbrutto;
     }
     return e.betrag * e.auszahlungen;
@@ -400,6 +430,10 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const beitragspflichtig: Beitragspflichtig[] = [];
     const posten: JahresPosten[] = [];
 
+    // Die private Krankenversicherung DIESES Jahres — sie wird in der
+    // Erwerbsphase wie im Ruhestand gebraucht.
+    const pkvHeuer = pkvImJahr(pkv, alterHeuteA + jahreAbHeute, jahreAbHeute);
+
     /**
      * Werbungskosten-Pauschbetrag, je Person und Einkunftsart EINMAL:
      * 102 EUR fuer alle Versorgungsbezuege (§ 9a S. 1 Nr. 1b) und 102 EUR fuer
@@ -462,13 +496,23 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       // Nur die Personen, die in DIESEM Jahr noch arbeiten. Frueher wurde das
       // Haushaltseinkommen pauschal nach Koepfen geteilt — unabhaengig davon,
       // wer wie viel verdient hat.
+      const nochAmArbeiten = personen.filter((k) => jahr < k.rentenbeginnJahr).length || 1;
+      /*
+        Der PKV-Aufwand ist ein HAUSHALTSbetrag und wird auf die
+        Erwerbstaetigen verteilt. Ihn jeder Person voll zu uebergeben
+        verdoppelte ihn bei zwei Verdienern — genau das geschah hier bisher.
+        Enthalten ist auch der Beitrag zum Entlastungstarif: er faellt in der
+        Erwerbsphase tatsaechlich an.
+      */
+      const pkvAufwandMonat = pkvHeuer.gesamtMonat / nochAmArbeiten;
+
       const arbeitend = personen
         .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
         .filter(({ k }) => jahr < k.rentenbeginnJahr)
         .map(({ e }) => ({
           jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           beamter: e.beamter,
-          pkvPraemieMonat: erwerbsOpt.pkvPraemieMonat,
+          pkvPraemieMonat: pkvAufwandMonat,
         }));
 
       const n = erwerbHaushalt(arbeitend, { ...erwerbsOpt, beamter: false }, p);
@@ -520,7 +564,10 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
     // --- KV/PV ---
     const kv = kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinder, p, {
-      pkvPraemieMonat: s.haushalt.pkvPraemieMonat,
+      // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
+      // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
+      // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
+      pkvPraemieMonat: pkvHeuer.praemieMonat,
       personen: personen.filter((k) => jahr >= k.rentenbeginnJahr).length || 1,
     });
     const kvPvJahr = kv.gesamt * 12;

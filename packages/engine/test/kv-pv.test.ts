@@ -1,3 +1,4 @@
+import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied, bavFreibetragMonat,
@@ -147,7 +148,7 @@ describe('Gegenprobe an der Zeitachse', () => {
     haushalt: {
       verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: true,
       hatKinder: false, kinderUnter25: 0, kinder: [],
-      kvStatus: 'kvdr', pkvPraemieMonat: 0, zielNettoHeute: 2500,
+      kvStatus: 'kvdr', pkv: PKV_VORGABE, zielNettoHeute: 2500,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
     einkommenHeute: {

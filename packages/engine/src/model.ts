@@ -1,5 +1,6 @@
 import type { KvStatus } from './social/kv-pv.js';
 import type { AvdKind } from './products/altersvorsorgedepot.js';
+import type { PkvAnnahmen } from './social/pkv.js';
 
 export type PersonId = 'A' | 'B';
 export type Versorgungsart = 'grv' | 'pension';
@@ -114,7 +115,14 @@ export interface Haushalt {
    */
   kinder: AvdKind[];
   kvStatus: KvStatus;
-  pkvPraemieMonat: number;
+  /**
+   * Die private Krankenversicherung mit ihrem Verlauf ueber die Zeit.
+   *
+   * Loest das fruehere `pkvPraemieMonat` ab: eine einzelne Zahl liess sich
+   * nicht fortschreiben, und genau das fehlte — die Praemie lief unveraendert
+   * durch jedes Jahr der Zeitachse.
+   */
+  pkv: PkvAnnahmen;
   /** Zielnetto in heutiger Kaufkraft */
   zielNettoHeute: number;
 }

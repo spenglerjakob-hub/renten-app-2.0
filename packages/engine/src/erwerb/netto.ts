@@ -1,15 +1,37 @@
 import type { LegalParameters } from '../params/types.js';
 import { einkommensteuer, solidaritaetszuschlag, kirchensteuersatz } from '../tax/estg.js';
-import { kvPvArbeitnehmer, type KinderStatus } from '../social/kv-pv.js';
+import { kvPvArbeitnehmer, kvSatzVoll, pvSatzMitglied, type KinderStatus } from '../social/kv-pv.js';
+import { arbeitgeberzuschuss, PKV_BASISANTEIL } from '../social/pkv.js';
 
 export interface ErwerbsOptionen {
   verheiratet: boolean;
   bundesland: string;
   kirchensteuerpflichtig: boolean;
   kinder: KinderStatus;
-  /** Beamte zahlen keine RV/AV und sind i. d. R. beihilfeberechtigt */
+  /** Beamte zahlen keine gesetzliche RV/AV */
   beamter?: boolean;
-  /** Monatliche PKV-Praemie bei Beamten/privat Versicherten */
+  /**
+   * Privat krankenversichert.
+   *
+   * BEFUND: Diese Angabe gab es hier nicht — die Praemie hing allein an
+   * `beamter`, und `beamter` ist im Rechenkern nichts weiter als "Einkommen
+   * als Besoldung erfasst". Damit erledigte EIN Merkmal zwei verschiedene
+   * Aufgaben: "keine RV/AV" und "privat krankenversichert". Die Mengen sind
+   * aber nicht dieselbe. Jeder Beamte ist privat versichert, laengst nicht
+   * jeder privat Versicherte ist Beamter.
+   *
+   * Die Folge waren zwei falsche Nettos: ein privat versicherter Angestellter
+   * zahlte bis zum Rentenbeginn den GKV-Arbeitnehmeranteil, und ein Beamter
+   * ohne gesetzten PKV-Status zahlte GAR KEINE Krankenversicherung, weil die
+   * Praemie dann auf null gesetzt wurde und der Beamtenzweig keine
+   * Alternative kannte.
+   */
+  privatVersichert?: boolean;
+  /**
+   * Monatlicher Aufwand fuer die private Kranken- und Pflegeversicherung —
+   * Praemie zuzueglich eines etwaigen Beitragsentlastungstarifs, VOR dem
+   * Arbeitgeberzuschuss. Fortgeschrieben auf das jeweilige Jahr.
+   */
   pkvPraemieMonat?: number;
 }
 
@@ -40,19 +62,54 @@ function personAnteil(
   pkvPraemieMonat: number,
 ): { brutto: number; sv: number; zveBeitrag: number } {
   const brutto = Math.max(0, jahresbrutto);
+  const privat = o.privatVersichert ?? false;
 
   let sv: number;
   let vorsorgeAbzug: number;
 
-  if (beamter) {
-    // Keine gesetzliche RV/AV. Krankenversicherung privat (Beihilfe).
-    const praemie = Math.max(0, pkvPraemieMonat) * 12;
-    sv = praemie;
-    vorsorgeAbzug = praemie * 0.8; // Basisabsicherungsanteil
+  const gesetzlich = kvPvArbeitnehmer(brutto, o.kinder, p, { sachsen: o.bundesland === 'Sachsen' });
+
+  if (privat) {
+    /*
+      Der Arbeitgeberzuschuss (§ 257 SGB V, § 61 SGB XI) steht Beschaeftigten
+      zu, nicht Beamten — bei denen tritt die Beihilfe an seine Stelle, und
+      die steckt bereits in der niedrigeren Praemie, die sie eintragen.
+    */
+    const aufwandMonat = Math.max(0, pkvPraemieMonat);
+    const zuschussMonat = beamter ? 0 : arbeitgeberzuschuss(aufwandMonat, brutto, p);
+    const eigenerAnteil = Math.max(0, aufwandMonat - zuschussMonat) * 12;
+
+    // Abziehbar ist nur der EIGENE Anteil: der Zuschuss ist nach
+    // § 3 Nr. 62 EStG steuerfrei und mindert deshalb den Sonderausgabenabzug.
+    const kvAbzug = eigenerAnteil * PKV_BASISANTEIL;
+
+    if (beamter) {
+      sv = eigenerAnteil;
+      vorsorgeAbzug = kvAbzug;
+    } else {
+      // Renten- und Arbeitslosenversicherung laufen unveraendert weiter — die
+      // private Krankenversicherung aendert daran nichts.
+      sv = gesetzlich.rv + gesetzlich.av + eigenerAnteil;
+      vorsorgeAbzug = gesetzlich.rv + kvAbzug;
+    }
+  } else if (beamter) {
+    /*
+      Beamter, aber gesetzlich versichert — freiwillige Mitgliedschaft. Selten,
+      aber es gibt sie, und bisher stand hier eine Null: die Praemie war 0,
+      weil kein PKV-Status gesetzt war, und einen gesetzlichen Zweig gab es
+      nicht. Ein Dienstherr zahlt keinen Arbeitgeberanteil, also traegt das
+      Mitglied den vollen Satz.
+    */
+    const bemessung = Math.min(brutto, p.bbgKvJahr);
+    const kv = bemessung * kvSatzVoll(p);
+    const pv = bemessung * pvSatzMitglied(o.kinder, p);
+    sv = kv + pv;
+    // Wie bei Angestellten: der auf das Krankengeld entfallende Anteil ist
+    // nicht abzugsfaehig (§ 10 Abs. 1 Nr. 3 Buchst. a S. 4 EStG).
+    vorsorgeAbzug = kv * 0.96 + pv;
   } else {
-    const b = kvPvArbeitnehmer(brutto, o.kinder, p, { sachsen: o.bundesland === 'Sachsen' });
-    sv = b.gesamt;
-    vorsorgeAbzug = b.abzugsfaehig;
+    sv = gesetzlich.gesamt;
+    vorsorgeAbzug = gesetzlich.abzugsfaehig;
   }
 
   const zveBeitrag = Math.max(
@@ -91,7 +148,13 @@ export function bruttoZuNetto(
 export interface HaushaltsPerson {
   jahresbrutto: number;
   beamter: boolean;
-  /** Nur bei Beamten/privat Versicherten */
+  /**
+   * Anteil dieser Person am monatlichen PKV-Aufwand des Haushalts.
+   *
+   * Der Haushaltsbetrag wird vom Aufrufer auf die Erwerbstaetigen verteilt.
+   * Ihn jeder Person voll zu uebergeben verdoppelte ihn bei zwei Verdienern —
+   * genau das tat die Zeitachse bisher.
+   */
   pkvPraemieMonat?: number;
 }
 

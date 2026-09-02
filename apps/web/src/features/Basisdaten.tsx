@@ -2,6 +2,7 @@ import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, type ProjektionsErgebn
 import { RotateCcw, Target } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
+import { PkvFelder } from './PkvFelder';
 import { EinkommenFelder } from './EinkommenFelder';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
@@ -85,23 +86,16 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
             optionen={laenderOptionen}
           />
           <AuswahlFeld
-            label="Krankenversicherung im Alter"
+            label="Krankenversicherung"
             wert={s.haushalt.kvStatus}
             onChange={(v) => setzeHaushalt({ kvStatus: v })}
+            hilfe="Gilt für die Erwerbsphase und den Ruhestand — aus der PKV führt praktisch kein Weg zurück."
             optionen={[
               { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
               { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
               { wert: 'pkv', text: 'Privat versichert' },
             ]}
           />
-          {s.haushalt.kvStatus === 'pkv' && (
-            <ZahlFeld
-              label="PKV-Beitrag monatlich"
-              wert={s.haushalt.pkvPraemieMonat}
-              onChange={(n) => setzeHaushalt({ pkvPraemieMonat: n })}
-              einheit="€"
-            />
-          )}
           <ZahlFeld
             label="Kinder unter 25"
             wert={s.haushalt.kinderUnter25}
@@ -110,6 +104,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
             hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag."
           />
         </div>
+
+        {s.haushalt.kvStatus === 'pkv' && <PkvFelder />}
 
         {s.haushalt.kinder.length > 0 && (
           <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2">

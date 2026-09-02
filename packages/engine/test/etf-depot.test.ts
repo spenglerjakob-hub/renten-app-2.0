@@ -1,3 +1,4 @@
+import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import { projiziere } from '../src/projection/timeline.js';
 import type { Szenario, Vertrag } from '../src/model.js';
@@ -7,7 +8,7 @@ function szenario(depot: Partial<Vertrag>): Szenario {
     schemaVersion: 1,
     haushalt: {
       verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
+      hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkv: PKV_VORGABE,
       zielNettoHeute: 2000,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },

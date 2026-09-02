@@ -211,7 +211,10 @@ describe('Migration aus dem Prototyp-Format', () => {
 
     expect(r.migriertVon).toBe('prototyp');
     expect(s.haushalt.kvStatus).toBe('pkv');
-    expect(s.haushalt.pkvPraemieMonat).toBe(620);
+    // Die Praemie stand in der Prototyp-Datei unmittelbar im Haushalt und
+    // wandert beim Laden in den PKV-Block. Ginge sie dabei verloren, saehe
+    // ein PKV-Nutzer nach dem Update eine Praemie von null.
+    expect(s.haushalt.pkv.praemieMonat).toBe(620);
     expect(s.haushalt.kirchensteuer).toBe(true);
     expect(s.annahmen.rentendynamik).toBeCloseTo(0.01, 6);
     // Die Prototyp-Datei trug taxIndexRate 1,5 % bei grvIncreaseRate 1,0 %.

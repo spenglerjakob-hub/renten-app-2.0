@@ -18,6 +18,11 @@ export {
   kvPvImAlter, kvPvArbeitnehmer, pvSatzMitglied, kvSatzVoll, bavFreibetragMonat,
   type KvStatus, type BeitragsArt, type Beitragspflichtig, type KinderStatus, type KvPvErgebnis,
 } from './social/kv-pv.js';
+export {
+  pkvImJahr, pkvVerlauf, arbeitgeberzuschuss, betVergleich,
+  PKV_VORGABE, PKV_BASISANTEIL, ZUSCHLAG_QUOTE, ZUSCHLAG_BIS_ALTER, DAEMPFUNG_AB_ALTER,
+  type PkvAnnahmen, type BetAnnahmen, type PkvJahr, type BetVergleich,
+} from './social/pkv.js';
 
 // Erwerbsphase
 export {

@@ -220,6 +220,7 @@ export function DatumFeld(props: {
 export function AuswahlFeld<T extends string>(props: {
   label: string; wert: T; onChange: (v: T) => void;
   optionen: readonly { wert: T; text: string }[];
+  hilfe?: string;
 }) {
   const id = `s${useId()}`;
   return (
@@ -229,10 +230,12 @@ export function AuswahlFeld<T extends string>(props: {
         id={id}
         value={props.wert}
         onChange={(e) => props.onChange(e.target.value as T)}
+        aria-describedby={props.hilfe ? `${id}-hilfe` : undefined}
         className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm"
       >
         {props.optionen.map((o) => <option key={o.wert} value={o.wert}>{o.text}</option>)}
       </select>
+      {props.hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
     </div>
   );
 }

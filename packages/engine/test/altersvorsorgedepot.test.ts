@@ -1,3 +1,4 @@
+import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import {
   avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
@@ -196,7 +197,7 @@ describe('Altersvorsorgedepot als Vertragsart in der Zeitachse', () => {
       schemaVersion: 1,
       haushalt: {
         verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkv: PKV_VORGABE,
         zielNettoHeute: 2000,
       },
       annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },
@@ -296,7 +297,7 @@ describe('KV/PV-Verteilung im Kassenbon', () => {
       schemaVersion: 1,
       haushalt: {
         verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkvPraemieMonat: 0,
+        hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus: 'kvdr', pkv: PKV_VORGABE,
         zielNettoHeute: 2000,
       },
       annahmen: { inflation: 0.02, rentendynamik: 0.02, tarifIndex: 0.02, gehaltsdynamik: 0.02 },

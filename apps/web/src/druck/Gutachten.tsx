@@ -9,6 +9,7 @@ import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
+import { pkvRechnen } from '../features/pkv-berechnung';
 import { personNameAus } from '../features/personen';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
@@ -16,6 +17,7 @@ import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
 import { RuhestandVerlauf } from './RuhestandVerlauf';
 import { Kaufkraft } from './Kaufkraft';
+import { Krankenversicherung } from './Krankenversicherung';
 import { Sparziel } from './Sparziel';
 import { Stellschrauben } from './Stellschrauben';
 import { Merkblatt } from './Merkblatt';
@@ -75,6 +77,13 @@ export function Gutachten({
     () => sparzielRechnen(szenario, zeile, SPARZIEL_VORGABE),
     [szenario, zeile],
   );
+  // Nur bei privat Versicherten mit einem eingetragenen Beitrag; sonst null,
+  // und die Seite entfaellt samt Eintrag im Inhaltsverzeichnis.
+  const pkv = useMemo(
+    () => pkvRechnen(szenario, zeile.zielNettoMonat),
+    [szenario, zeile.zielNettoMonat],
+  );
+
   const gedeckt = zeile.zielNettoMonat > 0
     ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
     : 100;
@@ -92,6 +101,7 @@ export function Gutachten({
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
     'Ihre Einkünfte im Ruhestand',
     'Was Ihr Geld dann noch wert ist',
+    ...(pkv ? ['Ihre Krankenversicherung im Alter'] : []),
     ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
     ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
     'Zum Mitnehmen',
@@ -225,6 +235,15 @@ export function Gutachten({
 
       <RuhestandVerlauf zeilen={fenster} />
       <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />
+
+      {pkv && (
+        <Krankenversicherung
+          ergebnis={pkv}
+          steigerung={szenario.haushalt.pkv.steigerung}
+          inflation={szenario.annahmen.inflation}
+          zielNettoMonat={zeile.zielNettoMonat}
+        />
+      )}
 
       {sparziel && (
         <>

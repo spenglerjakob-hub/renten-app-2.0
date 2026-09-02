@@ -1,5 +1,5 @@
 import {
-  vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum,
+  vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis,
   type LegalParameters,
@@ -38,9 +38,21 @@ export function tuevBasis(szenario: SzenarioParsed): {
     kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
     kinder: { hatKinder: szenario.haushalt.hatKinder, kinderUnter25: szenario.haushalt.kinderUnter25 },
     beamter: szenario.einkommenHeute.modus === 'besoldung',
-    pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv' ? szenario.haushalt.pkvPraemieMonat : 0,
+    // Der Vertrags-TUEV rechnet mit dem HEUTIGEN Netto, also auch mit der
+    // heutigen Praemie — inklusive eines laufenden Entlastungstarifs, denn der
+    // belastet das Budget genauso.
+    privatVersichert: szenario.haushalt.kvStatus === 'pkv',
+    pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv'
+      ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).gesamtMonat
+      : 0,
   }, p);
   return { p, jahresbrutto: n.jahresbrutto, zve: n.zve, monatsbrutto: n.monatsbrutto };
+}
+
+/** Alter von Person A heute — steuert den Praemienverlauf. */
+function alterHeuteA(szenario: SzenarioParsed): number {
+  const geburt = parseDatum(szenario.personen[0]?.geburtsdatum ?? '');
+  return geburt ? new Date().getFullYear() - geburt.jahr : 40;
 }
 
 /** Ein Jahr aus einem Datumsfeld, egal ob TT.MM.JJJJ oder JJJJ-MM-TT. */

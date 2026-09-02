@@ -43,9 +43,18 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         <Angabe feld="Familienstand" wert={h.verheiratet ? 'Verheiratet (Splitting)' : 'Alleinstehend'} />
         <Angabe feld="Bundesland" wert={h.bundesland} />
         <Angabe feld="Kirchensteuer" wert={h.kirchensteuer ? 'ja' : 'nein'} />
-        <Angabe feld="Krankenversicherung im Alter" wert={KV_TEXT[h.kvStatus]} />
+        <Angabe feld="Krankenversicherung" wert={KV_TEXT[h.kvStatus]} />
         {h.kvStatus === 'pkv' && (
-          <Angabe feld="PKV-Beitrag" wert={`${euro(h.pkvPraemieMonat)} im Monat`} />
+          <>
+            <Angabe feld="PKV-Beitrag heute" wert={`${euro(h.pkv.praemieMonat)} im Monat`} />
+            <Angabe feld="Angenommene Steigerung" wert={`${prozent(h.pkv.steigerung)} p. a.`} />
+            {h.pkv.bet.aktiv && (
+              <Angabe
+                feld="Beitragsentlastungstarif"
+                wert={`${euro(h.pkv.bet.beitragMonat)} für ${euro(h.pkv.bet.entlastungMonat)} ab ${h.pkv.bet.abAlter}`}
+              />
+            )}
+          </>
         )}
         <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
       </Zweispaltig>
