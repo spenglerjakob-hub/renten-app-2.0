@@ -127,7 +127,7 @@ export default function App() {
   const verheiratet = szenario.haushalt.verheiratet;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-40 text-slate-800 sm:pb-36 print:pb-0">
+    <div className="min-h-screen bg-slate-50 pb-28 text-slate-800 sm:pb-36 print:pb-0">
       {/* KOPFZEILE */}
       <header
         className={`sticky top-0 z-50 bg-slate-900 text-white shadow-md transition-all print:hidden ${
@@ -152,7 +152,7 @@ export default function App() {
                 <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
                   JS-Rentenplaner
                 </h1>
-                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'text-[8px] sm:text-[10px]' : 'text-[10px] sm:text-xs'}`}>
+                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'text-[10px] sm:text-[10px]' : 'text-[10px] sm:text-xs'}`}>
                   Ihre Zukunft. Smart geplant.
                 </p>
               </div>
@@ -446,7 +446,13 @@ export default function App() {
       {/* FESTE FUSSLEISTE */}
       {zeile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-800 bg-slate-900 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.3)] print:hidden">
-          <div className="mx-auto max-w-6xl px-2 py-2.5 sm:px-4 sm:py-3">
+          {/*
+            Die Rechenzeichen "−" und "=" entfallen auf dem Telefon. Sie
+            erklaeren einen Zusammenhang, den die drei Kacheln von links nach
+            rechts ohnehin erzaehlen, und kosten dort Breite, die den
+            Beschriftungen fehlt.
+          */}
+          <div className="mx-auto max-w-6xl px-2 py-2 sm:px-4 sm:py-3">
             <div className="flex items-center justify-between gap-1.5 sm:gap-4">
               <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-center sm:p-2.5">
                 <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
@@ -457,7 +463,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="text-[10px] font-black text-slate-500 sm:text-sm">−</div>
+              <div className="hidden font-black text-slate-500 sm:block sm:text-sm">−</div>
 
               <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-center sm:p-2.5">
                 <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
@@ -468,7 +474,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="text-[11px] font-black text-slate-500 sm:text-sm">=</div>
+              <div className="hidden font-black text-slate-500 sm:block sm:text-sm">=</div>
 
               <div
                 className={`flex-1 rounded-lg border p-1.5 text-center shadow-inner sm:p-2.5 ${

@@ -3,6 +3,7 @@ import { ChevronDown, Target } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
+import { useSchmal } from '../components/useSchmal';
 import {
   sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
@@ -18,6 +19,7 @@ import {
  */
 export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
   const szenario = useSzenario((x) => x.szenario);
+  const schmal = useSchmal();
   const [offen, setOffen] = useState(false);
   const [eingaben, setEingaben] = useState<SparzielEingaben>(SPARZIEL_VORGABE);
 
@@ -108,6 +110,22 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
               und hebt das Ende. Eine Tabelle zeigt das in einem Blick, ein
               einzelner Wert nicht.
             */}
+            {schmal ? (
+              <div className="mt-4 space-y-2">
+                {r.varianten.map((v) => (
+                  <Karteikarte
+                    key={v.dynamik}
+                    titel={v.dynamik === 0 ? 'Gleichbleibender Beitrag' : `${prozent(v.dynamik)} Beitragsdynamik`}
+                    hervor={Math.abs(v.dynamik - eingaben.dynamik) < 1e-9}
+                    zeilen={[
+                      ['Start heute', euro(v.startbeitrag)],
+                      ['Im letzten Sparjahr', euro(v.endbeitrag)],
+                      ['Summe aller Beiträge', euro(v.summeBeitraege)],
+                    ]}
+                  />
+                ))}
+              </div>
+            ) : (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full border-collapse text-xs">
                 <thead>
@@ -141,6 +159,7 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/*
               Was Warten kostet — dieselbe Rechnung, nur mit spaeterem
@@ -151,6 +170,31 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Was es kostet, damit zu warten
                 </div>
+                {schmal ? (
+                  <div className="space-y-2">
+                    {r.aufschub.map((a) => (
+                      <Karteikarte
+                        key={a.wartenJahre}
+                        titel={
+                          a.wartenJahre === 0
+                            ? `Heute beginnen · ${a.sparjahre} Sparjahre`
+                            : `In ${a.wartenJahre} Jahren · ${a.sparjahre} Sparjahre`
+                        }
+                        hervor={a.wartenJahre === 0}
+                        gut={a.wartenJahre === 0}
+                        zeilen={[
+                          ['Startbeitrag', euro(a.startbeitrag)],
+                          ['Summe aller Beiträge', euro(a.summeBeitraege)],
+                          [
+                            'Mehr als heute',
+                            a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`,
+                            a.wartenJahre === 0 ? undefined : 'text-rose-600',
+                          ],
+                        ]}
+                      />
+                    ))}
+                  </div>
+                ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-xs">
                     <thead>
@@ -192,6 +236,7 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
                     </tbody>
                   </table>
                 </div>
+                )}
                 <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                   <strong className="text-rose-700">
                     Jedes Jahr Warten kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
@@ -215,6 +260,44 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Eine Tabellenzeile als Karte — fuer das Telefon.
+ *
+ * Fuenf Spalten auf 360 Punkten geben je siebzig, und "227.110 €" braucht
+ * allein sechzig. Statt die Betraege umbrechen zu lassen, steht auf dem
+ * Telefon jede Zeile untereinander: Beschriftung links, Betrag rechts. Der
+ * Inhalt ist derselbe wie in der Tabelle, nur gedreht.
+ */
+function Karteikarte({ titel, zeilen, hervor, gut }: {
+  titel: string;
+  /** Beschriftung, Wert und optional eine Farbklasse fuer den Wert */
+  zeilen: [string, string, string?][];
+  hervor?: boolean;
+  gut?: boolean;
+}) {
+  const rahmen = !hervor
+    ? 'border-slate-200 bg-white'
+    : gut
+      ? 'border-emerald-300 bg-emerald-50/60'
+      : 'border-indigo-300 bg-indigo-50/60';
+
+  return (
+    <div className={`rounded-lg border p-2.5 ${rahmen}`}>
+      <div className="text-[11px] font-bold text-slate-800">{titel}</div>
+      <dl className="mt-1 space-y-0.5">
+        {zeilen.map(([text, wert, farbe]) => (
+          <div key={text} className="flex items-baseline justify-between gap-3">
+            <dt className="text-[11px] text-slate-500">{text}</dt>
+            <dd className={`text-[11px] font-semibold tabular-nums ${farbe ?? 'text-slate-900'}`}>
+              {wert}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

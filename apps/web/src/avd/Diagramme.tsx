@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { AvdJahr } from '@renten/engine';
 import { euro } from '../components/Feld';
+import { useSchmal } from '../components/useSchmal';
 
 /**
  * Diagramme der Altersvorsorgedepot-Seite.
@@ -56,13 +57,27 @@ export function KapitalaufbauDiagramm({
   const [alsTabelle, setAlsTabelle] = useState(false);
   const [aktiv, setAktiv] = useState<number | null>(null);
   const titelId = useId();
+  const schmal = useSchmal();
 
   if (verlauf.length < 2) return null;
 
   const letzte = verlauf[verlauf.length - 1]!;
   const max = Math.max(...verlauf.map((d) => d.kapital), 1) * 1.08;
 
-  const B = 780, H = 300, L = 54, R = 152, T = 14, U = 34;
+  /*
+    Auf dem Telefon ist die viewBox schmaler, nicht das Diagramm kleiner.
+    Ein SVG skaliert seinen gesamten Inhalt mit der Breite — bei 780
+    Einheiten auf 330 Bildschirmpunkten schrumpft eine Schriftgroesse von 13
+    auf reale 5,5 Punkte. Eine schmalere viewBox haelt den Massstab nahe 1:1,
+    dann stimmt die Schrift wieder. Der Rand rechts (R) traegt sonst die
+    Beschriftung der drei Flaechen; auf dem Telefon entfaellt sie zugunsten
+    der Legende darueber und gibt ein Fuenftel der Breite frei.
+  */
+  const B = schmal ? 360 : 780;
+  const H = schmal ? 250 : 300;
+  const L = schmal ? 42 : 54;
+  const R = schmal ? 10 : 152;
+  const T = 14, U = 34;
   const plotB = B - L - R, plotH = H - T - U;
   const x = (i: number) => L + (i / (verlauf.length - 1)) * plotB;
   const y = (v: number) => T + plotH - (v / max) * plotH;
@@ -94,6 +109,48 @@ export function KapitalaufbauDiagramm({
   const d = aktiv !== null ? verlauf[aktiv] : undefined;
   const ersparnisHier = aktiv !== null ? (steuerersparnisKumuliert[aktiv] ?? 0) : 0;
 
+  /*
+    Auswahl aus der Zeigerposition statt aus einer Trefferflaeche je Jahr.
+    Bei dreissig Jahren waere jede einzelne rund neun Punkte breit — ein
+    Finger ist vierzig. So trifft jeder Tipp das naechstgelegene Jahr, und
+    dieselbe Rechnung dient der Maus zum Ueberfahren.
+  */
+  const zeigeAuf = (e: { clientX: number; currentTarget: Element }) => {
+    const kasten = e.currentTarget.getBoundingClientRect();
+    if (kasten.width <= 0) return;
+    const anteil = (e.clientX - kasten.left) / kasten.width;
+    const i = Math.round(anteil * (verlauf.length - 1));
+    setAktiv(Math.min(verlauf.length - 1, Math.max(0, i)));
+  };
+
+  const tooltip = d && (
+    <>
+      <div className="font-bold text-slate-800">{d.jahr} · Alter {d.alter}</div>
+      <dl className="mt-1 space-y-0.5">
+        <Wert farbe={FARBE.eigen} text="Eigenbeiträge" wert={euro(d.eigenbeitraegeKumuliert)} />
+        {/* Eingerueckt und in Rot: gehoert zu den Eigenbeitraegen
+            darueber, zaehlt aber NICHT zum Kapital — es ist der Teil,
+            den die Steuer zurueckgibt. Nur die schwarzen Werte
+            summieren sich unten zum Kapital. */}
+        {ersparnisHier > 0 && (
+          <div className="flex items-center justify-between gap-4 pl-3.5">
+            <dt className="text-rose-600">davon Steuerersparnis</dt>
+            <dd className="tabular-nums text-rose-600">{euro(ersparnisHier)}</dd>
+          </div>
+        )}
+        <Wert farbe={FARBE.zulagen} text="Zulagen" wert={euro(d.zulagenKumuliert)} />
+        <Wert farbe={FARBE.gewinn} text="Kursgewinne" wert={euro(d.gewinnKumuliert)} />
+      </dl>
+      {/* Die Summe steht in derselben Flucht wie die Posten darueber:
+          linksbuendig unter einer Trennlinie musste man die Augen
+          bewegen, um sie mit den Einzelbetraegen zu vergleichen. */}
+      <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-slate-100 pt-1">
+        <span className="font-bold text-slate-800">Kapital gesamt</span>
+        <span className="font-bold tabular-nums text-slate-800">{euro(d.kapital)}</span>
+      </div>
+    </>
+  );
+
   return (
     <figure className="m-0">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -120,26 +177,43 @@ export function KapitalaufbauDiagramm({
 
       {alsTabelle ? (
         <div className="max-h-80 overflow-auto">
-          <table className="w-full text-sm">
+          {/*
+            Sechs Spalten sind auf 360 Punkten je fuenfzig breit — schmaler
+            als ein einziger Betrag. Das Alter faellt auf dem Telefon weg: es
+            steht in derselben Zeile schon als Jahr, und die Ueberschrift
+            nennt es. Die vier Betragsspalten bleiben, sie sind der Inhalt.
+          */}
+          <table className="w-full text-[11px] sm:text-sm">
             <caption className="sr-only">{zusammenfassung}</caption>
             <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                <th scope="col" className="py-2">Jahr</th>
-                <th scope="col">Alter</th>
-                <th scope="col" className="text-right">Eigenbeiträge</th>
-                <th scope="col" className="text-right">Zulagen</th>
-                <th scope="col" className="text-right">Kursgewinne</th>
+              <tr className="border-b border-slate-200 text-left text-[10px] uppercase text-slate-500 sm:text-xs">
+                <th scope="col" className="py-2 pr-2">Jahr</th>
+                <th scope="col" className="hidden pr-2 sm:table-cell">Alter</th>
+                {/*
+                  Die Ueberschriften sind auf dem Telefon breiter als die
+                  Betraege darunter — "EIGENBEITRÄGE" allein misst mehr als
+                  eine Spalte hergibt und schob die Kapitalspalte aus dem
+                  Bild. Gekuerzt passt die Tabelle; `title` und die Legende
+                  ueber der Tabelle nennen weiter das ganze Wort.
+                */}
+                <th scope="col" title="Eigenbeiträge" className="pr-2 text-right">
+                  {schmal ? 'Eigen' : 'Eigenbeiträge'}
+                </th>
+                <th scope="col" className="pr-2 text-right">Zulagen</th>
+                <th scope="col" title="Kursgewinne" className="pr-2 text-right">
+                  {schmal ? 'Gewinn' : 'Kursgewinne'}
+                </th>
                 <th scope="col" className="text-right">Kapital</th>
               </tr>
             </thead>
             <tbody>
               {verlauf.map((r) => (
                 <tr key={r.jahr} className="border-b border-slate-50">
-                  <td className="py-1.5 tabular-nums">{r.jahr}</td>
-                  <td className="tabular-nums">{r.alter}</td>
-                  <td className="text-right tabular-nums">{euro(r.eigenbeitraegeKumuliert)}</td>
-                  <td className="text-right tabular-nums">{euro(r.zulagenKumuliert)}</td>
-                  <td className="text-right tabular-nums">{euro(r.gewinnKumuliert)}</td>
+                  <td className="py-1.5 pr-2 tabular-nums">{r.jahr}</td>
+                  <td className="hidden pr-2 tabular-nums sm:table-cell">{r.alter}</td>
+                  <td className="pr-2 text-right tabular-nums">{euro(r.eigenbeitraegeKumuliert)}</td>
+                  <td className="pr-2 text-right tabular-nums">{euro(r.zulagenKumuliert)}</td>
+                  <td className="pr-2 text-right tabular-nums">{euro(r.gewinnKumuliert)}</td>
                   <td className="text-right font-bold tabular-nums">{euro(r.kapital)}</td>
                 </tr>
               ))}
@@ -147,20 +221,26 @@ export function KapitalaufbauDiagramm({
           </table>
         </div>
       ) : (
-        <div className="relative overflow-x-auto">
+        <div className="relative sm:overflow-x-auto">
           <svg
             viewBox={`0 0 ${B} ${H}`}
-            className="h-auto w-full min-w-[560px]"
+            className="h-auto w-full sm:min-w-[560px]"
             role="img"
             aria-labelledby={titelId}
-            onMouseLeave={() => setAktiv(null)}
+            /*
+              NUR die Maus raeumt den Kasten wieder ab. Nach einem Fingertipp
+              schickt der Browser noch Ersatz-Mausereignisse hinterher, und
+              deren `mouseleave` loeschte die Auswahl unmittelbar wieder — der
+              Tooltip erschien und verschwand im selben Wimpernschlag.
+            */
+            onPointerLeave={(e) => { if (e.pointerType === 'mouse') setAktiv(null); }}
           >
             <title id={titelId}>{zusammenfassung}</title>
 
             {[0, 0.25, 0.5, 0.75, 1].map((q) => (
               <g key={q}>
                 <line x1={L} y1={y(max * q)} x2={B - R} y2={y(max * q)} stroke={RASTER} strokeWidth="1" />
-                <text x={L - 8} y={y(max * q) + 4} textAnchor="end" fontSize="13" fill={BESCHRIFTUNG}>
+                <text x={L - 6} y={y(max * q) + 4} textAnchor="end" fontSize="13" fill={BESCHRIFTUNG}>
                   {kurz(max * q)}
                 </text>
               </g>
@@ -184,8 +264,9 @@ export function KapitalaufbauDiagramm({
               );
             })}
 
-            {/* Beschriftung je Serie am rechten Rand */}
-            {eben.map((e, idx) => {
+            {/* Beschriftung je Serie am rechten Rand — auf dem Telefon
+                gibt es dafuer keinen Platz, dort traegt die Legende. */}
+            {!schmal && eben.map((e, idx) => {
               const oben = e.wert(letzte);
               const unten = idx === 0 ? 0 : eben[idx - 1]!.wert(letzte);
               const mitte = (oben + unten) / 2;
@@ -200,7 +281,7 @@ export function KapitalaufbauDiagramm({
 
             <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke={ACHSE} strokeWidth="1.5" />
             {verlauf.map((r, i) =>
-              r.alter % 5 === 0 ? (
+              r.alter % (schmal ? 10 : 5) === 0 ? (
                 <text key={r.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize="13" fill={BESCHRIFTUNG}>
                   {r.alter}
                 </text>
@@ -213,47 +294,40 @@ export function KapitalaufbauDiagramm({
                 stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
             )}
 
-            {/* Unsichtbare, breite Trefferflaechen — das Diagramm selbst hat
-                keine Punkte, auf die man zielen koennte. */}
-            {verlauf.map((r, i) => (
-              <rect
-                key={r.jahr}
-                x={x(i) - plotB / verlauf.length / 2}
-                y={T}
-                width={plotB / verlauf.length}
-                height={plotH}
-                fill="transparent"
-                onMouseEnter={() => setAktiv(i)}
-              />
-            ))}
+            {/*
+              Eine einzige Trefferflaeche ueber der gesamten Zeichenflaeche.
+              `onPointerDown` ist der eigentliche Punkt: `onMouseEnter` gibt es
+              auf einem Telefon nicht, die Betraege waren dort bisher
+              unerreichbar. `touchAction: pan-y` laesst das senkrechte
+              Scrollen der Seite unberuehrt.
+            */}
+            <rect
+              x={L} y={T} width={plotB} height={plotH}
+              fill="transparent"
+              style={{ touchAction: 'pan-y' }}
+              onPointerDown={zeigeAuf}
+              onPointerMove={zeigeAuf}
+            />
           </svg>
 
-          {d && (
-            <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
-              <div className="font-bold text-slate-800">{d.jahr} · Alter {d.alter}</div>
-              <dl className="mt-1 space-y-0.5">
-                <Wert farbe={FARBE.eigen} text="Eigenbeiträge" wert={euro(d.eigenbeitraegeKumuliert)} />
-                {/* Eingerueckt und in Rot: gehoert zu den Eigenbeitraegen
-                    darueber, zaehlt aber NICHT zum Kapital — es ist der Teil,
-                    den die Steuer zurueckgibt. Nur die schwarzen Werte
-                    summieren sich unten zum Kapital. */}
-                {ersparnisHier > 0 && (
-                  <div className="flex items-center justify-between gap-4 pl-3.5">
-                    <dt className="text-rose-600">davon Steuerersparnis</dt>
-                    <dd className="tabular-nums text-rose-600">{euro(ersparnisHier)}</dd>
-                  </div>
-                )}
-                <Wert farbe={FARBE.zulagen} text="Zulagen" wert={euro(d.zulagenKumuliert)} />
-                <Wert farbe={FARBE.gewinn} text="Kursgewinne" wert={euro(d.gewinnKumuliert)} />
-              </dl>
-              {/* Die Summe steht in derselben Flucht wie die Posten darueber:
-                  linksbuendig unter einer Trennlinie musste man die Augen
-                  bewegen, um sie mit den Einzelbetraegen zu vergleichen. */}
-              <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-slate-100 pt-1">
-                <span className="font-bold text-slate-800">Kapital gesamt</span>
-                <span className="font-bold tabular-nums text-slate-800">{euro(d.kapital)}</span>
-              </div>
+          {/*
+            Auf schmalen Schirmen steht der Kasten FEST UNTER dem Diagramm.
+            Schwebend verdeckte er auf 360 Punkten genau die Flaechen, die er
+            erklaeren soll — und der Finger liegt ohnehin darauf.
+          */}
+          {tooltip && (
+            <div className={
+              schmal
+                ? 'mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs'
+                : 'pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg'
+            }>
+              {tooltip}
             </div>
+          )}
+          {schmal && !tooltip && (
+            <p className="mt-2 text-xs text-slate-400">
+              Tippen Sie auf das Diagramm, um die Beträge eines Jahres zu sehen.
+            </p>
           )}
         </div>
       )}

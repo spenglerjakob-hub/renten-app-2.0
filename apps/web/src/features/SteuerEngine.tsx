@@ -13,9 +13,9 @@ function Kachel({
   return (
     <div className="relative overflow-hidden rounded border border-slate-700 bg-slate-800 p-2.5 sm:p-3">
       {akzent && <div className="absolute right-0 top-0 h-full w-1 bg-emerald-500" />}
-      <div className="mb-0.5 text-[9px] uppercase text-slate-400 sm:mb-1 sm:text-[10px]">{titel}</div>
+      <div className="mb-0.5 text-[11px] uppercase text-slate-400 sm:mb-1 sm:text-[10px]">{titel}</div>
       <div className={`text-sm font-bold tabular-nums sm:text-lg ${farbe ?? 'text-white'}`}>{wert}</div>
-      <div className="mt-1 text-[8px] leading-tight text-slate-500 sm:text-[9px]">{erklaerung}</div>
+      <div className="mt-1 text-[11px] leading-tight text-slate-500 sm:text-[9px]">{erklaerung}</div>
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function SteuerEngine({
             <span className="block text-xs font-bold text-white sm:text-sm">
               Steuer- &amp; Abgaben-Engine
             </span>
-            <span className="block text-[9px] text-slate-400 sm:text-[10px]">
+            <span className="block text-[11px] text-slate-400 sm:text-[10px]">
               Transparente Ansicht der Progressions- und KV/PV-Berechnung
             </span>
           </span>

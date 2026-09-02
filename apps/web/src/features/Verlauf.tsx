@@ -1,6 +1,7 @@
 import { useMemo, useState, useId } from 'react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { Karte, euro } from '../components/Feld';
+import { useSchmal } from '../components/useSchmal';
 
 /**
  * Einkommensverlauf.
@@ -14,6 +15,7 @@ export function Verlauf({
 }: { ergebnis: ProjektionsErgebnis; kaufkraftHeute: boolean }) {
   const [alsTabelle, setAlsTabelle] = useState(false);
   const titelId = useId();
+  const schmal = useSchmal();
 
   const daten = useMemo(
     () =>
@@ -34,7 +36,18 @@ export function Verlauf({
   if (daten.length === 0) return null;
 
   const maxWert = Math.max(...daten.map((d) => Math.max(d.netto, d.ziel)), 1) * 1.15;
-  const B = 860, H = 300, L = 62, R = 12, T = 12, U = 34;
+  /*
+    Schmalere viewBox auf dem Telefon statt erzwungener Mindestbreite: ein
+    SVG skaliert seinen Inhalt mit, also schrumpfte die Achsenschrift von 11
+    auf reale vier Punkte, sobald 860 Einheiten auf 330 Bildschirmpunkte
+    fielen. Bei 360 Einheiten steht der Massstab wieder nahe 1:1.
+  */
+  const B = schmal ? 360 : 860;
+  const H = schmal ? 250 : 300;
+  const L = schmal ? 40 : 62;
+  // Genug Rand, dass die letzte Altersmarke ("100") nicht am Rand abschneidet.
+  const R = schmal ? 18 : 12;
+  const T = 12, U = 34;
   const plotB = B - L - R, plotH = H - T - U;
   const x = (i: number) => L + (i / Math.max(1, daten.length - 1)) * plotB;
   const y = (v: number) => T + plotH - (v / maxWert) * plotH;
@@ -76,24 +89,32 @@ export function Verlauf({
 
       {alsTabelle ? (
         <div className="max-h-96 overflow-auto">
-          <table className="w-full text-sm">
+          {/*
+            Auf dem Telefon bleiben Jahr, Alter und die beiden Betraege. Die
+            Phase faellt weg — sie ist die einzige Spalte, die das Diagramm
+            schon ueber die Farbe erzaehlt, und sie kostete hier ein Fuenftel
+            der Breite.
+          */}
+          <table className="w-full text-[11px] sm:text-sm">
             <caption className="sr-only">Haushaltsnetto und Bedarf je Kalenderjahr</caption>
             <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                <th scope="col" className="py-2">Jahr</th>
-                <th scope="col">Alter</th>
-                <th scope="col">Phase</th>
-                <th scope="col" className="text-right">Netto/Monat</th>
+              <tr className="border-b border-slate-200 text-left text-[10px] uppercase text-slate-500 sm:text-xs">
+                <th scope="col" className="py-2 pr-2">Jahr</th>
+                <th scope="col" className="pr-2">Alter</th>
+                <th scope="col" className="hidden pr-2 sm:table-cell">Phase</th>
+                <th scope="col" className="pr-2 text-right">Netto/Monat</th>
                 <th scope="col" className="text-right">Bedarf</th>
               </tr>
             </thead>
             <tbody>
               {daten.map((d) => (
                 <tr key={d.jahr} className="border-b border-slate-50">
-                  <td className="py-1.5 tabular-nums">{d.jahr}</td>
-                  <td className="tabular-nums">{d.alter}</td>
-                  <td className="text-xs text-slate-500">{d.ruhestand ? 'Ruhestand' : d.gemischt ? 'gemischt' : 'Erwerb'}</td>
-                  <td className="text-right tabular-nums">{euro(d.netto)}</td>
+                  <td className="py-1.5 pr-2 tabular-nums">{d.jahr}</td>
+                  <td className="pr-2 tabular-nums">{d.alter}</td>
+                  <td className="hidden pr-2 text-xs text-slate-500 sm:table-cell">
+                    {d.ruhestand ? 'Ruhestand' : d.gemischt ? 'gemischt' : 'Erwerb'}
+                  </td>
+                  <td className="pr-2 text-right tabular-nums">{euro(d.netto)}</td>
                   <td className="text-right tabular-nums text-slate-500">{euro(d.ziel)}</td>
                 </tr>
               ))}
@@ -101,15 +122,19 @@ export function Verlauf({
           </table>
         </div>
       ) : (
+        /*
+          `overflow-x-auto` bleibt fuer breitere Schirme, wo die Mindestbreite
+          noch gilt; auf dem Telefon gibt es nichts mehr zu schieben.
+        */
         <div className="overflow-x-auto">
-          <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full min-w-[600px]" role="img" aria-labelledby={titelId}>
+          <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full sm:min-w-[600px]" role="img" aria-labelledby={titelId}>
             <title id={titelId}>{zusammenfassung}</title>
             {[0, 0.25, 0.5, 0.75, 1].map((q) => {
               const v = maxWert * q;
               return (
                 <g key={q}>
                   <line x1={L} y1={y(v)} x2={B - R} y2={y(v)} stroke="#e2e8f0" strokeWidth="1" />
-                  <text x={L - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#64748b">
+                  <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize={schmal ? 12 : 11} fill="#64748b">
                     {v >= 1000 ? `${Math.round(v / 1000)}k` : Math.round(v)}
                   </text>
                 </g>
@@ -130,13 +155,23 @@ export function Verlauf({
             <path d={zielPfad} fill="none" stroke="#f43f5e" strokeWidth="2" />
             <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke="#94a3b8" strokeWidth="1.5" />
             {daten.map((d, i) =>
-              d.alter % 5 === 0 ? (
-                <text key={d.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="#64748b">
+              d.alter % (schmal ? 10 : 5) === 0 ? (
+                <text key={d.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize={schmal ? 12 : 11} fill="#64748b">
                   {d.alter}
                 </text>
               ) : null,
             )}
-            <text x={L} y={H - 1} fontSize="10" fill="#94a3b8">Alter</text>
+            {/* Rechts statt links: auf dem Telefon stand die Achsen-
+                bezeichnung sonst unmittelbar unter der ersten Altersmarke. */}
+            <text
+              x={schmal ? B - R : L}
+              y={H - 1}
+              textAnchor={schmal ? 'end' : 'start'}
+              fontSize={schmal ? 11 : 10}
+              fill="#94a3b8"
+            >
+              Alter
+            </text>
           </svg>
         </div>
       )}

@@ -50,7 +50,7 @@ function SchichtBlock({
                 {w(p.nettoJahr)}
               </span>
             </div>
-            <div className="flex flex-col gap-1 text-[9px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
+            <div className="flex flex-col gap-1 text-[11px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
               <span>Brutto: {w(p.bruttoJahr)}</span>
               <span className="leading-tight text-rose-500 sm:text-right">
                 KV/PV: {w(p.kvPvJahr)} | Steuer: {w(p.steuerJahr)}
@@ -113,7 +113,7 @@ export function Kassenbon({
 
       {/* Gestapelter Fortschrittsbalken */}
       <div className="mb-5 sm:mb-6">
-        <div className="mb-1 flex justify-between text-[9px] font-bold uppercase text-slate-500 sm:text-[10px]">
+        <div className="mb-1 flex justify-between text-[11px] font-bold uppercase text-slate-500 sm:text-[10px]">
           <span>Ziel-Erreichung</span>
           <span>
             {luecke > 0
@@ -135,7 +135,7 @@ export function Kassenbon({
             <div style={{ width: `${(luecke / skala) * 100}%` }} className="bg-white transition-all duration-500" />
           )}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-2 text-[8px] font-semibold text-slate-500 sm:mt-2 sm:gap-3 sm:text-[9px]">
+        <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500 sm:mt-2 sm:gap-3 sm:text-[9px]">
           {nachSchicht.map(({ schicht }) => (
             <span key={schicht} className="flex items-center gap-1">
               <span className={`h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2 ${SCHICHT[schicht].punkt}`} />
@@ -185,7 +185,7 @@ export function Kassenbon({
                     {euro(a.nettoKapital * kaufkraft(a.jahr))}
                   </span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[9px] text-slate-500 sm:text-[10px]">
+                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500 sm:text-[10px]">
                   <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
                   {/*
                     NICHT "Abgeltungsteuer": beim Depot stimmt das, bei einer
