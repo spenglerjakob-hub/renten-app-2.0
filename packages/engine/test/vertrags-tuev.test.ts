@@ -51,6 +51,8 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
     jahresbrutto: 54_000,
     zveHeute: 40_000,
     beamter: false,
+    privatVersichert: false,
+    pkvPraemieMonat: 0,
     rentenbeginnJahr: 2042,
     alterBeiRentenbeginn: 67,
     bruttoRenteMonat: 400,
@@ -562,5 +564,129 @@ describe('Auszahldauer: Auszahlplan gegen lebenslange Rente', () => {
       );
       expect(r.jahreAuszahlung, typ).toBe(12);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+
+describe('Entgeltumwandlung bei privater Krankenversicherung', () => {
+  const bav = (k: TuevKontext, beitragMonat = 200) =>
+    vertragsTuev(
+      vertrag({ typ: 'bav', schicht: 2 }),
+      annahmen({ beitragMonat }),
+      k,
+      szenario,
+      p,
+    );
+
+  /** Weit unter beiden Beitragsbemessungsgrenzen. */
+  const brutto = 54_000;
+
+  it('rechnet privat Versicherten keine KV/PV-Ersparnis an', () => {
+    /*
+      DER GEMELDETE BEFUND: Die Ersparnis war fuer jeden Nicht-Beamten gleich,
+      `kvStatus` wurde gar nicht gelesen. Eine private Praemie haengt aber am
+      Vertrag, nicht am Gehalt.
+    */
+    const gkv = bav(kontext({ jahresbrutto: brutto }));
+    const pkv = bav(kontext({
+      jahresbrutto: brutto, privatVersichert: true, pkvPraemieMonat: 600,
+    }));
+    expect(pkv.svErsparnisMonat).toBeLessThan(gkv.svErsparnisMonat);
+  });
+
+  /*
+    ENTSCHEIDEND IST NICHT DIE BEITRAGSBEMESSUNGSGRENZE, sondern welcher der
+    beiden Deckel des § 257 SGB V greift. Der Zuschuss ist das Kleinere aus
+    "halber Beitragssatz auf das Entgelt" und "halbe Praemie". Nur solange die
+    gehaltsbezogene Groesse die kleinere ist, bewegt er sich mit einer
+    Umwandlung — und das ist er, wenn die Praemie mehr als rund 21 % des
+    Monatsbruttos ausmacht.
+  */
+  it('laesst den Zuschuss unberuehrt, solange er am Praemiendeckel haengt', () => {
+    // 600 EUR Praemie auf 4 500 EUR Monatsbrutto: der Praemiendeckel greift,
+    // der Zuschuss ruehrt sich nicht. Der haeufigere Fall.
+    const r = bav(kontext({
+      jahresbrutto: brutto, privatVersichert: true, pkvPraemieMonat: 600,
+    }));
+    const nurRvAv = 200 * (p.rvSatzGesamt / 2 + p.avSatzGesamt / 2);
+    expect(r.svErsparnisMonat).toBeCloseTo(nurRvAv, 6);
+  });
+
+  it('verliert bei hoher Praemie den Arbeitgeberzuschuss mit', () => {
+    // 800 EUR Praemie auf 3 333 EUR Monatsbrutto — eine Familienpraemie auf
+    // mittlerem Gehalt. Jetzt bemisst sich der Zuschuss am Entgelt und sinkt
+    // mit: 10,55 % verlorener Zuschuss gegen 10,60 % RV/AV, es bleiben Cent.
+    const r = bav(kontext({
+      jahresbrutto: 40_000, zveHeute: 30_000,
+      privatVersichert: true, pkvPraemieMonat: 800,
+    }));
+    expect(Math.abs(r.svErsparnisMonat)).toBeLessThan(1);
+    expect(r.hinweise.join(' ')).toContain('§ 257 SGB V');
+  });
+
+  it('behaelt sonst die vollen RV/AV-Anteile', () => {
+    const hoch = kontext({
+      jahresbrutto: p.bbgKvJahr + 15_000, zveHeute: 80_000,
+      privatVersichert: true, pkvPraemieMonat: 900,
+    });
+    const r = bav(hoch);
+    const erwartet = 200 * (p.rvSatzGesamt / 2 + p.avSatzGesamt / 2);
+    expect(r.svErsparnisMonat).toBeCloseTo(erwartet, 6);
+  });
+
+  it('nennt den Grund im Hinweis', () => {
+    const r = bav(kontext({
+      jahresbrutto: p.bbgKvJahr + 15_000, zveHeute: 80_000,
+      privatVersichert: true, pkvPraemieMonat: 900,
+    }));
+    expect(r.hinweise.join(' ')).toContain('privat krankenversichert');
+    // Ohne bewegten Zuschuss darf der zweite Hinweis NICHT erscheinen.
+    expect(r.hinweise.join(' ')).not.toContain('§ 257 SGB V');
+  });
+
+  it('laesst einen Beamten bei null, ob privat versichert oder nicht', () => {
+    for (const privatVersichert of [true, false]) {
+      const r = bav(kontext({ beamter: true, privatVersichert, pkvPraemieMonat: 400 }));
+      expect(r.svErsparnisMonat, String(privatVersichert)).toBe(0);
+    }
+  });
+});
+
+describe('Beitragsbemessungsgrenze: der Teil darunter zaehlt', () => {
+  const bav = (jahresbrutto: number, beitragMonat: number) =>
+    vertragsTuev(
+      vertrag({ typ: 'bav', schicht: 2 }),
+      annahmen({ beitragMonat }),
+      kontext({ jahresbrutto, zveHeute: jahresbrutto * 0.75 }),
+      szenario,
+      p,
+    );
+
+  it('springt an der Grenze nicht mehr auf null', () => {
+    /*
+      BEFUND: `jahresbrutto < bbg` entschied ueber das VOLLE Gehalt. Wer knapp
+      darueber lag, bekam gar keine KV/PV-Ersparnis — obwohl die Umwandlung
+      ihn darunter bringt.
+    */
+    const beitrag = 300;                       // 3 600 EUR im Jahr
+    const knappDrueber = bav(p.bbgKvJahr + 1_200, beitrag);
+    const klarDrunter = bav(p.bbgKvJahr - 20_000, beitrag);
+    const klarDrueber = bav(p.bbgKvJahr + 40_000, beitrag);
+
+    // Ein Teil der Umwandlung liegt unter der Grenze, also zaehlt er auch.
+    expect(knappDrueber.svErsparnisMonat).toBeGreaterThan(klarDrueber.svErsparnisMonat);
+    // Aber nicht so viel wie bei jemandem, der ganz darunter liegt.
+    expect(knappDrueber.svErsparnisMonat).toBeLessThan(klarDrunter.svErsparnisMonat);
+  });
+
+  it('aendert an den klaren Faellen nichts', () => {
+    // Regressionsprobe: weit unter beiden Grenzen bleibt es beim vollen Satz.
+    const r = bav(54_000, 200);
+    const voll = 200 * (
+      p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2 + p.pv.satz / 2
+      + p.rvSatzGesamt / 2 + p.avSatzGesamt / 2
+    );
+    expect(r.svErsparnisMonat).toBeCloseTo(voll, 6);
   });
 });

@@ -300,7 +300,11 @@ export function VertragsTuev({
                         {r.agZuschussMonat > 0 && (
                           <GegenueberZeile text="− AG-Zuschuss" wert={euro(r.agZuschussMonat)} farbe="text-emerald-600" />
                         )}
-                        {r.svErsparnisMonat > 0 && (
+                        {/* Erst ab einem halben Euro: bei privat
+                            Versicherten bleiben nach dem wegfallenden
+                            Arbeitgeberzuschuss manchmal Cent uebrig, und eine
+                            Zeile "SV-Ersparnis 0 \u20ac" sagt weniger als keine. */}
+                        {r.svErsparnisMonat >= 0.5 && (
                           <GegenueberZeile text="− SV-Ersparnis" wert={euro(r.svErsparnisMonat)} farbe="text-emerald-600" />
                         )}
                         {r.steuerersparnisMonat > 0 && (

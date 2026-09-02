@@ -1,4 +1,5 @@
 import type { LegalParameters } from '../params/types.js';
+import { arbeitgeberzuschuss, PKV_BASISANTEIL } from '../social/pkv.js';
 import type { Szenario, Vertrag } from '../model.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
 import { riesterZulagen, riesterZulagenkuerzung } from '../products/bav.js';
@@ -85,6 +86,16 @@ export interface TuevKontext {
    * gutgeschrieben, die es nicht geben kann.
    */
   beamter: boolean;
+  /**
+   * Privat krankenversichert.
+   *
+   * Ohne diese Angabe rechnete der TUEV jedem Nicht-Beamten den KV/PV-Anteil
+   * als Ersparnis an — bei einem privat Versicherten das Doppelte des
+   * Richtigen. Seine Praemie haengt am Vertrag, nicht am Gehalt.
+   */
+  privatVersichert: boolean;
+  /** Monatliche PKV-Praemie — Bezugsgroesse fuer den Arbeitgeberzuschuss */
+  pkvPraemieMonat: number;
   /** Jahresbruttogehalt heute — Basis fuer die SV-Ersparnis */
   jahresbrutto: number;
   /** Zu versteuerndes Einkommen heute — Basis fuer die Steuerersparnis */
@@ -204,38 +215,122 @@ function auszahlungsdauer(
   return Math.min(bisLebensende, fest);
 }
 
-/**
- * Je Euro umgewandeltem Entgelt: um wie viel der abziehbare Vorsorgeaufwand
- * sinkt (§ 10 Abs. 1 Nr. 2 und 3 EStG).
- *
- * Ein SATZ, kein Verhaeltnis. Rentenversicherung voll, Krankenversicherung zu
- * 96 % (der Rest entfaellt auf Krankengeld), Pflegeversicherung voll — je
- * Arbeitnehmeranteil. Die Arbeitslosenversicherung bleibt aussen vor, sie ist
- * kein Vorsorgeaufwand im Sinne der Vorschrift.
- */
-function abzugsfaehigeSvQuote(beamter: boolean, p: LegalParameters): number {
-  if (beamter) return 0;
-  return p.rvSatzGesamt / 2
-    + (p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2) * 0.96
-    + p.pv.satz / 2;
+/** Was eine Entgeltumwandlung an Sozialabgaben bewirkt. */
+export interface SvWirkung {
+  /** Ersparnis an Sozialabgaben, Jahresbetrag */
+  ersparnis: number;
+  /** Um so viel sinkt der abziehbare Vorsorgeaufwand (§ 10 EStG) */
+  wegfallenderAbzug: number;
+  /**
+   * Was vom Arbeitgeberzuschuss zur PKV verloren geht, Jahresbetrag.
+   *
+   * Steht hier und nicht nur in `ersparnis`, damit der Hinweistext ihn beim
+   * Namen nennen kann. Bei gesetzlich Versicherten und Beamten immer 0.
+   */
+  verlorenerZuschuss: number;
 }
 
-/** Sozialversicherungsersparnis je Euro Entgeltumwandlung. */
-function svErsparnisQuote(jahresbrutto: number, beamter: boolean, p: LegalParameters): number {
+/**
+ * Der Teil einer Umwandlung, der die Bemessungsgrundlage tatsaechlich senkt.
+ *
+ * BEFUND: Vorher entschied `jahresbrutto < bbg` ueber das VOLLE Gehalt. Wer
+ * knapp ueber der Grenze lag, bekam gar keine Ersparnis zugerechnet — obwohl
+ * die Umwandlung ihn darunter bringt. Diese Differenz deckt alle drei Lagen
+ * von selbst ab: ganz unterhalb, ueber die Grenze hinweg, ganz oberhalb.
+ */
+function anteilUnterGrenze(brutto: number, umwandlung: number, bbg: number): number {
+  const vorher = Math.min(Math.max(0, brutto), bbg);
+  const nachher = Math.min(Math.max(0, brutto - umwandlung), bbg);
+  return Math.max(0, vorher - nachher);
+}
+
+/**
+ * Was eine Entgeltumwandlung an Sozialabgaben spart — und was sie beim
+ * Sonderausgabenabzug kostet.
+ *
+ * EIN BETRAG, KEIN SATZ. Bei einem privat Versicherten haengt die Wirkung am
+ * Deckel des Arbeitgeberzuschusses, und ein Deckel laesst sich nicht als
+ * Prozentsatz ausdruecken.
+ *
+ * BEIDE WIRKUNGEN IN EINER FUNKTION, weil sie dieselbe Grenzlogik brauchen.
+ * Vorher standen sie als zwei Saetze nebeneinander, mussten dieselbe
+ * Fallunterscheidung treffen und taten es unterschiedlich — genau daran ist
+ * der PKV-Fall gescheitert.
+ *
+ * BEFUND: Beide kannten nur `beamter` und rechneten jedem Nicht-Beamten den
+ * KV/PV-Anteil an. Eine private Krankenversicherung haengt aber nicht am
+ * Gehalt: sie ist ein Vertragsbeitrag, und ein umgewandelter Euro senkt sie
+ * um nichts. Die ausgewiesene Ersparnis war dadurch bei privat Versicherten
+ * doppelt so hoch wie in Wirklichkeit (21,15 % statt 10,60 % im Rechtsstand
+ * 2026).
+ */
+function svWirkung(
+  umwandlungJahr: number,
+  k: TuevKontext,
+  p: LegalParameters,
+): SvWirkung {
   // Beamte zahlen weder Renten- noch Arbeitslosenversicherung und sind ueber
   // die Beihilfe abgesichert. Bei ihnen spart eine Entgeltumwandlung nichts.
-  if (beamter) return 0;
+  if (k.beamter) return { ersparnis: 0, wegfallenderAbzug: 0, verlorenerZuschuss: 0 };
 
-  // Entgeltumwandlung spart nur, soweit das Gehalt UNTER der jeweiligen
-  // Beitragsbemessungsgrenze liegt. Oberhalb der BBG entsteht keine
-  // Ersparnis — der Prototyp rechnete sie dort trotzdem an.
-  const unterKvBbg = jahresbrutto < p.bbgKvJahr;
-  const unterRvBbg = jahresbrutto < p.bbgRvJahr;
+  const u = Math.max(0, umwandlungJahr);
+  const rvTeil = anteilUnterGrenze(k.jahresbrutto, u, p.bbgRvJahr);
+  const rvSatz = p.rvSatzGesamt / 2;
+  const avSatz = p.avSatzGesamt / 2;
 
-  let quote = 0;
-  if (unterKvBbg) quote += p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2 + p.pv.satz / 2;
-  if (unterRvBbg) quote += p.rvSatzGesamt / 2 + p.avSatzGesamt / 2;
-  return quote;
+  if (k.privatVersichert) {
+    /*
+      Kranken- und Pflegeversicherung sparen nichts — die Praemie haengt am
+      Vertrag, nicht am Gehalt. Stattdessen KOSTET die Umwandlung etwas: der
+      Arbeitgeberzuschuss nach § 257 SGB V bemisst sich am beitragspflichtigen
+      Entgelt, und eine Umwandlung nach § 3 Nr. 63 EStG senkt genau dieses
+      Entgelt.
+
+      Als Differenz gerechnet, damit der Deckel "hoechstens die halbe Praemie"
+      sich von selbst regelt. WANN er ueberhaupt greift, ist der Punkt: der
+      Zuschuss bewegt sich nur, solange die GEHALTSBEZOGENE Groesse die
+      kleinere ist — also solange die Praemie mehr als rund 21 % des
+      Monatsbruttos ausmacht. Das ist der Fall einer Familienpraemie auf einem
+      mittleren Gehalt, nicht der Regelfall.
+
+      Trifft er zu, frisst der verlorene Zuschuss (10,55 %) die Ersparnis bei
+      Renten- und Arbeitslosenversicherung (10,60 %) nahezu vollstaendig auf:
+      es bleiben Cent. Andernfalls steht der Zuschuss am Praemiendeckel und
+      ruehrt sich nicht.
+    */
+    const verlorenerZuschuss = Math.max(0,
+      arbeitgeberzuschuss(k.pkvPraemieMonat, k.jahresbrutto, p)
+      - arbeitgeberzuschuss(k.pkvPraemieMonat, k.jahresbrutto - u, p)) * 12;
+
+    return {
+      verlorenerZuschuss,
+      ersparnis: rvTeil * (rvSatz + avSatz) - verlorenerZuschuss,
+      /*
+        Kein Vorzeichenfehler: sinkt der Zuschuss, steigt der EIGENE
+        Praemienanteil — und der ist zu 80 % Sonderausgabe. Der abziehbare
+        Aufwand faellt also weniger stark, als die Rentenversicherung allein
+        ergaebe, und kann sogar steigen. Dann ist der Wert negativ, und die
+        zvE-Minderung faellt entsprechend groesser aus. Das ist richtig so.
+      */
+      wegfallenderAbzug: rvTeil * rvSatz - verlorenerZuschuss * PKV_BASISANTEIL,
+    };
+  }
+
+  const kvTeil = anteilUnterGrenze(k.jahresbrutto, u, p.bbgKvJahr);
+  const kvSatz = p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2;
+  const pvSatz = p.pv.satz / 2;
+
+  return {
+    verlorenerZuschuss: 0,
+    ersparnis: kvTeil * (kvSatz + pvSatz) + rvTeil * (rvSatz + avSatz),
+    /*
+      Rentenversicherung voll, Krankenversicherung zu 96 % (der Rest entfaellt
+      auf das Krankengeld, § 10 Abs. 1 Nr. 3 Buchst. a S. 4 EStG),
+      Pflegeversicherung voll. Die Arbeitslosenversicherung bleibt aussen vor,
+      sie ist kein Vorsorgeaufwand im Sinne der Vorschrift.
+    */
+    wegfallenderAbzug: rvTeil * rvSatz + kvTeil * (kvSatz * 0.96 + pvSatz),
+  };
 }
 
 export function vertragsTuev(
@@ -255,13 +350,48 @@ export function vertragsTuev(
   const jahreEinzahlung = Math.max(1, k.rentenbeginnJahr - a.beginnJahr);
   const jahreAuszahlung = auszahlungsdauer(v, a, k);
 
-  const svQuote = svErsparnisQuote(k.jahresbrutto, k.beamter, p);
-  if (svQuote === 0 && v.typ.startsWith('bav')) {
-    hinweise.push(k.beamter
-      ? 'Als Beamter zahlen Sie keine Sozialabgaben. Eine Entgeltumwandlung spart hier '
-        + 'nur Steuern, keine Beiträge.'
-      : 'Das Gehalt liegt über beiden Beitragsbemessungsgrenzen. Eine Entgeltumwandlung '
-        + 'spart hier keine Sozialabgaben mehr.');
+  /*
+    Zur Beurteilung der Lage genuegt eine Probe mit dem tatsaechlichen
+    Beitrag: nur so schlaegt der Deckel des Arbeitgeberzuschusses richtig
+    durch. Der Betrag selbst wird spaeter je Jahr neu gerechnet, weil er mit
+    der Beitragsdynamik waechst.
+  */
+  const probe = svWirkung(a.beitragMonat * 12, k, p);
+  if (v.typ.startsWith('bav')) {
+    if (k.beamter) {
+      hinweise.push(
+        'Als Beamter zahlen Sie keine Sozialabgaben. Eine Entgeltumwandlung spart hier '
+        + 'nur Steuern, keine Beiträge.',
+      );
+    } else if (k.privatVersichert) {
+      /*
+        Der wichtigste der drei Hinweise: er dreht die Aussage um. Wer privat
+        versichert ist und unter der Beitragsbemessungsgrenze verdient, spart
+        durch eine Entgeltumwandlung sozialversicherungsrechtlich fast nichts
+        — der verlorene Arbeitgeberzuschuss frisst die Ersparnis bei Renten-
+        und Arbeitslosenversicherung nahezu auf.
+      */
+      hinweise.push(
+        'Sie sind privat krankenversichert: Ihre Prämie hängt am Vertrag, nicht am Gehalt. '
+        + 'Eine Entgeltumwandlung spart deshalb keine Kranken- und Pflegebeiträge, sondern '
+        + 'nur Renten- und Arbeitslosenversicherung.',
+      );
+      if (probe.verlorenerZuschuss > 0.5) {
+        hinweise.push(
+          'Ihre Prämie ist im Verhältnis zum Gehalt so hoch, dass sich der Zuschuss Ihres '
+          + 'Arbeitgebers nach dem beitragspflichtigen Entgelt bemisst (§ 257 SGB V) — und '
+          + 'mit der Umwandlung sinkt. Das kostet Sie '
+          + `${euroText(probe.verlorenerZuschuss / 12)} im Monat und hebt die Ersparnis bei `
+          + 'Renten- und Arbeitslosenversicherung nahezu auf. Die Umwandlung lohnt sich für '
+          + 'Sie über die Steuer, nicht über die Sozialabgaben.',
+        );
+      }
+    } else if (probe.ersparnis <= 0.01) {
+      hinweise.push(
+        'Das Gehalt liegt über beiden Beitragsbemessungsgrenzen. Eine Entgeltumwandlung '
+        + 'spart hier keine Sozialabgaben mehr.',
+      );
+    }
   }
 
   const einzahlungenJeJahr: number[] = [];
@@ -365,14 +495,18 @@ export function vertragsTuev(
         ? eigenanteil
         : Math.min(eigenanteil, STEUER_FREI_QUOTE * p.bbgRvJahr);
 
-      svJahr = svFrei * svQuote;
+      /*
+        Beitragsfrei ist nur, was unter 4 % der Beitragsbemessungsgrenze
+        bleibt — also wirkt auch nur dieser Teil auf die Sozialabgaben.
+      */
+      const wirkung = svWirkung(svFrei, k, p);
+      svJahr = wirkung.ersparnis;
 
       // Die Entgeltumwandlung mindert das zvE nicht um den vollen Betrag: mit
       // dem Bruttolohn sinken auch die abzugsfaehigen Vorsorgeaufwendungen.
       // Naeherung — der genaue Wert haengt davon ab, welche Beitraege im
       // Einzelfall unter den Hoechstbetrag des § 10 Abs. 3 EStG passen.
-      const wegfallenderVorsorgeabzug = svFrei * abzugsfaehigeSvQuote(k.beamter, p);
-      const zveMinderung = Math.max(0, steuerFrei - wegfallenderVorsorgeabzug);
+      const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
 
       steuerJahr = zusatzsteuer(k.zveHeute - zveMinderung, zveMinderung, steuerOpt, p);
       aufwandJahr = Math.max(0, eigenanteil - steuerJahr - svJahr);

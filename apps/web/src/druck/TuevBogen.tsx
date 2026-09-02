@@ -74,7 +74,7 @@ export function TuevBogen({
           {r.agZuschussMonat > 0 && (
             <Angabe feld="− Arbeitgeberzuschuss" wert={euro(r.agZuschussMonat)} />
           )}
-          {r.svErsparnisMonat > 0 && (
+          {r.svErsparnisMonat >= 0.5 && (
             <Angabe feld="− Ersparnis Sozialabgaben" wert={euro(r.svErsparnisMonat)} />
           )}
           {r.steuerersparnisMonat > 0 && (

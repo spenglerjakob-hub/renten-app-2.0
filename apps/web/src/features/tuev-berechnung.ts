@@ -118,6 +118,17 @@ export function tuevPositionen(
         jahresbrutto: basis.jahresbrutto,
         zveHeute: basis.zve,
         beamter: szenario.einkommenHeute.modus === 'besoldung',
+        /*
+          Ohne diese beiden Angaben rechnete der TUEV jedem Nicht-Beamten den
+          KV/PV-Anteil als Ersparnis an — bei einem privat Versicherten das
+          Doppelte des Richtigen. Die Praemie ist Bezugsgroesse fuer den
+          Arbeitgeberzuschuss, der mit dem umgewandelten Entgelt sinkt; ohne
+          Entlastungstarif, denn der Zuschuss haengt an der Praemie.
+        */
+        privatVersichert: szenario.haushalt.kvStatus === 'pkv',
+        pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv'
+          ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
+          : 0,
         rentenbeginnJahr,
         alterBeiRentenbeginn,
         bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
