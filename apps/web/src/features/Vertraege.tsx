@@ -58,13 +58,20 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   const betrag = kopfBetrag(v);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60">
+    /*
+      Weiss auf getoentem Grund, nicht umgekehrt. Die Karte steht in der
+      Eingabespalte, die seit der Farbtrennung indigo hinterlegt ist — und
+      IN dieser Karte ist Indigo bereits die Ergebnisfarbe (Depotwert,
+      AVD-Werte, Kinder-Block weiter unten). Bliebe die Karte getoent,
+      verschwaenden genau diese Bloecke im Untergrund.
+    */
+    <div className="rounded-lg border border-indigo-100 bg-white">
       <div className="flex items-center gap-1 p-2 sm:p-3">
         <button
           type="button"
           onClick={() => setOffen((x) => !x)}
           aria-expanded={offen}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-100"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-50"
         >
           <ChevronDown
             className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
@@ -92,7 +99,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         </button>
       </div>
 
-      <div className={`border-t border-slate-200 p-3 ${offen ? 'block' : 'hidden'}`}>
+      <div className={`border-t border-indigo-100 p-3 ${offen ? 'block' : 'hidden'}`}>
       <div className="mb-3 grid gap-3 sm:grid-cols-2">
         <AuswahlFeld label="Vertragsart" wert={v.typ}
           onChange={(t) => vertragAendern(v.id, { typ: t })}
@@ -391,7 +398,7 @@ export function Vertraege({
     <Abschnitt titel={SCHICHT_TITEL[schicht]}>
       <div className="space-y-3">
         {vertraege.length === 0 && (
-          <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+          <p className="rounded-lg border border-dashed border-indigo-300 px-4 py-6 text-center text-sm text-slate-500">
             Noch kein Vertrag in dieser Schicht.
           </p>
         )}
@@ -408,7 +415,7 @@ export function Vertraege({
         <button
           type="button"
           onClick={() => vertragHinzufuegen(schicht)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-700"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-indigo-300 bg-white/60 py-2 text-sm font-medium text-slate-600 hover:border-indigo-500 hover:text-indigo-700"
         >
           <PlusCircle className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
         </button>

@@ -4,7 +4,7 @@ import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
 import { tuevPositionen, tuevBasis } from './tuev-berechnung';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
-  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent,
+  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent, TON,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 
@@ -137,9 +137,12 @@ export function VertragsTuev({
                 </header>
 
                 <div className="grid gap-4 p-4 lg:grid-cols-3 lg:gap-6">
-                  {/* 1) ANNAHMEN */}
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {/* 1) ANNAHMEN
+                      Getoent wie die Eingabespalte oben: die Regel „hier
+                      tragen Sie ein" soll auch hier unten gelten, wo Eingabe
+                      und Auswertung dicht nebeneinander stehen. */}
+                  <div className={`space-y-3 rounded-lg border p-3 ${TON.eingabe}`}>
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       1. Ihre Annahmen
                     </h4>
                     <ZahlFeld
@@ -182,7 +185,7 @@ export function VertragsTuev({
                     </div>
 
                     {v.typ === 'riester' && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                      <div className="rounded-lg border border-slate-200 bg-white p-2.5">
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                             Kinder (Zulage) — für diesen Vertrag
@@ -238,7 +241,9 @@ export function VertragsTuev({
                       Riester es anders macht, steht in beiden Ueberschriften.
                     */}
                     {v.typ === 'avd' && (
-                      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2.5">
+                      /* Weiss, nicht indigo: der Kasten steht jetzt selbst auf
+                         indigofarbenem Grund und waere darin untergegangen. */
+                      <div className="rounded-lg border border-indigo-300 bg-white p-2.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
                           Kinder (Zulage) — aus Ihren Basisdaten
                         </span>

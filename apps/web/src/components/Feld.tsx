@@ -20,8 +20,10 @@ export function ZahlFeld(props: {
   einheit?: string;
   hilfe?: string;
   id?: string;
+  /** Groesseres Feld fuer die eine Zahl, an der alles Weitere haengt. */
+  gross?: boolean;
 }) {
-  const { label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe } = props;
+  const { label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross } = props;
   /*
     Die Kennung kam frueher aus der BESCHRIFTUNG. Steht dieselbe Beschriftung
     zweimal auf der Seite — zwei Vertragskarten, Person A und Person B —,
@@ -59,12 +61,18 @@ export function ZahlFeld(props: {
           onChange={(e) => uebernehmen(e.target.value)}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : undefined}
-          className={`w-full rounded-md border p-2 text-sm font-medium tabular-nums ${
+          className={`w-full rounded-md border font-medium tabular-nums ${
+            gross ? 'p-3 text-xl font-bold' : 'p-2 text-sm'
+          } ${
             fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
-          } ${einheit ? 'pr-10' : ''}`}
+          } ${einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
         />
         {einheit && (
-          <span className="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">{einheit}</span>
+          <span className={`pointer-events-none absolute text-slate-400 ${
+            gross ? 'right-4 top-3.5 text-lg' : 'right-3 top-2 text-sm'
+          }`}>
+            {einheit}
+          </span>
         )}
       </div>
       {fehler && <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>}
@@ -243,9 +251,38 @@ export function Schalter(props: { label: string; wert: boolean; onChange: (b: bo
   );
 }
 
-export function Karte(props: { titel: string; kopfzeile?: ReactNode; children: ReactNode; klasse?: string }) {
+/**
+ * Eingabe oder Ergebnis — die Grundfarbe einer Karte.
+ *
+ * Auf der Seite zum Altersvorsorgedepot steht die Eingabespalte seit jeher
+ * auf getoentem Grund mit kraeftigem Rand, die Ergebnisse auf weissen
+ * Karten. Der Rechner macht es jetzt genauso.
+ *
+ * Bewusst eine VARIANTE und keine ueber `klasse` nachgeschobene Klasse:
+ * `bg-white` und `bg-indigo-50/50` haben dieselbe Spezifitaet, und welche
+ * von beiden gewinnt, entscheidet dann die Reihenfolge im erzeugten
+ * Stylesheet — nicht die Reihenfolge im Klassenstring. Das waere eine
+ * Wette, keine Regel.
+ */
+export type Ton = 'ergebnis' | 'eingabe';
+
+/**
+ * Exportiert, weil zwei Flaechen den Eingabeton tragen, die keine Karte
+ * sind: die Vertragskarte mit der Reiterleiste (`App.tsx`) und der Block
+ * „1. Ihre Annahmen" im Vertrags-TUEV. Dieselbe Farbe an drei Stellen
+ * abzuschreiben hiesse, dass sie beim naechsten Mal an zweien geaendert
+ * wird.
+ */
+export const TON: Record<Ton, string> = {
+  ergebnis: 'border-slate-200 bg-white',
+  eingabe: 'border-2 border-indigo-200 bg-indigo-50/50',
+};
+
+export function Karte(props: {
+  titel: string; kopfzeile?: ReactNode; children: ReactNode; klasse?: string; ton?: Ton;
+}) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white shadow-sm druckbereich ${props.klasse ?? ''}`}>
+    <section className={`rounded-xl border shadow-sm druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
       <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-bold text-slate-700">{props.titel}</h2>
         {props.kopfzeile}
@@ -286,14 +323,18 @@ export function AkkordeonKarte(props: {
   kopfzeile?: ReactNode;
   children: ReactNode;
   klasse?: string;
+  ton?: Ton;
 }) {
+  const eingabe = props.ton === 'eingabe';
   return (
-    <section className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich ${props.klasse ?? ''}`}>
+    <section className={`overflow-hidden rounded-xl border shadow-sm druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
       <button
         type="button"
         onClick={props.onUmschalten}
         aria-expanded={props.offen}
-        className="druck-kopf flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+        className={`druck-kopf flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left ${
+          eingabe ? 'border-indigo-100 hover:bg-indigo-100/40' : 'border-slate-100 hover:bg-slate-50'
+        }`}
       >
         <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700">
           {props.symbol}

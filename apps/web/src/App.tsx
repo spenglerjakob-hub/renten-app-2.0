@@ -20,7 +20,7 @@ import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
-import { AkkordeonKarte, euro } from './components/Feld';
+import { AkkordeonKarte, euro, TON } from './components/Feld';
 
 type Reiter = 's1' | 's2' | 's3' | 'planer';
 type Ansicht = 'kassenbon' | 'verlauf';
@@ -127,7 +127,14 @@ export default function App() {
   const verheiratet = szenario.haushalt.verheiratet;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-28 text-slate-800 sm:pb-36 print:pb-0">
+    /*
+      Grauer Seitengrund wie auf der Landingpage (`avd/Seite.tsx`), nicht
+      fast-weiss. Er ist die Voraussetzung dafuer, dass die Farbtrennung
+      ueberhaupt traegt: erst gegen ein graues Blatt heben sich die weissen
+      Ergebniskarten rechts UND der getoente Eingabegrund links ab. Auf
+      `slate-50` verschwammen beide mit der Seite.
+    */
+    <div className="min-h-screen bg-slate-100 pb-28 text-slate-800 sm:pb-36 print:pb-0">
       {/* KOPFZEILE */}
       <header
         className={`sticky top-0 z-50 bg-slate-900 text-white shadow-md transition-all print:hidden ${
@@ -296,25 +303,38 @@ export default function App() {
       )}
 
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 p-2 sm:gap-8 sm:p-6 lg:grid-cols-12 print:hidden">
-        {/* LINKE SPALTE: EINGABEN */}
+        {/*
+          LINKE SPALTE: EINGABEN
+
+          Getoenter Grund mit kraeftigem Rand, wie auf der Seite zum
+          Altersvorsorgedepot. Rechts stehen die Ergebnisse auf weissen
+          Karten. Ohne diesen Unterschied sehen Eingabe und Ergebnis gleich
+          aus, und man muss erst lesen, um zu wissen, wo man etwas eintraegt.
+        */}
         <div className="space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-5 print:hidden">
           <AkkordeonKarte
             titel="Allgemeine Daten & Ziel"
             offen={basisOffen}
             onUmschalten={() => setBasisOffen((v) => !v)}
-            symbol={<User className="h-4 w-4 text-slate-400" aria-hidden />}
+            symbol={<User className="h-4 w-4 text-indigo-400" aria-hidden />}
+            ton="eingabe"
           >
-            <Basisdaten onEhepartnerDialog={() => setEhepartnerDialog(true)} />
+            <Basisdaten
+              ergebnis={ergebnis ?? null}
+              onEhepartnerDialog={() => setEhepartnerDialog(true)}
+            />
           </AkkordeonKarte>
 
-          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <section className={`overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
             <Reiterleiste
               reiter={REITER}
               aktiv={reiter}
               onWechsel={setReiter}
               beschriftung="Versorgungsschichten"
             />
-            <div className="min-h-[300px] bg-slate-50/50 p-3 sm:min-h-[400px] sm:p-4">
+            {/* Kein eigener Grundton: die Flaeche traegt den der Karte, damit
+                die weissen Vertragskarten darauf hervortreten. */}
+            <div className="min-h-[300px] p-3 sm:min-h-[400px] sm:p-4">
               {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
               {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
               {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
@@ -326,7 +346,8 @@ export default function App() {
             titel="Konto"
             offen={kontoOffen}
             onUmschalten={() => setKontoOffen((v) => !v)}
-            symbol={<Wallet className="h-4 w-4 text-slate-400" aria-hidden />}
+            symbol={<Wallet className="h-4 w-4 text-indigo-400" aria-hidden />}
+            ton="eingabe"
           >
             <Konto />
           </AkkordeonKarte>

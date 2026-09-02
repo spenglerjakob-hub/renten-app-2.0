@@ -60,7 +60,13 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
       </div>
 
       {offen && (
-        <div className="rounded-lg border border-blue-100 bg-blue-50 p-2.5 shadow-inner sm:p-3 print:hidden">
+        /*
+          Weiss mit blauem Rand statt blauer Flaeche: die Eingabespalte liegt
+          seit der Farbtrennung auf indigofarbenem Grund, und Blau darauf
+          liegt so dicht daneben, dass der Kasten nur trueb wirkte statt
+          eigenstaendig.
+        */
+        <div className="rounded-lg border-2 border-blue-200 bg-white p-2.5 shadow-sm sm:p-3 print:hidden">
           <h4 className="mb-2 text-[10px] font-bold uppercase text-blue-800">Karriere-Schätzer</h4>
 
           <ZahlFeld

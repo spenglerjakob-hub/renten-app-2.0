@@ -1,15 +1,18 @@
-import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer } from '@renten/engine';
-import { RotateCcw } from 'lucide-react';
+import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
+import { RotateCcw, Target } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { EinkommenFelder } from './EinkommenFelder';
-import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
-export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => void } = {}) {
+export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
+  ergebnis?: ProjektionsErgebnis | null;
+  onEhepartnerDialog?: () => void;
+} = {}) {
   const s = useSzenario((x) => x.szenario);
   const { setzeHaushalt, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
   const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
@@ -24,8 +27,55 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
 
   const nameVon = (id: string) => personNameAus(s.personen, id);
 
+  /*
+    Das heutige Haushaltsnetto als Bezugsgroesse fuer das Zielnetto.
+
+    `zeilen[0]` ist immer das laufende Kalenderjahr (die Zeitachse beginnt
+    in timeline.ts bei `jetzt.jahr`), also steht dort das Netto von heute —
+    und `zielNettoHeute` ist ausdruecklich in heutiger Kaufkraft angegeben.
+    Der Vergleich ist damit sauber, ohne Abzinsung.
+
+    Er unterbleibt, sobald er etwas anderes behaupten wuerde, als er sagt:
+    ohne Ergebnis, ohne Einkommen, und wenn der Ruhestand bereits begonnen
+    hat — dann ist `zeilen[0]` kein Erwerbsjahr mehr.
+  */
+  const heute0 = ergebnis?.zeilen[0];
+  const nettoHeuteMonat =
+    heute0 && !heute0.vollstaendigImRuhestand ? heute0.nettoGesamt / 12 : 0;
+  const zielAnteil =
+    nettoHeuteMonat > 0 ? s.haushalt.zielNettoHeute / nettoHeuteMonat : null;
+
   return (
     <div className="space-y-4">
+      {/*
+        Das Zielnetto steht VOR dem Haushaltsraster und in einem eigenen
+        Kasten. Es war bisher eines von fuenf gleichrangigen Feldern —
+        dabei misst sich alles Weitere an dieser Zahl: der Bedarf, die
+        Versorgungsluecke, die noetige Sparrate, das ganze Gutachten.
+      */}
+      <section className="rounded-xl border-2 border-indigo-300 bg-white p-3 shadow-sm sm:p-4">
+        <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+          <Target className="h-3.5 w-3.5" aria-hidden /> Ihr Ziel
+        </h3>
+        <ZahlFeld
+          label="Zielnetto im Alter (Kaufkraft heute)"
+          wert={s.haushalt.zielNettoHeute}
+          onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
+          einheit="€"
+          gross
+        />
+        {zielAnteil !== null && (
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            Das sind <strong className="text-indigo-800">{prozent(zielAnteil, 0)}</strong> Ihres
+            heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
+          </p>
+        )}
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
+          die nötig wäre, um sie zu schließen.
+        </p>
+      </section>
+
       <Abschnitt titel="Haushalt">
         <div className="grid gap-3 sm:grid-cols-2">
           <AuswahlFeld
@@ -53,12 +103,6 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
             />
           )}
           <ZahlFeld
-            label="Zielnetto im Alter (Kaufkraft heute)"
-            wert={s.haushalt.zielNettoHeute}
-            onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
-            einheit="€"
-          />
-          <ZahlFeld
             label="Kinder unter 25"
             wert={s.haushalt.kinderUnter25}
             onChange={setzeKinderAnzahl}
@@ -68,7 +112,7 @@ export function Basisdaten({ onEhepartnerDialog }: { onEhepartnerDialog?: () => 
         </div>
 
         {s.haushalt.kinder.length > 0 && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Für die Kinderzulage des Altersvorsorgedepots
             </p>

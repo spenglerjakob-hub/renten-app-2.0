@@ -16,7 +16,7 @@ export function Reiterleiste<T extends string>({
     <div
       role="tablist"
       aria-label={beschriftung}
-      className="hide-scrollbar flex overflow-x-auto border-b border-slate-200 bg-slate-50 print:hidden"
+      className="hide-scrollbar flex overflow-x-auto border-b border-indigo-200 bg-indigo-100/50 print:hidden"
     >
       {reiter.map((r) => (
         <button
