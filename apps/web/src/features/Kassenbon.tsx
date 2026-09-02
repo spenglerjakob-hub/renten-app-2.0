@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { ProjektionsErgebnis, Jahreszeile } from '@renten/engine';
+import { versorgungsluecke, type ProjektionsErgebnis, type Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
 
 /** Farbgebung der drei Schichten, wie im urspruenglichen Entwurf. */
@@ -98,7 +98,7 @@ export function Kassenbon({
     netto: zeile.posten.filter((p) => p.schicht === sch).reduce((s, p) => s + p.nettoJahr, 0),
   }));
 
-  const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
+  const luecke = versorgungsluecke(zeile);
   const skala = Math.max(zeile.zielNettoMonat, zeile.nettoMonat, 1);
   const anteil = (n: number) => `${Math.max(0, (n / 12 / skala) * 100)}%`;
 

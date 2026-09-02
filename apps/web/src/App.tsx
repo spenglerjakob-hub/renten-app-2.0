@@ -3,12 +3,13 @@ import {
   ChevronDown, ChevronUp, Coins, Download, FolderOpen, List, Printer,
   RotateCcw, Settings, TrendingUp, User, Users, Wallet,
 } from 'lucide-react';
-import type { Jahreszeile } from '@renten/engine';
+import { versorgungsluecke, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from './store/szenario';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
 import { Vertraege } from './features/Vertraege';
 import { Planer } from './features/Planer';
+import { Sparrechner } from './features/Sparrechner';
 import { Kassenbon } from './features/Kassenbon';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
@@ -119,7 +120,7 @@ export default function App() {
     ergebnis?.zeilen.find((z) => z.vollstaendigImRuhestand);
   const zeile = echteZeile ?? LEERE_ZEILE;
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
-  const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
+  const luecke = versorgungsluecke(zeile);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
   const hinweise = ergebnis && !echteZeile ? ergebnis.hinweise : [];
 
@@ -373,6 +374,12 @@ export default function App() {
               </div>
 
               <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
+
+              {/*
+                Der Sparrechner steht bewusst DIREKT unter der Luecke: dort
+                stellt sich die Frage, was zu tun waere.
+              */}
+              <Sparrechner zeile={zeile} />
 
               <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                 <button

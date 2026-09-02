@@ -68,6 +68,10 @@ export {
 } from './analyse/kennzahlen.js';
 export { ruhestandsfenster } from './analyse/ruhestandsfenster.js';
 export {
+  versorgungsluecke, benoetigtesKapital, benoetigteSparrate, sparrateZuRente,
+  type Sparziel,
+} from './analyse/sparziel.js';
+export {
   vertragsTuev, renteOderKapital,
   type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
 } from './analyse/vertrags-tuev.js';

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import {
-  ruhestandsfenster, parameterFuer,
+  ruhestandsfenster, parameterFuer, versorgungsluecke,
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
@@ -8,6 +8,7 @@ import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
+import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { personNameAus } from '../features/personen';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
@@ -15,6 +16,9 @@ import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
 import { RuhestandVerlauf } from './RuhestandVerlauf';
 import { Kaufkraft } from './Kaufkraft';
+import { Sparziel } from './Sparziel';
+import { Stellschrauben } from './Stellschrauben';
+import { Merkblatt } from './Merkblatt';
 import { TuevBogen } from './TuevBogen';
 
 /**
@@ -63,7 +67,14 @@ export function Gutachten({
     ? `${personNameAus(szenario.personen, 'A')} und ${personNameAus(szenario.personen, 'B')}`
     : personNameAus(szenario.personen, 'A');
 
-  const luecke = Math.max(0, zeile.zielNettoMonat - zeile.nettoMonat);
+  const luecke = versorgungsluecke(zeile);
+
+  // Die Sparziel-Rechnung: null, wenn es nichts zu schliessen gibt — dann
+  // entfallen beide Handlungsseiten, statt eine Null-Empfehlung zu drucken.
+  const sparziel = useMemo(
+    () => sparzielRechnen(szenario, zeile, SPARZIEL_VORGABE),
+    [szenario, zeile],
+  );
   const gedeckt = zeile.zielNettoMonat > 0
     ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
     : 100;
@@ -80,8 +91,10 @@ export function Gutachten({
     'Ihre Angaben und Verträge',
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
     'Ihre Einkünfte im Ruhestand',
-    'Dieselben Zahlen in heutiger Kaufkraft',
+    'Was Ihr Geld dann noch wert ist',
+    ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
     ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
+    'Zum Mitnehmen',
     'Rechtsstand, Methodik und Vorbehalt',
   ];
 
@@ -137,7 +150,7 @@ export function Gutachten({
           <strong>{prozent(szenario.annahmen.inflation)}</strong> Inflation im Jahr. Deshalb stehen
           in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
           Rentenjahres statt im Geld von heute. Wie sich beide Maßstäbe über den ganzen Ruhestand
-          entwickeln, zeigt die Seite „Dieselben Zahlen in heutiger Kaufkraft“.
+          entwickeln, zeigt die Seite „Was Ihr Geld dann noch wert ist“.
         </Text>
 
         <Untertitel>Im Jahr {zeile.jahr} — mit Inflation gerechnet</Untertitel>
@@ -211,11 +224,25 @@ export function Gutachten({
       )}
 
       <RuhestandVerlauf zeilen={fenster} />
-      <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} bezugsjahr={zeile.jahr} />
+      <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />
+
+      {sparziel && (
+        <>
+          <Sparziel
+            ergebnis={sparziel}
+            eingaben={SPARZIEL_VORGABE}
+            rentenjahr={zeile.jahr}
+            inflation={szenario.annahmen.inflation}
+          />
+          <Stellschrauben szenario={szenario} zeile={zeile} eingaben={SPARZIEL_VORGABE} />
+        </>
+      )}
 
       {positionen.map((p) => (
         <TuevBogen key={p.vertrag.id} position={p} szenario={szenario} />
       ))}
+
+      <Merkblatt />
 
       {/*
         Rechtsstand und Methodik stehen ans ENDE. Der vorhandene Abschnitt
