@@ -58,6 +58,19 @@ export function pvSatzMitglied(k: KinderStatus, p: LegalParameters): number {
   return Math.max(0, p.pv.satz - abschlaege * p.pv.abschlagJeKind);
 }
 
+/**
+ * Mindestbemessungsgrundlage freiwillig Versicherter, monatlich
+ * (§ 240 Abs. 4 SGB V: ein Neunzigstel der monatlichen Bezugsgroesse je
+ * Kalendertag, also ein Drittel im Monat).
+ *
+ * Herausgezogen, weil sie an zwei Stellen gilt: im Ruhestand und bei einem
+ * freiwillig versicherten Selbststaendigen in der Erwerbsphase. Zweimal
+ * geschrieben waere sie zweimal zu pflegen.
+ */
+export function mindestbemessungMonat(p: LegalParameters): number {
+  return p.bezugsgroesseMonat / 3;
+}
+
 /** Voller allgemeiner KV-Satz inkl. Zusatzbeitrag. */
 export function kvSatzVoll(p: LegalParameters): number {
   return p.kv.allgemeinerSatz + p.kv.zusatzbeitrag;
@@ -175,7 +188,7 @@ export function kvPvImAlter(
   // Freiwillig Versicherte zahlen mindestens auf die Mindestbemessungsgrundlage
   // (1/3 der monatlichen Bezugsgroesse, § 240 Abs. 4 SGB V). Fehlte im Prototyp.
   if (status === 'freiwillig') {
-    const mindestBemessung = (p.bezugsgroesseMonat / 3) * personen;
+    const mindestBemessung = mindestbemessungMonat(p) * personen;
     const bemessen = bbgMonat - restBbg;
     if (bemessen < mindestBemessung) {
       const fehlend = mindestBemessung - bemessen;

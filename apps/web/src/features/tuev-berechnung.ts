@@ -38,6 +38,11 @@ export function tuevBasis(szenario: SzenarioParsed): {
     kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
     kinder: { hatKinder: szenario.haushalt.hatKinder, kinderUnter25: szenario.haushalt.kinderUnter25 },
     beamter: szenario.einkommenHeute.modus === 'besoldung',
+    selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
+    grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
+      && szenario.einkommenHeute.grvPflicht
+      ? szenario.einkommenHeute.grvBeitragMonat * 12
+      : 0,
     // Der Vertrags-TUEV rechnet mit dem HEUTIGEN Netto, also auch mit der
     // heutigen Praemie — inklusive eines laufenden Entlastungstarifs, denn der
     // belastet das Budget genauso.
@@ -128,6 +133,17 @@ export function tuevPositionen(
         privatVersichert: szenario.haushalt.kvStatus === 'pkv',
         pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv'
           ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
+          : 0,
+        /*
+          Der GRV-Beitrag entscheidet ueber den freien Hoechstbetrag des
+          § 10 Abs. 3 EStG — und damit darueber, wie viel von einer Basisrente
+          absetzbar ist. Ohne diese Angabe unterstellte der TUEV jedem den
+          fiktiven Arbeitnehmer- UND Arbeitgeberanteil.
+        */
+        selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
+        grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
+          && szenario.einkommenHeute.grvPflicht
+          ? szenario.einkommenHeute.grvBeitragMonat * 12
           : 0,
         rentenbeginnJahr,
         alterBeiRentenbeginn,

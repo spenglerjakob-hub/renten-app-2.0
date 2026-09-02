@@ -154,6 +154,7 @@ describe('Gegenprobe an der Zeitachse', () => {
     einkommenHeute: {
       modus: 'brutto', betrag: 5300, auszahlungen: 12,
       besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
     },
     personen: [{
       id: 'A', name: '', geburtsdatum: '01.04.2001', rentenbeginn: '01.04.2068',

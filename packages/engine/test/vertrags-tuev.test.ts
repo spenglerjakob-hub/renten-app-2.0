@@ -19,6 +19,7 @@ const szenario: Szenario = {
   einkommenHeute: {
     modus: 'brutto', betrag: 4500, auszahlungen: 12,
     besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+    grvPflicht: false, grvBeitragMonat: 0,
   },
   personen: [{
     id: 'A', name: 'Test', geburtsdatum: '1975-01-01', rentenbeginn: '2042-01-01',
@@ -53,6 +54,8 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
     beamter: false,
     privatVersichert: false,
     pkvPraemieMonat: 0,
+    selbststaendig: false,
+    grvBeitragJahr: 0,
     rentenbeginnJahr: 2042,
     alterBeiRentenbeginn: 67,
     bruttoRenteMonat: 400,
@@ -688,5 +691,88 @@ describe('Beitragsbemessungsgrenze: der Teil darunter zaehlt', () => {
       + p.rvSatzGesamt / 2 + p.avSatzGesamt / 2
     );
     expect(r.svErsparnisMonat).toBeCloseTo(voll, 6);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+
+describe('Selbstständige im Vertrags-TÜV', () => {
+  const selbst = (over: Partial<TuevKontext> = {}) =>
+    kontext({ selbststaendig: true, grvBeitragJahr: 0, ...over });
+
+  const pruefe = (
+    typ: 'basis' | 'bav' | 'riester' | 'avd',
+    k: TuevKontext,
+    beitragMonat = 300,
+  ) =>
+    vertragsTuev(
+      vertrag({ typ, schicht: typ === 'basis' ? 1 : 2 }),
+      // Das Altersvorsorgedepot gibt es erst ab 2027; vorher waeren die
+      // Zulagen null, und der Test pruefte nichts.
+      annahmen({ beitragMonat, beginnJahr: typ === 'avd' ? 2027 : 2026 }),
+      k, szenario, p,
+    );
+
+  it('gibt der Basisrente den vollen Höchstbetrag, wenn keine GRV-Beiträge fließen', () => {
+    /*
+      BEFUND: `min(brutto, bbgRv) × 18,6 %` unterstellte JEDEM, sein
+      Hoechstbetrag sei durch Arbeitnehmer- UND Arbeitgeberbeitraege belegt.
+      Ein Selbststaendiger ohne Rentenversicherungspflicht hat gar nichts
+      verbraucht — genau deshalb ist die Basisrente sein klassisches Produkt.
+    */
+    /*
+      Der Beitrag muss GROSS genug sein, um den Unterschied zu zeigen: bei
+      54 000 EUR Gehalt sind vom Hoechstbetrag noch gut 20 000 EUR frei, ein
+      kleiner Beitrag passt bei beiden hinein und ergibt dieselbe Zahl. Erst
+      oberhalb dieser Grenze trennt sich der Selbststaendige ab.
+    */
+    const alsSelbst = pruefe('basis', selbst(), 2_000);
+    const alsAngestellter = pruefe('basis', kontext(), 2_000);
+    expect(alsSelbst.steuerersparnisMonat).toBeGreaterThan(alsAngestellter.steuerersparnisMonat);
+    expect(alsSelbst.hinweise.join(' ')).toContain('§ 10 Abs. 3 EStG');
+  });
+
+  it('zieht den eigenen GRV-Beitrag vom Höchstbetrag ab', () => {
+    const ohne = pruefe('basis', selbst(), 2_000);
+    const mit = pruefe('basis', selbst({ grvBeitragJahr: 20_000 }), 2_000);
+    // Mit hohem eigenem Beitrag bleibt weniger Rahmen — also weniger Ersparnis.
+    expect(mit.steuerersparnisMonat).toBeLessThanOrEqual(ohne.steuerersparnisMonat);
+    // Und der Hinweis auf den vollen Rahmen entfaellt.
+    expect(mit.hinweise.join(' ')).not.toContain('in voller Höhe');
+  });
+
+  it('weist bei der bAV keine Beitragsersparnis aus', () => {
+    // Ohne Arbeitgeber laesst sich kein Entgelt umwandeln.
+    const r = pruefe('bav', selbst());
+    expect(r.svErsparnisMonat).toBe(0);
+    expect(r.hinweise.join(' ')).toContain('kein Entgelt umwandeln');
+  });
+
+  it('rechnet ohne Rentenversicherungspflicht keine Riester-Zulagen an', () => {
+    const r = pruefe('riester', selbst());
+    expect(r.zulageMonat).toBe(0);
+    expect(r.hinweise.join(' ')).toContain('§ 10a EStG');
+
+    // Gegenprobe: ein Angestellter bekommt sie weiterhin.
+    expect(pruefe('riester', kontext()).zulageMonat).toBeGreaterThan(0);
+  });
+
+  it('laesst die Förderung des Altersvorsorgedepots unberührt', () => {
+    // Selbststaendige sind dort ab 2027 ausdruecklich foerderberechtigt.
+    const alsSelbst = pruefe('avd', selbst());
+    const alsAngestellter = pruefe('avd', kontext());
+    expect(alsSelbst.zulageMonat).toBeCloseTo(alsAngestellter.zulageMonat, 6);
+    expect(alsSelbst.zulageMonat).toBeGreaterThan(0);
+    expect(alsSelbst.hinweise.join(' ')).toContain('förderberechtigt');
+  });
+
+  it('laesst Angestellte und Beamte unveraendert', () => {
+    // Regressionsprobe: die vier Zweige duerfen sich nicht gegenseitig stoeren.
+    for (const typ of ['basis', 'bav', 'riester', 'avd'] as const) {
+      const angestellt = pruefe(typ, kontext());
+      const beamter = pruefe(typ, kontext({ beamter: true }));
+      expect(angestellt.echterAufwandMonat, typ).toBeGreaterThan(0);
+      expect(beamter.svErsparnisMonat, typ).toBe(0);
+    }
   });
 });

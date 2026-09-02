@@ -290,18 +290,35 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
    * Deshalb wird das Einkommen jetzt in jedem Fall auf Personen verteilt —
    * bei getrennter Erfassung mit den echten Betraegen, sonst haelftig.
    */
-  const einkommenJePerson: { brutto: number; beamter: boolean }[] = (() => {
+  const einkommenJePerson: {
+    brutto: number; beamter: boolean; selbststaendig: boolean; grvBeitragJahr: number;
+  }[] = (() => {
+    /** Erwerbsart und GRV-Beitrag EINER Einkommensangabe. */
+    const art = (e: EinkommenHeute, brutto: number) => ({
+      brutto,
+      beamter: e.modus === 'besoldung',
+      selbststaendig: e.modus === 'selbststaendig',
+      /*
+        Der EINGETRAGENE Beitrag, nicht ein Satz darauf. Die Oberflaeche
+        belegt das Feld mit dem vollen Satz vor; wer freiwillig einen anderen
+        Betrag zahlt, traegt ihn ein. Was hier steht, ist deshalb, was
+        tatsaechlich fliesst.
+      */
+      grvBeitragJahr: e.modus === 'selbststaendig' && e.grvPflicht
+        ? Math.max(0, e.grvBeitragMonat) * 12
+        : 0,
+    });
+
     const getrennt = s.einkommenGetrennt === true && personen.length > 1;
     if (getrennt) {
       const zweites = s.einkommenPartner ?? s.einkommenHeute;
       return personen.map((_, i) => {
         const e = i === 0 ? s.einkommenHeute : zweites;
-        return { brutto: bruttoAus(e), beamter: e.modus === 'besoldung' };
+        return art(e, bruttoAus(e));
       });
     }
     const gesamt = bruttoAus(s.einkommenHeute);
-    const beamter = s.einkommenHeute.modus === 'besoldung';
-    return personen.map(() => ({ brutto: gesamt / personen.length, beamter }));
+    return personen.map(() => art(s.einkommenHeute, gesamt / personen.length));
   })();
 
   // --- Auszahlungs-Planer ---
@@ -512,6 +529,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         .map(({ e }) => ({
           jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           beamter: e.beamter,
+          selbststaendig: e.selbststaendig,
+          // Der Beitrag waechst mit dem Einkommen mit — er ist entweder ein
+          // Satz darauf oder ein Betrag, den man mit steigendem Gewinn
+          // ebenfalls anhebt.
+          grvBeitragJahr: e.grvBeitragJahr * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           pkvPraemieMonat: pkvAufwandMonat,
         }));
 

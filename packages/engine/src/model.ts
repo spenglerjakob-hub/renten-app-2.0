@@ -100,7 +100,7 @@ export interface Annahmen {
   gehaltsdynamik: number;
 }
 
-export type GehaltsEingabe = 'brutto' | 'netto' | 'besoldung';
+export type GehaltsEingabe = 'brutto' | 'netto' | 'besoldung' | 'selbststaendig';
 
 export interface Haushalt {
   verheiratet: boolean;
@@ -129,13 +129,17 @@ export interface Haushalt {
 
 export interface EinkommenHeute {
   modus: GehaltsEingabe;
-  /** Monatsbetrag bei brutto/netto */
+  /** Monatsbetrag bei brutto/netto, Gewinn bei selbststaendig */
   betrag: number;
   /** Anzahl Auszahlungen p. a. */
   auszahlungen: number;
   besoldungsgruppe: string;
   besoldungsstufe: number;
   besoldungsland: string;
+  /** Nur bei `selbststaendig`: zahlt in die gesetzliche Rentenversicherung ein */
+  grvPflicht: boolean;
+  /** Nur bei `selbststaendig`: monatlicher eigener Beitrag zur GRV */
+  grvBeitragMonat: number;
 }
 
 export interface Entnahmeplaner {

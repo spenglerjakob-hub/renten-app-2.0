@@ -165,6 +165,7 @@ const szenario = (kvStatus: 'kvdr' | 'pkv', pkv: PkvAnnahmen): Szenario => ({
   einkommenHeute: {
     modus: 'brutto', betrag: 5000, auszahlungen: 12,
     besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
   },
   personen: [{
     id: 'A', name: 'A', art: 'grv', geburtsdatum: '01.01.1986', rentenbeginn: '01.01.2053',
@@ -175,6 +176,7 @@ const szenario = (kvStatus: 'kvdr' | 'pkv', pkv: PkvAnnahmen): Szenario => ({
   einkommenPartner: {
     modus: 'brutto', betrag: 0, auszahlungen: 12,
     besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
   },
   planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: true },
 });

@@ -154,6 +154,7 @@ describe('Erwerbseinkommen in der Projektion', () => {
     einkommenHeute: {
       modus: 'brutto', betrag: 10_000, auszahlungen: 12,
       besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
     },
     personen: [
       { id: 'A', name: 'A', geburtsdatum: '1975-01-01', rentenbeginn: '2042-01-01',
@@ -185,10 +186,12 @@ describe('Erwerbseinkommen in der Projektion', () => {
       einkommenHeute: {
         modus: 'brutto', betrag: 8_000, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
       },
       einkommenPartner: {
         modus: 'brutto', betrag: 2_000, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
       },
     });
 
@@ -212,15 +215,111 @@ describe('Erwerbseinkommen in der Projektion', () => {
       einkommenHeute: {
         modus: 'besoldung', betrag: 0, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 8, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
       },
       einkommenPartner: {
         modus: 'brutto', betrag: 5_000, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+    grvPflicht: false, grvBeitragMonat: 0,
       },
     });
     const e = erwerbIm(s, new Date().getFullYear())!;
     expect(e.bruttoJahr).toBeGreaterThan(0);
     expect(e.nettoJahr).toBeGreaterThan(0);
     expect(e.nettoJahr).toBeLessThan(e.bruttoJahr);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+
+describe('Selbstständige', () => {
+  const gewinn = 60_000;
+  const selbst = (over = {}) =>
+    erwerbHaushalt(
+      [{ jahresbrutto: gewinn, beamter: false, selbststaendig: true, ...over }],
+      opt, p,
+    );
+
+  it('rechnet ohne eingetragenen Beitrag keine Rentenversicherung', () => {
+    /*
+      BEFUND: Ein Selbststaendiger musste sich als Angestellter eintragen und
+      bekam damit Renten- und Arbeitslosenversicherung berechnet, die er nicht
+      zahlt. Die meisten sind nicht pflichtversichert.
+    */
+    const r = selbst();
+    const angestellt = erwerbHaushalt([{ jahresbrutto: gewinn, beamter: false }], opt, p);
+    expect(r.proPerson[0]!.sv).toBeLessThan(angestellt.proPerson[0]!.sv);
+  });
+
+  it('uebernimmt den eingetragenen GRV-Beitrag unveraendert', () => {
+    // Er traegt ihn ALLEIN — kein Arbeitgeber uebernimmt die Haelfte.
+    const ohne = selbst().proPerson[0]!.sv;
+    const mit = selbst({ grvBeitragJahr: 7_200 }).proPerson[0]!.sv;
+    expect(mit - ohne).toBeCloseTo(7_200, 6);
+  });
+
+  it('zahlt niemals Arbeitslosenversicherung', () => {
+    // Gegenprobe ueber die Differenz: waere die AV drin, laege sie hoeher.
+    const r = selbst();
+    const bemessung = Math.min(gewinn, p.bbgKvJahr);
+    const nurKvPv = bemessung * (
+      p.kv.allgemeinerSatz + p.kv.zusatzbeitrag
+      + p.pv.satz + p.pv.kinderloseZuschlag
+    );
+    expect(r.proPerson[0]!.sv).toBeCloseTo(nurKvPv, 6);
+  });
+
+  it('traegt den VOLLEN Krankenkassenbeitrag, nicht den halben', () => {
+    const r = selbst();
+    const angestellt = erwerbHaushalt([{ jahresbrutto: gewinn, beamter: false }], opt, p);
+    const bemessung = Math.min(gewinn, p.bbgKvJahr);
+    const kvPvAngestellt = angestellt.proPerson[0]!.sv
+      - gewinn * (p.rvSatzGesamt / 2 + p.avSatzGesamt / 2);
+    // Der volle Satz ist genau das Doppelte des Arbeitnehmeranteils beim KV-
+    // Grundsatz; beim Pflegesatz traegt das Mitglied den Zuschlag ohnehin
+    // allein, deshalb nur groesser statt exakt doppelt.
+    expect(r.proPerson[0]!.sv).toBeGreaterThan(kvPvAngestellt * 1.5);
+    expect(bemessung).toBeGreaterThan(0);
+  });
+
+  it('setzt bei kleinem Gewinn die Mindestbemessungsgrundlage an', () => {
+    // § 240 Abs. 4 SGB V: mindestens ein Drittel der Bezugsgroesse.
+    const winzig = erwerbHaushalt(
+      [{ jahresbrutto: 3_000, beamter: false, selbststaendig: true }], opt, p,
+    );
+    const mindest = (p.bezugsgroesseMonat / 3) * 12;
+    const erwartet = mindest * (
+      p.kv.allgemeinerSatz + p.kv.zusatzbeitrag + p.pv.satz + p.pv.kinderloseZuschlag
+    );
+    expect(winzig.proPerson[0]!.sv).toBeCloseTo(erwartet, 6);
+  });
+
+  it('zahlt privat versichert die Praemie ohne Arbeitgeberzuschuss', () => {
+    // Es gibt keinen Arbeitgeber, der zuschiessen koennte.
+    const privat = { ...opt, privatVersichert: true };
+    const r = erwerbHaushalt(
+      [{ jahresbrutto: gewinn, beamter: false, selbststaendig: true, pkvPraemieMonat: 700 }],
+      privat, p,
+    );
+    expect(r.proPerson[0]!.sv).toBeCloseTo(700 * 12, 6);
+  });
+
+  it('bekommt keinen Arbeitnehmer-Pauschbetrag', () => {
+    /*
+      § 9a S. 1 Nr. 1a EStG gilt nur fuer Einkuenfte aus NICHTSELBSTAENDIGER
+      Arbeit. Gegenprobe bei gleichem Sozialabgabenbetrag: das zvE des
+      Selbststaendigen liegt genau um den Pauschbetrag hoeher.
+    */
+    const mitBeitrag = selbst({ grvBeitragJahr: 0 });
+    const zveSelbst = mitBeitrag.proPerson[0]!.zveBeitrag;
+    const sv = mitBeitrag.proPerson[0]!.sv;
+    // Nachgebaut: Gewinn minus Sonderausgabenpauschbetrag minus abziehbare
+    // Vorsorgeaufwendungen, OHNE den Arbeitnehmer-Pauschbetrag.
+    const bemessung = Math.min(gewinn, p.bbgKvJahr);
+    const kv = bemessung * (p.kv.allgemeinerSatz + p.kv.zusatzbeitrag);
+    const pv = bemessung * (p.pv.satz + p.pv.kinderloseZuschlag);
+    const abzug = kv * 0.96 + pv;
+    expect(sv).toBeCloseTo(kv + pv, 6);
+    expect(zveSelbst).toBeCloseTo(gewinn - p.pauschbetraege.sonderausgaben - abzug, 6);
   });
 });

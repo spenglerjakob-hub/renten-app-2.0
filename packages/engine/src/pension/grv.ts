@@ -89,6 +89,31 @@ export function entgeltpunkteJahr(jahresbrutto: number, p: LegalParameters): num
   return beitragspflichtig / p.durchschnittsentgelt;
 }
 
+/**
+ * Der volle Beitrag zur gesetzlichen Rentenversicherung auf ein
+ * Jahreseinkommen — was ein pflichtversicherter Selbststaendiger zahlt.
+ *
+ * Er traegt ihn ALLEIN: es gibt keinen Arbeitgeber, der die Haelfte
+ * uebernimmt. Dient in der Oberflaeche als Vorbelegung des Beitragsfeldes;
+ * freiwillig Versicherte tragen stattdessen ihren gewaehlten Betrag ein.
+ */
+export function grvVollerBeitragJahr(jahresEinkommen: number, p: LegalParameters): number {
+  return Math.min(Math.max(0, jahresEinkommen), p.bbgRvJahr) * p.rvSatzGesamt;
+}
+
+/**
+ * Entgeltpunkte aus einem BEITRAG statt aus einem Entgelt.
+ *
+ * Fuer Selbststaendige der einzig richtige Weg: wer den Mindestbeitrag zahlt,
+ * sammelt die Punkte eines Mindestbeitragszahlers — nicht die seines
+ * Gewinns. Der Beitrag wird dafuer in das Entgelt zurueckgerechnet, das ihn
+ * ausgeloest haette.
+ */
+export function entgeltpunkteAusBeitrag(beitragJahr: number, p: LegalParameters): number {
+  if (p.rvSatzGesamt <= 0) return 0;
+  return entgeltpunkteJahr(Math.max(0, beitragJahr) / p.rvSatzGesamt, p);
+}
+
 export interface KarriereSchaetzung {
   entgeltpunkte: number;
   /** Monatsrente in HEUTIGER Kaufkraft (ohne Rentenwertdynamik) */

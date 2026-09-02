@@ -199,12 +199,26 @@ export const annahmenSchema = z.object({
 });
 
 export const einkommenHeuteSchema = z.object({
-  modus: z.enum(['brutto', 'netto', 'besoldung']).default('netto'),
+  modus: z.enum(['brutto', 'netto', 'besoldung', 'selbststaendig']).default('netto'),
   betrag: z.number().min(0).default(2500),
   auszahlungen: z.number().min(12).max(14).default(12),
   besoldungsgruppe: z.string().default('A13'),
   besoldungsstufe: z.number().int().min(1).max(12).default(4),
   besoldungsland: z.string().default('Baden-Württemberg'),
+
+  /**
+   * Zahlt der Selbststaendige in die gesetzliche Rentenversicherung ein?
+   *
+   * EIN Schalter plus EIN Beitragsfeld statt einer Auswahl aus drei
+   * Zustaenden: Pflichtversicherte (Handwerker, Kuenstlersozialkasse) lassen
+   * die Vorbelegung mit dem vollen Satz stehen, freiwillig Versicherte
+   * tragen ihren tatsaechlich gewaehlten Beitrag ein. Die Unterscheidung
+   * "pflicht oder freiwillig" koennen viele Nutzer selbst nicht sicher
+   * treffen — der Beitrag steht dagegen auf ihrem Kontoauszug.
+   */
+  grvPflicht: z.boolean().default(false),
+  /** Monatlicher eigener Beitrag zur gesetzlichen Rentenversicherung */
+  grvBeitragMonat: z.number().min(0).default(0),
 });
 
 export const planerSchema = z.object({

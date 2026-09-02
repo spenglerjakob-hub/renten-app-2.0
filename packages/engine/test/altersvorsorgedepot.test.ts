@@ -204,6 +204,7 @@ describe('Altersvorsorgedepot als Vertragsart in der Zeitachse', () => {
       einkommenHeute: {
         modus: 'brutto', betrag: 4500, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+        grvPflicht: false, grvBeitragMonat: 0,
       },
       personen: [{
         id: 'A', name: 'Test',
@@ -304,6 +305,7 @@ describe('KV/PV-Verteilung im Kassenbon', () => {
       einkommenHeute: {
         modus: 'brutto', betrag: 4500, auszahlungen: 12,
         besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Bund',
+        grvPflicht: false, grvBeitragMonat: 0,
       },
       personen: [{
         id: 'A', name: 'Test',

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Calculator, CheckCircle } from 'lucide-react';
-import { schaetzeEntgeltpunkte, parameterFuer, parseDatum, alterExakt, heute } from '@renten/engine';
+import {
+  schaetzeEntgeltpunkte, parameterFuer, parseDatum, alterExakt, heute,
+} from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, euro } from '../components/Feld';
 
@@ -26,11 +28,38 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   const setzePerson = useSzenario((s) => s.setzePerson);
 
   const [offen, setOffen] = useState(false);
+  /*
+    Bei einem Selbststaendigen ist das massgebliche "Entgelt" nicht sein
+    Gewinn, sondern der Beitrag, den er zahlt — zurueckgerechnet in das
+    Entgelt, das ihn ausgeloest haette. Wer den Mindestbeitrag zahlt, sammelt
+    die Punkte eines Mindestbeitragszahlers und nicht die seines Gewinns.
+  */
+  const selbststaendig = einkommen.modus === 'selbststaendig';
+  const p0 = parameterFuer(heute().jahr, { indexRate: tarifIndex });
   const [gehalt, setGehalt] = useState(() =>
-    Math.round((einkommen.betrag || 4000) * (einkommen.auszahlungen || 12)),
+    selbststaendig
+      ? Math.round((einkommen.grvBeitragMonat * 12) / p0.rvSatzGesamt)
+      : Math.round((einkommen.betrag || 4000) * (einkommen.auszahlungen || 12)),
   );
 
   if (!person) return null;
+
+  /*
+    Ohne Beitrag gibt es nichts zu schaetzen. Das stumm mit einem
+    Gewinn-basierten Wert zu fuellen waere die schlimmere Variante: es saehe
+    aus wie eine Auskunft.
+  */
+  if (selbststaendig && !einkommen.grvPflicht) {
+    return (
+      <div className="sm:col-span-2">
+        <p className="rounded-lg border border-slate-200 bg-white p-2.5 text-xs leading-relaxed text-slate-500">
+          Sie zahlen nach Ihren Angaben nicht in die gesetzliche Rentenversicherung ein — es
+          gibt hier also nichts zu schätzen. Ein Anspruch aus früheren Beitragsjahren steht in
+          Ihrer Renteninformation und gehört in das Feld darüber.
+        </p>
+      </div>
+    );
+  }
 
   const geburt = parseDatum(person.geburtsdatum);
   const rentenbeginn = parseDatum(person.rentenbeginn);
@@ -70,10 +99,13 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
           <h4 className="mb-2 text-[10px] font-bold uppercase text-blue-800">Karriere-Schätzer</h4>
 
           <ZahlFeld
-            label="Heutiges Bruttojahresgehalt"
+            label={selbststaendig ? 'Beitragspflichtiges Entgelt im Jahr' : 'Heutiges Bruttojahresgehalt'}
             wert={gehalt}
             onChange={setGehalt}
             einheit="€"
+            hilfe={selbststaendig
+              ? `Aus Ihrem Beitrag zurückgerechnet (${euro(einkommen.grvBeitragMonat)} im Monat geteilt durch den Beitragssatz).`
+              : undefined}
           />
 
           <dl className="mt-3 grid grid-cols-2 gap-3">

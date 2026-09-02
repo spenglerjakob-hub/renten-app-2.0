@@ -1,6 +1,9 @@
 import type { LegalParameters } from '../params/types.js';
 import { einkommensteuer, solidaritaetszuschlag, kirchensteuersatz } from '../tax/estg.js';
-import { kvPvArbeitnehmer, kvSatzVoll, pvSatzMitglied, type KinderStatus } from '../social/kv-pv.js';
+import {
+  kvPvArbeitnehmer, kvSatzVoll, pvSatzMitglied, mindestbemessungMonat,
+  type KinderStatus,
+} from '../social/kv-pv.js';
 import { arbeitgeberzuschuss, PKV_BASISANTEIL } from '../social/pkv.js';
 
 export interface ErwerbsOptionen {
@@ -27,6 +30,14 @@ export interface ErwerbsOptionen {
    * Alternative kannte.
    */
   privatVersichert?: boolean;
+  /**
+   * Selbststaendig: keine Arbeitslosenversicherung, Rentenversicherung nur
+   * in Hoehe des tatsaechlich gezahlten Beitrags, Krankenversicherung allein
+   * getragen — und kein Arbeitnehmer-Pauschbetrag.
+   */
+  selbststaendig?: boolean;
+  /** Nur bei `selbststaendig`: eigener Jahresbeitrag zur gesetzlichen RV */
+  grvBeitragJahr?: number;
   /**
    * Monatlicher Aufwand fuer die private Kranken- und Pflegeversicherung —
    * Praemie zuzueglich eines etwaigen Beitragsentlastungstarifs, VOR dem
@@ -60,6 +71,8 @@ function personAnteil(
   p: LegalParameters,
   beamter: boolean,
   pkvPraemieMonat: number,
+  selbststaendig = false,
+  grvBeitragJahr = 0,
 ): { brutto: number; sv: number; zveBeitrag: number } {
   const brutto = Math.max(0, jahresbrutto);
   const privat = o.privatVersichert ?? false;
@@ -69,7 +82,44 @@ function personAnteil(
 
   const gesetzlich = kvPvArbeitnehmer(brutto, o.kinder, p, { sachsen: o.bundesland === 'Sachsen' });
 
-  if (privat) {
+  if (selbststaendig) {
+    /*
+      SELBSTSTAENDIG. Bisher musste sich diese Gruppe als "angestellt"
+      eintragen — und bekam damit Renten- und Arbeitslosenversicherung
+      berechnet, die sie nicht zahlt, den halben Krankenkassenbeitrag statt
+      des vollen, und den Arbeitnehmer-Pauschbetrag, der ihr nicht zusteht.
+
+      Rentenversicherung: nur was tatsaechlich gezahlt wird. Die meisten
+      Selbststaendigen sind nicht pflichtversichert; wer es ist oder freiwillig
+      zahlt, traegt den Beitrag ALLEIN — es gibt keinen Arbeitgeber, der die
+      Haelfte uebernimmt. Deshalb der eingetragene Betrag und kein Satz.
+
+      Arbeitslosenversicherung: keine.
+    */
+    const rv = Math.max(0, grvBeitragJahr);
+
+    if (privat) {
+      const aufwandMonat = Math.max(0, pkvPraemieMonat);
+      // Kein Arbeitgeberzuschuss: es gibt keinen Arbeitgeber.
+      const praemieJahr = aufwandMonat * 12;
+      sv = rv + praemieJahr;
+      vorsorgeAbzug = rv + praemieJahr * PKV_BASISANTEIL;
+    } else {
+      /*
+        Freiwillig gesetzlich versichert: voller Satz, allein getragen, und
+        MINDESTENS auf ein Drittel der Bezugsgroesse (§ 240 Abs. 4 SGB V) —
+        wer wenig verdient, zahlt trotzdem den Mindestbeitrag.
+      */
+      const bemessung = Math.min(
+        Math.max(brutto, mindestbemessungMonat(p) * 12),
+        p.bbgKvJahr,
+      );
+      const kv = bemessung * kvSatzVoll(p);
+      const pv = bemessung * pvSatzMitglied(o.kinder, p);
+      sv = rv + kv + pv;
+      vorsorgeAbzug = rv + kv * 0.96 + pv;
+    }
+  } else if (privat) {
     /*
       Der Arbeitgeberzuschuss (§ 257 SGB V, § 61 SGB XI) steht Beschaeftigten
       zu, nicht Beamten — bei denen tritt die Beihilfe an seine Stelle, und
@@ -112,9 +162,18 @@ function personAnteil(
     vorsorgeAbzug = gesetzlich.abzugsfaehig;
   }
 
+  /*
+    Der Arbeitnehmer-Pauschbetrag steht nur Einkuenften aus NICHTSELBSTAENDIGER
+    Arbeit zu (§ 9a S. 1 Nr. 1a EStG). Ein Selbststaendiger zieht stattdessen
+    seine tatsaechlichen Betriebsausgaben ab — die stecken bereits im Gewinn,
+    den er eintraegt. Beamte bekommen ihn dagegen, ihre Bezuege sind
+    Einkuenfte aus nichtselbstaendiger Arbeit.
+  */
+  const arbeitnehmerPauschbetrag = selbststaendig ? 0 : p.pauschbetraege.arbeitnehmer;
+
   const zveBeitrag = Math.max(
     0,
-    brutto - p.pauschbetraege.arbeitnehmer - p.pauschbetraege.sonderausgaben - vorsorgeAbzug,
+    brutto - arbeitnehmerPauschbetrag - p.pauschbetraege.sonderausgaben - vorsorgeAbzug,
   );
 
   return { brutto, sv, zveBeitrag };
@@ -126,7 +185,10 @@ export function bruttoZuNetto(
   o: ErwerbsOptionen,
   p: LegalParameters,
 ): ErwerbsNetto {
-  const a = personAnteil(jahresbrutto, o, p, o.beamter ?? false, o.pkvPraemieMonat ?? 0);
+  const a = personAnteil(
+    jahresbrutto, o, p, o.beamter ?? false, o.pkvPraemieMonat ?? 0,
+    o.selbststaendig ?? false, o.grvBeitragJahr ?? 0,
+  );
   const brutto = a.brutto;
   const sv = a.sv;
   const zve = a.zveBeitrag;
@@ -148,6 +210,10 @@ export function bruttoZuNetto(
 export interface HaushaltsPerson {
   jahresbrutto: number;
   beamter: boolean;
+  /** Selbststaendig — je Person, denn im Haushalt kann beides vorkommen */
+  selbststaendig?: boolean;
+  /** Eigener Jahresbeitrag zur gesetzlichen Rentenversicherung */
+  grvBeitragJahr?: number;
   /**
    * Anteil dieser Person am monatlichen PKV-Aufwand des Haushalts.
    *
@@ -191,7 +257,10 @@ export function erwerbHaushalt(
   p: LegalParameters,
 ): ErwerbHaushaltErgebnis {
   const proPerson = personen.map((x) =>
-    personAnteil(x.jahresbrutto, o, p, x.beamter, x.pkvPraemieMonat ?? 0),
+    personAnteil(
+      x.jahresbrutto, o, p, x.beamter, x.pkvPraemieMonat ?? 0,
+      x.selbststaendig ?? false, x.grvBeitragJahr ?? 0,
+    ),
   );
 
   const jahresbrutto = proPerson.reduce((sum, x) => sum + x.brutto, 0);

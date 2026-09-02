@@ -12,7 +12,9 @@ const KV_TEXT = {
 
 const ART_TEXT = { grv: 'Gesetzliche Rente', pension: 'Beamtenpension' } as const;
 
-const EINKOMMEN_TEXT = { brutto: 'Brutto', netto: 'Netto', besoldung: 'Besoldung' } as const;
+const EINKOMMEN_TEXT = {
+  brutto: 'Brutto', netto: 'Netto', besoldung: 'Besoldung', selbststaendig: 'Gewinn',
+} as const;
 
 /**
  * "Ihre Angaben" — die Eingaben, mit denen gerechnet wurde.
@@ -34,7 +36,18 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
   const einkommen = (e: SzenarioParsed['einkommenHeute']) =>
     e.modus === 'besoldung'
       ? `${e.besoldungsgruppe}, Stufe ${e.besoldungsstufe} (${e.besoldungsland})`
-      : `${euro(e.betrag)} ${EINKOMMEN_TEXT[e.modus]} im Monat, ${e.auszahlungen} Zahlungen`;
+      : e.modus === 'selbststaendig'
+        ? `${euro(e.betrag)} Gewinn im Monat (selbstständig)`
+        : `${euro(e.betrag)} ${EINKOMMEN_TEXT[e.modus]} im Monat, ${e.auszahlungen} Zahlungen`;
+
+  /* Der GRV-Beitrag entscheidet ueber den Hoechstbetrag einer Basisrente —
+     er gehoert deshalb in die Angaben, nicht nur in die Rechnung. */
+  const eA = szenario.einkommenHeute;
+  const grvZeile = eA.modus === 'selbststaendig'
+    ? (eA.grvPflicht
+        ? `${euro(eA.grvBeitragMonat)} im Monat, allein getragen`
+        : 'zahlt nicht ein')
+    : null;
 
   return (
     <>
@@ -56,6 +69,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
             )}
           </>
         )}
+        {grvZeile && <Angabe feld="Gesetzliche Rentenversicherung" wert={grvZeile} />}
         <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
       </Zweispaltig>
 

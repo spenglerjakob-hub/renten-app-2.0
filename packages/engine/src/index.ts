@@ -16,6 +16,7 @@ export {
 // Sozialversicherung
 export {
   kvPvImAlter, kvPvArbeitnehmer, pvSatzMitglied, kvSatzVoll, bavFreibetragMonat,
+  mindestbemessungMonat,
   type KvStatus, type BeitragsArt, type Beitragspflichtig, type KinderStatus, type KvPvErgebnis,
 } from './social/kv-pv.js';
 export {
@@ -37,7 +38,8 @@ export {
 } from './pension/freibetraege.js';
 export {
   regelaltersgrenze, regelaltersrentenbeginn, zugangsfaktor, renteAusEntgeltpunkten, entgeltpunkteJahr,
-  schaetzeEntgeltpunkte, type KarriereSchaetzung,
+  schaetzeEntgeltpunkte, grvVollerBeitragJahr, entgeltpunkteAusBeitrag,
+  type KarriereSchaetzung,
 } from './pension/grv.js';
 export {
   besoldung, ruhegehaltssatz, versorgungsabschlag, mindestversorgung,

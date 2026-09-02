@@ -96,6 +96,17 @@ export interface TuevKontext {
   privatVersichert: boolean;
   /** Monatliche PKV-Praemie — Bezugsgroesse fuer den Arbeitgeberzuschuss */
   pkvPraemieMonat: number;
+  /**
+   * Selbststaendig.
+   *
+   * Wirkt an drei Stellen: eine Entgeltumwandlung ist mangels Arbeitgeber
+   * unmoeglich, der Hoechstbetrag des § 10 Abs. 3 EStG ist nicht durch
+   * fiktive Arbeitgeberbeitraege belegt, und ohne Rentenversicherungspflicht
+   * besteht keine unmittelbare Riester-Zulageberechtigung.
+   */
+  selbststaendig: boolean;
+  /** Eigener Jahresbeitrag zur gesetzlichen Rentenversicherung */
+  grvBeitragJahr: number;
   /** Jahresbruttogehalt heute — Basis fuer die SV-Ersparnis */
   jahresbrutto: number;
   /** Zu versteuerndes Einkommen heute — Basis fuer die Steuerersparnis */
@@ -269,9 +280,17 @@ function svWirkung(
   k: TuevKontext,
   p: LegalParameters,
 ): SvWirkung {
-  // Beamte zahlen weder Renten- noch Arbeitslosenversicherung und sind ueber
-  // die Beihilfe abgesichert. Bei ihnen spart eine Entgeltumwandlung nichts.
-  if (k.beamter) return { ersparnis: 0, wegfallenderAbzug: 0, verlorenerZuschuss: 0 };
+  /*
+    Beamte zahlen weder Renten- noch Arbeitslosenversicherung und sind ueber
+    die Beihilfe abgesichert. Bei ihnen spart eine Entgeltumwandlung nichts.
+
+    Selbststaendige koennen gar nicht umwandeln: es gibt kein Entgelt und
+    keinen Arbeitgeber. Ihr GRV-Beitrag steht fest — ein Vertragsbeitrag
+    senkt ihn um nichts.
+  */
+  if (k.beamter || k.selbststaendig) {
+    return { ersparnis: 0, wegfallenderAbzug: 0, verlorenerZuschuss: 0 };
+  }
 
   const u = Math.max(0, umwandlungJahr);
   const rvTeil = anteilUnterGrenze(k.jahresbrutto, u, p.bbgRvJahr);
@@ -357,8 +376,40 @@ export function vertragsTuev(
     der Beitragsdynamik waechst.
   */
   const probe = svWirkung(a.beitragMonat * 12, k, p);
+
+  /*
+    Unmittelbar zulageberechtigt ist nach § 10a EStG, wer in der gesetzlichen
+    Rentenversicherung pflichtversichert ist. Ein Selbststaendiger, der nicht
+    einzahlt, ist es nicht. Mittelbar ueber einen zulageberechtigten
+    Ehepartner bleibt moeglich — deshalb steht es im Hinweis und wird nicht
+    stillschweigend unterstellt.
+  */
+  const ohneZulageberechtigung = k.selbststaendig && k.grvBeitragJahr <= 0;
+
+  if (v.typ === 'riester' && ohneZulageberechtigung) {
+    hinweise.push(
+      'Ohne Pflichtversicherung in der gesetzlichen Rentenversicherung besteht keine '
+      + 'unmittelbare Zulageberechtigung (§ 10a EStG) — die Zulagen sind hier deshalb nicht '
+      + 'angesetzt. Über einen zulageberechtigten Ehepartner ist eine mittelbare '
+      + 'Berechtigung möglich; dann gilt ein Sockelbetrag von 60 € im Jahr.',
+    );
+  }
+
+  if (v.typ === 'avd' && k.selbststaendig) {
+    hinweise.push(
+      'Selbstständige sind beim Altersvorsorgedepot ab 2027 ausdrücklich förderberechtigt — '
+      + 'die Reform weitet den Kreis darauf aus. Für Sie ist es damit der geförderte Weg, '
+      + 'den Riester nie geboten hat.',
+    );
+  }
   if (v.typ.startsWith('bav')) {
-    if (k.beamter) {
+    if (k.selbststaendig) {
+      hinweise.push(
+        'Als Selbstständiger können Sie kein Entgelt umwandeln — dafür bräuchte es einen '
+        + 'Arbeitgeber. Ein bestehender Vertrag aus früherer Anstellung lässt sich hier '
+        + 'trotzdem bewerten; ausgewiesen wird dann nur die Steuerwirkung.',
+      );
+    } else if (k.beamter) {
       hinweise.push(
         'Als Beamter zahlen Sie keine Sozialabgaben. Eine Entgeltumwandlung spart hier '
         + 'nur Steuern, keine Beiträge.',
@@ -417,7 +468,12 @@ export function vertragsTuev(
     if (v.typ === 'riester') {
       // Zulagen zuerst, dann der Steuervorteil ueber den Hoechstbetrag § 10a
       // ABZUEGLICH der Zulagen (Guenstigerpruefung in vereinfachter Form).
-      const roh = riesterZulagen(a.kinder, jahr, p);
+      //
+      // Unmittelbar zulageberechtigt ist nach § 10a EStG, wer in der
+      // gesetzlichen Rentenversicherung pflichtversichert ist. Ein
+      // Selbststaendiger ohne diese Pflicht ist es nicht — ihm Zulagen
+      // gutzuschreiben verspraeche Geld, das nicht fliesst.
+      const roh = ohneZulageberechtigung ? 0 : riesterZulagen(a.kinder, jahr, p);
       const kuerzung = riesterZulagenkuerzung(
         { eigenbeitragJahr: beitragJahr, vorjahresbruttoRvPflichtig: k.jahresbrutto, zulagenGesamt: roh },
         p,
@@ -535,10 +591,30 @@ export function vertragsTuev(
       // Stelle der fiktive Gesamtbeitrag (§ 10 Abs. 3 S. 3); beide Male
       // dieselbe Formel. Ohne diese Deckelung zog der TUEV auch Beitraege
       // ab, die das Finanzamt gar nicht anerkennt.
-      const verbraucht = Math.min(k.jahresbrutto, p.bbgRvJahr) * p.rvSatzGesamt;
+      /*
+        BEFUND: `min(brutto, bbgRv) × 18,6 %` unterstellte JEDEM, sein
+        Hoechstbetrag sei durch Arbeitnehmer- UND Arbeitgeberbeitraege belegt.
+        Ein Selbststaendiger hat aber keinen Arbeitgeber — und die Mehrheit
+        zahlt gar nicht in die gesetzliche Rentenversicherung ein. Bei ihm
+        zaehlt allein sein eigener Beitrag, ohne ihn steht der volle
+        Hoechstbetrag bereit. Genau deshalb ist die Basisrente das klassische
+        Produkt dieser Gruppe, und genau das konnte der Rechner nicht zeigen.
+      */
+      const verbraucht = k.selbststaendig
+        ? Math.max(0, k.grvBeitragJahr)
+        : Math.min(k.jahresbrutto, p.bbgRvJahr) * p.rvSatzGesamt;
       const rahmen = Math.max(0,
         p.hoechstbetragAltersvorsorge * (steuerOpt.verheiratet ? 2 : 1) - verbraucht);
       const abziehbar = Math.min(beitragJahr, rahmen);
+
+      if (t === 0 && k.selbststaendig && verbraucht <= 0.5) {
+        hinweise.push(
+          `Als Selbstständiger ohne Rentenversicherungspflicht steht Ihnen der Höchstbetrag `
+          + `nach § 10 Abs. 3 EStG in voller Höhe zur Verfügung: `
+          + `${euroText(rahmen / 12)} im Monat sind absetzbar. Bei einem Angestellten ist er `
+          + 'bereits durch die Beiträge zur gesetzlichen Rentenversicherung weitgehend belegt.',
+        );
+      }
 
       steuerJahr = zusatzsteuer(k.zveHeute - abziehbar, abziehbar, steuerOpt, p);
       aufwandJahr = Math.max(0, beitragJahr - steuerJahr);
