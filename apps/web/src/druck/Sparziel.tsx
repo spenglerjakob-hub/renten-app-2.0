@@ -84,6 +84,58 @@ export function Sparziel({
         gleich schwer an.
       </Text>
 
+      {/*
+        Die eindringlichste Zahl des ganzen Gutachtens: Wer spaeter beginnt,
+        zahlt mehr im Monat UND ueber die kuerzere Zeit trotzdem mehr
+        insgesamt. Beides gehoert nebeneinander, sonst wirkt nur die halbe
+        Aussage.
+      */}
+      {r.aufschub.length > 1 && (
+        <>
+          <Untertitel>Was es kostet, damit zu warten</Untertitel>
+          <Tabelle
+            kopf={[
+              'Wenn Sie beginnen',
+              'Sparjahre',
+              'Startbeitrag',
+              'Summe aller Beiträge',
+              'Mehr als heute',
+            ]}
+            spalten={[26, 14, 18, 22, 20]}
+          >
+            {r.aufschub.map((a) => (
+              <Zeile
+                key={a.wartenJahre}
+                fett={a.wartenJahre === 0}
+                zellen={[
+                  a.wartenJahre === 0 ? 'heute' : `in ${a.wartenJahre} Jahren`,
+                  `${a.sparjahre}`,
+                  euro(a.startbeitrag),
+                  euro(a.summeBeitraege),
+                  a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`,
+                ]}
+              />
+            ))}
+          </Tabelle>
+
+          <Text>
+            <strong>Jedes Jahr, das Sie warten, kostet Sie{' '}
+            {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat</strong> — und über die dann
+            kürzere Sparzeit {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt. Das wirkt
+            zunächst widersprüchlich: Wer später beginnt, zahlt über <em>weniger</em> Jahre und
+            am Ende trotzdem <em>mehr</em>. Der Grund ist der Zinseszins — die Jahre am Anfang
+            sind die wertvollsten, weil ihre Erträge am längsten mitarbeiten. Wer sie verstreichen
+            lässt, muss den fehlenden Ertrag aus eigener Tasche nachlegen.
+          </Text>
+
+          <Text>
+            Die Summen sind nominal addiert. Wer später beginnt, zahlt seine Beiträge in
+            späteren und damit etwas weniger wertvollen Euro — der Effekt ist real, fällt aber
+            eine Spur kleiner aus, als die rohe Differenz aussehen lässt.
+          </Text>
+        </>
+      )}
+
       <Untertitel>Worauf die Rechnung beruht</Untertitel>
       <Text>
         Angenommen sind <strong>{prozent(eingaben.rendite)}</strong> Rendite pro Jahr{' '}

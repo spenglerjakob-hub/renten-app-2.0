@@ -30,6 +30,21 @@ export const SPARZIEL_VORGABE: SparzielEingaben = {
 /** Die Dynamikstufen der Vergleichstabelle. */
 export const DYNAMIKSTUFEN = [0, 0.03, 0.04, 0.05] as const;
 
+/** So viele Jahre muessen zum Sparen mindestens uebrig bleiben. */
+const MINDEST_SPARJAHRE = 5;
+
+/** Was es kostet, den Beginn um `wartenJahre` zu verschieben. */
+export interface Aufschub {
+  wartenJahre: number;
+  sparjahre: number;
+  startbeitrag: number;
+  summeBeitraege: number;
+  /** Mehrbetrag im Monat gegenueber dem Beginn heute */
+  mehrProMonat: number;
+  /** Mehrbetrag ueber die gesamte Sparzeit */
+  mehrGesamt: number;
+}
+
 export interface SparzielErgebnis {
   /** Fehlbetrag im Monat, Betrag des Rentenjahres */
   luecke: number;
@@ -42,6 +57,23 @@ export interface SparzielErgebnis {
   gewaehlt: Sparziel;
   /** Dieselbe Rechnung bei 0 / 3 / 4 / 5 % Beitragsdynamik */
   varianten: Sparziel[];
+  /** Was Warten kostet — erste Zeile ist immer "heute beginnen" */
+  aufschub: Aufschub[];
+  /** Was ein EINZELNES Jahr Warten kostet */
+  proJahrWarten: { mehrProMonat: number; mehrGesamt: number };
+}
+
+/**
+ * Die Stufen der Warten-Tabelle passen sich der verbleibenden Zeit an.
+ *
+ * Feste 5/10/15 Jahre ergeben bei jemandem, der noch zwoelf Jahre hat, keine
+ * Tabelle — und eine Zeile mit zwei verbleibenden Sparjahren nennt Betraege,
+ * die niemand aufbringt.
+ */
+function wartestufen(jahreBisRente: number): number[] {
+  const schritt = jahreBisRente >= 25 ? 5 : jahreBisRente >= 15 ? 3 : 2;
+  return [0, schritt, schritt * 2, schritt * 3]
+    .filter((w) => jahreBisRente - w >= MINDEST_SPARJAHRE);
 }
 
 /**
@@ -80,6 +112,30 @@ export function sparzielRechnen(
     zielkapital, jahre: jahreBisRente, rendite: eingaben.rendite, dynamik,
   });
 
+  /*
+    Was Warten kostet. Dasselbe Zielkapital, dieselbe Rendite, dieselbe
+    Dynamik — nur der Beginn wandert. Nur so isoliert die Tabelle den Effekt
+    des Wartens und mischt ihn nicht mit einer geaenderten Annahme.
+  */
+  const nachJahren = (jahre: number) => benoetigteSparrate({
+    zielkapital, jahre, rendite: eingaben.rendite, dynamik: eingaben.dynamik,
+  });
+  const heute = nachJahren(jahreBisRente);
+  const aufschub: Aufschub[] = wartestufen(jahreBisRente).map((wartenJahre) => {
+    const sparjahre = jahreBisRente - wartenJahre;
+    const r = nachJahren(sparjahre);
+    return {
+      wartenJahre,
+      sparjahre,
+      startbeitrag: r.startbeitrag,
+      summeBeitraege: r.summeBeitraege,
+      mehrProMonat: r.startbeitrag - heute.startbeitrag,
+      mehrGesamt: r.summeBeitraege - heute.summeBeitraege,
+    };
+  });
+
+  const einJahr = nachJahren(Math.max(1, jahreBisRente - 1));
+
   return {
     luecke,
     lueckeHeute: luecke / zeile.kaufkraftfaktor,
@@ -87,5 +143,10 @@ export function sparzielRechnen(
     zielkapital,
     gewaehlt: fuer(eingaben.dynamik),
     varianten: DYNAMIKSTUFEN.map(fuer),
+    aufschub,
+    proJahrWarten: {
+      mehrProMonat: Math.max(0, einJahr.startbeitrag - heute.startbeitrag),
+      mehrGesamt: Math.max(0, einJahr.summeBeitraege - heute.summeBeitraege),
+    },
   };
 }

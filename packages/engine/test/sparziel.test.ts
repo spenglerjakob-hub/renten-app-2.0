@@ -145,3 +145,43 @@ describe('Sparrate zu Rente — die Gegenrichtung', () => {
     expect(bei(0.06)).toBeGreaterThan(bei(0.05));
   });
 });
+
+describe('Was Warten kostet', () => {
+  // Die Aussage der Seite steht und faellt mit diesen beiden Zeilen. Sie
+  // wirkt widerspruechlich — weniger Jahre, aber MEHR Geld — und genau
+  // deshalb muss sie festgenagelt sein.
+  const ziel = 500_000, rendite = 0.05;
+
+  it('weniger Sparjahre heben den Monatsbeitrag', () => {
+    const bei = (jahre: number) =>
+      benoetigteSparrate({ zielkapital: ziel, jahre, rendite, dynamik: 0.03 }).startbeitrag;
+    expect(bei(25)).toBeGreaterThan(bei(35));
+    expect(bei(15)).toBeGreaterThan(bei(25));
+  });
+
+  it('weniger Sparjahre heben AUCH die Summe aller Beitraege', () => {
+    // Der Zinseszins der fruehen Jahre faellt weg und muss aus eigener
+    // Tasche nachgelegt werden — trotz kuerzerer Laufzeit.
+    const bei = (jahre: number) =>
+      benoetigteSparrate({ zielkapital: ziel, jahre, rendite, dynamik: 0.03 }).summeBeitraege;
+    expect(bei(25)).toBeGreaterThan(bei(35));
+    expect(bei(15)).toBeGreaterThan(bei(25));
+  });
+
+  it('gilt auch ohne Beitragsdynamik', () => {
+    const bei = (jahre: number) =>
+      benoetigteSparrate({ zielkapital: ziel, jahre, rendite, dynamik: 0 });
+    expect(bei(25).startbeitrag).toBeGreaterThan(bei(35).startbeitrag);
+    expect(bei(25).summeBeitraege).toBeGreaterThan(bei(35).summeBeitraege);
+  });
+
+  it('ohne Rendite kostet Warten nur mehr im Monat, nicht mehr insgesamt', () => {
+    // Gegenprobe: Ohne Zinseszins gibt es nichts zu verlieren — dieselbe
+    // Summe verteilt sich nur auf weniger Jahre. Wer hier einen Mehrbetrag
+    // ausweist, hat einen Rechenfehler.
+    const bei = (jahre: number) =>
+      benoetigteSparrate({ zielkapital: ziel, jahre, rendite: 0, dynamik: 0 });
+    expect(bei(25).startbeitrag).toBeGreaterThan(bei(35).startbeitrag);
+    expect(bei(25).summeBeitraege).toBeCloseTo(bei(35).summeBeitraege, 4);
+  });
+});

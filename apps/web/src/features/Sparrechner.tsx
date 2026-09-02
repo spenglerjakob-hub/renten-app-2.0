@@ -142,6 +142,67 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
               </table>
             </div>
 
+            {/*
+              Was Warten kostet — dieselbe Rechnung, nur mit spaeterem
+              Beginn. Die Zeile "heute" bleibt als Bezugspunkt stehen.
+            */}
+            {r.aufschub.length > 1 && (
+              <div className="mt-5">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Was es kostet, damit zu warten
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                        <th className="py-1.5 pr-3 font-bold">Beginn</th>
+                        <th className="py-1.5 pr-3 text-right font-bold">Sparjahre</th>
+                        <th className="py-1.5 pr-3 text-right font-bold">Startbeitrag</th>
+                        <th className="py-1.5 pr-3 text-right font-bold">Summe</th>
+                        <th className="py-1.5 text-right font-bold">Mehr als heute</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.aufschub.map((a) => (
+                        <tr
+                          key={a.wartenJahre}
+                          className={`border-b border-slate-100 ${
+                            a.wartenJahre === 0 ? 'bg-emerald-50/60 font-bold' : ''
+                          }`}
+                        >
+                          <td className="py-1.5 pr-3 text-slate-700">
+                            {a.wartenJahre === 0 ? 'heute' : `in ${a.wartenJahre} Jahren`}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
+                            {a.sparjahre}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-900">
+                            {euro(a.startbeitrag)}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
+                            {euro(a.summeBeitraege)}
+                          </td>
+                          <td className={`py-1.5 text-right tabular-nums ${
+                            a.wartenJahre === 0 ? 'text-slate-400' : 'text-rose-600'
+                          }`}>
+                            {a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                  <strong className="text-rose-700">
+                    Jedes Jahr Warten kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
+                  </strong>{' '}
+                  — und {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt, obwohl dann über
+                  weniger Jahre gezahlt wird. Die frühen Jahre sind die wertvollsten, weil ihre
+                  Erträge am längsten mitarbeiten.
+                </p>
+              </div>
+            )}
+
             <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
               Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
               <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik beginnen Sie mit{' '}
