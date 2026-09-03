@@ -9,6 +9,22 @@ import type { ReactNode } from 'react';
  * standen deshalb leere Eingabekaesten. Hier wird das Dokument eigens gebaut;
  * gerechnet wird nichts neu, alle Zahlen kommen aus demselben Ergebnis, das
  * auch der Bildschirm zeigt.
+ *
+ * DIE SCHRIFTSTUFEN. Sie stehen als Tailwind-Literale in den einzelnen
+ * Bausteinen und Seiten; hier ist die Leiter, an der sie sich ausrichten —
+ * sonst laeuft sie beim naechsten Eingriff wieder auseinander:
+ *
+ *   10 px  Fussnoten, Kachelbeschriftungen, Hinweiszeilen
+ *   11 px  Fliesstext (`Text`), Tabellen, Gruppenzeilen
+ *   12 px  `Angabe`, `Untertitel`, Inhaltsverzeichnis
+ *   14 px  hervorgehobene Zeilen im TUEV-Bogen
+ *   16 px  Seitentitel (`text-base`)
+ *   24 px  `GrosseZahl` (`text-2xl`)
+ *
+ * Jede Stufe lag bis dahin einen Punkt tiefer. Das Dokument liest ein
+ * Endverbraucher am Kuechentisch, nicht ein Sachbearbeiter am Bildschirm —
+ * und der Platz war da: die vollste Seite fuellte 928 von 979 Punkten, die
+ * leerste 498.
  */
 
 /**
@@ -32,7 +48,7 @@ export function Seite({
       {titel && (
         <header className="mb-4 flex items-baseline justify-between gap-4 border-b-2 border-slate-800 pb-1">
           <h2 className="text-base font-black tracking-tight text-slate-900">{titel}</h2>
-          {nummer && <span className="text-[10px] font-medium text-slate-500">{nummer}</span>}
+          {nummer && <span className="text-[11px] font-medium text-slate-500">{nummer}</span>}
         </header>
       )}
       {children}
@@ -43,7 +59,7 @@ export function Seite({
 /** Ueberschrift innerhalb einer Seite. Bleibt bei ihrem Absatz. */
 export function Untertitel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 mt-5 break-after-avoid text-[11px] font-bold uppercase tracking-wider text-slate-500 first:mt-0">
+    <h3 className="mb-2 mt-5 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-slate-500 first:mt-0">
       {children}
     </h3>
   );
@@ -56,8 +72,8 @@ export function Untertitel({ children }: { children: ReactNode }) {
 export function Angabe({ feld, wert }: { feld: string; wert: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 break-inside-avoid border-b border-dotted border-slate-200 py-1">
-      <dt className="text-[11px] text-slate-600">{feld}</dt>
-      <dd className="text-right text-[11px] font-semibold tabular-nums text-slate-900">{wert}</dd>
+      <dt className="text-[12px] text-slate-600">{feld}</dt>
+      <dd className="text-right text-[12px] font-semibold tabular-nums text-slate-900">{wert}</dd>
     </div>
   );
 }
@@ -89,7 +105,7 @@ export function Tabelle({
 }) {
   const links = (i: number) => i === 0 || (textSpalten?.includes(i) ?? false);
   return (
-    <table className={`w-full border-collapse text-[10px] ${spalten ? 'table-fixed' : ''}`}>
+    <table className={`w-full border-collapse text-[11px] ${spalten ? 'table-fixed' : ''}`}>
       {spalten && (
         <colgroup>
           {spalten.map((b, i) => <col key={i} style={{ width: `${b}%` }} />)}
@@ -145,7 +161,7 @@ export function Zeile({
 export function Gruppenzeile({ text, spalten }: { text: string; spalten: number }) {
   return (
     <tr className="break-inside-avoid break-after-avoid">
-      <td colSpan={spalten} className="pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <td colSpan={spalten} className="pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         {text}
       </td>
     </tr>
@@ -163,7 +179,7 @@ export function Hinweiszeile({ text, spalten }: { text: string; spalten: number 
   return (
     <tr className="break-inside-avoid">
       <td colSpan={spalten} className="pb-1">
-        <span className="block rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] leading-relaxed text-amber-900">
+        <span className="block rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-relaxed text-amber-900">
           {text}
         </span>
       </td>
@@ -185,14 +201,14 @@ export function GrosseZahl({
     : 'text-slate-900 border-slate-300';
   return (
     <div className={`break-inside-avoid rounded-lg border bg-white p-3 ${farbe}`}>
-      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
-      <div className="mt-0.5 text-xl font-black tabular-nums">{wert}</div>
-      {hinweis && <div className="mt-0.5 text-[9px] leading-tight text-slate-500">{hinweis}</div>}
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
+      <div className="mt-0.5 text-2xl font-black tabular-nums">{wert}</div>
+      {hinweis && <div className="mt-0.5 text-[10px] leading-tight text-slate-500">{hinweis}</div>}
     </div>
   );
 }
 
 /** Erklaerender Fliesstext. Keine Restzeilen auf der Folgeseite. */
 export function Text({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-[10px] leading-relaxed text-slate-600">{children}</p>;
+  return <p className="mt-2 text-[11px] leading-relaxed text-slate-600">{children}</p>;
 }

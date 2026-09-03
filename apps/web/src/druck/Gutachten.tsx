@@ -120,7 +120,7 @@ export function Gutachten({
           </div>
         </div>
 
-        <h1 className="mt-8 text-3xl font-black tracking-tight text-slate-900">
+        <h1 className="mt-6 text-3xl font-black tracking-tight text-slate-900">
           Altersvorsorge-Analyse
         </h1>
         <p className="mt-2 text-lg text-slate-700">für {name}</p>
@@ -145,7 +145,7 @@ export function Gutachten({
             },
           ].map((x) => (
             <div key={x.titel}>
-              <div className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 {x.titel}
               </div>
               <div className="text-base font-black tabular-nums text-slate-900">
@@ -191,19 +191,19 @@ export function Gutachten({
           <div className="h-3 flex-1 overflow-hidden rounded-full border border-slate-300 bg-slate-100">
             <div className="h-full bg-blue-500" style={{ width: `${gedeckt}%` }} />
           </div>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {gedeckt.toFixed(0)} % erreicht
           </span>
         </div>
 
         <div className="mt-6">
           <Untertitel>Inhalt</Untertitel>
-          <ol className="list-inside list-decimal space-y-1 text-[11px] text-slate-700">
+          <ol className="list-inside list-decimal space-y-0.5 text-[12px] text-slate-700">
             {abschnitte.map((a) => <li key={a}>{a}</li>)}
           </ol>
         </div>
 
-        <div className="mt-5 rounded-lg border border-slate-300 bg-slate-50 p-3">
+        <div className="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3">
           <Text>
             <strong>Was dieses Dokument ist.</strong> Eine Modellrechnung auf Grundlage der von
             Ihnen gemachten Angaben und der auf Seite „Ihre Angaben“ genannten Annahmen. Es ist

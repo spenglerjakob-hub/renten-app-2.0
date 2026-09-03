@@ -117,7 +117,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         .filter((p) => p.id === 'A' || h.verheiratet)
         .map((p) => (
           <div key={p.id} className="mb-3 break-inside-avoid">
-            <div className="mb-1 text-[11px] font-bold text-slate-800">
+            <div className="mb-1 text-[12px] font-bold text-slate-800">
               {personName(p)}
             </div>
             <Zweispaltig>
@@ -145,19 +145,19 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
       <Untertitel>Heutiges Einkommen</Untertitel>
       <Zweispaltig>
         <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[12px] text-slate-600">
             {szenario.einkommenGetrennt ? personNameAus(szenario.personen, 'A') : 'Haushalt'}
           </div>
-          <div className="text-[11px] font-semibold tabular-nums text-slate-900">
+          <div className="text-[12px] font-semibold tabular-nums text-slate-900">
             {einkommen(szenario.einkommenHeute)}
           </div>
         </div>
         {h.verheiratet && szenario.einkommenGetrennt && (
           <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
-            <div className="text-[11px] text-slate-600">
+            <div className="text-[12px] text-slate-600">
               {personNameAus(szenario.personen, 'B')}
             </div>
-            <div className="text-[11px] font-semibold tabular-nums text-slate-900">
+            <div className="text-[12px] font-semibold tabular-nums text-slate-900">
               {einkommen(szenario.einkommenPartner)}
             </div>
           </div>

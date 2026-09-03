@@ -100,23 +100,33 @@ export function Merkblatt() {
       <ol className="space-y-2">
         {CHECKLISTE.map((x, i) => (
           <li key={x.was} className="flex break-inside-avoid gap-2">
-            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-400 text-[9px] font-bold text-slate-600">
+            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-400 text-[10px] font-bold text-slate-600">
               {i + 1}
             </span>
             <span>
-              <span className="block text-[11px] font-semibold text-slate-900">{x.was}</span>
-              <span className="block text-[10px] leading-relaxed text-slate-600">{x.warum}</span>
+              <span className="block text-[12px] font-semibold text-slate-900">{x.was}</span>
+              <span className="block text-[11px] leading-relaxed text-slate-600">{x.warum}</span>
             </span>
           </li>
         ))}
       </ol>
 
       <Untertitel>Die Begriffe aus diesem Bericht, in Alltagssprache</Untertitel>
+      {/*
+        Begriff und Erklaerung stehen in EINER Zeile, nicht uebereinander.
+        Das ist die uebliche Form eines Glossars und spart acht Zeilen — der
+        Platz, den die groessere Schrift auf dieser Seite braucht. Gestrichen
+        wird dafuer nichts.
+      */}
       <dl className="space-y-1.5">
         {GLOSSAR.map((x) => (
-          <div key={x.begriff} className="break-inside-avoid">
-            <dt className="text-[11px] font-semibold text-slate-900">{x.begriff}</dt>
-            <dd className="text-[10px] leading-relaxed text-slate-600">{x.erklaerung}</dd>
+          <div
+            key={x.begriff}
+            className="break-inside-avoid text-[11px] leading-relaxed text-slate-600"
+          >
+            <dt className="inline font-bold text-slate-900">{x.begriff}</dt>
+            {' — '}
+            <dd className="inline">{x.erklaerung}</dd>
           </div>
         ))}
       </dl>

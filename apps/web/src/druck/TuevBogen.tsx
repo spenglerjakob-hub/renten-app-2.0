@@ -67,7 +67,7 @@ export function TuevBogen({
 
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-          <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Was Sie einzahlen (1. Jahr, monatlich)
           </div>
           <Angabe feld="Beitrag" wert={euro(r.beitragMonat)} />
@@ -81,15 +81,15 @@ export function TuevBogen({
             <Angabe feld="− Steuerersparnis" wert={euro(r.steuerersparnisMonat)} />
           )}
           <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
-            <span className="text-[11px] font-bold text-slate-800">Kostet Sie wirklich</span>
-            <span className="text-[13px] font-black tabular-nums text-slate-900">
+            <span className="text-[12px] font-bold text-slate-800">Kostet Sie wirklich</span>
+            <span className="text-[14px] font-black tabular-nums text-slate-900">
               {euro(r.echterAufwandMonat)}
             </span>
           </div>
         </div>
 
         <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-          <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Was ankommt {istKapital ? '(einmalig)' : '(monatlich)'}
           </div>
           <Angabe
@@ -104,8 +104,8 @@ export function TuevBogen({
             wert={euro(istKapital ? r.steuerKapital : r.steuerMonat)}
           />
           <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
-            <span className="text-[11px] font-bold text-slate-800">Bleibt Ihnen</span>
-            <span className="text-[13px] font-black tabular-nums text-slate-900">
+            <span className="text-[12px] font-bold text-slate-800">Bleibt Ihnen</span>
+            <span className="text-[14px] font-black tabular-nums text-slate-900">
               {euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)}
             </span>
           </div>
@@ -119,7 +119,7 @@ export function TuevBogen({
       */}
       {r.zulageMonat > 0 && (
         <div className="mt-4 break-inside-avoid rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-          <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
             Was der Staat dazugibt (1. Jahr, monatlich)
           </div>
           {r.zulageDetail ? (
@@ -136,12 +136,12 @@ export function TuevBogen({
             <Angabe feld="Zulage" wert={euro(r.zulageMonat)} />
           )}
           {r.zulageDetail && r.zulageDetail.bonusEinmalig > 0 && (
-            <p className="mt-1 text-[10px] text-emerald-800">
+            <p className="mt-1 text-[11px] text-emerald-800">
               Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
               {euro(r.zulageDetail.bonusEinmalig)}.
             </p>
           )}
-          <p className="mt-1 text-[10px] leading-relaxed text-emerald-800">
+          <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
             Die Zulagen fließen zusätzlich in den Vertrag — sie senken Ihren Beitrag nicht.
             Im Vertrag kommen an: <strong>{euro(r.beitragMonat + r.zulageMonat)}</strong> im Monat.
           </p>
@@ -188,10 +188,10 @@ export function TuevBogen({
 
       {r.hinweise.length > 0 && (
         <div className="mt-3 break-inside-avoid rounded-lg border border-amber-300 bg-amber-50 p-2">
-          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-amber-800">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
             Zu beachten
           </div>
-          <ul className="list-inside list-disc space-y-0.5 text-[10px] leading-relaxed text-amber-900">
+          <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-relaxed text-amber-900">
             {r.hinweise.map((h) => <li key={h}>{h}</li>)}
           </ul>
         </div>

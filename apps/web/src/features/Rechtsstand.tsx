@@ -41,8 +41,9 @@ export function Rechtsstand({
         )}
       </p>
 
-      {/* Ausfuehrliche Fassung nur im Druck */}
-      <div className="mt-3 hidden space-y-2 text-[11px] leading-relaxed text-slate-700 print:block">
+      {/* Ausfuehrliche Fassung nur im Druck — deshalb auch in der Schriftstufe
+          des Gutachtens (12 px, siehe druck/Bausteine.tsx). */}
+      <div className="mt-3 hidden space-y-2 text-[12px] leading-relaxed text-slate-700 print:block">
         <h3 className="font-bold text-slate-800">Wie die Zahlen zustande kommen</h3>
 
         <p>

@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import {
-  projiziere, sparrateZuRente, versorgungsluecke,
+  projiziere, sparrateZuRente, versorgungsluecke, foerdercheck,
   type Jahreszeile, type Szenario,
 } from '@renten/engine';
+import { foerderBasis } from '../features/tuev-berechnung';
 import { euro, prozent } from '../components/Feld';
 import type { SzenarioParsed } from '../store/szenario';
 import type { SparzielEingaben } from '../features/sparziel-berechnung';
@@ -141,10 +142,10 @@ export function Stellschrauben({
       </Tabelle>
 
       <div className="mt-4 break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
           Das Wichtigste dieser Seite
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-800">
+        <p className="mt-1 text-[12px] leading-relaxed text-slate-800">
           Ein Prozentpunkt mehr Rendite bringt über {jahreBisRente} Jahre{' '}
           <strong>
             {euro((beiMehrRendite.endkapital - beiRendite.endkapital))}
@@ -156,6 +157,8 @@ export function Stellschrauben({
         </p>
       </div>
 
+      <Foerderabschnitt szenario={szenario} zeile={zeile} />
+
       <Text>
         Die Zahlen der ersten Zeile stammen aus einer vollständigen zweiten Berechnung mit
         verschobenem Rentenbeginn, nicht aus einer Faustformel. Sie fallen dabei eher{' '}
@@ -166,5 +169,64 @@ export function Stellschrauben({
         das Ergebnis.
       </Text>
     </Seite>
+  );
+}
+
+/**
+ * „Welche Förderung Sie nicht ausschöpfen" — derselbe Befund wie auf dem
+ * Bildschirm, aus derselben Funktion.
+ *
+ * Er steht auf DIESER Seite und bekommt keine eigene: Die Stellschrauben
+ * füllen von den 979 Punkten einer A4-Seite nur rund die Hälfte, und ein
+ * Abschnitt, der bei den meisten Haushalten aus einer oder zwei Zeilen
+ * besteht, trägt keine Seite allein.
+ */
+function Foerderabschnitt({ szenario, zeile }: { szenario: SzenarioParsed; zeile: Jahreszeile }) {
+  const { befunde, ohneBeitrag } = useMemo(() => {
+    const b = foerderBasis(szenario, zeile);
+    return { befunde: foerdercheck(b.kontext, b.steuerOpt, b.p), ohneBeitrag: b.ohneBeitrag };
+  }, [szenario, zeile]);
+
+  if (befunde.length === 0) return null;
+
+  return (
+    <>
+      <Untertitel>Welche Förderung Sie nicht ausschöpfen</Untertitel>
+      <Tabelle
+        kopf={['Förderweg', 'Frei im Monat', 'Beitrag', 'Kostet netto']}
+        spalten={[52, 16, 16, 16]}
+      >
+        {befunde.map((b) => (
+          <Zeile
+            key={b.id}
+            zellen={[
+              <>
+                <span className="font-semibold">{b.titel}</span>
+                <span className="block text-slate-500">{b.text} ({b.paragraf})</span>
+              </>,
+              euro(b.rahmenMonat),
+              euro(b.probeMonat),
+              <>
+                {euro(b.nettoAufwandMonat)}
+                <span className="block text-slate-500">
+                  {Math.round(b.foerderquote * 100)} % gefördert
+                </span>
+              </>,
+            ]}
+          />
+        ))}
+      </Tabelle>
+      <Text>
+        Die Spalte „Beitrag" nennt einen Betrag, an dem die Wirkung gerechnet ist — nicht eine
+        Empfehlung über die Höhe. Maßgeblich ist das Verhältnis: Was ein geförderter Euro netto
+        kostet, gilt für jeden Betrag innerhalb des freien Rahmens.
+        {ohneBeitrag > 0 && (
+          <>
+            {' '}Zu {ohneBeitrag === 1 ? 'einem Ihrer geförderten Verträge' : `${ohneBeitrag} Ihrer geförderten Verträge`}{' '}
+            ist kein laufender Beitrag erfasst; der freie Rahmen ist insoweit zu groß ausgewiesen.
+          </>
+        )}
+      </Text>
+    </>
   );
 }

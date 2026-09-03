@@ -11,6 +11,7 @@ import { Vertraege } from './features/Vertraege';
 import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
 import { PkvRechner } from './features/PkvRechner';
+import { Foerdercheck } from './features/Foerdercheck';
 import { Kassenbon } from './features/Kassenbon';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
@@ -410,6 +411,13 @@ export default function App() {
                 stillschweigend weg.
               */}
               <PkvRechner zeile={zeile} />
+
+              {/*
+                Der Foerdercheck schliesst die Reihe „was waere zu tun": erst
+                die Luecke, dann die Sparrate, dann die Krankenversicherung —
+                und hier die Foerderung, die ohne Zutun liegen bleibt.
+              */}
+              <Foerdercheck zeile={zeile} />
 
               <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                 <button

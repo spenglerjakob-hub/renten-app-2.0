@@ -191,8 +191,8 @@ export interface TuevErgebnis {
  * Grenzen des § 3 Nr. 63 EStG, als Anteil der Beitragsbemessungsgrenze der
  * allgemeinen Rentenversicherung: 8 % steuerfrei, 4 % beitragsfrei.
  */
-const STEUER_FREI_QUOTE = 0.08;
-const SV_FREI_QUOTE = 0.04;
+export const STEUER_FREI_QUOTE = 0.08;
+export const SV_FREI_QUOTE = 0.04;
 
 /** Vorgabe der Auszahldauer, wenn am Vertrag nichts eingetragen ist. */
 const AUSZAHLDAUER_VORGABE = 25;
@@ -225,6 +225,19 @@ function auszahlungsdauer(
   const fest = Math.max(1, Math.round(v.entnahmedauer ?? AUSZAHLDAUER_VORGABE));
   return Math.min(bisLebensende, fest);
 }
+
+/**
+ * Was `svWirkung` von einem Kontext tatsaechlich braucht.
+ *
+ * Als Ausschnitt geschrieben, damit auch der Foerdercheck die Funktion
+ * benutzen kann: der bilanziert den ungenutzten Rahmen je Haushalt und hat
+ * keinen Vertrag, also auch keinen vollstaendigen `TuevKontext`. Ein
+ * `TuevKontext` erfuellt den Ausschnitt weiterhin von selbst.
+ */
+export type SvKontext = Pick<
+  TuevKontext,
+  'beamter' | 'selbststaendig' | 'privatVersichert' | 'pkvPraemieMonat' | 'jahresbrutto'
+>;
 
 /** Was eine Entgeltumwandlung an Sozialabgaben bewirkt. */
 export interface SvWirkung {
@@ -275,9 +288,9 @@ function anteilUnterGrenze(brutto: number, umwandlung: number, bbg: number): num
  * doppelt so hoch wie in Wirklichkeit (21,15 % statt 10,60 % im Rechtsstand
  * 2026).
  */
-function svWirkung(
+export function svWirkung(
   umwandlungJahr: number,
-  k: TuevKontext,
+  k: SvKontext,
   p: LegalParameters,
 ): SvWirkung {
   /*

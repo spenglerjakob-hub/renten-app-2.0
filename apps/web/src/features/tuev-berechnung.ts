@@ -1,8 +1,9 @@
 import {
   vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
+  versorgungsluecke,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis,
-  type LegalParameters,
+  type LegalParameters, type FoerderKontext,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -178,4 +179,89 @@ export function tuevPositionen(
 
     return [{ vertrag: v, ergebnis, vergleich, istKapital, alterBeiRentenbeginn, rentenbeginnJahr }];
   });
+}
+
+/**
+ * Die Angaben, aus denen der Foerdercheck seinen Befund zieht.
+ *
+ * Er sitzt hier und nicht im Rechenkern, weil nur die Oberflaeche weiss, wo
+ * die Beitraege stehen: Ein Vertrag traegt seine kuenftige Rente
+ * (`brutto`), aber nur bei wenigen Arten auch einen laufenden Beitrag. Was
+ * heute in eine bAV oder eine Basisrente fliesst, steht ausschliesslich in
+ * den Positionen des Vertrags-TUEV.
+ *
+ * `ohneBeitrag` zaehlt die gefoerderten Vertraege, zu denen KEIN Beitrag
+ * erfasst ist. Ohne diese Zahl behauptete der Check bei einem ungeprueften
+ * Vertrag, der ganze Rahmen sei frei — und das waere schlicht falsch.
+ */
+export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null): {
+  kontext: FoerderKontext;
+  steuerOpt: { verheiratet: boolean; bundesland: string; kirchensteuerpflichtig: boolean };
+  p: LegalParameters;
+  ohneBeitrag: number;
+} {
+  const basis = tuevBasis(szenario);
+  const gefoerdert = szenario.vertraege.filter(
+    (v) => v.typ.startsWith('bav') || v.typ === 'basis',
+  );
+
+  let bavEigenanteilJahr = 0;
+  let basisBeitragJahr = 0;
+  let ohneBeitrag = 0;
+  for (const v of gefoerdert) {
+    const t = szenario.tuev.find((x) => x.vertragId === v.id);
+    if (!t || t.beitragMonat <= 0) { ohneBeitrag += 1; continue; }
+    if (v.typ === 'basis') {
+      basisBeitragJahr += t.beitragMonat * 12;
+    } else {
+      // Nur der EIGENE Verzicht auf Entgelt zaehlt; der Arbeitgeberzuschuss
+      // ist keine Umwandlung.
+      bavEigenanteilJahr += Math.max(0, t.beitragMonat - t.agZuschussMonat) * 12;
+    }
+  }
+
+  /*
+    Wie viel des Bedarfs die gesetzliche Rente bzw. die Pension traegt. Die
+    Posten der Ruhestandszeile tragen die Kennung `person-A` / `person-B` —
+    alles andere sind Vertraege.
+  */
+  const grvNettoMonat = (zeile?.posten ?? [])
+    .filter((x) => x.id.startsWith('person-'))
+    .reduce((s, x) => s + x.nettoJahr, 0) / 12;
+  const grvDeckung = zeile && zeile.zielNettoMonat > 0
+    ? grvNettoMonat / zeile.zielNettoMonat
+    : 0;
+
+  return {
+    p: basis.p,
+    ohneBeitrag,
+    steuerOpt: {
+      verheiratet: szenario.haushalt.verheiratet,
+      bundesland: szenario.haushalt.bundesland,
+      kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
+    },
+    kontext: {
+      jahresbrutto: basis.jahresbrutto,
+      zveHeute: basis.zve,
+      beamter: szenario.einkommenHeute.modus === 'besoldung',
+      selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
+      grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
+        && szenario.einkommenHeute.grvPflicht
+        ? szenario.einkommenHeute.grvBeitragMonat * 12
+        : 0,
+      privatVersichert: privatImErwerb(szenario),
+      pkvPraemieMonat: privatImErwerb(szenario)
+        ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
+        : 0,
+      bavEigenanteilJahr,
+      basisBeitragJahr,
+      grvDeckung,
+      /*
+        In HEUTIGER Kaufkraft. Der Befund nennt die Luecke neben einem
+        Beitrag, den jemand heute zahlen wuerde — stuende sie in Euro des
+        Rentenjahres, verglichen sich zwei verschiedene Massstaebe.
+      */
+      lueckeMonat: zeile ? versorgungsluecke(zeile) / zeile.kaufkraftfaktor : 0,
+    },
+  };
 }

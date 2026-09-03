@@ -79,9 +79,14 @@ export {
   type Sparziel,
 } from './analyse/sparziel.js';
 export {
-  vertragsTuev, renteOderKapital,
+  vertragsTuev, renteOderKapital, svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE,
   type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
+  type SvKontext, type SvWirkung,
 } from './analyse/vertrags-tuev.js';
+export {
+  foerdercheck, basisrahmenJahr,
+  type FoerderKontext, type FoerderBefund,
+} from './analyse/foerdercheck.js';
 
 // Projektion
 export {

@@ -80,7 +80,7 @@ export function Renteneinkuenfte({
       */}
       <Untertitel>Ihr Versorgungsziel — monatlich, in zwei Maßstäben</Untertitel>
       <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-        <div className="mb-1 grid grid-cols-2 gap-x-8 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="mb-1 grid grid-cols-2 gap-x-8 text-[10px] font-bold uppercase tracking-wider text-slate-500">
           <span>In heutiger Kaufkraft</span>
           <span>Beträge des Jahres {zeile.jahr}</span>
         </div>
@@ -107,11 +107,11 @@ export function Renteneinkuenfte({
               style={{ width: `${Math.min(100, Math.max(0, gedeckt))}%` }}
             />
           </div>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {gedeckt.toFixed(0)} % erreicht
           </span>
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
           Bei <strong>{prozent(inflation)}</strong> Inflation im Jahr kostet das, was heute{' '}
           {euro(zielNettoHeute)} kostet, im Jahr {zeile.jahr} rund{' '}
           <strong>{euro(zeile.zielNettoMonat)}</strong>. Beide Spalten sagen dasselbe — die linke
@@ -177,7 +177,7 @@ export function Renteneinkuenfte({
           <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
             {ergebnis.kapitalauszahlungen.map((a) => (
               <div key={a.vertragId} className="mb-2 last:mb-0">
-                <div className="mb-1 text-[11px] font-bold text-slate-800">
+                <div className="mb-1 text-[12px] font-bold text-slate-800">
                   {a.bezeichnung} <span className="font-normal text-slate-500">· Zufluss {a.jahr}</span>
                 </div>
                 <Zweispaltig>
@@ -193,7 +193,7 @@ export function Renteneinkuenfte({
                 </Zweispaltig>
               </div>
             ))}
-            <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
               Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
             </p>
           </div>

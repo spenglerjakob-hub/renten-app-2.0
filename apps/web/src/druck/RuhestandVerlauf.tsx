@@ -82,7 +82,7 @@ export function RuhestandVerlauf({ zeilen }: { zeilen: readonly Jahreszeile[] })
         <text x={L - 6} y={H - 10} textAnchor="end" fontSize="8" fill="#94a3b8">Alter</text>
       </svg>
 
-      <div className="mt-1 flex gap-4 text-[9px] text-slate-600">
+      <div className="mt-1 flex gap-4 text-[10px] text-slate-600">
         <span className="flex items-center gap-1">
           <span className="h-2 w-3 rounded-sm" style={{ background: '#6366f1' }} /> Netto im Monat
         </span>

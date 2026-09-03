@@ -117,7 +117,7 @@ export function Kaufkraft({
           <text x={L - 6} y={H - 12} textAnchor="end" fontSize="8" fill="#94a3b8">Alter</text>
         </svg>
 
-        <div className="mt-1 flex flex-wrap gap-4 text-[9px] text-slate-600">
+        <div className="mt-1 flex flex-wrap gap-4 text-[10px] text-slate-600">
           <span className="flex items-center gap-1">
             <span className="h-0.5 w-4" style={{ background: '#3b82f6' }} /> Ihr Netto in heutigem Geld
           </span>
@@ -139,10 +139,10 @@ export function Kaufkraft({
             : 'border-emerald-300 bg-emerald-50'
         }`}
       >
-        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
           Das Wichtigste dieser Seite
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-800">
+        <p className="mt-1 text-[12px] leading-relaxed text-slate-800">
           {!kippt ? (
             <>
               Ihre Kurve bleibt über den ganzen Ruhestand oberhalb der Bedarfslinie — auch dann
