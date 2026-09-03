@@ -29,19 +29,28 @@ const bav = (k: FoerderKontext) => foerdercheck(k, steuerOpt, p).find((b) => b.i
 const basis = (k: FoerderKontext) => foerdercheck(k, steuerOpt, p).find((b) => b.id === 'basis') ?? null;
 
 describe('Fördercheck — betriebliche Altersvorsorge', () => {
-  it('meldet den vollen Rahmen, wenn nichts umgewandelt wird', () => {
+  it('misst den Rahmen am BEITRAGSFREIEN Teil, nicht am steuerfreien', () => {
+    /*
+      Beitrags- UND steuerfrei sind nur 4 % der Beitragsbemessungsgrenze; die
+      zweiten 4 % sind allein steuerfrei. Der Rahmen, den der Befund nennt,
+      ist deshalb der beitragsfreie — die zweite Stufe pauschal zu empfehlen
+      waere falsch.
+    */
     const b = bav(angestellt);
     expect(b).not.toBeNull();
-    expect(b!.rahmenMonat).toBeCloseTo(STEUER_FREI_QUOTE * p.bbgRvJahr / 12, 6);
+    expect(b!.rahmenMonat).toBeCloseTo(SV_FREI_QUOTE * p.bbgRvJahr / 12, 6);
+    expect(b!.rahmenMonat).toBeLessThan(STEUER_FREI_QUOTE * p.bbgRvJahr / 12);
   });
 
   it('zieht die laufende Umwandlung vom Rahmen ab', () => {
     const b = bav({ ...angestellt, bavEigenanteilJahr: 1_200 });
-    expect(b!.rahmenMonat).toBeCloseTo((STEUER_FREI_QUOTE * p.bbgRvJahr - 1_200) / 12, 6);
+    expect(b!.rahmenMonat).toBeCloseTo((SV_FREI_QUOTE * p.bbgRvJahr - 1_200) / 12, 6);
   });
 
-  it('schweigt, wenn der steuerfreie Rahmen ausgeschöpft ist', () => {
-    expect(bav({ ...angestellt, bavEigenanteilJahr: STEUER_FREI_QUOTE * p.bbgRvJahr })).toBeNull();
+  it('schweigt, wenn der beitragsfreie Rahmen ausgeschöpft ist', () => {
+    // Ab hier bliebe nur noch die Steuerfreiheit — und die reicht fuer eine
+    // pauschale Empfehlung nicht aus.
+    expect(bav({ ...angestellt, bavEigenanteilJahr: SV_FREI_QUOTE * p.bbgRvJahr })).toBeNull();
   });
 
   it('schweigt bei Beamten und Selbstständigen — sie können nicht umwandeln', () => {
@@ -49,16 +58,26 @@ describe('Fördercheck — betriebliche Altersvorsorge', () => {
     expect(bav({ ...angestellt, selbststaendig: true })).toBeNull();
   });
 
-  it('nennt die Beitragsfreiheit nur, solange die 4-Prozent-Grenze offen ist', () => {
-    // Zwischen 4 % und 8 %: steuerfrei ja, beitragsfrei nein. Genau der
-    // Unterschied, den man vor dem Abschluss kennen sollte.
-    const knapp = bav({ ...angestellt, bavEigenanteilJahr: SV_FREI_QUOTE * p.bbgRvJahr });
-    expect(knapp).not.toBeNull();
-    expect(knapp!.text).toContain('4-Prozent-Grenze');
+  it('nennt die zweite Stufe, ohne sie zu empfehlen', () => {
+    const b = bav(angestellt)!;
+    expect(b.text).toContain('Steuer- UND beitragsfrei');
+    expect(b.text).toContain('nur noch steuerfrei');
+    expect(b.text).toContain('volle Sozialabgaben');
+    // Der genannte Zusatzrahmen ist die Differenz beider Grenzen.
+    expect(b.text).toContain(
+      Math.round((STEUER_FREI_QUOTE - SV_FREI_QUOTE) * p.bbgRvJahr / 12).toLocaleString('de-DE'),
+    );
+  });
 
-    const offen = bav(angestellt);
-    expect(offen!.text).toContain('beitragsfrei');
-    expect(offen!.text).not.toContain('4-Prozent-Grenze');
+  it('rechnet die Ersparnis am beitragsfreien Beitrag — mit Sozialabgaben', () => {
+    /*
+      Weil die Probe jetzt innerhalb der 4 % bleibt, wirken Steuer UND
+      Sozialabgaben. Die Foerderquote liegt dadurch deutlich hoeher als bei
+      einem Beitrag, der nur steuerfrei waere.
+    */
+    const b = bav(angestellt)!;
+    expect(b.probeMonat).toBeLessThanOrEqual(SV_FREI_QUOTE * p.bbgRvJahr / 12 + 1e-9);
+    expect(b.foerderquote).toBeGreaterThan(0.4);
   });
 
   it('spart bei einem privat Versicherten weniger als bei einem gesetzlich versicherten', () => {

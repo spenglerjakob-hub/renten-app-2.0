@@ -157,8 +157,6 @@ export function Stellschrauben({
         </p>
       </div>
 
-      <Foerderabschnitt szenario={szenario} zeile={zeile} />
-
       <Text>
         Die Zahlen der ersten Zeile stammen aus einer vollständigen zweiten Berechnung mit
         verschobenem Rentenbeginn, nicht aus einer Faustformel. Sie fallen dabei eher{' '}
@@ -168,6 +166,18 @@ export function Stellschrauben({
         unterstellen einen gleichbleibenden Beitrag; mit Dynamik verschiebt sich die Last, nicht
         das Ergebnis.
       </Text>
+
+      {/*
+        GANZ ANS ENDE, und als geschlossener Block. Der Vorbehalt darueber
+        gehoert zur Tabelle der Hebel und soll nicht mitwandern; der
+        Foerderteil selbst passt im Regelfall noch auf diese Seite, aber die
+        Texte sind fallabhaengig lang. `break-inside-avoid` sorgt dafuer, dass
+        er dann als Ganzes auf die Folgeseite rutscht, statt mitten in der
+        Tabelle zu brechen.
+      */}
+      <div className="break-inside-avoid">
+        <Foerderabschnitt szenario={szenario} zeile={zeile} />
+      </div>
     </Seite>
   );
 }
@@ -192,9 +202,14 @@ function Foerderabschnitt({ szenario, zeile }: { szenario: SzenarioParsed; zeile
   return (
     <>
       <Untertitel>Welche Förderung Sie nicht ausschöpfen</Untertitel>
+      {/*
+        Die Textspalte bekommt so viel Breite wie moeglich: In den drei
+        Zahlenspalten steht nie mehr als „1.825 €", und jede Zeile weniger im
+        Erklaerungstext ist Platz, den diese Seite gut gebrauchen kann.
+      */}
       <Tabelle
         kopf={['Förderweg', 'Frei im Monat', 'Beitrag', 'Kostet netto']}
-        spalten={[52, 16, 16, 16]}
+        spalten={[58, 14, 14, 14]}
       >
         {befunde.map((b) => (
           <Zeile
@@ -217,9 +232,8 @@ function Foerderabschnitt({ szenario, zeile }: { szenario: SzenarioParsed; zeile
         ))}
       </Tabelle>
       <Text>
-        Die Spalte „Beitrag" nennt einen Betrag, an dem die Wirkung gerechnet ist — nicht eine
-        Empfehlung über die Höhe. Maßgeblich ist das Verhältnis: Was ein geförderter Euro netto
-        kostet, gilt für jeden Betrag innerhalb des freien Rahmens.
+        Die Spalte „Beitrag" ist ein Rechenbeispiel, keine Empfehlung über die Höhe: Was ein
+        geförderter Euro netto kostet, gilt für jeden Betrag innerhalb des freien Rahmens.
         {ohneBeitrag > 0 && (
           <>
             {' '}Zu {ohneBeitrag === 1 ? 'einem Ihrer geförderten Verträge' : `${ohneBeitrag} Ihrer geförderten Verträge`}{' '}

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
 import { tuevPositionen, tuevBasis } from './tuev-berechnung';
+import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent, TON,
@@ -531,6 +532,14 @@ export function VertragsTuev({
           })}
         </div>
       )}
+
+      {/*
+        Der Foerdercheck schliesst diesen Bereich ab: erst was die Vertraege
+        leisten, dann was an Foerderung liegen bleibt. Er steht AUSSERHALB der
+        Liste, weil er nicht an der Auswahl haengt — auch wer noch keinen
+        Vertrag zur Pruefung gewaehlt hat, soll seinen freien Rahmen sehen.
+      */}
+      <Foerdercheck zeile={zeile ?? null} />
     </section>
   );
 }

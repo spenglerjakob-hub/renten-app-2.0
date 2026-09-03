@@ -143,10 +143,14 @@ export function foerdercheck(
  * Nur fuer Angestellte: ein Beamter wandelt kein Entgelt um, und ein
  * Selbststaendiger hat keinen Arbeitgeber, der es koennte.
  *
- * ZWEI GRENZEN, beide genannt, weil sie auseinanderfallen: beitragsfrei sind
- * 4 % der Beitragsbemessungsgrenze, steuerfrei 8 %. Wer zwischen beiden
- * liegt, spart Steuern, aber keine Sozialabgaben mehr — das ist ein
- * Unterschied, den man vor dem Abschluss kennen sollte und nicht danach.
+ * DER MASSSTAB SIND DIE 4 %, NICHT DIE 8 %. Beitrags- UND steuerfrei sind
+ * nur 4 % der Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV); die zweiten
+ * 4 % bis zur Grenze des § 3 Nr. 63 EStG sind allein steuerfrei, auf sie
+ * fallen volle Sozialabgaben an. Der Befund misst deshalb den freien Rahmen
+ * am beitragsfreien Teil und meldet sich nicht mehr, sobald der ausgeschoepft
+ * ist: Den vollen Rahmen auszureizen ist eine Einzelfallentscheidung und
+ * taugt nicht als pauschaler Hinweis. Die zweite Stufe wird trotzdem genannt
+ * — aber als das, was sie ist.
  */
 function bavBefund(
   k: FoerderKontext,
@@ -156,13 +160,13 @@ function bavBefund(
   if (k.beamter || k.selbststaendig) return null;
 
   const genutzt = Math.max(0, k.bavEigenanteilJahr);
-  const steuerRahmen = Math.max(0, STEUER_FREI_QUOTE * p.bbgRvJahr - genutzt);
   const svRahmen = Math.max(0, SV_FREI_QUOTE * p.bbgRvJahr - genutzt);
-  const rahmenMonat = steuerRahmen / 12;
+  const nurSteuerfrei = Math.max(0, STEUER_FREI_QUOTE * p.bbgRvJahr - genutzt - svRahmen);
+  const rahmenMonat = svRahmen / 12;
   if (rahmenMonat < BAGATELLE_BAV) return null;
 
-  const probeJahr = Math.min(steuerRahmen, PROBE_HOECHSTENS * 12);
-  const wirkung = svWirkung(Math.min(probeJahr, svRahmen), k, p);
+  const probeJahr = Math.min(svRahmen, PROBE_HOECHSTENS * 12);
+  const wirkung = svWirkung(probeJahr, k, p);
   /*
     Wie im TUEV: die Umwandlung mindert das zvE nicht um den vollen Betrag,
     weil mit dem Bruttolohn auch die abziehbaren Vorsorgeaufwendungen sinken.
@@ -172,29 +176,26 @@ function bavBefund(
   const ersparnisJahr = Math.max(0, wirkung.ersparnis + steuer);
   if (ersparnisJahr <= 0) return null;
 
-  const nochBeitragsfrei = Math.max(0, svRahmen) / 12;
-  const text = genutzt > 0.5
-    ? `Sie wandeln heute ${euroText(genutzt / 12)} im Monat um. Steuerfrei möglich sind `
-      + `${euroText(STEUER_FREI_QUOTE * p.bbgRvJahr / 12)} — es bleiben `
-      + `${euroText(rahmenMonat)} ungenutzt`
-      + (nochBeitragsfrei > 0.5
-        ? `, davon ${euroText(nochBeitragsfrei)} auch beitragsfrei.`
-        : '. Sozialabgaben sparen Sie darauf allerdings nicht mehr: die 4-Prozent-Grenze '
-          + 'ist bereits ausgeschöpft.')
-    : `Sie nutzen die Entgeltumwandlung bisher gar nicht. Steuerfrei sind `
-      + `${euroText(rahmenMonat)} im Monat möglich, davon `
-      + `${euroText(nochBeitragsfrei)} zusätzlich beitragsfrei.`;
+  const text = (genutzt > 0.5
+    ? `Sie wandeln heute ${euroText(genutzt / 12)} im Monat um. Steuer- UND beitragsfrei sind `
+      + `${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} (4 % der Beitragsbemessungsgrenze) — `
+      + `${euroText(rahmenMonat)} davon liegen brach.`
+    : 'Sie nutzen die Entgeltumwandlung bisher gar nicht. Steuer- UND beitragsfrei sind '
+      + `${euroText(rahmenMonat)} im Monat, das sind 4 % der Beitragsbemessungsgrenze.`)
+    + ` Darüber hinaus wären weitere ${euroText(nurSteuerfrei / 12)} nur noch steuerfrei: `
+    + 'Auf sie zahlen Sie volle Sozialabgaben, der Vorteil beschränkt sich dann auf die '
+    + 'Steuer. Diese zweite Stufe lohnt sich nicht mehr in jedem Fall — die erste fast immer.';
 
   return {
     id: 'bav',
-    titel: 'Betriebliche Altersvorsorge nicht ausgeschöpft',
+    titel: 'Entgeltumwandlung nicht ausgeschöpft',
     rahmenMonat,
     probeMonat: probeJahr / 12,
     ersparnisJahr,
     nettoAufwandMonat: Math.max(0, probeJahr - ersparnisJahr) / 12,
     foerderquote: probeJahr > 0 ? ersparnisJahr / probeJahr : 0,
     text,
-    paragraf: '§ 3 Nr. 63 EStG',
+    paragraf: '§ 1 Abs. 1 Nr. 9 SvEV, § 3 Nr. 63 EStG',
   };
 }
 
