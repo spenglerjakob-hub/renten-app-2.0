@@ -72,6 +72,11 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
           <Angabe feld="Krankenversicherung heute" wert={KV_ERWERB_TEXT[h.kvErwerb]} />
         )}
         <Angabe feld="Krankenversicherung im Ruhestand" wert={KV_TEXT[h.kvStatus]} />
+        {/* Nur wenn er vom gesetzlichen Durchschnitt abweicht — sonst ist es
+            keine Angabe des Nutzers, sondern der Rechtsstand. */}
+        {h.zusatzbeitrag !== undefined && (
+          <Angabe feld="Zusatzbeitrag der Krankenkasse" wert={prozent(h.zusatzbeitrag)} />
+        )}
         {(h.kvStatus === 'pkv' || h.kvErwerb === 'pkv') && (
           <>
             <Angabe feld="PKV-Beitrag heute" wert={`${euro(h.pkv.praemieMonat)} im Monat`} />

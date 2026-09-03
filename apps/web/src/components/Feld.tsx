@@ -299,13 +299,51 @@ export function Karte(props: {
  * Schlichter Abschnitt ohne Kartenrahmen. Fuer Inhalte, die BEREITS in einer
  * Karte stecken — sonst entstuenden verschachtelte Kaesten.
  */
-export function Abschnitt(props: { titel: string; children: ReactNode }) {
+export function Abschnitt(props: {
+  titel: string;
+  children: ReactNode;
+  /**
+   * Macht den Abschnitt einklappbar. Ohne die Angabe bleibt er offen und
+   * traegt wie bisher eine schlichte Ueberschrift — Bloecke aus zwei Feldern
+   * einklappbar zu machen kostet nur einen Klick.
+   */
+  einklappbar?: boolean;
+}) {
+  const [offen, setOffen] = useState(true);
+  if (!props.einklappbar) {
+    return (
+      <section className="druckbereich">
+        <h3 className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+          {props.titel}
+        </h3>
+        {props.children}
+      </section>
+    );
+  }
+
+  /*
+    `druck-kopf` am Knopf und `druck-inhalt` am Inhalt: Die Druckregeln in
+    index.css blenden Bedienelemente aus und zeigen den Inhalt unabhaengig
+    vom Zustand am Bildschirm — sonst fehlte ein zugeklappter Abschnitt im
+    Ausdruck.
+  */
   return (
     <section className="druckbereich">
-      <h3 className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
-        {props.titel}
-      </h3>
-      {props.children}
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        className="druck-kopf mb-2 flex w-full items-center justify-between gap-2 border-b border-slate-100 pb-1.5 text-left"
+      >
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          {props.titel}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${offen ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </button>
+      <div className={`druck-inhalt ${offen ? 'block' : 'hidden'}`}>{props.children}</div>
     </section>
   );
 }

@@ -92,7 +92,10 @@ export function sparzielRechnen(
   const jahreBisRente = Math.max(0, zeile.jahr - jetzt);
   if (jahreBisRente <= 0) return null;
 
-  const p = parameterFuer(zeile.jahr, { indexRate: szenario.annahmen.tarifIndex });
+  const p = parameterFuer(zeile.jahr, {
+    indexRate: szenario.annahmen.tarifIndex,
+    zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
+  });
 
   // Die Entnahme muss mit der Inflation wachsen, sonst deckt sie die Luecke
   // nur im ersten Jahr.

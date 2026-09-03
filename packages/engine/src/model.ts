@@ -117,6 +117,14 @@ export interface Haushalt {
   /** Krankenversicherung IM RUHESTAND */
   kvStatus: KvStatus;
   /**
+   * Individueller Zusatzbeitrag der Krankenkasse, z. B. 0.031 fuer 3,1 %.
+   *
+   * Ohne Angabe gilt der durchschnittliche Zusatzbeitrag des Rechtsstands.
+   * Die Kassen weichen davon spuerbar ab, und der Satz wirkt auf beide
+   * Lebensphasen: auf das Erwerbsnetto und auf die Beitraege im Alter.
+   */
+  zusatzbeitrag?: number;
+  /**
    * Krankenversicherung in der ERWERBSPHASE.
    *
    * Getrennt gefuehrt, weil beides auseinanderfallen kann: Wer als

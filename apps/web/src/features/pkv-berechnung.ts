@@ -78,7 +78,10 @@ export function pkvRechnen(
   const heutigesGeld = (betrag: number, jahr: number) =>
     betrag / Math.pow(1 + szenario.annahmen.inflation, jahr - jetzt);
 
-  const p = parameterFuer(jetzt, { indexRate: szenario.annahmen.tarifIndex });
+  const p = parameterFuer(jetzt, {
+    indexRate: szenario.annahmen.tarifIndex,
+    zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
+  });
   const beamter = szenario.einkommenHeute.modus === 'besoldung';
   const jahresbrutto = szenario.einkommenHeute.betrag * szenario.einkommenHeute.auszahlungen;
   const zuschussHeute = beamter ? 0 : arbeitgeberzuschuss(heute.praemieMonat, jahresbrutto, p);

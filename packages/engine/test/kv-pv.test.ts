@@ -4,7 +4,7 @@ import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied, bavFreibetragMonat,
   type Beitragspflichtig,
 } from '../src/social/kv-pv.js';
-import { parameterFuer } from '../src/params/registry.js';
+import { parameterFuer, durchschnittlicherZusatzbeitrag } from '../src/params/registry.js';
 import { projiziere } from '../src/projection/timeline.js';
 import type { Szenario } from '../src/model.js';
 
@@ -184,5 +184,48 @@ describe('Gegenprobe an der Zeitachse', () => {
     const z = projiziere(szenario).zeilen.find((x) => x.jahr === 2068)!;
     const summe = z.posten.reduce((s, x) => s + x.nettoJahr, 0);
     expect(summe).toBeCloseTo(z.nettoGesamt, 4);
+  });
+});
+
+describe('Individueller Zusatzbeitrag', () => {
+  /*
+    Der Rechtsstand kennt nur den DURCHSCHNITTLICHEN Zusatzbeitrag. Die Kassen
+    weichen davon ab, und der Unterschied ist kein Rundungsfehler: ein Punkt
+    sind auf 60.000 EUR Jahresbrutto rund 300 EUR. Er wird deshalb an den
+    Parametern gesetzt — an EINER Stelle, damit ihn keine Rechnung uebersieht.
+  */
+  it('ersetzt den durchschnittlichen Satz in den Parametern', () => {
+    const standard = parameterFuer(2026, { indexRate: 0 });
+    const eigen = parameterFuer(2026, { indexRate: 0, zusatzbeitrag: 0.041 });
+    expect(eigen.kv.zusatzbeitrag).toBeCloseTo(0.041, 6);
+    expect(standard.kv.zusatzbeitrag).toBeCloseTo(durchschnittlicherZusatzbeitrag(2026), 6);
+    // Alles andere bleibt unangetastet.
+    expect(eigen.kv.allgemeinerSatz).toBe(standard.kv.allgemeinerSatz);
+    expect(eigen.bbgKvJahr).toBe(standard.bbgKvJahr);
+  });
+
+  it('wirkt auch in fortgeschriebenen Jahren', () => {
+    const p = parameterFuer(2060, { indexRate: 0.02, zusatzbeitrag: 0.041 });
+    expect(p.kv.zusatzbeitrag).toBeCloseTo(0.041, 6);
+    expect(p.extrapoliert).toBe(true);
+  });
+
+  it('hebt die Beiträge im Alter entsprechend an', () => {
+    const einkuenfte = [{ id: 'r', art: 'gesetzlicheRente' as const, monatsbetrag: 2_000 }];
+    const kinder = { hatKinder: false, kinderUnter25: 0 };
+    const niedrig = kvPvImAlter('kvdr', einkuenfte, kinder,
+      parameterFuer(2026, { indexRate: 0, zusatzbeitrag: 0.01 }));
+    const hoch = kvPvImAlter('kvdr', einkuenfte, kinder,
+      parameterFuer(2026, { indexRate: 0, zusatzbeitrag: 0.04 }));
+    // Halber Satz auf die gesetzliche Rente: 3 Punkte mehr sind 1,5 % von 2.000.
+    expect(hoch.gesamt - niedrig.gesamt).toBeCloseTo(2_000 * 0.015, 6);
+  });
+
+  it('ohne Angabe bleibt es beim gesetzlichen Durchschnitt', () => {
+    const ohne = parameterFuer(2026, { indexRate: 0 });
+    const mitDurchschnitt = parameterFuer(2026, {
+      indexRate: 0, zusatzbeitrag: durchschnittlicherZusatzbeitrag(2026),
+    });
+    expect(ohne.kv.zusatzbeitrag).toBe(mitDurchschnitt.kv.zusatzbeitrag);
   });
 });

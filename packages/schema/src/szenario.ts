@@ -163,6 +163,15 @@ export const haushaltSchema = z.object({
   /** Krankenversicherung IM RUHESTAND */
   kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).default('kvdr'),
   /**
+   * Individueller Zusatzbeitrag der Krankenkasse, als Dezimalzahl.
+   *
+   * `optional`: Fehlt er — in jeder bisher gespeicherten Datei —, rechnet der
+   * Kern mit dem durchschnittlichen Zusatzbeitrag des Rechtsstands weiter.
+   * Obergrenze 10 %: darueber liegt keine Kasse, und ein Tippfehler wie „31"
+   * statt „3,1" soll nicht durchgehen.
+   */
+  zusatzbeitrag: z.number().min(0).max(0.1).optional(),
+  /**
    * Krankenversicherung in der ERWERBSPHASE.
    *
    * Getrennt vom Ruhestandsstatus, weil beides auseinanderfallen kann und bei

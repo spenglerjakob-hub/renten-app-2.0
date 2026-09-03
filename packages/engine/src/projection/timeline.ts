@@ -158,7 +158,7 @@ function personKontext(person: Person, s: Szenario, jetzt: Datum): PersonKontext
   const alterBeiRentenbeginn = alterExakt(geburt, rentenbeginn);
   const rentenbeginnJahr = rentenbeginn.jahr;
   const jahreBisRente = Math.max(0, rentenbeginnJahr - jetzt.jahr);
-  const pRente = parameterFuer(rentenbeginnJahr, { indexRate: s.annahmen.tarifIndex });
+  const pRente = parameterFuer(rentenbeginnJahr, fortschreibung(s));
 
   let startbezugMonat: number;
   const istVersorgungsbezug = person.art === 'pension';
@@ -230,7 +230,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   const alterHeuteA = alterExakt(personA.geburt, { jahr: jetzt.jahr, monat: 7, tag: 1 });
 
   // --- Erwerbseinkommen heute ---
-  const pHeute = parameterFuer(jetzt.jahr, { indexRate: s.annahmen.tarifIndex });
+  const pHeute = parameterFuer(jetzt.jahr, fortschreibung(s));
   /*
     ERWERBSPHASE UND RUHESTAND SIND ZWEI FRAGEN.
 
@@ -345,7 +345,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   // das uebrige Renteneinkommen des Ruhestandsjahres. Damit wird die
   // Zirkularitaet vermieden, die entstuende, wenn die Planerentnahme ihre
   // eigene Steuerbemessung mitbestimmte.
-  const pRuhestand = parameterFuer(ruhestandsjahr, { indexRate: s.annahmen.tarifIndex });
+  const pRuhestand = parameterFuer(ruhestandsjahr, fortschreibung(s));
   const uebertragenesKapital = planerKapital(s, personen, pRuhestand);
   const planerGesamt = Math.max(0, s.planer.startkapital) + uebertragenesKapital;
 
@@ -460,7 +460,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   const zeilen: Jahreszeile[] = [];
 
   for (let jahr = jetzt.jahr; jahr <= letztesJahr; jahr++) {
-    const p = parameterFuer(jahr, { indexRate: s.annahmen.tarifIndex });
+    const p = parameterFuer(jahr, fortschreibung(s));
     const jahreAbHeute = jahr - jetzt.jahr;
     const kaufkraftfaktor = Math.pow(1 + s.annahmen.inflation, jahreAbHeute);
 
@@ -847,6 +847,18 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     hinweise,
     vertragsHinweise,
   };
+}
+
+/**
+ * Die Fortschreibungsannahmen des Szenarios — an EINER Stelle gebuendelt.
+ *
+ * Sie bestimmen zwei Dinge: mit welchem Index Euro-Betraege in kuenftige
+ * Jahre gerechnet werden und welchen Zusatzbeitrag die Krankenkasse erhebt.
+ * Beides wird an jedem Parameterabruf gebraucht; einzeln durchgereicht wurde
+ * frueher oder spaeter einer davon vergessen.
+ */
+function fortschreibung(s: Szenario) {
+  return { indexRate: s.annahmen.tarifIndex, zusatzbeitrag: s.haushalt.zusatzbeitrag };
 }
 
 /** Vertragsarten, die als Einmalbetrag faellig werden statt als laufende Rente. */

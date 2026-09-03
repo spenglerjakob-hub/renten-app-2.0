@@ -1,11 +1,16 @@
-import { BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
+import {
+  BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag,
+  type ProjektionsErgebnis,
+} from '@renten/engine';
 import { RotateCcw, Target } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { PkvFelder } from './PkvFelder';
 import { KvdrHinweis } from './KvdrHinweis';
 import { EinkommenFelder } from './EinkommenFelder';
-import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent } from '../components/Feld';
+import {
+  ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
+} from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 
@@ -79,7 +84,10 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         </p>
       </section>
 
-      <Abschnitt titel="Haushalt">
+      {/* Einklappbar: Der Block wird einmal ausgefuellt und danach selten
+          wieder angefasst — offen kostet er jedes Mal eine halbe
+          Bildschirmlaenge auf dem Weg zu den Personen darunter. */}
+      <Abschnitt titel="Haushalt" einklappbar>
         <div className="grid gap-3 sm:grid-cols-2">
           <AuswahlFeld
             label="Bundesland (Kirchensteuer, Besoldung)"
@@ -125,6 +133,21 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
               ]}
             />
           )}
+          {/*
+            Der individuelle Zusatzbeitrag. Vorbelegt mit dem gesetzlichen
+            Durchschnitt des Rechtsstands — wer seine Kasse kennt, traegt
+            ihren Satz ein; ein Punkt Unterschied sind auf 60.000 EUR Brutto
+            rund 300 EUR im Jahr.
+          */}
+          <ProzentFeld
+            label="Zusatzbeitrag Ihrer Krankenkasse"
+            wert={s.haushalt.zusatzbeitrag ?? durchschnittlicherZusatzbeitrag(jetzt)}
+            onChange={(n) => setzeHaushalt({ zusatzbeitrag: n })}
+            max={10}
+            hilfe={s.haushalt.zusatzbeitrag === undefined
+              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt))}. Ihre Kasse weicht davon ab.`
+              : `Zum Vergleich: Der Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt))}.`}
+          />
           {/*
             „Heute" ist hier woertlich zu nehmen: Die Abschlaege enden mit dem
             25. Geburtstag, und die Rechnung laesst sie mit den Geburtsjahren

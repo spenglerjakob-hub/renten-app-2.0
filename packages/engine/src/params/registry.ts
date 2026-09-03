@@ -18,6 +18,19 @@ import { BELEGTE_JAHRE, BASISJAHR } from './jahre.js';
 export interface Fortschreibung {
   /** Jaehrliche Indexierung aller Euro-Betraege, z. B. 0.02 fuer 2 % p. a. */
   indexRate: number;
+  /**
+   * INDIVIDUELLER Zusatzbeitrag der Krankenkasse, z. B. 0.031 fuer 3,1 %.
+   *
+   * Der Rechtsstand kennt nur den durchschnittlichen Zusatzbeitrag, den das
+   * Bundesministerium jaehrlich festsetzt. Die Kassen weichen davon nach oben
+   * und unten ab, und der Unterschied ist kein Rundungsfehler: ein Punkt
+   * Zusatzbeitrag sind auf ein Jahresbrutto von 60.000 EUR rund 300 EUR.
+   *
+   * Fehlt die Angabe, bleibt es beim gesetzlichen Durchschnitt. Der Satz gilt
+   * fuer alle Jahre der Projektion — er wird wie jeder andere Prozentsatz
+   * nicht fortgeschrieben.
+   */
+  zusatzbeitrag?: number;
 }
 
 const belegtNachJahr = new Map<number, LegalParameters>(
@@ -77,6 +90,23 @@ function skaliere(basis: LegalParameters, jahr: number, indexRate: number): Lega
  * Jahre VOR dem fruehesten belegten Stand nutzen diesen unveraendert.
  */
 export function parameterFuer(jahr: number, fs: Fortschreibung): LegalParameters {
+  return mitZusatzbeitrag(basisParameter(jahr, fs), fs.zusatzbeitrag);
+}
+
+/**
+ * Der individuelle Zusatzbeitrag ersetzt den durchschnittlichen.
+ *
+ * EIN Eingriff an EINER Stelle: Alle Rechnungen lesen den Satz aus den
+ * Parametern — Erwerbsphase, Ruhestand, Vertrags-TUEV, Arbeitgeberzuschuss
+ * zur PKV. Ihn hier zu setzen erspart es, jede dieser Stellen einzeln zu
+ * unterrichten, und schliesst aus, dass eine davon vergessen wird.
+ */
+function mitZusatzbeitrag(p: LegalParameters, satz: number | undefined): LegalParameters {
+  if (satz === undefined || satz === p.kv.zusatzbeitrag) return p;
+  return { ...p, kv: { ...p.kv, zusatzbeitrag: Math.max(0, satz) } };
+}
+
+function basisParameter(jahr: number, fs: Fortschreibung): LegalParameters {
   const exakt = belegtNachJahr.get(jahr);
   if (exakt) return exakt;
 
@@ -84,6 +114,11 @@ export function parameterFuer(jahr: number, fs: Fortschreibung): LegalParameters
   if (jahr < fruehestes.jahr) return { ...fruehestes, jahr, extrapoliert: true, quelle: `Rechtsstand ${fruehestes.jahr} rueckwirkend angewandt` };
 
   return skaliere(BASISJAHR, jahr, fs.indexRate);
+}
+
+/** Der gesetzliche Durchschnitt — Vorbelegung fuer die Eingabe. */
+export function durchschnittlicherZusatzbeitrag(jahr: number): number {
+  return basisParameter(jahr, { indexRate: 0 }).kv.zusatzbeitrag;
 }
 
 /** Beschreibung des verwendeten Rechtsstands fuer Anzeige und PDF. */

@@ -31,7 +31,12 @@ export function tuevBasis(szenario: SzenarioParsed): {
   p: LegalParameters; jahresbrutto: number; zve: number; monatsbrutto: number;
 } {
   const jahr = new Date().getFullYear();
-  const p = parameterFuer(jahr, { indexRate: szenario.annahmen.tarifIndex });
+  const p = parameterFuer(jahr, {
+    indexRate: szenario.annahmen.tarifIndex,
+    // Der individuelle Zusatzbeitrag wirkt auch hier: Der TUEV misst die
+    // Ersparnis einer Entgeltumwandlung an genau diesen Saetzen.
+    zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
+  });
   const brutto = szenario.einkommenHeute.betrag * szenario.einkommenHeute.auszahlungen;
   const n = bruttoZuNetto(brutto, {
     verheiratet: szenario.haushalt.verheiratet,

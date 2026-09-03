@@ -1,7 +1,10 @@
 // Rechtsstand
 export * from './params/types.js';
 export { PARAMETER_2024, PARAMETER_2025, PARAMETER_2026, BELEGTE_JAHRE, BASISJAHR } from './params/jahre.js';
-export { parameterFuer, rechtsstandInfo, type Fortschreibung, type RechtsstandInfo } from './params/registry.js';
+export {
+  parameterFuer, rechtsstandInfo, durchschnittlicherZusatzbeitrag,
+  type Fortschreibung, type RechtsstandInfo,
+} from './params/registry.js';
 
 // Steuer
 export {
