@@ -306,3 +306,39 @@ describe('Kinder: Umschreibung des alten Formats', () => {
     expect(r.szenario.haushalt.kinder).toEqual([{ geburtsjahr: 2010, ausbildungBisJahr: 2035 }]);
   });
 });
+
+describe('Krankenversicherung in der Erwerbsphase', () => {
+  /*
+    Das Feld kam erst mit der Trennung von Erwerbsphase und Ruhestand hinzu.
+    Gespeicherte Dateien kennen es nicht — und muessen weiterrechnen wie
+    bisher, als der Ruhestandsstatus beide Phasen steuerte.
+  */
+  it('leitet die fehlende Angabe aus dem Ruhestandsstatus ab', () => {
+    expect(szenarioSchema.parse(vollstaendig).haushalt.kvErwerb).toBe('gesetzlich');
+    expect(szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kvStatus: 'pkv' as const },
+    }).haushalt.kvErwerb).toBe('pkv');
+  });
+
+  it('laesst eine eigene Angabe stehen, auch wenn sie vom Ruhestand abweicht', () => {
+    // Der Regelfall bei Selbststaendigen: heute freiwillig gesetzlich,
+    // im Ruhestand in der KVdR.
+    const h = szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kvStatus: 'kvdr' as const, kvErwerb: 'pkv' as const },
+    }).haushalt;
+    expect(h.kvErwerb).toBe('pkv');
+    expect(h.kvStatus).toBe('kvdr');
+  });
+
+  it('uebersteht Export und erneuten Import', () => {
+    const einmal = szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kvErwerb: 'pkv' as const },
+    });
+    const r = importiere(exportiere(einmal));
+    if (!r.ok) throw new Error('fehlgeschlagen');
+    expect(r.szenario.haushalt.kvErwerb).toBe('pkv');
+  });
+});

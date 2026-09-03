@@ -230,21 +230,35 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   // --- Erwerbseinkommen heute ---
   const pHeute = parameterFuer(jetzt.jahr, { indexRate: s.annahmen.tarifIndex });
   /*
-    `privatVersichert` steuert die Krankenversicherung in BEIDEN Phasen.
+    ERWERBSPHASE UND RUHESTAND SIND ZWEI FRAGEN.
 
-    Bisher hing sie allein an `beamter` — also daran, ob das Einkommen als
-    Besoldung erfasst ist. Ein privat versicherter Angestellter zahlte
-    dadurch bis zum Rentenbeginn GKV-Beitraege, obwohl er aus der PKV gar
-    nicht mehr zurueckkann; und ein Beamter ohne gesetzten PKV-Status zahlte
-    gar nichts. Der Ruhestandsstatus steuert die Erwerbsphase mit und nicht
-    umgekehrt, weil der Weg nur in eine Richtung fuehrt: wer im Alter privat
-    versichert ist, war es vorher schon.
+    Bis hierher steuerte der Ruhestandsstatus beide Phasen, begruendet damit,
+    dass aus der PKV praktisch niemand zurueckkommt. Das gilt aber nur in
+    EINER Richtung. Der umgekehrte Fall ist der Regelfall bei Selbststaendigen:
+    wer in der Erwerbsphase freiwillig gesetzlich versichert ist, kommt im
+    Ruhestand in die KVdR, sofern er die Vorversicherungszeit erfuellt. Dort
+    ist nur die gesetzliche Rente zur Haelfte beitragspflichtig und eine
+    Ruerup- oder Privatrente gar nicht — bei freiwilliger Mitgliedschaft im
+    Alter dagegen alles. Der Unterschied betraegt in einem typischen Fall
+    ueber 300 EUR im Monat.
+
+    Fuer Angestellte und Beamte wird die Erwerbsphase weiterhin abgeleitet:
+    dort ist sie aus dem Ruhestandsstatus eindeutig, und eine zweite Frage
+    braechte keine Information — nur eine weitere Gelegenheit, sich zu
+    widersprechen. Die Ableitung steht HIER und nicht in der Oberflaeche,
+    damit es keinen Zustand geben kann, in dem beide Felder einander
+    widersprechen.
   */
-  const privatVersichert = s.haushalt.kvStatus === 'pkv';
-  const pkv: PkvAnnahmen = privatVersichert
+  const privatVersichert = s.einkommenHeute.modus === 'selbststaendig'
+    ? s.haushalt.kvErwerb === 'pkv'
+    : s.haushalt.kvStatus === 'pkv';
+
+  // Die Praemie zaehlt in einer Phase nur, wenn sie dort auch privat sind.
+  const pkvGebraucht = privatVersichert || s.haushalt.kvStatus === 'pkv';
+  const pkv: PkvAnnahmen = pkvGebraucht
     ? s.haushalt.pkv
-    // Ohne PKV-Status ist die Praemie null — und der Entlastungstarif dazu:
-    // er senkt eine Praemie, die es dann nicht gibt.
+    // Ohne PKV ist die Praemie null — und der Entlastungstarif dazu: er senkt
+    // eine Praemie, die es dann nicht gibt.
     : { ...s.haushalt.pkv, praemieMonat: 0, bet: { ...s.haushalt.pkv.bet, aktiv: false } };
 
   const erwerbsOpt = {
@@ -521,7 +535,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         Enthalten ist auch der Beitrag zum Entlastungstarif: er faellt in der
         Erwerbsphase tatsaechlich an.
       */
-      const pkvAufwandMonat = pkvHeuer.gesamtMonat / nochAmArbeiten;
+      const pkvAufwandMonat = privatVersichert ? pkvHeuer.gesamtMonat / nochAmArbeiten : 0;
 
       const arbeitend = personen
         .map((k, i) => ({ k, e: einkommenJePerson[i]! }))

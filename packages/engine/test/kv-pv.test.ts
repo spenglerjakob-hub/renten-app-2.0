@@ -148,7 +148,7 @@ describe('Gegenprobe an der Zeitachse', () => {
     haushalt: {
       verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: true,
       hatKinder: false, kinderUnter25: 0, kinder: [],
-      kvStatus: 'kvdr', pkv: PKV_VORGABE, zielNettoHeute: 2500,
+      kvStatus: 'kvdr', kvErwerb: 'gesetzlich', pkv: PKV_VORGABE, zielNettoHeute: 2500,
     },
     annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
     einkommenHeute: {

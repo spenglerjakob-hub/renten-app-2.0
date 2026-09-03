@@ -154,18 +154,30 @@ describe('Beitragsentlastungstarif', () => {
 
 /* --- Zusammenspiel mit der Zeitachse --- */
 
-const szenario = (kvStatus: 'kvdr' | 'pkv', pkv: PkvAnnahmen): Szenario => ({
+/**
+ * Ein Szenario mit getrennt einstellbarer Krankenversicherung.
+ *
+ * `kvStatus` gilt im RUHESTAND, `kvErwerb` in der ERWERBSPHASE. Fehlt die
+ * zweite Angabe, wird sie abgeleitet — genau wie im Schema, damit die Proben
+ * hier dasselbe sehen wie eine gespeicherte Datei.
+ */
+const szenario = (
+  kvStatus: 'kvdr' | 'freiwillig' | 'pkv',
+  pkv: PkvAnnahmen,
+  o: { selbststaendig?: boolean; kvErwerb?: 'gesetzlich' | 'pkv'; grvBeitragMonat?: number } = {},
+): Szenario => ({
   schemaVersion: 1,
   haushalt: {
     verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-    hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus, pkv,
+    hatKinder: false, kinderUnter25: 0, kinder: [], kvStatus,
+    kvErwerb: o.kvErwerb ?? (kvStatus === 'pkv' ? 'pkv' : 'gesetzlich'), pkv,
     zielNettoHeute: 2500,
   },
   annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
   einkommenHeute: {
-    modus: 'brutto', betrag: 5000, auszahlungen: 12,
+    modus: o.selbststaendig ? 'selbststaendig' : 'brutto', betrag: 5000, auszahlungen: 12,
     besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
-    grvPflicht: false, grvBeitragMonat: 0,
+    grvPflicht: (o.grvBeitragMonat ?? 0) > 0, grvBeitragMonat: o.grvBeitragMonat ?? 0,
   },
   personen: [{
     id: 'A', name: 'A', art: 'grv', geburtsdatum: '01.01.1986', rentenbeginn: '01.01.2053',
@@ -217,5 +229,97 @@ describe('Zeitachse mit privater Krankenversicherung', () => {
     const a = privat.zeilen.find((z) => z.jahr === jahr)!;
     const b = gesetzlich.zeilen.find((z) => z.jahr === jahr)!;
     expect(a.nettoGesamt).not.toBeCloseTo(b.nettoGesamt, 2);
+  });
+});
+
+/* --- Erwerbsphase und Ruhestand sind zwei Fragen --- */
+
+describe('Krankenversicherung je Lebensphase', () => {
+  /*
+    Der Fall, der die Trennung erzwungen hat: ein Selbststaendiger, der heute
+    freiwillig gesetzlich versichert ist und im Ruhestand die
+    Vorversicherungszeit der KVdR erfuellt. Eine einzige Angabe musste ihn in
+    einer der beiden Phasen falsch rechnen.
+  */
+  const selbst = { selbststaendig: true, grvBeitragMonat: 700 };
+  const imRuhestand = (e: ReturnType<typeof projiziere>) =>
+    e.zeilen.filter((z) => z.vollstaendigImRuhestand);
+  const amArbeiten = (e: ReturnType<typeof projiziere>) =>
+    e.zeilen.filter((z) => z.jahr < e.ruhestandsjahr);
+
+  it('laesst den Ruhestand unberuehrt, wenn sich die Erwerbsphase aendert', () => {
+    const gesetzlich = projiziere(szenario('kvdr', basis, { ...selbst, kvErwerb: 'gesetzlich' }));
+    const privat = projiziere(szenario('kvdr', basis, { ...selbst, kvErwerb: 'pkv' }));
+
+    const a = imRuhestand(gesetzlich);
+    const b = imRuhestand(privat);
+    expect(b.length).toBe(a.length);
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i]!.kvPvGesamt).toBeCloseTo(a[i]!.kvPvGesamt, 6);
+      expect(b[i]!.nettoGesamt).toBeCloseTo(a[i]!.nettoGesamt, 6);
+    }
+
+    // ... die Erwerbsphase aber sehr wohl: dort traegt er die volle Praemie.
+    expect(privat.zeilen[0]!.nettoGesamt).not.toBeCloseTo(gesetzlich.zeilen[0]!.nettoGesamt, 2);
+  });
+
+  /*
+    Fuer diese Probe braucht es eine Privatrente. Steht im Alter nur die
+    gesetzliche Rente da, kosten KVdR und freiwillige Mitgliedschaft naemlich
+    dasselbe: die Rente ist in beiden Faellen zur Haelfte zu tragen, den Rest
+    zahlt die Rentenversicherung. Der Unterschied entsteht erst an den
+    UEBRIGEN Einkuenften — und genau die sind bei freiwillig Versicherten
+    voll beitragspflichtig.
+  */
+  const mitPrivatrente = (s: Szenario): Szenario => ({
+    ...s,
+    vertraege: [{
+      id: 'v1', inhaber: 'A', schicht: 3, typ: 'prvRente', name: 'Privatrente',
+      brutto: 800, strategie: 'rente', altvertrag: false,
+    }],
+  });
+
+  it('laesst die Erwerbsphase unberuehrt, wenn sich der Ruhestand aendert', () => {
+    const kvdr = projiziere(mitPrivatrente(szenario('kvdr', basis, { ...selbst, kvErwerb: 'gesetzlich' })));
+    const frei = projiziere(mitPrivatrente(szenario('freiwillig', basis, { ...selbst, kvErwerb: 'gesetzlich' })));
+
+    const a = amArbeiten(kvdr);
+    const b = amArbeiten(frei);
+    expect(b.length).toBe(a.length);
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i]!.nettoGesamt).toBeCloseTo(a[i]!.nettoGesamt, 6);
+    }
+
+    // Im Ruhestand ist der Unterschied der Grund fuer das ganze Feld.
+    expect(imRuhestand(frei)[0]!.kvPvGesamt).toBeGreaterThan(imRuhestand(kvdr)[0]!.kvPvGesamt);
+  });
+
+  it('traegt eine Praemie in der Erwerbsphase auch ohne PKV im Alter', () => {
+    // Der seltene, aber zulaessige Fall: privat versichert, spaeter dennoch
+    // in der gesetzlichen Krankenversicherung der Rentner.
+    const spaeterGesetzlich = projiziere(szenario('kvdr', basis, { ...selbst, kvErwerb: 'pkv' }));
+    const durchgehendPrivat = projiziere(szenario('pkv', basis, { ...selbst, kvErwerb: 'pkv' }));
+
+    const a = amArbeiten(spaeterGesetzlich);
+    const b = amArbeiten(durchgehendPrivat);
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i]!.nettoGesamt).toBeCloseTo(a[i]!.nettoGesamt, 6);
+    }
+    expect(imRuhestand(durchgehendPrivat)[0]!.kvPvGesamt)
+      .not.toBeCloseTo(imRuhestand(spaeterGesetzlich)[0]!.kvPvGesamt, 2);
+  });
+
+  it('ignoriert die Erwerbsangabe bei Angestellten', () => {
+    /*
+      Die Regressionsprobe. Bei Angestellten und Beamten ist die Erwerbsphase
+      aus dem Ruhestandsstatus eindeutig — ein versehentlich gesetztes
+      `kvErwerb` darf dort nichts bewegen.
+    */
+    const ohne = projiziere(szenario('kvdr', basis, { kvErwerb: 'gesetzlich' }));
+    const mit = projiziere(szenario('kvdr', basis, { kvErwerb: 'pkv' }));
+    for (let i = 0; i < ohne.zeilen.length; i++) {
+      expect(mit.zeilen[i]!.nettoGesamt).toBeCloseTo(ohne.zeilen[i]!.nettoGesamt, 6);
+      expect(mit.zeilen[i]!.kvPvGesamt).toBeCloseTo(ohne.zeilen[i]!.kvPvGesamt, 6);
+    }
   });
 });

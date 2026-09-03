@@ -160,7 +160,21 @@ export const haushaltSchema = z.object({
   kinderGeburtsjahre: z.array(z.number().int().min(1900).max(2200)).optional(),
   kinderInAusbildung: z.boolean().optional(),
 
+  /** Krankenversicherung IM RUHESTAND */
   kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).default('kvdr'),
+  /**
+   * Krankenversicherung in der ERWERBSPHASE.
+   *
+   * Getrennt vom Ruhestandsstatus, weil beides auseinanderfallen kann und bei
+   * Selbststaendigen regelmaessig auseinanderfaellt: Wer als Selbststaendiger
+   * freiwillig gesetzlich versichert ist, kommt im Ruhestand in die KVdR,
+   * sofern er die Vorversicherungszeit erfuellt — und dort gilt eine voellig
+   * andere Rechnung als bei freiwilliger Mitgliedschaft im Alter.
+   *
+   * `optional` und unten aufgeloest: gespeicherte Dateien kennen das Feld
+   * nicht, und ihr bisheriges Verhalten muss Zahl fuer Zahl erhalten bleiben.
+   */
+  kvErwerb: z.enum(['gesetzlich', 'pkv']).optional(),
   /**
    * ALTLAST. Wird nur noch GELESEN und unten nach `pkv.praemieMonat`
    * umgeschrieben — dasselbe Vorgehen wie bei `kinderGeburtsjahre`.
@@ -171,6 +185,13 @@ export const haushaltSchema = z.object({
   zielNettoHeute: z.number().min(0).default(2000),
 }).transform(({ kinderGeburtsjahre, kinderInAusbildung, pkvPraemieMonat, ...h }) => ({
   ...h,
+  /*
+    Fehlt die Angabe zur Erwerbsphase, wird sie aus dem Ruhestandsstatus
+    abgeleitet — genau die Kopplung, die bis hierher fest verdrahtet war.
+    Gespeicherte Dateien rechnen damit unveraendert weiter; neu ist nur, dass
+    man sie jetzt aufloesen KANN.
+  */
+  kvErwerb: h.kvErwerb ?? (h.kvStatus === 'pkv' ? 'pkv' as const : 'gesetzlich' as const),
   // Die Praemie stand bis 2026 unmittelbar im Haushalt. Steht im neuen Block
   // noch nichts, wandert der alte Wert dorthin — sonst faende ein
   // gespeichertes PKV-Szenario seine Praemie nicht wieder.

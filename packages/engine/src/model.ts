@@ -1,4 +1,4 @@
-import type { KvStatus } from './social/kv-pv.js';
+import type { KvStatus, KvErwerb } from './social/kv-pv.js';
 import type { AvdKind } from './products/altersvorsorgedepot.js';
 import type { PkvAnnahmen } from './social/pkv.js';
 
@@ -114,7 +114,16 @@ export interface Haushalt {
    * Pflegeversicherung und Kinderfreibetrag; beide muessen zusammenpassen.
    */
   kinder: AvdKind[];
+  /** Krankenversicherung IM RUHESTAND */
   kvStatus: KvStatus;
+  /**
+   * Krankenversicherung in der ERWERBSPHASE.
+   *
+   * Getrennt gefuehrt, weil beides auseinanderfallen kann: Wer als
+   * Selbststaendiger freiwillig gesetzlich versichert ist, kommt im Ruhestand
+   * in die KVdR — und dort gilt eine ganz andere Rechnung.
+   */
+  kvErwerb: KvErwerb;
   /**
    * Die private Krankenversicherung mit ihrem Verlauf ueber die Zeit.
    *

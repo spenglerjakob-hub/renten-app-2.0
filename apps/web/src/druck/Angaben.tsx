@@ -10,6 +10,12 @@ const KV_TEXT = {
   pkv: 'Privat versichert',
 } as const;
 
+/* In der Erwerbsphase gibt es nur zwei Faelle: gesetzlich oder privat. */
+const KV_ERWERB_TEXT = {
+  gesetzlich: 'Freiwillig gesetzlich versichert',
+  pkv: 'Privat versichert',
+} as const;
+
 const ART_TEXT = { grv: 'Gesetzliche Rente', pension: 'Beamtenpension' } as const;
 
 const EINKOMMEN_TEXT = {
@@ -56,8 +62,17 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         <Angabe feld="Familienstand" wert={h.verheiratet ? 'Verheiratet (Splitting)' : 'Alleinstehend'} />
         <Angabe feld="Bundesland" wert={h.bundesland} />
         <Angabe feld="Kirchensteuer" wert={h.kirchensteuer ? 'ja' : 'nein'} />
-        <Angabe feld="Krankenversicherung" wert={KV_TEXT[h.kvStatus]} />
-        {h.kvStatus === 'pkv' && (
+        {/*
+          Bei Selbststaendigen sind das zwei Angaben: wer heute freiwillig
+          gesetzlich versichert ist, kommt im Ruhestand in die KVdR. Bei allen
+          anderen folgt die Erwerbsphase dem Ruhestandsstatus — dort waere die
+          zweite Zeile nur eine Wiederholung.
+        */}
+        {eA.modus === 'selbststaendig' && (
+          <Angabe feld="Krankenversicherung heute" wert={KV_ERWERB_TEXT[h.kvErwerb]} />
+        )}
+        <Angabe feld="Krankenversicherung im Ruhestand" wert={KV_TEXT[h.kvStatus]} />
+        {(h.kvStatus === 'pkv' || h.kvErwerb === 'pkv') && (
           <>
             <Angabe feld="PKV-Beitrag heute" wert={`${euro(h.pkv.praemieMonat)} im Monat`} />
             <Angabe feld="Angenommene Steigerung" wert={`${prozent(h.pkv.steigerung)} p. a.`} />

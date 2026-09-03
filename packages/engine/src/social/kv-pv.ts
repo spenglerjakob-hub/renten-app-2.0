@@ -3,6 +3,15 @@ import { PKV_BASISANTEIL } from './pkv.js';
 
 export type KvStatus = 'kvdr' | 'freiwillig' | 'pkv';
 
+/**
+ * Krankenversicherung in der Erwerbsphase.
+ *
+ * Nur zwei Werte, weil die Rechnung dort nur zwei Faelle kennt: gesetzlich
+ * (pflicht oder freiwillig — der Unterschied liegt in der Bemessung, nicht im
+ * Satz) oder privat. Die drei Ruhestandswerte sind eine andere Frage.
+ */
+export type KvErwerb = 'gesetzlich' | 'pkv';
+
 /** Einkunftsarten mit unterschiedlicher Beitragsbehandlung im Alter. */
 export type BeitragsArt =
   | 'gesetzlicheRente'   // halber Satz, DRV traegt die andere Haelfte

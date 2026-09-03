@@ -46,12 +46,26 @@ export function tuevBasis(szenario: SzenarioParsed): {
     // Der Vertrags-TUEV rechnet mit dem HEUTIGEN Netto, also auch mit der
     // heutigen Praemie — inklusive eines laufenden Entlastungstarifs, denn der
     // belastet das Budget genauso.
-    privatVersichert: szenario.haushalt.kvStatus === 'pkv',
-    pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv'
+    privatVersichert: privatImErwerb(szenario),
+    pkvPraemieMonat: privatImErwerb(szenario)
       ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).gesamtMonat
       : 0,
   }, p);
   return { p, jahresbrutto: n.jahresbrutto, zve: n.zve, monatsbrutto: n.monatsbrutto };
+}
+
+/**
+ * Privat krankenversichert IN DER ERWERBSPHASE.
+ *
+ * Der Vertrags-TUEV rechnet mit dem heutigen Netto und dem heutigen
+ * Grenzsteuersatz — massgeblich ist deshalb die Erwerbsphase, nicht der
+ * Ruhestand. Dieselbe Ableitung wie in der Zeitachse: bei Selbststaendigen
+ * eine eigene Angabe, sonst aus dem Ruhestandsstatus.
+ */
+function privatImErwerb(szenario: SzenarioParsed): boolean {
+  return szenario.einkommenHeute.modus === 'selbststaendig'
+    ? szenario.haushalt.kvErwerb === 'pkv'
+    : szenario.haushalt.kvStatus === 'pkv';
 }
 
 /** Alter von Person A heute — steuert den Praemienverlauf. */
@@ -130,8 +144,8 @@ export function tuevPositionen(
           Arbeitgeberzuschuss, der mit dem umgewandelten Entgelt sinkt; ohne
           Entlastungstarif, denn der Zuschuss haengt an der Praemie.
         */
-        privatVersichert: szenario.haushalt.kvStatus === 'pkv',
-        pkvPraemieMonat: szenario.haushalt.kvStatus === 'pkv'
+        privatVersichert: privatImErwerb(szenario),
+        pkvPraemieMonat: privatImErwerb(szenario)
           ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
           : 0,
         /*

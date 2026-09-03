@@ -3,6 +3,7 @@ import { RotateCcw, Target } from 'lucide-react';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { PkvFelder } from './PkvFelder';
+import { KvdrHinweis } from './KvdrHinweis';
 import { EinkommenFelder } from './EinkommenFelder';
 import { ZahlFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
@@ -27,6 +28,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
   const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: s.annahmen.tarifIndex }).avd;
 
   const nameVon = (id: string) => personNameAus(s.personen, id);
+  const selbststaendig = s.einkommenHeute.modus === 'selbststaendig';
 
   /*
     Das heutige Haushaltsnetto als Bezugsgroesse fuer das Zielnetto.
@@ -85,17 +87,44 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
             onChange={(v) => setzeHaushalt({ bundesland: v })}
             optionen={laenderOptionen}
           />
+          {/*
+            ZWEI FRAGEN, nicht eine. Bis hierher galt die Angabe fuer beide
+            Phasen — das ist bei Selbststaendigen regelmaessig falsch: wer
+            heute freiwillig gesetzlich versichert ist, kommt im Ruhestand in
+            die KVdR, und dort gilt eine ganz andere Rechnung.
+          */}
           <AuswahlFeld
-            label="Krankenversicherung"
+            label="Krankenversicherung im Ruhestand"
             wert={s.haushalt.kvStatus}
             onChange={(v) => setzeHaushalt({ kvStatus: v })}
-            hilfe="Gilt für die Erwerbsphase und den Ruhestand — aus der PKV führt praktisch kein Weg zurück."
+            hilfe={selbststaendig
+              ? undefined
+              : 'Aus der PKV führt praktisch kein Weg zurück — die Erwerbsphase folgt dieser Angabe.'}
             optionen={[
               { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
               { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
               { wert: 'pkv', text: 'Privat versichert' },
             ]}
           />
+
+          {/*
+            Nur bei Selbststaendigen. Bei Angestellten und Beamten ist die
+            Erwerbsphase aus dem Ruhestandsstatus eindeutig — ein zweites Feld
+            braechte dort keine Information, nur eine weitere Gelegenheit,
+            sich zu widersprechen. Die Ableitung steht im Rechenkern.
+          */}
+          {selbststaendig && (
+            <AuswahlFeld
+              label="Krankenversicherung in der Erwerbsphase"
+              wert={s.haushalt.kvErwerb}
+              onChange={(v) => setzeHaushalt({ kvErwerb: v })}
+              hilfe="Als Selbstständiger tragen Sie den gesetzlichen Beitrag allein — einen Arbeitgeberanteil gibt es nicht."
+              optionen={[
+                { wert: 'gesetzlich', text: 'Gesetzlich freiwillig versichert' },
+                { wert: 'pkv', text: 'Privat versichert' },
+              ]}
+            />
+          )}
           <ZahlFeld
             label="Kinder unter 25"
             wert={s.haushalt.kinderUnter25}
@@ -105,7 +134,14 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
           />
         </div>
 
-        {s.haushalt.kvStatus === 'pkv' && <PkvFelder />}
+        {selbststaendig
+          && s.haushalt.kvErwerb === 'gesetzlich'
+          && s.haushalt.kvStatus === 'kvdr'
+          && <KvdrHinweis szenario={s} />}
+
+        {/* Die Praemie wird gebraucht, sobald EINE der beiden Phasen privat
+            ist — sonst koennte man sie bei getrennten Angaben nicht eintragen. */}
+        {(s.haushalt.kvStatus === 'pkv' || s.haushalt.kvErwerb === 'pkv') && <PkvFelder />}
 
         {s.haushalt.kinder.length > 0 && (
           <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2">
