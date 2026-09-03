@@ -115,16 +115,15 @@ export function tuevPositionen(
 
     /*
       Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
-      Zuflussjahr und die KV/PV auf die Kapitalleistung (§ 229 SGB V, 1/120
-      ueber 120 Monate). Beide kommen fertig aus dem Rechenkern — und werden
-      GETRENNT weitergereicht. Zusammengefasst als eine Zahl blieb unerklaert,
-      warum der TUEV weniger auswies als die Eingabemaske: dort steht das
-      Kapital nach Steuer, hier nach Steuer UND zehn Jahren Beitraegen.
+      Zuflussjahr und die Beitraege zur Kranken- und Pflegeversicherung. Beide
+      werden beim Zufluss abgezogen und kommen fertig aus dem Rechenkern;
+      `nettoKapital` ist bereits nach beidem. Getrennt weitergereicht werden
+      sie nur, damit die Herleitung sichtbar bleibt.
     */
     const bruttoKapital = einmal?.bruttoKapital ?? 0;
     const steuerKapital = einmal?.steuer ?? 0;
     const kvPvKapital = einmal?.kvPvGesamt ?? 0;
-    const nettoKapital = einmal ? Math.max(0, einmal.nettoKapital - einmal.kvPvGesamt) : 0;
+    const nettoKapital = einmal?.nettoKapital ?? 0;
 
     const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);

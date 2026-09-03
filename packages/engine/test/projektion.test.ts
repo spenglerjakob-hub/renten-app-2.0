@@ -248,45 +248,62 @@ describe('Einmalige Kapitalauszahlung', () => {
     }],
   });
 
-  it('trennt Steuer im Zuflussjahr von den Beiträgen über 120 Monate', () => {
+  it('zieht Steuer UND Beiträge beim Zufluss ab', () => {
     /*
-      Die Eingabemaske zeigte das Kapital nach STEUER, der Vertrags-TUEV nach
-      Steuer UND zehn Jahren Beitraegen — dieselbe Auszahlung mit zwei
-      verschiedenen Zahlen. Beide Groessen stehen jetzt getrennt bereit, und
-      ihre Beziehung ist nachrechenbar.
+      Eine Kapitalleistung wird im Zuflussjahr versteuert, und die Kasse zieht
+      die Beitraege ebenfalls sofort ab. Dass § 229 Abs. 1 S. 3 SGB V sie mit
+      1/120 ueber 120 Monate bemisst, ist eine Rechengroesse: Sie sorgt dafuer,
+      dass der Freibetrag hundertzwanzigmal gegengerechnet wird.
     */
     const e = projiziere(mitKapital());
     const a = e.kapitalauszahlungen[0]!;
     expect(a.bruttoKapital).toBeCloseTo(120_000, 6);
-    expect(a.nettoKapital).toBeCloseTo(a.bruttoKapital - a.steuer, 6);
+    expect(a.steuer).toBeGreaterThan(0);
     expect(a.kvPvGesamt).toBeGreaterThan(0);
-    expect(a.nettoKapital - a.kvPvGesamt).toBeLessThan(a.nettoKapital);
+    expect(a.nettoKapital).toBeCloseTo(a.bruttoKapital - a.steuer - a.kvPvGesamt, 6);
   });
 
-  it('bucht die Beiträge als reinen Abzug in die Monatsrechnung', () => {
-    // Ein Posten ohne Brutto mit negativem Netto: wirtschaftlich richtig, die
-    // Beitragspflicht laeuft zehn Jahre. Die Summe der Posten muss trotzdem
-    // mit der Jahressumme zusammenpassen.
+  it('hinterlässt keinen Posten in der Monatsrechnung', () => {
+    /*
+      DER BEFUND: Ein Posten ohne Brutto mit negativem Netto stand zehn Jahre
+      lang in der Monatsrechnung — der Abzug, der bereits vom Kapital genommen
+      war, minderte das Haushaltsnetto ein zweites Mal.
+    */
     const e = projiziere(mitKapital());
-    const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr)!;
-    const abzug = zeile.posten.find((x) => x.id === 'k1')!;
-    expect(abzug.bruttoJahr).toBe(0);
-    expect(abzug.kvPvJahr).toBeGreaterThan(0);
-    expect(abzug.nettoJahr).toBeCloseTo(-abzug.kvPvJahr, 6);
+    for (const z of e.zeilen) {
+      expect(z.posten.find((x) => x.id === 'k1')).toBeUndefined();
+      expect(z.posten.every((x) => x.nettoJahr >= 0)).toBe(true);
+    }
+  });
+
+  it('lässt das monatliche Netto unberührt', () => {
+    // Die Kapitalauszahlung ist eine Einmalzahlung; das Monatsnetto der
+    // Ruhestandsjahre darf sich durch sie weder heben noch senken.
+    const ohne = projiziere(szenario());
+    const mit = projiziere(mitKapital());
+    for (let i = 0; i < ohne.zeilen.length; i++) {
+      expect(mit.zeilen[i]!.nettoMonat).toBeCloseTo(ohne.zeilen[i]!.nettoMonat, 6);
+    }
+  });
+
+  it('hält die Summe der Posten mit der Jahressumme zusammen', () => {
+    const e = projiziere(mitKapital());
     for (const z of e.zeilen) {
       const summe = z.posten.reduce((sum, x) => sum + x.kvPvJahr, 0);
       expect(summe).toBeCloseTo(z.kvPvGesamt, 4);
     }
   });
 
-  it('summiert die Beiträge über die zehn Jahre, nicht länger', () => {
+  it('rechnet die Beiträge mit dem Freibetrag über 120 Monate', () => {
+    /*
+      Gegenprobe zur Bemessung: Ohne die Verteilung auf 120 Monate faellt der
+      Freibetrag des § 226 SGB V nur einmal an, und die Beitraege waeren
+      spuerbar hoeher. Der ausgewiesene Betrag liegt deshalb unter dem vollen
+      Satz auf das ganze Kapital.
+    */
     const e = projiziere(mitKapital());
     const a = e.kapitalauszahlungen[0]!;
-    const jahre = e.zeilen.filter((z) => (z.posten.find((x) => x.id === 'k1')?.kvPvJahr ?? 0) > 0);
-    expect(jahre.length).toBeLessThanOrEqual(11);
-    const summe = jahre.reduce(
-      (s, z) => s + (z.posten.find((x) => x.id === 'k1')?.kvPvJahr ?? 0), 0,
-    );
-    expect(summe).toBeCloseTo(a.kvPvGesamt, 4);
+    expect(a.kvPvGesamt).toBeLessThan(a.bruttoKapital * 0.2);
+    expect(a.kvPvGesamt).toBeGreaterThan(a.bruttoKapital * 0.1);
   });
 });

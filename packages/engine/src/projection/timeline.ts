@@ -102,13 +102,16 @@ export interface ProjektionsErgebnis {
    */
   kapitalauszahlungen: {
     vertragId: string; bezeichnung: string; jahr: number;
-    bruttoKapital: number; steuer: number; nettoKapital: number;
+    bruttoKapital: number; steuer: number;
     /**
-     * Kranken- und Pflegeversicherung auf die Kapitalleistung ueber die
-     * gesamten 120 Monate (§ 229 Abs. 1 S. 3 SGB V). Sie faellt an, obwohl
-     * der Betrag kein laufendes Einkommen liefert — beim Depot ist sie 0.
+     * Kranken- und Pflegeversicherung auf die Kapitalleistung, EINMALIG beim
+     * Zufluss (§ 229 Abs. 1 S. 3 SGB V bemisst sie mit 1/120 ueber 120
+     * Monate — das ist die Bemessung, nicht der Zahlungsweg). Beim Depot 0,
+     * bei privat Versicherten ebenfalls.
      */
     kvPvGesamt: number;
+    /** Nach Steuer UND Beitraegen — der Betrag, der wirklich ankommt. */
+    nettoKapital: number;
   }[];
   /**
    * Je Kapitalvertrag mit Strategie "rente": Steuer im Zuflussjahr und die
@@ -432,8 +435,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         vertragId: v.id,
         bezeichnung: v.name || 'Kapitalauszahlung',
         jahr: k.rentenbeginnJahr,
-        ...r,
-        kvPvGesamt: 0,   // wird nach der Jahresschleife aus den Posten gefuellt
+        bruttoKapital: r.bruttoKapital,
+        steuer: r.steuer,
+        nettoKapital: r.nettoKapital,
+        // Einmalig beim Zufluss abgezogen, nicht ueber zehn Jahre verteilt.
+        kvPvGesamt: r.kvPv,
       });
       continue;
     }
@@ -738,11 +744,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     // Sonst wuerde sie nach Bruttoanteil auf die uebrigen Einkuenfte verteilt,
     // und der gerade beseitigte Verteilungsschluessel kaeme durch die
     // Hintertuer zurueck.
-    // Auch Vertraege mit Strategie "planer" und "kapital" kommen hier vorbei:
-    // sie liefern kein laufendes Einkommen, tragen aber ihre Beitraege. Ohne
-    // einen Posten dafuer stimmte die Summe der Posten nicht mehr mit
-    // `kvPvGesamt` ueberein, und zehn Jahre Beitragspflicht verschwaenden
-    // lautlos aus der Rechnung.
+    // Kapitalvertraege mit Strategie "kapital" oder "planer" erscheinen hier
+    // NICHT mehr: Ihre Beitraege sind beim Zufluss in einer Summe vom Kapital
+    // abgezogen (siehe `kvPvAufKapitalleistung`). Frueher lief dafuer eine
+    // Beitragspflicht ueber zehn Jahre mit — ein Posten ohne Brutto mit
+    // negativem Netto, der das Haushaltsnetto ein zweites Mal minderte.
     for (const v of s.vertraege) {
       if (!istKapitalvertrag(v.typ) || v.strategie === 'ignorieren') continue;
       const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
@@ -818,19 +824,6 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       posten,
       parameterFortgeschrieben: p.extrapoliert,
     });
-  }
-
-  // Beitraege auf eine Kapitalleistung ueber alle Jahre aufsummieren.
-  //
-  // Sie fallen zehn Jahre lang an, obwohl der Betrag kein laufendes Einkommen
-  // liefert. Ohne diese Summe zeigte der Vertrags-TUEV einen Einmalbetrag,
-  // von dem nur die Steuer abgezogen waere — bei 300.000 EUR sind das mehrere
-  // zehntausend Euro Unterschied.
-  for (const a of kapitalauszahlungen) {
-    a.kvPvGesamt = zeilen.reduce(
-      (sum, z) => sum + (z.posten.find((x) => x.id === a.vertragId)?.kvPvJahr ?? 0),
-      0,
-    );
   }
 
   return {
@@ -932,9 +925,9 @@ function kapitalNachSteuer(
   zveBasis: number,
   jahr: number,
   p: ReturnType<typeof parameterFuer>,
-): { bruttoKapital: number; steuer: number; nettoKapital: number } {
+): { bruttoKapital: number; steuer: number; kvPv: number; nettoKapital: number } {
   const brutto = Math.max(0, v.brutto);
-  const leer = { bruttoKapital: 0, steuer: 0, nettoKapital: 0 };
+  const leer = { bruttoKapital: 0, steuer: 0, kvPv: 0, nettoKapital: 0 };
   if (brutto === 0) return leer;
 
   if (v.typ === 'bavKapital') {
@@ -949,7 +942,12 @@ function kapitalNachSteuer(
       },
       p,
     );
-    return { bruttoKapital: brutto, steuer, nettoKapital: Math.max(0, brutto - steuer) };
+    // Altzusagen nach § 40b EStG a. F. sind steuerfrei, aber beitragspflichtig.
+    const kvPv = kvPvAufKapitalleistung(brutto, s, jahr, p);
+    return {
+      bruttoKapital: brutto, steuer, kvPv,
+      nettoKapital: Math.max(0, brutto - steuer - kvPv),
+    };
   }
 
   if (v.typ === 'prvKapital') {
@@ -973,10 +971,61 @@ function kapitalNachSteuer(
       },
       p,
     );
-    return { bruttoKapital: brutto, steuer, nettoKapital: Math.max(0, brutto - steuer) };
+    /*
+      Bei der privaten Kapitalwahl sind nur freiwillig Versicherte
+      beitragspflichtig; in der KVdR bleibt die Leistung beitragsfrei, weil
+      sie kein Versorgungsbezug ist.
+    */
+    const kvPv = s.haushalt.kvStatus === 'freiwillig'
+      ? kvPvAufKapitalleistung(brutto, s, jahr, p, 'sonstiges')
+      : 0;
+    return {
+      bruttoKapital: brutto, steuer, kvPv,
+      nettoKapital: Math.max(0, brutto - steuer - kvPv),
+    };
   }
 
   return leer;
+}
+
+/**
+ * Kranken- und Pflegeversicherung auf eine KAPITALLEISTUNG — einmalig.
+ *
+ * § 229 Abs. 1 S. 3 SGB V bemisst die Beitraege mit einem Hundertzwanzigstel
+ * des Betrags ueber 120 Monate. Diese Verteilung ist die BEMESSUNG, nicht der
+ * Zahlungsweg: Sie sorgt dafuer, dass der Freibetrag des § 226 SGB V
+ * hundertzwanzigmal gegengerechnet wird — deshalb wird hier auch mit dem
+ * Monatswert gerechnet und anschliessend hochmultipliziert, statt den ganzen
+ * Betrag in einen Monat zu legen.
+ *
+ * Abgezogen wird der Betrag beim Zufluss, in einer Summe. Die frueher
+ * gebuchte Beitragspflicht ueber zehn Jahre erzeugte in der Monatsrechnung
+ * einen Posten ohne Brutto mit negativem Netto und minderte das Haushaltsnetto
+ * ein zweites Mal.
+ *
+ * VEREINFACHUNG: Der Freibetrag wird der Kapitalleistung in voller Hoehe
+ * zugerechnet. Laufen daneben weitere Versorgungsbezuege, teilen sie ihn sich
+ * in Wirklichkeit — derselbe offene Punkt wie in der Jahresrechnung.
+ */
+function kvPvAufKapitalleistung(
+  kapital: number,
+  s: Szenario,
+  jahr: number,
+  p: ReturnType<typeof parameterFuer>,
+  art: 'versorgungsbezug' | 'sonstiges' = 'versorgungsbezug',
+): number {
+  const { monatswert, monate } = bavKapitalMonatswert(kapital);
+  if (monatswert <= 0) return 0;
+  const kv = kvPvImAlter(
+    s.haushalt.kvStatus,
+    [{ id: 'kapitalleistung', art, monatsbetrag: monatswert }],
+    kinderImJahr(s.haushalt, jahr),
+    p,
+    // Ohne Praemie: Bei privat Versicherten loest eine Kapitalleistung keine
+    // Beitraege aus, `kvPvImAlter` liefert dann von selbst null.
+    { pkvPraemieMonat: 0 },
+  );
+  return kv.gesamt * monate;
 }
 
 /**
@@ -1350,24 +1399,27 @@ function vertragImJahr(
       // Altzusagen nach § 40b EStG a. F. sind steuerfrei, bleiben aber
       // beitragspflichtig.
       //
-      // KV/PV: 1/120 des Betrags gilt 120 Monate lang als Versorgungsbezug.
-      const kapital = Math.max(0, v.brutto);
-      const { monatswert } = bavKapitalMonatswert(kapital);
-      const beitragsjahre = 10;
+      /*
+        KV/PV: SOFORT UND EINMALIG, nicht als zehnjaehrige Zeitreihe.
 
-      if (jahreSeitRente === 0) {
-        return {
-          brutto: kapital,
-          zveBeitrag: v.altvertrag ? 0 : kapital,
-          kvArt: 'versorgungsbezug',
-          kvMonatsbetrag: monatswert,
-        };
-      }
-      if (jahreSeitRente > 0 && jahreSeitRente < beitragsjahre) {
-        // Kein Zufluss mehr, aber die Beitragspflicht laeuft weiter.
-        return { brutto: 0, zveBeitrag: 0, kvArt: 'versorgungsbezug', kvMonatsbetrag: monatswert };
-      }
-      return null;
+        § 229 Abs. 1 S. 3 SGB V bemisst die Beitraege mit 1/120 des Betrags
+        ueber 120 Monate — das ist die BEMESSUNG, nicht der Zahlungsweg. Die
+        Kasse zieht auf die Kapitalleistung einmal ab; die Verteilung auf
+        zehn Jahre ist eine Rechengroesse. Genau so hat es der urspruengliche
+        Rechner gehalten, und genau darauf beruht die Erwartung des Nutzers.
+
+        Vorher lief hier eine Beitragspflicht ueber zehn Jahre mit: Sie
+        erzeugte in der Monatsrechnung einen Posten ohne Brutto mit negativem
+        Netto — wirtschaftlich eine Doppelung des Abzugs, der bereits vom
+        Kapital genommen war. Der Abzug steckt jetzt in `kapitalNachSteuer`.
+      */
+      if (jahreSeitRente !== 0) return null;
+      const kapital = Math.max(0, v.brutto);
+      return {
+        brutto: kapital,
+        zveBeitrag: v.altvertrag ? 0 : kapital,
+        kvArt: null,
+      };
     }
     case 'prvKapital': {
       // Kapitalwahl aus einer privaten Renten-/Lebensversicherung.
@@ -1392,11 +1444,12 @@ function vertragImJahr(
         altvertragVor2005: v.altvertrag,
       });
 
+      // Beitraege wie bei der bAV-Kapitalleistung: einmalig beim Zufluss,
+      // abgezogen in `kapitalNachSteuer` — nicht als Zeitreihe.
       return {
         brutto: auszahlung,
         zveBeitrag: e.steuerpflichtigerAnteil,
-        kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
-        kvMonatsbetrag: s.haushalt.kvStatus === 'freiwillig' ? auszahlung / 120 : 0,
+        kvArt: null,
       };
     }
     case 'immobilie': {

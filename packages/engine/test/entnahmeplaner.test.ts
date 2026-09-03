@@ -193,8 +193,15 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     }
   });
 
-  it('haelt die KV-Beitragspflicht auf bAV-Kapital ueber 120 Monate aufrecht', () => {
-    // § 229 Abs. 1 S. 3 SGB V: 1/120 gilt 10 Jahre lang als Versorgungsbezug.
+  it('zieht die Beitraege auf bAV-Kapital EINMALIG ab, nicht ueber zehn Jahre', () => {
+    /*
+      § 229 Abs. 1 S. 3 SGB V bemisst die Beitraege mit 1/120 des Betrags
+      ueber 120 Monate. Das ist die BEMESSUNG, nicht der Zahlungsweg: Die
+      Kasse zieht beim Zufluss ab. Vorher lief hier eine Beitragspflicht ueber
+      zehn Jahre mit — sie erschien in der Monatsrechnung als Posten ohne
+      Brutto mit negativem Netto und minderte das Haushaltsnetto ein zweites
+      Mal, obwohl der Abzug im Kapital schon steckte.
+    */
     const ohne = projiziere(szenario());
     const mit = projiziere(szenario({
       vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 120_000 })],
@@ -203,10 +210,24 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     const kv = (r: ReturnType<typeof projiziere>, versatz: number) =>
       r.zeilen.find((z) => z.jahr === r.ruhestandsjahr + versatz)!.kvPvGesamt;
 
-    // Im 5. Jahr nach Rentenbeginn liegt noch Beitragspflicht vor ...
-    expect(kv(mit, 5)).toBeGreaterThan(kv(ohne, 5));
-    // ... im 11. Jahr nicht mehr.
+    // Kein laufender Beitrag — weder im 5. noch in irgendeinem anderen Jahr.
+    expect(kv(mit, 5)).toBeCloseTo(kv(ohne, 5), 6);
     expect(kv(mit, 11)).toBeCloseTo(kv(ohne, 11), 6);
+
+    // Stattdessen einmalig vom Kapital: Brutto − Steuer − Beitraege. Bei der
+    // Einmalauszahlung steht das in `kapitalauszahlungen`, bei der Verrentung
+    // mindert es das Kapital, das verteilt wird.
+    const einmal = projiziere(szenario({
+      vertraege: [vertrag({
+        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 120_000, strategie: 'kapital',
+      })],
+    })).kapitalauszahlungen[0]!;
+    expect(einmal.kvPvGesamt).toBeGreaterThan(0);
+    expect(einmal.nettoKapital)
+      .toBeCloseTo(einmal.bruttoKapital - einmal.steuer - einmal.kvPvGesamt, 6);
+
+    // Die Verrentung verteilt ebenfalls den Betrag NACH Beitraegen.
+    expect(mit.verrentungen[0]!.nettoKapital).toBeLessThan(einmal.bruttoKapital - einmal.steuer);
   });
 
   it('stellt eine private Kapitalwahl nach der 12/62-Regel nur zur Haelfte ins zvE', () => {
@@ -281,16 +302,18 @@ describe('Auszahlungs-Planer in der Projektion', () => {
   });
 
   it('zaehlt ein Vertrag mit Strategie planer nicht doppelt', () => {
-    // Das Brutto darf nicht zusaetzlich als laufendes Einkommen erscheinen —
-    // der Posten traegt nur noch die Beitraege auf die Kapitalleistung.
+    /*
+      Das Kapital geht in den Auszahlungs-Planer — als laufendes Einkommen
+      darf es nicht ein zweites Mal erscheinen. Einen Posten gibt es dafuer
+      gar nicht mehr: Steuer und Beitraege sind beim Zufluss abgezogen, und
+      was danach entnommen wird, traegt der Planer.
+    */
     const r = projiziere(szenario({
       vertraege: [vertrag({
         id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'planer',
       })],
     }));
     const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;
-    const posten = zeile.posten.find((x) => x.id === 'bav1');
-    expect(posten?.bruttoJahr ?? 0).toBe(0);
-    expect(posten!.kvPvJahr).toBeGreaterThan(0);
+    expect(zeile.posten.find((x) => x.id === 'bav1')).toBeUndefined();
   });
 });

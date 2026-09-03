@@ -416,7 +416,7 @@ export function VertragsTuev({
                         )}
                         {istKapital && r.kvPvKapital > 0 && (
                           <GegenueberZeile
-                            text="− KV/PV über 120 Monate"
+                            text="− Kranken- und Pflegeversicherung"
                             wert={euro(r.kvPvKapital)}
                             farbe="text-rose-500"
                           />

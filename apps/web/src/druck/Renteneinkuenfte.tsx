@@ -184,19 +184,16 @@ export function Renteneinkuenfte({
                   <Angabe feld="Kapital brutto" wert={euro(a.bruttoKapital)} />
                   <Angabe feld="− Steuer im Zuflussjahr" wert={euro(a.steuer)} />
                   {a.kvPvGesamt > 0 && (
-                    <Angabe feld="− KV/PV über 120 Monate" wert={euro(a.kvPvGesamt)} />
+                    <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(a.kvPvGesamt)} />
                   )}
-                  <Angabe
-                    feld="Bleibt Ihnen"
-                    wert={euro(Math.max(0, a.nettoKapital - a.kvPvGesamt))}
-                  />
+                  <Angabe feld="Bleibt Ihnen" wert={euro(a.nettoKapital)} />
                 </Zweispaltig>
               </div>
             ))}
             <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
-              Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten —
-              die Beiträge auf die Kapitalleistung dagegen schon: Sie laufen zehn Jahre lang und
-              mindern in dieser Zeit das monatliche Netto (§ 229 SGB V).
+              Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
+              Steuer und Beiträge gehen beim Zufluss ab; dass § 229 SGB V die Beiträge über
+              120 Monate bemisst, ist eine Rechengröße und kein Zahlungsweg.
             </p>
           </div>
         </>

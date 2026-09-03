@@ -275,11 +275,9 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
       {istKapital(v.typ) && v.strategie === 'kapital' && auszahlung && (
         /*
-          DREI ZAHLEN, nicht eine. Der Betrag nach Steuer ist das, was auf dem
-          Konto landet; die Beitraege des § 229 SGB V gehen erst in den zehn
-          Jahren danach ab. Stand hier nur die erste Zahl und im Vertrags-TUEV
-          nur die letzte, sah es aus, als rechne der eine Teil des Programms
-          anders als der andere.
+          EINE Zahl, und darunter ihre Herleitung. Steuer und Beitraege gehen
+          beim Zufluss ab; die Verteilung der Bemessung auf 120 Monate
+          (§ 229 SGB V) ist eine Rechengroesse, kein Zahlungsweg.
         */
         <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -289,20 +287,11 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             {euro(auszahlung.nettoKapital)} netto
           </div>
           <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-            Brutto {euro(auszahlung.bruttoKapital)} − Steuer {euro(auszahlung.steuer)}.
+            Brutto {euro(auszahlung.bruttoKapital)} − Steuer {euro(auszahlung.steuer)}
+            {auszahlung.kvPvGesamt > 0
+              && ` − ${euro(auszahlung.kvPvGesamt)} Kranken- und Pflegeversicherung`}.
             Zählt nicht zum monatlichen Netto.
           </div>
-          {auszahlung.kvPvGesamt > 0 && (
-            <div className="mt-1 border-t border-indigo-100 pt-1 text-[10px] leading-relaxed text-slate-500">
-              Dazu {euro(auszahlung.kvPvGesamt)} Kranken- und Pflegeversicherung, verteilt auf
-              120 Monate — sie mindern das monatliche Netto, nicht diesen Betrag. Nach allen
-              Abzügen bleiben{' '}
-              <strong className="text-slate-700">
-                {euro(Math.max(0, auszahlung.nettoKapital - auszahlung.kvPvGesamt))}
-              </strong>
-              ; mit dieser Zahl rechnet der Vertrags-TÜV.
-            </div>
-          )}
         </div>
       )}
 
