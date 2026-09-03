@@ -181,7 +181,7 @@ describe('Vertrags-TUEV: Kennzahlen', () => {
 
   it('behandelt eine Kapitalauszahlung als Einmalbetrag am Ende', () => {
     const r = vertragsTuev(
-      vertrag({ typ: 'prvKapital' }), annahmen(),
+      vertrag({ typ: 'prvRente' }), annahmen(),
       kontext({ nettoRenteMonat: 0, nettoKapital: 80_000 }), szenario, p,
     );
     expect(r.summeAuszahlung).toBe(80_000);
@@ -542,7 +542,7 @@ describe('Auszahldauer: Auszahlplan gegen lebenslange Rente', () => {
     // schreibt dem Vertrag acht Jahre Zahlungen zu, die es nicht gibt — und
     // die Rendite faellt entsprechend zu hoch aus.
     const bei = (entnahmedauer: number) => vertragsTuev(
-      vertrag({ typ: 'bavKapital', entnahmedauer }), annahmen(), kontext(), szenario, p,
+      vertrag({ typ: 'bav', strategie: 'verrenten', entnahmedauer }), annahmen(), kontext(), szenario, p,
     );
     const kurz = bei(10);
     const lang = bei(18);
@@ -556,9 +556,24 @@ describe('Auszahldauer: Auszahlplan gegen lebenslange Rente', () => {
   it('ein Auszahlplan ueber die Lebenserwartung hinaus zaehlt nur bis dorthin', () => {
     // Was nach dem Tod ausgezahlt wuerde, kommt beim Vertragsinhaber nicht an.
     const r = vertragsTuev(
-      vertrag({ typ: 'bavKapital', entnahmedauer: 30 }), annahmen(), kontext(), szenario, p,
+      vertrag({ typ: 'bav', strategie: 'verrenten', entnahmedauer: 30 }), annahmen(), kontext(), szenario, p,
     );
     expect(r.jahreAuszahlung).toBe(18);
+  });
+
+  it('folgt der STRATEGIE, nicht der Vertragsart — derselbe Vertrag, zwei Dauern', () => {
+    /*
+      Frueher entschied die Vertragsart ueber die Auszahldauer: "bAV" hiess
+      lebenslang, "bAV (Kapitalauszahlung)" hiess Auszahlplan. Beides an
+      einem Vertrag war damit unmoeglich. Jetzt sagt der gewaehlte Weg, wie
+      lange gezahlt wird — und nur so lassen sich die Wege vergleichen.
+    */
+    const v = vertrag({ typ: 'bav', schicht: 2, entnahmedauer: 10 });
+    const alsRente = vertragsTuev({ ...v, strategie: 'rente' }, annahmen(), kontext(), szenario, p);
+    const alsPlan = vertragsTuev({ ...v, strategie: 'verrenten' }, annahmen(), kontext(), szenario, p);
+
+    expect(alsRente.jahreAuszahlung).toBe(18);  // bis zur Lebenserwartung
+    expect(alsPlan.jahreAuszahlung).toBe(10);   // bis das Kapital aufgebraucht ist
   });
 
   it('gilt auch fuer Depot und Altersvorsorgedepot', () => {

@@ -1,8 +1,8 @@
 import {
   vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke,
+  versorgungsluecke, projiziere, kenntKapitalwahl,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
-  type ProjektionsErgebnis,
+  type ProjektionsErgebnis, type Szenario,
   type LegalParameters, type FoerderKontext,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
@@ -24,6 +24,20 @@ export interface TuevPosition {
   istKapital: boolean;
   alterBeiRentenbeginn: number;
   rentenbeginnJahr: number;
+  /**
+   * BEIDE Auszahlungswege desselben Vertrags, sobald beide Betraege erfasst
+   * sind: die laufende Rente des Anbieters und seine Kapitalalternative.
+   *
+   * Jeder Weg ist eine VOLLSTAENDIGE Vertrags-TUEV-Rechnung — Netto-Hebel,
+   * Rendite, echter Gewinn. Frueher waren das zwei Vertragsarten, und man
+   * musste sich beim Anlegen entscheiden; verglichen werden konnte nie.
+   */
+  wege: {
+    rente: TuevErgebnis;
+    kapital: TuevErgebnis;
+    /** Ab welchem Alter die Rente das Kapital ueberholt */
+    breakEven: RenteOderKapital;
+  } | null;
 }
 
 /** Bemessungsgrundlage: das tatsaechliche Bruttogehalt und das zvE. */
@@ -85,6 +99,32 @@ function jahrAus(datum: string, ersatz: number): number {
   return parseDatum(datum)?.jahr ?? ersatz;
 }
 
+/**
+ * Die Auszahlseite eines Vertrags im GEGENTEILIGEN Weg.
+ *
+ * Die Zeitachse rechnet immer nur den gewaehlten Weg — den anderen gibt es
+ * dort nicht. Statt ihn hier ein zweites Mal nachzubauen, wird die Projektion
+ * mit umgestellter Strategie noch einmal gerechnet: dieselbe Funktion,
+ * dieselben Regeln, kein Auseinanderlaufen. Das kostet wenige Millisekunden
+ * und nur dann, wenn beide Betraege ueberhaupt erfasst sind.
+ */
+function andererWeg(
+  szenario: SzenarioParsed,
+  v: Vertrag,
+  strategie: Vertrag['strategie'],
+): { posten: Jahreszeile['posten'][number] | undefined; einmal: ProjektionsErgebnis['kapitalauszahlungen'][number] | undefined } {
+  const klon: Szenario = {
+    ...szenario,
+    vertraege: szenario.vertraege.map((x) => (x.id === v.id ? { ...x, strategie } : x)),
+  };
+  const e = projiziere(klon);
+  const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr);
+  return {
+    posten: zeile?.posten.find((x) => x.id === v.id),
+    einmal: e.kapitalauszahlungen.find((x) => x.vertragId === v.id),
+  };
+}
+
 export function tuevPositionen(
   szenario: SzenarioParsed,
   zeile: Jahreszeile | null,
@@ -134,8 +174,19 @@ export function tuevPositionen(
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
     const alterBeiRentenbeginn = rentenbeginnJahr - jahrAus(person.geburtsdatum, 1980);
 
-    const ergebnis = vertragsTuev(
-      v,
+    /**
+     * Eine TUEV-Rechnung fuer diesen Vertrag mit EINER bestimmten Auszahlseite.
+     *
+     * Herausgezogen, weil sie jetzt bis zu dreimal gebraucht wird: fuer den
+     * gewaehlten Weg und fuer die beiden Wege des Vergleichs. Der Kontext —
+     * Gehalt, zvE, Krankenversicherung, GRV-Beitrag — ist jedes Mal derselbe;
+     * nur die Auszahlseite wechselt.
+     */
+    const rechne = (vertrag: Vertrag, auszahlseite: {
+      bruttoRenteMonat: number; kvPvMonat: number; steuerMonat: number; nettoRenteMonat: number;
+      bruttoKapital: number; steuerKapital: number; kvPvKapital: number; nettoKapital: number;
+    }) => vertragsTuev(
+      vertrag,
       {
         beitragMonat: t.beitragMonat,
         dynamik: t.dynamik,
@@ -172,22 +223,68 @@ export function tuevPositionen(
           : 0,
         rentenbeginnJahr,
         alterBeiRentenbeginn,
-        bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
-        bruttoKapital, steuerKapital, kvPvKapital, nettoKapital,
+        ...auszahlseite,
       },
       szenario,
       basis.p,
     );
 
+    const ergebnis = rechne(v, {
+      bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
+      bruttoKapital, steuerKapital, kvPvKapital, nettoKapital,
+    });
+
+    /*
+      BEIDE WEGE, sobald beide Betraege dastehen. Der gewaehlte kommt aus der
+      Projektion, der andere aus einer zweiten Rechnung mit umgestellter
+      Strategie. Geschaetzt wird nichts: Fehlt einer der beiden Betraege,
+      gibt es keinen Vergleich.
+    */
+    const beide = kenntKapitalwahl(v.typ) && v.brutto > 0 && (v.kapitalAlternative ?? 0) > 0;
+    let wege: TuevPosition['wege'] = null;
+
+    if (beide) {
+      const gegen = andererWeg(szenario, v, istKapital ? 'rente' : 'kapital');
+      const rentePosten = istKapital ? gegen.posten : posten;
+      const kapitalEinmal = istKapital ? einmal : gegen.einmal;
+
+      const renteSeite = {
+        bruttoRenteMonat: (rentePosten?.bruttoJahr ?? 0) / 12,
+        kvPvMonat: (rentePosten?.kvPvJahr ?? 0) / 12,
+        steuerMonat: (rentePosten?.steuerJahr ?? 0) / 12,
+        nettoRenteMonat: (rentePosten?.nettoJahr ?? 0) / 12,
+        bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
+      };
+      const kapitalSeite = {
+        bruttoRenteMonat: 0, kvPvMonat: 0, steuerMonat: 0, nettoRenteMonat: 0,
+        bruttoKapital: kapitalEinmal?.bruttoKapital ?? 0,
+        steuerKapital: kapitalEinmal?.steuer ?? 0,
+        kvPvKapital: kapitalEinmal?.kvPvGesamt ?? 0,
+        nettoKapital: kapitalEinmal?.nettoKapital ?? 0,
+      };
+
+      // Die Strategie wandert MIT: Sie entscheidet im TUEV ueber die Dauer
+      // der Auszahlphase — lebenslang bei der Rente, endlich beim Kapital.
+      wege = {
+        rente: rechne({ ...v, strategie: 'rente' }, renteSeite),
+        kapital: rechne({ ...v, strategie: 'kapital' }, kapitalSeite),
+        breakEven: renteOderKapital(
+          renteSeite.nettoRenteMonat, kapitalSeite.nettoKapital, alterBeiRentenbeginn,
+        ),
+      };
+    }
+
     // Der Vergleich braucht eine ECHTE Kapitalalternative. Ohne sie verglichen
     // wir die Rente mit ihrer eigenen Auszahlungssumme — das ergibt immer
     // wieder die Lebenserwartung, also nichts.
     const vergleichsKapital = nettoKapital > 0 ? nettoKapital : t.vergleichKapitalNetto;
-    const vergleich = t.vergleichen && vergleichsKapital > 0 && nettoRenteMonat > 0
-      ? renteOderKapital(nettoRenteMonat, vergleichsKapital, alterBeiRentenbeginn)
-      : null;
+    const vergleich = wege?.breakEven ?? (
+      t.vergleichen && vergleichsKapital > 0 && nettoRenteMonat > 0
+        ? renteOderKapital(nettoRenteMonat, vergleichsKapital, alterBeiRentenbeginn)
+        : null
+    );
 
-    return [{ vertrag: v, ergebnis, vergleich, istKapital, alterBeiRentenbeginn, rentenbeginnJahr }];
+    return [{ vertrag: v, ergebnis, vergleich, istKapital, alterBeiRentenbeginn, rentenbeginnJahr, wege }];
   });
 }
 

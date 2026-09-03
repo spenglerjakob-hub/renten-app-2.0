@@ -106,7 +106,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     // Jahres in der Zeile. Jede Anzeige teilt ein Jahresbrutto durch zwoelf —
     // aus 100.000 EUR Kapital wurden 8.333 EUR "Rente im Monat".
     const r = projiziere(szenario({
-      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bav', strategie: 'verrenten' as const, kapitalAlternative: 100_000 })],
     }));
     const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;
     const posten = zeile.posten.find((x) => x.id === 'bav1');
@@ -131,7 +131,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     // geblieben ist. Im allgemeinen Hinweiskasten waere nicht zu erkennen,
     // auf welchen Vertrag er sich bezieht.
     const r = projiziere(szenario({
-      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bav', strategie: 'verrenten' as const, kapitalAlternative: 100_000 })],
     }));
     const zum = r.vertragsHinweise.filter((x) => x.vertragId === 'bav1');
     expect(zum).toHaveLength(1);
@@ -142,7 +142,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
   it('laesst die Verrentung genau die Entnahmedauer laufen', () => {
     const r = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, entnahmedauer: 15,
+        id: 'bav1', schicht: 2, typ: 'bav', strategie: 'verrenten' as const, kapitalAlternative: 100_000, entnahmedauer: 15,
       })],
     }));
     const brutto = (versatz: number) =>
@@ -156,11 +156,11 @@ describe('Kapitalvertraege in der Zeitachse', () => {
 
   it('haelt eine einmalige Kapitalauszahlung aus dem Monatsnetto heraus', () => {
     const rente = projiziere(szenario({
-      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000 })],
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bav', strategie: 'verrenten' as const, kapitalAlternative: 100_000 })],
     }));
     const einmal = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'kapital',
+        id: 'bav1', schicht: 2, typ: 'bav', kapitalAlternative: 100_000, strategie: 'kapital',
       })],
     }));
 
@@ -182,7 +182,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     for (const strategie of ['rente', 'kapital', 'planer'] as const) {
       const r = projiziere(szenario({
         vertraege: [vertrag({
-          id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie,
+          id: 'bav1', schicht: 2, typ: 'bav', kapitalAlternative: 100_000, strategie,
         })],
       }));
       const z = r.zeilen.find((x) => x.jahr === r.ruhestandsjahr)!;
@@ -204,7 +204,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     */
     const ohne = projiziere(szenario());
     const mit = projiziere(szenario({
-      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 120_000 })],
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bav', strategie: 'verrenten' as const, kapitalAlternative: 120_000 })],
     }));
 
     const kv = (r: ReturnType<typeof projiziere>, versatz: number) =>
@@ -219,7 +219,7 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     // mindert es das Kapital, das verteilt wird.
     const einmal = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 120_000, strategie: 'kapital',
+        id: 'bav1', schicht: 2, typ: 'bav', kapitalAlternative: 120_000, strategie: 'kapital',
       })],
     })).kapitalauszahlungen[0]!;
     expect(einmal.kvPvGesamt).toBeGreaterThan(0);
@@ -236,13 +236,13 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     // 42 Jahre erfuellt die 12/62-Regel, 7 Jahre nicht.
     const lang = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'prv1', typ: 'prvKapital', brutto: 100_000,
+        id: 'prv1', typ: 'prvRente', strategie: 'verrenten' as const, kapitalAlternative: 100_000,
         beginnJahr: 2000, monatsbeitrag: 100,
       })],
     }));
     const kurz = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'prv1', typ: 'prvKapital', brutto: 100_000,
+        id: 'prv1', typ: 'prvRente', strategie: 'verrenten' as const, kapitalAlternative: 100_000,
         beginnJahr: 2035, monatsbeitrag: 600,
       })],
     }));
@@ -260,6 +260,77 @@ describe('Kapitalvertraege in der Zeitachse', () => {
   });
 });
 
+describe('Ein Vertrag, zwei Auszahlungswege', () => {
+  /*
+    Rente und Kapital waren bis 2026 zwei VERTRAGSARTEN. Derselbe Vertrag
+    liess sich damit nicht in beiden Wegen erfassen — man musste sich beim
+    Anlegen entscheiden, und verglichen werden konnte nie. Jetzt traegt ein
+    Vertrag beide Betraege, und die Strategie entscheidet, welcher zaehlt.
+  */
+  const beides = (strategie: Vertrag['strategie']) => projiziere(szenario({
+    vertraege: [vertrag({
+      id: 'bav1', schicht: 2, typ: 'bav', brutto: 500, kapitalAlternative: 120_000, strategie,
+    })],
+  }));
+
+  const rentenzeile = (r: ReturnType<typeof projiziere>) =>
+    r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!.posten.find((x) => x.id === 'bav1');
+
+  it('rechnet als "rente" die laufende Rente und KEIN Kapital', () => {
+    const r = beides('rente');
+    expect(rentenzeile(r)!.bruttoJahr).toBeCloseTo(500 * 12, 0);
+    expect(r.kapitalauszahlungen).toHaveLength(0);
+  });
+
+  it('rechnet als "kapital" den Einmalbetrag und KEINE laufende Rente', () => {
+    const r = beides('kapital');
+    const einmal = r.kapitalauszahlungen.find((x) => x.vertragId === 'bav1')!;
+    expect(einmal.bruttoKapital).toBe(120_000);
+    // Die 500 EUR Rente stehen weiter am Vertrag — sie duerfen aber nicht
+    // zusaetzlich ins Monatsnetto laufen. Sonst haette man beides zugleich.
+    expect(rentenzeile(r)).toBeUndefined();
+  });
+
+  it('nimmt fuer "verrenten" den Kapitalbetrag, nicht die Rente', () => {
+    // Der Betrag stand frueher im Rentenfeld. Griffe die Verrentung noch
+    // dorthin, verteilte sie 500 EUR statt 120.000 EUR — die Monatsrente
+    // laege dann bei rund zwei Euro.
+    const e = beides('verrenten').verrentungen.find((x) => x.vertragId === 'bav1')!;
+    expect(e.bruttoKapital).toBe(120_000);
+
+    // Die Gegenprobe: derselbe Vertrag OHNE Rentenbetrag verrentet identisch.
+    // Das Rentenfeld spielt fuer diesen Weg keine Rolle — frueher war es die
+    // einzige Quelle des Betrags.
+    const ohneRente = projiziere(szenario({
+      vertraege: [vertrag({
+        id: 'bav1', schicht: 2, typ: 'bav', brutto: 0,
+        kapitalAlternative: 120_000, strategie: 'verrenten',
+      })],
+    })).verrentungen.find((x) => x.vertragId === 'bav1')!;
+    expect(e.bruttoMonat).toBeCloseTo(ohneRente.bruttoMonat, 6);
+
+    // Verteilt wird das VERSTEUERTE Kapital ueber die Entnahmedauer; die
+    // Verzinsung des Restbestands hebt die Rate ueber die reine Aufteilung.
+    expect(e.bruttoMonat).toBeGreaterThan(e.nettoKapital / (e.dauerJahre * 12));
+    expect(e.bruttoMonat).toBeLessThan(e.nettoKapital / 12);
+  });
+
+  it('laesst den Weg das Ergebnis aendern — sonst gaebe es nichts zu vergleichen', () => {
+    const netto = (r: ReturnType<typeof projiziere>) =>
+      r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!.nettoGesamt;
+    expect(netto(beides('rente'))).not.toBeCloseTo(netto(beides('kapital')), 0);
+  });
+
+  it('ohne Kapitalbetrag faellt der Kapitalweg auf null — geraten wird nichts', () => {
+    // "Nur rechnen, nicht schaetzen": Wer keine Kapitalalternative erfasst,
+    // bekommt keine erfundene aus der Rente hochgerechnet.
+    const r = projiziere(szenario({
+      vertraege: [vertrag({ id: 'bav1', schicht: 2, typ: 'bav', brutto: 500, strategie: 'kapital' })],
+    }));
+    expect(r.kapitalauszahlungen).toHaveLength(0);
+  });
+});
+
 describe('Auszahlungs-Planer in der Projektion', () => {
   it('meldet kein Planerergebnis ohne Kapital', () => {
     expect(projiziere(szenario()).planer).toBeNull();
@@ -268,7 +339,7 @@ describe('Auszahlungs-Planer in der Projektion', () => {
   it('uebertraegt Kapital aus Vertraegen mit Strategie planer', () => {
     const r = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'planer',
+        id: 'bav1', schicht: 2, typ: 'bav', kapitalAlternative: 100_000, strategie: 'planer',
       })],
     }));
     expect(r.planer).not.toBeNull();
@@ -310,7 +381,7 @@ describe('Auszahlungs-Planer in der Projektion', () => {
     */
     const r = projiziere(szenario({
       vertraege: [vertrag({
-        id: 'bav1', schicht: 2, typ: 'bavKapital', brutto: 100_000, strategie: 'planer',
+        id: 'bav1', schicht: 2, typ: 'bav', kapitalAlternative: 100_000, strategie: 'planer',
       })],
     }));
     const zeile = r.zeilen.find((z) => z.jahr === r.ruhestandsjahr)!;

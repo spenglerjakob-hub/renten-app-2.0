@@ -8,7 +8,7 @@ import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
-  TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, strategieGruppe, typText,
+  TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, kenntKapitalwahl, strategieGruppe, typText,
   VERRENTUNG_JAHRE, VERRENTUNG_RENDITE,
 } from './vertragsarten';
 import { personNameAus } from './personen';
@@ -21,8 +21,9 @@ import { personNameAus } from './personen';
  * ohne Zahl waere nicht wiederzuerkennen.
  */
 function kopfBetrag(v: Vertrag): string | null {
-  if (istKapital(v.typ) && v.brutto) return `${euro(v.brutto)} Kapital`;
+  if (istKapital(v) && v.kapitalAlternative) return `${euro(v.kapitalAlternative)} Kapital`;
   if (v.brutto) return `${euro(v.brutto)} im Monat`;
+  if (v.kapitalAlternative) return `${euro(v.kapitalAlternative)} Kapital`;
   if (v.monatsbeitrag) return `${euro(v.monatsbeitrag)} Beitrag`;
   if (v.sparrate) return `${euro(v.sparrate)} Sparrate`;
   if (v.kapitalHeute) return `${euro(v.kapitalHeute)} vorhanden`;
@@ -120,8 +121,23 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
         {v.typ !== 'etf' && v.typ !== 'avd' && (
           <ZahlFeld
-            label={istKapital(v.typ) ? 'Kapitalauszahlung (brutto)' : v.typ === 'immobilie' ? 'Kaltmiete monatlich' : 'Rente monatlich (brutto)'}
+            label={v.typ === 'immobilie' ? 'Kaltmiete monatlich' : 'Rente monatlich (brutto)'}
             wert={v.brutto} onChange={(n) => vertragAendern(v.id, { brutto: n })} einheit="€" />
+        )}
+
+        {/*
+          BEIDE WEGE AN EINEM VERTRAG. Frueher waren das zwei Vertragsarten,
+          und man musste sich beim Anlegen entscheiden — ein Vergleich war
+          damit unmoeglich. Wer beide Betraege eintraegt, bekommt ihn im
+          Vertrags-TUEV samt Break-even.
+        */}
+        {kenntKapitalwahl(v.typ) && (
+          <ZahlFeld
+            label="Alternativ: Kapitalauszahlung (brutto)"
+            wert={v.kapitalAlternative ?? 0}
+            onChange={(n) => vertragAendern(v.id, { kapitalAlternative: n })}
+            einheit="€"
+            hilfe="Was der Anbieter stattdessen einmalig zahlen würde." />
         )}
 
         {v.typ === 'immobilie' && (
@@ -211,7 +227,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           </>
         )}
 
-        {v.typ === 'prvKapital' && (
+        {v.typ === 'prvRente' && (v.kapitalAlternative ?? 0) > 0 && (
           <>
             <ZahlFeld label="Vertragsbeginn (Jahr)" wert={v.beginnJahr ?? 2010}
               onChange={(n) => vertragAendern(v.id, { beginnJahr: n })} min={1900} max={2200} />
@@ -230,7 +246,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           Verrentungsweg: der gesamte Betrag wurde als Einkommen EINES Jahres
           gebucht, und aus 300.000 € Kapital wurden 25.000 € "Rente im Monat".
         */}
-        {istKapital(v.typ) && v.strategie === 'rente' && (
+        {v.strategie === 'verrenten' && (
           <>
             <ZahlFeld label="Verrentungsdauer" wert={v.entnahmedauer ?? VERRENTUNG_JAHRE}
               onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })}
@@ -244,7 +260,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         )}
       </div>
 
-      {(v.typ === 'bav' || v.typ === 'bavKapital' || v.typ === 'prvRente' || v.typ === 'prvKapital') && (
+      {(v.typ === 'bav' || v.typ === 'prvRente') && (
         <div className="mt-3">
           <Schalter label="Vertrag vor 2005 abgeschlossen (Steuerprivileg)"
             wert={v.altvertrag} onChange={(b) => vertragAendern(v.id, { altvertrag: b })} />
@@ -257,7 +273,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         der Grund, warum aus dem Kapital eine deutlich kleinere Monatsrente
         wird — und muss deshalb sichtbar sein, nicht im Ergebnis verschwinden.
       */}
-      {istKapital(v.typ) && v.strategie === 'rente' && verrentung && (
+      {v.strategie === 'verrenten' && verrentung && (
         <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Verrentung über {verrentung.dauerJahre} Jahre ab {verrentung.startjahr}
@@ -273,7 +289,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         </div>
       )}
 
-      {istKapital(v.typ) && v.strategie === 'kapital' && auszahlung && (
+      {istKapital(v) && v.strategie === 'kapital' && auszahlung && (
         /*
           EINE Zahl, und darunter ihre Herleitung. Steuer und Beitraege gehen
           beim Zufluss ab; die Verteilung der Bemessung auf 120 Monate
@@ -366,7 +382,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         </div>
       )}
 
-      {v.typ === 'bavKapital' && !v.altvertrag && (
+      {istKapital(v) && !v.altvertrag && (
         <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600">
           Kapitalauszahlungen aus Direktversicherung, Pensionskasse und Pensionsfonds sind im
           Zuflussjahr <strong>voll steuerpflichtig</strong> (§ 22 Nr. 5 EStG). Die Fünftelregelung

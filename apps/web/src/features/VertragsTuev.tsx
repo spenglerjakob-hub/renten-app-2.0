@@ -2,12 +2,27 @@ import { useMemo } from 'react';
 import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
 import { tuevPositionen, tuevBasis } from './tuev-berechnung';
+import { kenntKapitalwahl } from './vertragsarten';
 import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent, TON,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+
+/** Eine Zeile im Vergleich der beiden Auszahlungswege. */
+function WegZeile({ text, rente, kapital, hervor }: {
+  text: string; rente: string; kapital: string; hervor?: 'rente' | 'kapital';
+}) {
+  const stark = 'font-black text-emerald-700';
+  return (
+    <tr className="border-b border-slate-50 last:border-0">
+      <td className="px-3 py-1.5 text-slate-600">{text}</td>
+      <td className={`px-2 py-1.5 text-right ${hervor === 'rente' ? stark : 'text-slate-800'}`}>{rente}</td>
+      <td className={`px-3 py-1.5 text-right ${hervor === 'kapital' ? stark : 'text-slate-800'}`}>{kapital}</td>
+    </tr>
+  );
+}
 
 /**
  * VERTRAGS-TUEV
@@ -110,7 +125,7 @@ export function VertragsTuev({
             // andere Zahlen als der Ausdruck.
             const pos = positionen.find((x) => x.vertrag.id === v.id);
             if (!pos) return null;
-            const { ergebnis: r, vergleich, istKapital } = pos;
+            const { ergebnis: r, vergleich, istKapital, wege } = pos;
 
             const gut = r.nettoHebel >= 1;
 
@@ -488,6 +503,75 @@ export function VertragsTuev({
                       </div>
                     </div>
 
+                    {/*
+                      BEIDE WEGE NEBENEINANDER. Frueher standen Rente und
+                      Kapital unter zwei Vertragsarten und liessen sich nie
+                      vergleichen; jetzt traegt ein Vertrag beide Betraege,
+                      und jeder Weg bekommt seine eigene volle Rechnung.
+                    */}
+                    {wege && (
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Rente gegen Kapital — beide Wege gerechnet
+                        </div>
+                        <table className="w-full text-[11px]">
+                          <thead>
+                            <tr className="border-b border-slate-100 text-slate-500">
+                              <th className="px-3 py-1.5 text-left font-semibold"> </th>
+                              <th className="px-2 py-1.5 text-right font-semibold">Rente</th>
+                              <th className="px-3 py-1.5 text-right font-semibold">Kapital</th>
+                            </tr>
+                          </thead>
+                          <tbody className="tabular-nums">
+                            <WegZeile
+                              text="Netto"
+                              rente={`${euro(wege.rente.nettoRenteMonat)} / Mon.`}
+                              kapital={euro(wege.kapital.nettoKapital)}
+                            />
+                            <WegZeile
+                              text="Über die Laufzeit"
+                              rente={euro(wege.rente.summeAuszahlung)}
+                              kapital={euro(wege.kapital.summeAuszahlung)}
+                            />
+                            <WegZeile
+                              text="Netto-Gewinn"
+                              rente={euro(wege.rente.echterGewinn)}
+                              kapital={euro(wege.kapital.echterGewinn)}
+                              hervor={wege.rente.echterGewinn >= wege.kapital.echterGewinn ? 'rente' : 'kapital'}
+                            />
+                            <WegZeile
+                              text="Netto-Hebel"
+                              rente={`${wege.rente.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
+                              kapital={`${wege.kapital.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
+                            />
+                            <WegZeile
+                              text="Nettorendite"
+                              rente={prozent(wege.rente.rendite, 2)}
+                              kapital={prozent(wege.kapital.rendite, 2)}
+                            />
+                          </tbody>
+                        </table>
+                        <p className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+                          {/*
+                            Der Wert ist ein ALTER, nicht eine Dauer:
+                            `renteOderKapital` rechnet ab dem Alter bei
+                            Rentenbeginn. "Ab 12 Jahren" waere schlicht falsch.
+                          */}
+                          <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn Sie{' '}
+                          <strong className="text-slate-900">
+                            {wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
+                          </strong>{' '}
+                          alt werden — ohne Verzinsung.
+                          {wege.breakEven.kapitalTraegtSichSelbst
+                            ? ' Mit 2 % Verzinsung nie: der Kapitalertrag allein trägt die Rente.'
+                            : ` Mit 2 % Verzinsung erst mit ${wege.breakEven.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren.`}
+                          {' '}In die Gesamtübersicht geht{' '}
+                          <strong>{istKapital ? 'das Kapital' : 'die Rente'}</strong> ein — links
+                          umstellbar.
+                        </p>
+                      </div>
+                    )}
+
                     {r.zulagenGekuerzt && (
                       <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
                         <strong>Zulagen werden gekürzt.</strong> Ihr Eigenbeitrag liegt unter dem
@@ -502,14 +586,22 @@ export function VertragsTuev({
                       </p>
                     ))}
 
-                    {t.vergleichen && !vergleich && (
+                    {!wege && kenntKapitalwahl(v.typ) && (
                       <p className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
-                        Für den Vergleich fehlt die alternative Kapitalauszahlung. Tragen Sie
-                        links ein, was der Anbieter statt der Rente einmalig zahlen würde.
+                        Für den Vergleich fehlt {v.brutto > 0 ? 'die Kapitalauszahlung' : 'die monatliche Rente'}.
+                        Tragen Sie beide Beträge am Vertrag ein — dann rechnet der TÜV beide Wege
+                        und nennt den Break-even. Geschätzt wird nichts.
                       </p>
                     )}
 
-                    {vergleich && (
+                    {/*
+                      Nur der ALTE Weg des Vergleichs: eine von Hand erfasste
+                      Kapitalalternative oder ein Depotwert. Stehen beide
+                      Betraege am Vertrag, nennt der Block darueber denselben
+                      Break-even bereits — zweimal dieselbe Zahl in zwei
+                      Aufmachungen liest sich wie zwei verschiedene Aussagen.
+                    */}
+                    {!wege && vergleich && (
                       <div className="space-y-2">
                         <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-2.5 sm:p-3">
                           <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />

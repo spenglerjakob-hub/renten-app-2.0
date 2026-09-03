@@ -3,7 +3,7 @@ import { euro, prozent } from '../components/Feld';
 import { typText } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
-import { Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Text } from './Bausteine';
+import { Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text } from './Bausteine';
 
 /**
  * Der Vertrags-TUEV als Gutachtenbogen — eine Seite je geprueftem Vertrag.
@@ -21,7 +21,7 @@ export function TuevBogen({
   position: TuevPosition;
   szenario: SzenarioParsed;
 }) {
-  const { vertrag: v, ergebnis: r, vergleich, istKapital } = position;
+  const { vertrag: v, ergebnis: r, vergleich, istKapital, wege } = position;
   const t = szenario.tuev.find((x) => x.vertragId === v.id);
   const gut = r.nettoHebel >= 1;
 
@@ -168,7 +168,64 @@ export function TuevBogen({
         />
       </Zweispaltig>
 
-      {vergleich && (
+      {/*
+        BEIDE WEGE NEBENEINANDER, sobald am Vertrag beide Betraege stehen.
+        Rente und Kapital waren frueher zwei Vertragsarten — man musste sich
+        beim Anlegen entscheiden und konnte nie vergleichen. Jeder Weg bekommt
+        hier seine eigene vollstaendige Rechnung, den Netto-Gewinn
+        eingeschlossen: Er ist die Zahl, an der die Entscheidung haengt.
+      */}
+      {wege ? (
+        // mt-5 am Rahmen: `Untertitel` traegt `first:mt-0`, und als erstes
+        // Kind dieses div verloere die Ueberschrift sonst ihren Abstand nach
+        // oben — sie klebte am vorigen Block.
+        <div className="mt-5 break-inside-avoid">
+          <Untertitel>Rente oder Kapital — beide Wege gerechnet</Untertitel>
+          <Tabelle kopf={['', 'Laufende Rente', 'Kapitalauszahlung']} spalten={[46, 27, 27]}>
+            <Zeile zellen={[
+              'Was ankommt (netto)',
+              `${euro(wege.rente.nettoRenteMonat)} / Monat`,
+              `${euro(wege.kapital.nettoKapital)} einmalig`,
+            ]} />
+            <Zeile zellen={[
+              'Summe der Auszahlung (netto)',
+              euro(wege.rente.summeAuszahlung),
+              euro(wege.kapital.summeAuszahlung),
+            ]} />
+            <Zeile fett zellen={[
+              'Überschuss über den Aufwand',
+              euro(wege.rente.echterGewinn),
+              euro(wege.kapital.echterGewinn),
+            ]} />
+            <Zeile zellen={[
+              'Aus einem Euro Aufwand werden',
+              `${wege.rente.nettoHebel.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
+              `${wege.kapital.nettoHebel.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
+            ]} />
+            <Zeile zellen={[
+              'Rendite auf Ihren Aufwand',
+              prozent(wege.rente.rendite),
+              prozent(wege.kapital.rendite),
+            ]} />
+          </Tabelle>
+          <Text>
+            <strong>Break-even:</strong> Ohne Verzinsung des Kapitals müssten Sie{' '}
+            <strong>{wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>{' '}
+            alt werden, damit die laufende Rente die Einmalzahlung einholt.{' '}
+            {wege.breakEven.kapitalTraegtSichSelbst ? (
+              <>Mit 2 % Verzinsung trägt der Kapitalertrag allein bereits die Rente — dann
+              holt sie das Kapital rechnerisch nie ein.</>
+            ) : (
+              <>Mit 2 % Verzinsung wären es{' '}
+              <strong>{wege.breakEven.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>.</>
+            )}{' '}
+            Wer älter wird, fährt mit der Rente besser; wer früher stirbt, mit dem Kapital. Die
+            Rente sichert dafür gegen ein langes Leben ab — das Kapital tut das nicht. In die
+            Gesamtübersicht dieses Gutachtens geht{' '}
+            <strong>{istKapital ? 'die Kapitalauszahlung' : 'die laufende Rente'}</strong> ein.
+          </Text>
+        </div>
+      ) : vergleich && (
         <>
           <Untertitel>Rente oder Kapital</Untertitel>
           <Text>

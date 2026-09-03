@@ -210,11 +210,16 @@ export const SV_FREI_QUOTE = 0.04;
 const AUSZAHLDAUER_VORGABE = 25;
 
 /**
- * Vertragsarten, deren Auszahlung ein AUSZAHLPLAN ist und keine lebenslange
+ * Vertraege, deren Auszahlung ein AUSZAHLPLAN ist und keine lebenslange
  * Rente: Depot, Altersvorsorgedepot und die verrentete Kapitalauszahlung.
+ *
+ * Bei den beiden letzten entscheidet nicht die Vertragsart, sondern der
+ * gewaehlte Auszahlungsweg: Dieselbe bAV liefert als Rente lebenslang und als
+ * verrentetes Kapital nur so lange, wie das Kapital reicht.
  */
-function istAuszahlplan(typ: Vertrag['typ']): boolean {
-  return typ === 'etf' || typ === 'avd' || typ === 'bavKapital' || typ === 'prvKapital';
+function istAuszahlplan(v: Vertrag): boolean {
+  return v.typ === 'etf' || v.typ === 'avd'
+    || v.strategie === 'verrenten' || v.strategie === 'planer';
 }
 
 /**
@@ -233,7 +238,7 @@ function auszahlungsdauer(
   k: TuevKontext,
 ): number {
   const bisLebensende = Math.max(1, Math.round(a.lebenserwartung - k.alterBeiRentenbeginn));
-  if (!istAuszahlplan(v.typ)) return bisLebensende;
+  if (!istAuszahlplan(v)) return bisLebensende;
   const fest = Math.max(1, Math.round(v.entnahmedauer ?? AUSZAHLDAUER_VORGABE));
   return Math.min(bisLebensende, fest);
 }

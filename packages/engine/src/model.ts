@@ -5,25 +5,38 @@ import type { PkvAnnahmen } from './social/pkv.js';
 export type PersonId = 'A' | 'B';
 export type Versorgungsart = 'grv' | 'pension';
 
+/**
+ * Die Vertragsart sagt, WAS es ist — nicht, wie es ausgezahlt wird.
+ *
+ * „bAV (Kapitalauszahlung)" und „Private Rente (Kapitalwahl)" waren bis
+ * hierher eigene Arten. Damit liess sich derselbe Vertrag nicht in beiden
+ * Wegen erfassen: Man musste sich beim Anlegen entscheiden und konnte nie
+ * vergleichen. Der Weg steht jetzt in `strategie`, der Betrag in
+ * `kapitalAlternative`; gespeicherte Dateien schreibt das Schema um.
+ */
 export type VertragsTyp =
-  | 'basis'        // Ruerup
-  | 'bav'          // Direktversicherung/Pensionskasse, laufende Rente
+  | 'basis'        // Ruerup — Kapitalwahl gesetzlich ausgeschlossen
+  | 'bav'          // Direktversicherung/Pensionskasse
   | 'bavUkasse'    // Unterstuetzungskasse/Direktzusage (§ 19 Versorgungsbezug)
-  | 'bavKapital'
   | 'riester'
   | 'avd'          // Altersvorsorgedepot ab 2027
   | 'prvRente'
-  | 'prvKapital'
   | 'immobilie'
   | 'etf';
 
 /**
- * 'kapital' gibt es derzeit nur beim Wertpapierdepot: der Betrag zaehlt nicht
- * zur laufenden Rente, wird aber als einmalige Nettoauszahlung ausgewiesen.
- * Bei Ruerup ist eine Kapitalwahl gesetzlich ausgeschlossen, bei den uebrigen
- * Arten gibt es dafuer eigene Vertragstypen (bavKapital, prvKapital).
+ * Wie die Leistung in die Gesamtuebersicht eingeht.
+ *
+ * `rente`      — die laufende Rente des Anbieters (`brutto`)
+ * `kapital`    — die Kapitalauszahlung (`kapitalAlternative`), einmalig
+ * `verrenten`  — dieselbe Kapitalauszahlung, ueber feste Jahre verteilt
+ * `planer`     — dieselbe Kapitalauszahlung in den Auszahlungs-Planer
+ * `ignorieren` — gar nicht
+ *
+ * Beim Wertpapierdepot und beim Altersvorsorgedepot meint `kapital` den
+ * Depotwert; dort gibt es keine Anbieterrente, die daneben stuende.
  */
-export type Auszahlungsstrategie = 'rente' | 'planer' | 'kapital' | 'ignorieren';
+export type Auszahlungsstrategie = 'rente' | 'planer' | 'kapital' | 'verrenten' | 'ignorieren';
 
 export interface Teilzeitphase {
   id: string;
@@ -59,14 +72,22 @@ export interface Vertrag {
   typ: VertragsTyp;
   name: string;
 
-  /** Monatliche Bruttorente bzw. Bruttokapital, je nach Typ */
+  /** Monatliche BRUTTORENTE des Anbieters */
   brutto: number;
+  /**
+   * Was der Anbieter STATT der Rente einmalig auszahlen wuerde.
+   *
+   * Beide Wege stehen damit an einem Vertrag. `strategie` entscheidet,
+   * welcher in die Gesamtuebersicht eingeht; der andere wird trotzdem
+   * gerechnet, sonst gaebe es nichts zu vergleichen.
+   */
+  kapitalAlternative?: number;
 
   strategie: Auszahlungsstrategie;
   /** Vertragsabschluss vor 2005 (Steuerprivileg) */
   altvertrag: boolean;
 
-  /** prvKapital / bavKapital */
+  /** Kapitalauszahlung einer privaten Rentenversicherung: Beitragssumme */
   beginnJahr?: number;
   monatsbeitrag?: number;
   dynamik?: number;

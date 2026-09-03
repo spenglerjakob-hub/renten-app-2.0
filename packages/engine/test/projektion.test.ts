@@ -243,8 +243,8 @@ describe('Kinder in der Pflegeversicherung', () => {
 describe('Einmalige Kapitalauszahlung', () => {
   const mitKapital = () => szenario({
     vertraege: [{
-      id: 'k1', inhaber: 'A', schicht: 2, typ: 'bavKapital', name: 'Direktversicherung',
-      brutto: 120_000, strategie: 'kapital', altvertrag: false,
+      id: 'k1', inhaber: 'A', schicht: 2, typ: 'bav', name: 'Direktversicherung',
+      brutto: 0, kapitalAlternative: 120_000, strategie: 'kapital', altvertrag: false,
     }],
   });
 

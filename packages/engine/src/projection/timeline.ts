@@ -407,7 +407,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   // ueber `quellen`, sondern als fertiger Posten in die Jahreszeile.
   const verrentungen = new Map<string, KapitalVerrentung>();
   for (const v of s.vertraege) {
-    if (!istKapitalvertrag(v.typ) || v.strategie !== 'rente') continue;
+    if (!istKapitalauszahlung(v) || v.strategie !== 'verrenten') continue;
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
     const r = kapitalVerrentung(v, k, personen, s, pRuhestand);
     if (!r) continue;
@@ -427,7 +427,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     if (v.strategie !== 'kapital') continue;
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
 
-    if (istKapitalvertrag(v.typ)) {
+    if (istKapitalauszahlung(v)) {
       const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, pRuhestand);
       const r = kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, pRuhestand);
       if (r.bruttoKapital <= 0) continue;
@@ -593,7 +593,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       // Die Beitragspflicht in der KV/PV bleibt davon unberuehrt: § 229
       // Abs. 1 S. 3 SGB V belastet 1/120 des Betrags ueber 120 Monate,
       // unabhaengig davon, was der Empfaenger mit dem Geld macht.
-      if (v.strategie !== 'planer' && !istKapitalvertrag(v.typ)) {
+      if (v.strategie !== 'planer' && !istKapitalauszahlung(v)) {
         // "avd" waere als Ersatzbezeichnung im Kassenbon nicht lesbar; die
         // uebrigen Kuerzel sind wenigstens Woerter.
         const bezeichnung = v.name || (v.typ === 'avd' ? 'Altersvorsorgedepot' : v.typ);
@@ -632,7 +632,9 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     //
     // Vorher lief die Summe ueber ALLE Nicht-Personen-Quellen; der Betrag
     // fiel dadurch zu hoch aus.
-    const beguenstigt = new Set(['prvRente', 'immobilie', 'etf', 'prvKapital']);
+    // Als Set<VertragsTyp> typisiert: Ein Set<string> haette hier still eine
+    // Vertragsart weitergefuehrt, die es nicht mehr gibt.
+    const beguenstigt = new Set<Vertrag['typ']>(['prvRente', 'immobilie', 'etf']);
     const sonstigeEinkuenfte = quellen
       .filter((q) => {
         if (q.id === 'erwerb' || q.id.startsWith('person-')) return false;
@@ -750,7 +752,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     // Beitragspflicht ueber zehn Jahre mit — ein Posten ohne Brutto mit
     // negativem Netto, der das Haushaltsnetto ein zweites Mal minderte.
     for (const v of s.vertraege) {
-      if (!istKapitalvertrag(v.typ) || v.strategie === 'ignorieren') continue;
+      if (!istKapitalauszahlung(v) || v.strategie === 'ignorieren') continue;
       const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
       if (jahr < k.rentenbeginnJahr) continue;
 
@@ -861,9 +863,31 @@ function fortschreibung(s: Szenario) {
   return { indexRate: s.annahmen.tarifIndex, zusatzbeitrag: s.haushalt.zusatzbeitrag };
 }
 
-/** Vertragsarten, die als Einmalbetrag faellig werden statt als laufende Rente. */
-export function istKapitalvertrag(typ: Vertrag['typ']): boolean {
-  return typ === 'bavKapital' || typ === 'prvKapital';
+/**
+ * Vertragsarten, die neben der laufenden Rente eine Kapitalauszahlung
+ * anbieten. Bei Ruerup ist sie gesetzlich ausgeschlossen, bei der
+ * Unterstuetzungskasse folgt sie eigenen Regeln (Zuflussprinzip), und Depots
+ * kennen ohnehin keine Anbieterrente.
+ */
+export function kenntKapitalwahl(typ: Vertrag['typ']): boolean {
+  return typ === 'bav' || typ === 'prvRente';
+}
+
+/**
+ * NUTZT dieser Vertrag seinen Kapitalweg — statt der laufenden Rente?
+ *
+ * Nicht mehr die Vertragsart entscheidet das, sondern die gewaehlte
+ * Strategie. Beide Wege stehen an demselben Vertrag; welcher in die
+ * Gesamtuebersicht eingeht, waehlt der Nutzer.
+ */
+export function istKapitalauszahlung(v: Vertrag): boolean {
+  return kenntKapitalwahl(v.typ)
+    && (v.strategie === 'kapital' || v.strategie === 'verrenten' || v.strategie === 'planer');
+}
+
+/** Der Einmalbetrag des Vertrags — 0, wenn keiner erfasst ist. */
+export function kapitalBetrag(v: Vertrag): number {
+  return Math.max(0, v.kapitalAlternative ?? 0);
 }
 
 /**
@@ -938,11 +962,11 @@ function kapitalNachSteuer(
   jahr: number,
   p: ReturnType<typeof parameterFuer>,
 ): { bruttoKapital: number; steuer: number; kvPv: number; nettoKapital: number } {
-  const brutto = Math.max(0, v.brutto);
+  const brutto = kapitalBetrag(v);
   const leer = { bruttoKapital: 0, steuer: 0, kvPv: 0, nettoKapital: 0 };
   if (brutto === 0) return leer;
 
-  if (v.typ === 'bavKapital') {
+  if (v.typ === 'bav') {
     const { steuer } = bavKapitalSteuer(
       {
         kapital: brutto,
@@ -962,7 +986,7 @@ function kapitalNachSteuer(
     };
   }
 
-  if (v.typ === 'prvKapital') {
+  if (v.typ === 'prvRente') {
     const beginnJahr = v.beginnJahr ?? jahr - 12;
     const e = kapitalversicherungErtrag({
       auszahlung: brutto,
@@ -1056,7 +1080,7 @@ function planerKapital(
   for (const v of kandidaten) {
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personen[0]!;
 
-    if (istKapitalvertrag(v.typ)) {
+    if (istKapitalauszahlung(v)) {
       const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, p);
       summe += kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, p).nettoKapital;
       continue;
@@ -1349,6 +1373,28 @@ function vertragImJahr(
       return { brutto, zveBeitrag: brutto * anteil, kvArt: 'sonstiges', pauschbetragArt: 'sonstige' };
     }
     case 'bav': {
+      /*
+        EINE Vertragsart, ZWEI Wege. Welcher gilt, sagt die Strategie — nicht
+        mehr die Vertragsart. Frueher waren das zwei Arten, und derselbe
+        Vertrag liess sich nicht in beiden Wegen erfassen.
+      */
+      if (istKapitalauszahlung(v)) {
+        /*
+          Einmalige Kapitalleistung aus der bAV.
+
+          Steuer: voll steuerpflichtig im Zuflussjahr (§ 22 Nr. 5 EStG); die
+          Fuenftelregelung wird dafuer regelmaessig nicht gewaehrt. Der Betrag
+          geht in voller Hoehe ins zvE. Altzusagen nach § 40b EStG a. F. sind
+          steuerfrei, bleiben aber beitragspflichtig.
+
+          KV/PV: SOFORT UND EINMALIG, abgezogen in `kapitalNachSteuer`.
+          § 229 Abs. 1 S. 3 SGB V bemisst die Beitraege mit 1/120 ueber 120
+          Monate — das ist die Bemessung, nicht der Zahlungsweg.
+        */
+        if (jahreSeitRente !== 0) return null;
+        const kapital = kapitalBetrag(v);
+        return { brutto: kapital, zveBeitrag: v.altvertrag ? 0 : kapital, kvArt: null };
+      }
       const brutto = v.brutto * 12;
       const zve = v.altvertrag ? brutto * ertragsanteil(k.alterBeiRentenbeginn) : brutto;
       return { brutto, zveBeitrag: zve, kvArt: 'versorgungsbezug', pauschbetragArt: 'sonstige' };
@@ -1394,74 +1440,42 @@ function vertragImJahr(
       };
     }
     case 'prvRente': {
+      // Auch hier zwei Wege an einem Vertrag: laufende Rente oder Kapitalwahl.
+      if (istKapitalauszahlung(v)) {
+        // Kapitalwahl aus einer privaten Renten-/Lebensversicherung.
+        // § 20 Abs. 1 Nr. 6 EStG: steuerpflichtig ist der Unterschiedsbetrag
+        // zwischen Auszahlung und eingezahlten Beitraegen; bei mindestens
+        // 12 Jahren Laufzeit UND Auszahlung nach dem 62. Lebensjahr nur zur
+        // Haelfte, dann aber tariflich statt mit Abgeltungsteuer
+        // (§ 32d Abs. 2 Nr. 2). Beides bildet kapitalversicherungErtrag ab.
+        if (jahreSeitRente !== 0) return null;
+        const auszahlung = kapitalBetrag(v);
+        if (auszahlung === 0) return null;
+
+        const beginnJahr = v.beginnJahr ?? jahr - 12;
+        const beitragsjahre = Math.max(0, jahr - beginnJahr);
+        const e = kapitalversicherungErtrag({
+          auszahlung,
+          eingezahlteBeitraege: (v.monatsbeitrag ?? 0) * 12 * beitragsjahre,
+          vertragsbeginnJahr: beginnJahr,
+          auszahlungsJahr: jahr,
+          alterBeiAuszahlung: k.alterBeiRentenbeginn,
+          fondsgebunden: false,
+          altvertragVor2005: v.altvertrag,
+        });
+
+        // Beitraege wie bei der bAV-Kapitalleistung: einmalig beim Zufluss,
+        // abgezogen in `kapitalNachSteuer` — nicht als Zeitreihe.
+        return {
+          brutto: auszahlung,
+          zveBeitrag: e.steuerpflichtigerAnteil,
+          kvArt: null,
+        };
+      }
       const brutto = v.brutto * 12;
       return {
         brutto, zveBeitrag: brutto * ertragsanteil(k.alterBeiRentenbeginn),
         kvArt: 'sonstiges', pauschbetragArt: 'sonstige',
-      };
-    }
-    case 'bavKapital': {
-      // Einmalige Kapitalleistung aus der bAV. Sie floss bisher UEBERHAUPT
-      // NICHT in die Zeitachse ein — der Betrag verschwand stillschweigend.
-      //
-      // Steuer: voll steuerpflichtig im Zuflussjahr (§ 22 Nr. 5 EStG); die
-      // Fuenftelregelung wird dafuer regelmaessig nicht gewaehrt. Der Betrag
-      // geht deshalb in voller Hoehe ins zvE und wird zusammen mit dem
-      // uebrigen Einkommen EINMAL tariflich besteuert.
-      // Altzusagen nach § 40b EStG a. F. sind steuerfrei, bleiben aber
-      // beitragspflichtig.
-      //
-      /*
-        KV/PV: SOFORT UND EINMALIG, nicht als zehnjaehrige Zeitreihe.
-
-        § 229 Abs. 1 S. 3 SGB V bemisst die Beitraege mit 1/120 des Betrags
-        ueber 120 Monate — das ist die BEMESSUNG, nicht der Zahlungsweg. Die
-        Kasse zieht auf die Kapitalleistung einmal ab; die Verteilung auf
-        zehn Jahre ist eine Rechengroesse. Genau so hat es der urspruengliche
-        Rechner gehalten, und genau darauf beruht die Erwartung des Nutzers.
-
-        Vorher lief hier eine Beitragspflicht ueber zehn Jahre mit: Sie
-        erzeugte in der Monatsrechnung einen Posten ohne Brutto mit negativem
-        Netto — wirtschaftlich eine Doppelung des Abzugs, der bereits vom
-        Kapital genommen war. Der Abzug steckt jetzt in `kapitalNachSteuer`.
-      */
-      if (jahreSeitRente !== 0) return null;
-      const kapital = Math.max(0, v.brutto);
-      return {
-        brutto: kapital,
-        zveBeitrag: v.altvertrag ? 0 : kapital,
-        kvArt: null,
-      };
-    }
-    case 'prvKapital': {
-      // Kapitalwahl aus einer privaten Renten-/Lebensversicherung.
-      // § 20 Abs. 1 Nr. 6 EStG: steuerpflichtig ist der Unterschiedsbetrag
-      // zwischen Auszahlung und eingezahlten Beitraegen; bei mindestens
-      // 12 Jahren Laufzeit UND Auszahlung nach dem 62. Lebensjahr nur zur
-      // Haelfte, dann aber tariflich statt mit Abgeltungsteuer
-      // (§ 32d Abs. 2 Nr. 2). Beides bildet kapitalversicherungErtrag ab.
-      if (jahreSeitRente !== 0) return null;
-      const auszahlung = Math.max(0, v.brutto);
-      if (auszahlung === 0) return null;
-
-      const beginnJahr = v.beginnJahr ?? jahr - 12;
-      const beitragsjahre = Math.max(0, jahr - beginnJahr);
-      const e = kapitalversicherungErtrag({
-        auszahlung,
-        eingezahlteBeitraege: (v.monatsbeitrag ?? 0) * 12 * beitragsjahre,
-        vertragsbeginnJahr: beginnJahr,
-        auszahlungsJahr: jahr,
-        alterBeiAuszahlung: k.alterBeiRentenbeginn,
-        fondsgebunden: false,
-        altvertragVor2005: v.altvertrag,
-      });
-
-      // Beitraege wie bei der bAV-Kapitalleistung: einmalig beim Zufluss,
-      // abgezogen in `kapitalNachSteuer` — nicht als Zeitreihe.
-      return {
-        brutto: auszahlung,
-        zveBeitrag: e.steuerpflichtigerAnteil,
-        kvArt: null,
       };
     }
     case 'immobilie': {

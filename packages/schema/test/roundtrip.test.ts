@@ -342,3 +342,77 @@ describe('Krankenversicherung in der Erwerbsphase', () => {
     expect(r.szenario.haushalt.kvErwerb).toBe('pkv');
   });
 });
+
+describe('Kapitalauszahlung: Umschreibung der alten Vertragsarten', () => {
+  /*
+    Bis 2026 waren "bAV (Kapitalauszahlung)" und "Private Rente (Kapitalwahl)"
+    EIGENE Vertragsarten. Wer einen Vertrag anlegte, musste sich damit beim
+    Anlegen fuer einen Auszahlungsweg entscheiden — ein Vergleich der beiden
+    Wege war unmoeglich. Heute traegt EIN Vertrag beide Betraege.
+
+    Gespeicherte Dateien tragen die alte Form weiter. Sie muessen lesbar
+    bleiben und dabei Zahl fuer Zahl dieselbe Rechnung ergeben: Der Betrag
+    stand im Rentenfeld, war aber immer ein Einmalbetrag.
+  */
+  const alterVertrag = (extra: Record<string, unknown>) =>
+    szenarioSchema.parse({
+      ...vollstaendig,
+      vertraege: [{
+        id: 'k1', inhaber: 'A', schicht: 2, name: 'Direktversicherung',
+        brutto: 100_000, altvertrag: false, ...extra,
+      }],
+    }).vertraege[0]!;
+
+  it('macht aus bavKapital eine bAV mit Kapitalalternative', () => {
+    const v = alterVertrag({ typ: 'bavKapital', strategie: 'rente' });
+    expect(v.typ).toBe('bav');
+    expect(v.kapitalAlternative).toBe(100_000);
+    // Das Rentenfeld wird geraeumt: Sonst zaehlte derselbe Betrag zweimal —
+    // einmal als Einmalkapital und einmal als 100.000 EUR Monatsrente.
+    expect(v.brutto).toBe(0);
+  });
+
+  it('benennt das alte "rente" in "verrenten" um — es hiess nie Anbieterrente', () => {
+    // Bei den Kapitalarten bedeutete "rente": das Kapital ueber feste Jahre
+    // verteilen. Das ist ein anderer Vorgang als eine lebenslange
+    // Anbieterrente und heisst jetzt so, wie er heisst.
+    expect(alterVertrag({ typ: 'bavKapital', strategie: 'rente' }).strategie).toBe('verrenten');
+  });
+
+  it('laesst eine bereits gewaehlte Strategie unangetastet', () => {
+    for (const strategie of ['kapital', 'planer', 'ignorieren'] as const) {
+      expect(alterVertrag({ typ: 'bavKapital', strategie }).strategie).toBe(strategie);
+    }
+  });
+
+  it('macht aus prvKapital eine private Rentenversicherung', () => {
+    const v = alterVertrag({ typ: 'prvKapital', schicht: 3, strategie: 'kapital', beginnJahr: 2005, monatsbeitrag: 200 });
+    expect(v.typ).toBe('prvRente');
+    expect(v.kapitalAlternative).toBe(100_000);
+    expect(v.brutto).toBe(0);
+    // Die Felder der Ertragsrechnung (§ 20 Abs. 1 Nr. 6 EStG) bleiben stehen.
+    expect(v.beginnJahr).toBe(2005);
+    expect(v.monatsbeitrag).toBe(200);
+  });
+
+  it('laesst einen Vertrag der neuen Form in Ruhe — beide Betraege bleiben', () => {
+    const v = alterVertrag({ typ: 'bav', strategie: 'rente', brutto: 420, kapitalAlternative: 90_000 });
+    expect(v.typ).toBe('bav');
+    expect(v.brutto).toBe(420);
+    expect(v.kapitalAlternative).toBe(90_000);
+    expect(v.strategie).toBe('rente');
+  });
+
+  it('die alten Arten verschwinden beim Lesen — geschrieben werden sie nie wieder', () => {
+    const einmal = szenarioSchema.parse({
+      ...vollstaendig,
+      vertraege: [{
+        id: 'k1', inhaber: 'A', schicht: 2, typ: 'bavKapital', name: 'DV',
+        brutto: 100_000, strategie: 'rente', altvertrag: false,
+      }],
+    });
+    const zweimal = szenarioSchema.parse(JSON.parse(JSON.stringify(einmal)));
+    expect(zweimal.vertraege).toEqual(einmal.vertraege);
+    expect(zweimal.vertraege[0]!.typ).toBe('bav');
+  });
+});

@@ -14,12 +14,17 @@ import { Untertitel, Tabelle, Zeile, Gruppenzeile, Hinweiszeile, Text } from './
  * bleibt, waere schlechter als eine, die sagt, worum es sich handelt.
  */
 function betragText(v: Vertrag): string {
-  // Bei einer Kapitalauszahlung steht in `brutto` ein EINMALbetrag. Ihn als
-  // "Rente" zu beschriften macht aus 300.000 EUR Kapital eine 300.000-EUR-Rente.
-  if (istKapital(v.typ) && v.brutto) return `${euro(v.brutto)} Kapital`;
+  /*
+    Wer den Kapitalweg gewaehlt hat, bekommt den EINMALbetrag zu sehen — ihn
+    als „Rente" zu beschriften machte aus 300.000 EUR Kapital eine
+    300.000-EUR-Rente. Stehen beide Betraege am Vertrag, nennt die Zeile den,
+    der in die Gesamtuebersicht eingeht; der andere steht im Vertrags-TUEV.
+  */
+  if (istKapital(v) && v.kapitalAlternative) return `${euro(v.kapitalAlternative)} Kapital`;
+  if (v.brutto) return `${euro(v.brutto)} Rente`;
   if (v.monatsbeitrag) return `${euro(v.monatsbeitrag)} Beitrag`;
   if (v.sparrate) return `${euro(v.sparrate)} Sparrate`;
-  if (v.brutto) return `${euro(v.brutto)} Rente`;
+  if (v.kapitalAlternative) return `${euro(v.kapitalAlternative)} Kapital`;
   return '—';
 }
 

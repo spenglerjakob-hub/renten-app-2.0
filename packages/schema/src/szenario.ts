@@ -62,10 +62,24 @@ export const vertragSchema = z.object({
   id: z.string(),
   inhaber: z.enum(['A', 'B']).default('A'),
   schicht: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  /*
+    `bavKapital` und `prvKapital` sind KEINE Vertragsarten mehr, sondern ein
+    Auszahlungsweg. Sie stehen hier nur noch, um gespeicherte Dateien lesen zu
+    koennen; die Umschreibung unten macht daraus `bav` bzw. `prvRente` mit
+    einer Kapitalauszahlung.
+  */
   typ: z.enum(['basis', 'bav', 'bavUkasse', 'bavKapital', 'riester', 'avd', 'prvRente', 'prvKapital', 'immobilie', 'etf']),
   name: z.string().default(''),
   brutto: z.number().min(0).default(0),
-  strategie: z.enum(['rente', 'planer', 'kapital', 'ignorieren']).default('rente'),
+  /**
+   * Was der Anbieter STATT der laufenden Rente einmalig auszahlen wuerde.
+   *
+   * Beide Wege stehen damit an EINEM Vertrag, und `strategie` entscheidet,
+   * welcher in die Gesamtuebersicht eingeht. Der andere wird trotzdem
+   * gerechnet — sonst gaebe es nichts zu vergleichen.
+   */
+  kapitalAlternative: z.number().min(0).optional(),
+  strategie: z.enum(['rente', 'planer', 'kapital', 'verrenten', 'ignorieren']).default('rente'),
   altvertrag: z.boolean().default(false),
 
   beginnJahr: z.number().int().min(1900).max(2200).optional(),
@@ -85,6 +99,35 @@ export const vertragSchema = z.object({
   sonderzahlungJahr: z.number().int().min(1900).max(2200).optional(),
   teilfreistellung: z.number().min(0).max(1).optional(),
   einstandswert: z.number().min(0).optional(),
+}).transform((v) => {
+  /*
+    ALTLAST: Bis hierher waren „bAV (Kapitalauszahlung)" und „Private Rente
+    (Kapitalwahl)" eigene Vertragsarten. Damit liess sich derselbe Vertrag
+    nicht in beiden Auszahlungswegen erfassen — man musste sich beim Anlegen
+    entscheiden und konnte nie vergleichen.
+
+    Die Umschreibung geschieht beim Laden. Nach ihr gibt es die beiden Arten
+    nicht mehr — auch nicht im Typ, damit der Rechenkern sie gar nicht erst
+    behandeln muss.
+  */
+  const kapitalart = v.typ === 'bavKapital' || v.typ === 'prvKapital';
+  const typ = (v.typ === 'bavKapital' ? 'bav' : v.typ === 'prvKapital' ? 'prvRente' : v.typ) as
+    Exclude<typeof v.typ, 'bavKapital' | 'prvKapital'>;
+
+  if (!kapitalart) return { ...v, typ };
+  return {
+    ...v,
+    typ,
+    // Der Betrag stand im Rentenfeld, war aber immer ein Einmalbetrag.
+    kapitalAlternative: v.kapitalAlternative ?? v.brutto,
+    brutto: 0,
+    /*
+      „rente" hiess bei diesen Arten „das Kapital ueber feste Jahre
+      verrenten" — ein anderer Vorgang als eine laufende Anbieterrente. Er
+      heisst jetzt so, wie er heisst, und rechnet unveraendert weiter.
+    */
+    strategie: v.strategie === 'rente' ? ('verrenten' as const) : v.strategie,
+  };
 });
 
 /**
