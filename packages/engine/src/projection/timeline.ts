@@ -215,7 +215,6 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   }
 
   const ruhestandsjahr = Math.max(...personen.map((k) => k.rentenbeginnJahr));
-  const kinder: KinderStatus = { hatKinder: s.haushalt.hatKinder, kinderUnter25: s.haushalt.kinderUnter25 };
   const personA = personen[0]!;
   const letztesJahr = personA.geburt.jahr + 100;
   /*
@@ -265,7 +264,9 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     verheiratet: s.haushalt.verheiratet,
     bundesland: s.haushalt.bundesland,
     kirchensteuerpflichtig: s.haushalt.kirchensteuer,
-    kinder,
+    // Vorbelegung fuer das laufende Jahr; in der Jahresschleife wird sie je
+    // Jahr ersetzt, weil Kinder aelter werden.
+    kinder: kinderImJahr(s.haushalt, jetzt.jahr),
     privatVersichert,
   };
 
@@ -551,7 +552,14 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           pkvPraemieMonat: pkvAufwandMonat,
         }));
 
-      const n = erwerbHaushalt(arbeitend, { ...erwerbsOpt, beamter: false }, p);
+      const n = erwerbHaushalt(
+        arbeitend,
+        // Der Kinderstatus gilt JE JAHR: waehrend der Erwerbsphase wachsen
+        // Kinder aus der Beruecksichtigung heraus, und der Pflegebeitrag
+        // steigt entsprechend wieder.
+        { ...erwerbsOpt, beamter: false, kinder: kinderImJahr(s.haushalt, jahr) },
+        p,
+      );
       posten.push({
         id: 'erwerb', bezeichnung: 'Erwerbseinkommen', schicht: 1,
         bruttoJahr: n.jahresbrutto, zveBeitrag: n.zve, kvPvJahr: n.sv,
@@ -599,7 +607,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     }
 
     // --- KV/PV ---
-    const kv = kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinder, p, {
+    const kv = kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinderImJahr(s.haushalt, jahr), p, {
       // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
       // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
       // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
@@ -705,7 +713,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       // Nur freiwillig gesetzlich Versicherte zahlen auf Kapitalertraege
       // KV/PV-Beitraege; in der KVdR bleiben sie beitragsfrei.
       const kvPvJahr = s.haushalt.kvStatus === 'freiwillig'
-        ? e.bruttoProJahr * (kvSatzVoll(p) + pvSatzMitglied(kinder, p))
+        ? e.bruttoProJahr * (kvSatzVoll(p) + pvSatzMitglied(kinderImJahr(s.haushalt, jahr), p))
         : 0;
 
       posten.push({
@@ -851,6 +859,34 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 /** Vertragsarten, die als Einmalbetrag faellig werden statt als laufende Rente. */
 export function istKapitalvertrag(typ: Vertrag['typ']): boolean {
   return typ === 'bavKapital' || typ === 'prvKapital';
+}
+
+/**
+ * Kinderstatus fuer die Pflegeversicherung IN EINEM BESTIMMTEN JAHR.
+ *
+ * BEFUND: Der Status wurde einmal aus dem Haushalt gebildet und fuer jedes
+ * Jahr der Projektion verwendet. Ein heute fuenfjaehriges Kind senkte den
+ * Pflegebeitrag damit auch noch im Jahr 2070, in dem es fast fuenfzig ist.
+ * Die Abschlaege des § 55 Abs. 3 SGB XI gelten aber nur, solange das Kind das
+ * 25. Lebensjahr nicht vollendet hat.
+ *
+ * `hatKinder` bleibt dagegen dauerhaft: Der Kinderlosenzuschlag entfaellt ein
+ * Leben lang, sobald jemand ein Kind hat. Nur die ZAHL der beruecksichtigten
+ * Kinder sinkt mit der Zeit.
+ *
+ * Sind keine Geburtsjahre erfasst — moeglich bei sehr alten gespeicherten
+ * Dateien —, bleibt es bei der eingetragenen Anzahl. Ein Kind ohne
+ * Geburtsjahr laesst sich nicht altern lassen, und stillschweigend eines zu
+ * raten waere schlechter als die bekannte Vereinfachung.
+ */
+function kinderImJahr(h: Szenario['haushalt'], jahr: number): KinderStatus {
+  if (h.kinder.length === 0) {
+    return { hatKinder: h.hatKinder, kinderUnter25: h.kinderUnter25 };
+  }
+  return {
+    hatKinder: h.hatKinder || h.kinder.length > 0,
+    kinderUnter25: h.kinder.filter((k) => jahr - k.geburtsjahr < 25).length,
+  };
 }
 
 /**

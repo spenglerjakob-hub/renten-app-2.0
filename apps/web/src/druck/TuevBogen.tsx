@@ -100,9 +100,15 @@ export function TuevBogen({
             <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(r.kvPvMonat)} />
           )}
           <Angabe
-            feld="− Steuer"
+            feld={istKapital ? '− Steuer im Zuflussjahr' : '− Steuer'}
             wert={euro(istKapital ? r.steuerKapital : r.steuerMonat)}
           />
+          {/* Die Beitraege auf eine Kapitalleistung laufen 120 Monate
+              (§ 229 SGB V) und mindern in dieser Zeit das Monatsnetto — sie
+              stehen deshalb auch im Kassenbon, hier aber als Summe. */}
+          {istKapital && r.kvPvKapital > 0 && (
+            <Angabe feld="− Kranken- und Pflegeversicherung (120 Monate)" wert={euro(r.kvPvKapital)} />
+          )}
           <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
             <span className="text-[12px] font-bold text-slate-800">Bleibt Ihnen</span>
             <span className="text-[14px] font-black tabular-nums text-slate-900">

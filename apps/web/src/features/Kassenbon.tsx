@@ -40,24 +40,49 @@ function SchichtBlock({
       </button>
 
       <div className={`space-y-2 bg-white p-2.5 text-xs sm:p-3 ${offen ? 'block' : 'hidden'} druck-inhalt`}>
-        {kinder.map((p) => (
-          <div key={p.id} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 sm:p-3">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className={`truncate text-[11px] font-semibold sm:text-sm ${f.text}`}>
-                {p.bezeichnung}
-              </span>
-              <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
-                {w(p.nettoJahr)}
-              </span>
+        {kinder.map((p) => {
+          /*
+            REINE ABZUGSZEILE. Ein Posten ohne Brutto, der nur Beitraege
+            traegt, ist kein Einkommen — das sind die Beitraege auf eine
+            Kapitalleistung (§ 229 SGB V), die zehn Jahre lang laufen, obwohl
+            das Kapital laengst ausgezahlt ist. Als gewoehnliche Einkunftsart
+            mit negativem Netto sah das nach einem Rechenfehler aus.
+          */
+          const nurAbzug = p.bruttoJahr <= 0 && p.kvPvJahr > 0;
+          return (
+            <div
+              key={p.id}
+              className={`rounded-lg border p-2.5 sm:p-3 ${
+                nurAbzug ? 'border-rose-100 bg-rose-50/60' : 'border-slate-100 bg-slate-50'
+              }`}
+            >
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className={`truncate text-[11px] font-semibold sm:text-sm ${nurAbzug ? 'text-rose-900' : f.text}`}>
+                  {p.bezeichnung}
+                </span>
+                <span className={`whitespace-nowrap text-[11px] font-bold tabular-nums sm:text-base ${
+                  nurAbzug ? 'text-rose-700' : 'text-slate-800'
+                }`}>
+                  {w(p.nettoJahr)}
+                </span>
+              </div>
+              {nurAbzug ? (
+                <div className="text-[11px] leading-relaxed text-rose-900/80 sm:text-[10px]">
+                  Kein Einkommen, sondern ein Abzug: Auf eine Kapitalleistung sind zehn Jahre
+                  lang Beiträge zu zahlen (§ 229 SGB V). Das Kapital selbst steht unten bei den
+                  Einmalzahlungen.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 text-[11px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
+                  <span>Brutto: {w(p.bruttoJahr)}</span>
+                  <span className="leading-tight text-rose-500 sm:text-right">
+                    KV/PV: {w(p.kvPvJahr)} | Steuer: {w(p.steuerJahr)}
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-1 text-[11px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
-              <span>Brutto: {w(p.bruttoJahr)}</span>
-              <span className="leading-tight text-rose-500 sm:text-right">
-                KV/PV: {w(p.kvPvJahr)} | Steuer: {w(p.steuerJahr)}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -197,6 +222,22 @@ export function Kassenbon({
                     Steuer: {euro(a.steuer * kaufkraft(a.jahr))}
                   </span>
                 </div>
+                {/*
+                  Die Beitraege des § 229 SGB V laufen 120 Monate und stehen
+                  deshalb OBEN in der Monatsrechnung. Hier werden sie nur
+                  benannt — sonst fehlt die Bruecke zu der Zahl, die der
+                  Vertrags-TUEV als „Netto-Kapital" ausweist.
+                */}
+                {a.kvPvGesamt > 0 && (
+                  <div className="mt-1 border-t border-slate-100 pt-1 text-[11px] leading-relaxed text-slate-500 sm:text-[10px]">
+                    Dazu {euro(a.kvPvGesamt * kaufkraft(a.jahr))} Kranken- und
+                    Pflegeversicherung über 120 Monate — oben im Monatsnetto bereits abgezogen.
+                    Nach allen Abzügen bleiben{' '}
+                    <strong className="text-slate-700">
+                      {euro(Math.max(0, a.nettoKapital - a.kvPvGesamt) * kaufkraft(a.jahr))}
+                    </strong>.
+                  </div>
+                )}
               </div>
             ))}
           </div>

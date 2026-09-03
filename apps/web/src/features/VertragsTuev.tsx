@@ -403,8 +403,23 @@ export function VertragsTuev({
                         {!istKapital && r.steuerMonat > 0 && (
                           <GegenueberZeile text="− Steuer-Abzug" wert={euro(r.steuerMonat)} farbe="text-rose-500" />
                         )}
+                        {/*
+                          Steuer und Beitraege GETRENNT: Die Steuer faellt im
+                          Zuflussjahr an, die Beitraege laufen zehn Jahre
+                          (§ 229 SGB V) und stehen deshalb auch im monatlichen
+                          Kassenbon. Zusammengefasst als „Steuern und Abgaben"
+                          liess sich nicht erkennen, warum dieselbe Auszahlung
+                          in der Eingabemaske hoeher ausgewiesen ist.
+                        */}
                         {istKapital && r.steuerKapital > 0 && (
-                          <GegenueberZeile text="− Steuern und Abgaben" wert={euro(r.steuerKapital)} farbe="text-rose-500" />
+                          <GegenueberZeile text="− Steuer im Zuflussjahr" wert={euro(r.steuerKapital)} farbe="text-rose-500" />
+                        )}
+                        {istKapital && r.kvPvKapital > 0 && (
+                          <GegenueberZeile
+                            text="− KV/PV über 120 Monate"
+                            wert={euro(r.kvPvKapital)}
+                            farbe="text-rose-500"
+                          />
                         )}
 
                         <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-amber-200 pt-2">

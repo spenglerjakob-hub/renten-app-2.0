@@ -113,11 +113,17 @@ export function tuevPositionen(
     const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
     const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
 
-    // Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
-    // Zuflussjahr und die KV/PV auf die Kapitalleistung (§ 229 SGB V, 1/120
-    // ueber 120 Monate). Beide kommen fertig aus dem Rechenkern.
+    /*
+      Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
+      Zuflussjahr und die KV/PV auf die Kapitalleistung (§ 229 SGB V, 1/120
+      ueber 120 Monate). Beide kommen fertig aus dem Rechenkern — und werden
+      GETRENNT weitergereicht. Zusammengefasst als eine Zahl blieb unerklaert,
+      warum der TUEV weniger auswies als die Eingabemaske: dort steht das
+      Kapital nach Steuer, hier nach Steuer UND zehn Jahren Beitraegen.
+    */
     const bruttoKapital = einmal?.bruttoKapital ?? 0;
-    const steuerKapital = einmal ? einmal.steuer + einmal.kvPvGesamt : 0;
+    const steuerKapital = einmal?.steuer ?? 0;
+    const kvPvKapital = einmal?.kvPvGesamt ?? 0;
     const nettoKapital = einmal ? Math.max(0, einmal.nettoKapital - einmal.kvPvGesamt) : 0;
 
     const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
@@ -163,7 +169,7 @@ export function tuevPositionen(
         rentenbeginnJahr,
         alterBeiRentenbeginn,
         bruttoRenteMonat, kvPvMonat, steuerMonat, nettoRenteMonat,
-        bruttoKapital, steuerKapital, nettoKapital,
+        bruttoKapital, steuerKapital, kvPvKapital, nettoKapital,
       },
       szenario,
       basis.p,
@@ -206,6 +212,7 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
   );
 
   let bavEigenanteilJahr = 0;
+  let bavArbeitgeberJahr = 0;
   let basisBeitragJahr = 0;
   let ohneBeitrag = 0;
   for (const v of gefoerdert) {
@@ -214,9 +221,16 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
     if (v.typ === 'basis') {
       basisBeitragJahr += t.beitragMonat * 12;
     } else {
-      // Nur der EIGENE Verzicht auf Entgelt zaehlt; der Arbeitgeberzuschuss
-      // ist keine Umwandlung.
-      bavEigenanteilJahr += Math.max(0, t.beitragMonat - t.agZuschussMonat) * 12;
+      /*
+        BEIDE Teile werden gebraucht, und zwar getrennt: Die Grenzen des
+        § 3 Nr. 63 EStG und des § 1 Abs. 1 Nr. 9 SvEV gelten fuer die Summe
+        aller Beitraege aus dem Dienstverhaeltnis — der Arbeitgeberanteil
+        verbraucht den Rahmen also mit und geht dem eigenen vor. Fuer den
+        Satz „Sie wandeln heute X um" zaehlt dagegen nur der Eigenanteil.
+      */
+      const ag = Math.min(Math.max(0, t.agZuschussMonat), t.beitragMonat);
+      bavArbeitgeberJahr += ag * 12;
+      bavEigenanteilJahr += (t.beitragMonat - ag) * 12;
     }
   }
 
@@ -254,6 +268,7 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
         ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
         : 0,
       bavEigenanteilJahr,
+      bavArbeitgeberJahr,
       basisBeitragJahr,
       grvDeckung,
       /*

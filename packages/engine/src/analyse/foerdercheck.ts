@@ -59,14 +59,21 @@ export interface FoerderKontext extends SvKontext {
   /** Eigener Jahresbeitrag zur gesetzlichen Rentenversicherung */
   grvBeitragJahr: number;
   /**
-   * Laufende Entgeltumwandlung im Jahr, OHNE Arbeitgeberzuschuss.
-   *
-   * Der Zuschuss zaehlt zwar in die Grenzen des § 3 Nr. 63 EStG hinein, aber
-   * er ist kein Verzicht auf eigenes Entgelt. Fuer die Frage „was koennte ich
-   * noch umwandeln" ist der Eigenanteil die richtige Groesse; die Grenze
-   * selbst wird konservativ um den Zuschuss nicht erhoeht.
+   * Laufende Entgeltumwandlung im Jahr, OHNE Arbeitgeberzuschuss — der
+   * eigene Verzicht auf Entgelt.
    */
   bavEigenanteilJahr: number;
+  /**
+   * Arbeitgeberbeitraege und -zuschuesse zur bAV im Jahr.
+   *
+   * SIE GEHEN VOR. Die Grenzen des § 3 Nr. 63 EStG und des § 1 Abs. 1 Nr. 9
+   * SvEV gelten fuer die SUMME aller Beitraege aus dem Dienstverhaeltnis,
+   * nicht fuer den Eigenanteil allein — und die Arbeitgeberbeitraege
+   * verbrauchen den Rahmen zuerst. Wer 200 EUR vom Arbeitgeber bekommt, hat
+   * von den vier Prozent nur noch den Rest fuer sich; was er darueber hinaus
+   * umwandelt, ist bloss noch steuerfrei.
+   */
+  bavArbeitgeberJahr: number;
   /** Laufende Basisrentenbeitraege im Jahr */
   basisBeitragJahr: number;
   /**
@@ -91,7 +98,18 @@ export interface FoerderBefund {
   nettoAufwandMonat: number;
   /** Foerderquote: Ersparnis je eingesetztem Euro */
   foerderquote: number;
+  /** Der Befund selbst: was frei ist und warum. */
   text: string;
+  /**
+   * Einschraenkung oder Nebenbedingung — auf dem Bildschirm unter dem Befund,
+   * im Ausdruck weggelassen.
+   *
+   * Getrennt, weil beide verschieden viel Platz verdienen: Der Befund ist die
+   * Auskunft, der Hinweis die Fussnote dazu. Im Gutachten steht der Befund in
+   * einer Tabellenzeile, und eine Fussnote von drei Saetzen sprengte dort die
+   * Seite.
+   */
+  hinweis?: string;
   /** Fundstelle, z. B. "§ 3 Nr. 63 EStG" */
   paragraf: string;
 }
@@ -143,14 +161,20 @@ export function foerdercheck(
  * Nur fuer Angestellte: ein Beamter wandelt kein Entgelt um, und ein
  * Selbststaendiger hat keinen Arbeitgeber, der es koennte.
  *
- * DER MASSSTAB SIND DIE 4 %, NICHT DIE 8 %. Beitrags- UND steuerfrei sind
- * nur 4 % der Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV); die zweiten
- * 4 % bis zur Grenze des § 3 Nr. 63 EStG sind allein steuerfrei, auf sie
- * fallen volle Sozialabgaben an. Der Befund misst deshalb den freien Rahmen
- * am beitragsfreien Teil und meldet sich nicht mehr, sobald der ausgeschoepft
- * ist: Den vollen Rahmen auszureizen ist eine Einzelfallentscheidung und
- * taugt nicht als pauschaler Hinweis. Die zweite Stufe wird trotzdem genannt
- * — aber als das, was sie ist.
+ * DER MASSSTAB SIND DIE 4 %, NICHT DIE 8 %. Sozialversicherungsfrei UND
+ * steuerfrei sind nur 4 % der Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9
+ * SvEV); die zweiten 4 % bis zur Grenze des § 3 Nr. 63 EStG sind allein
+ * steuerfrei, auf sie fallen volle Sozialabgaben an. Der Befund misst deshalb
+ * den freien Rahmen am sozialversicherungsfreien Teil und meldet sich nicht
+ * mehr, sobald der ausgeschoepft ist: Den vollen Rahmen auszureizen ist eine
+ * Einzelfallentscheidung und taugt nicht als pauschaler Hinweis. Die zweite
+ * Stufe wird trotzdem genannt — aber als das, was sie ist.
+ *
+ * DIE ARBEITGEBERBEITRAEGE GEHEN VOR. Beide Grenzen gelten fuer die SUMME
+ * der Beitraege aus dem Dienstverhaeltnis. Ein Zuschuss von 200 EUR
+ * verbraucht die vier Prozent also mit, und was der Arbeitnehmer darueber
+ * hinaus umwandelt, ist nur noch steuerfrei. Wer allein den Eigenanteil
+ * gegen die Grenze haelt, weist einen Rahmen aus, den es nicht gibt.
  */
 function bavBefund(
   k: FoerderKontext,
@@ -159,7 +183,9 @@ function bavBefund(
 ): FoerderBefund | null {
   if (k.beamter || k.selbststaendig) return null;
 
-  const genutzt = Math.max(0, k.bavEigenanteilJahr);
+  const eigen = Math.max(0, k.bavEigenanteilJahr);
+  const vomArbeitgeber = Math.max(0, k.bavArbeitgeberJahr);
+  const genutzt = eigen + vomArbeitgeber;
   const svRahmen = Math.max(0, SV_FREI_QUOTE * p.bbgRvJahr - genutzt);
   const nurSteuerfrei = Math.max(0, STEUER_FREI_QUOTE * p.bbgRvJahr - genutzt - svRahmen);
   const rahmenMonat = svRahmen / 12;
@@ -176,25 +202,39 @@ function bavBefund(
   const ersparnisJahr = Math.max(0, wirkung.ersparnis + steuer);
   if (ersparnisJahr <= 0) return null;
 
-  const text = (genutzt > 0.5
-    ? `Sie wandeln heute ${euroText(genutzt / 12)} im Monat um. Steuer- UND beitragsfrei sind `
-      + `${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} (4 % der Beitragsbemessungsgrenze) — `
-      + `${euroText(rahmenMonat)} davon liegen brach.`
-    : 'Sie nutzen die Entgeltumwandlung bisher gar nicht. Steuer- UND beitragsfrei sind '
-      + `${euroText(rahmenMonat)} im Monat, das sind 4 % der Beitragsbemessungsgrenze.`)
-    + ` Darüber hinaus wären weitere ${euroText(nurSteuerfrei / 12)} nur noch steuerfrei: `
-    + 'Auf sie zahlen Sie volle Sozialabgaben, der Vorteil beschränkt sich dann auf die '
-    + 'Steuer. Diese zweite Stufe lohnt sich nicht mehr in jedem Fall — die erste fast immer.';
+  /*
+    Der Arbeitgeberanteil wird ausdruecklich genannt, wenn es ihn gibt: Sonst
+    wirkt der ausgewiesene Rahmen kleiner als die 4 %, ohne dass der Grund
+    dastuende.
+  */
+  const belegt = vomArbeitgeber > 0.5
+    ? ` Davon sind ${euroText(vomArbeitgeber / 12)} bereits durch Ihren Arbeitgeber belegt — `
+      + 'seine Beiträge gehen vor.'
+    : '';
+
+  const text = genutzt > 0.5
+    ? `Sie wandeln heute ${euroText(eigen / 12)} im Monat selbst um. Steuer- UND `
+      + `sozialversicherungsfrei sind ${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat `
+      + `(4 % der Beitragsbemessungsgrenze).${belegt} Frei sind noch `
+      + `${euroText(rahmenMonat)}.`
+    : 'Sie nutzen die Entgeltumwandlung bisher gar nicht. Steuer- UND sozialversicherungsfrei '
+      + `sind ${euroText(rahmenMonat)} im Monat, das sind 4 % der Beitragsbemessungsgrenze.`;
+
+  const hinweis = `Darüber hinaus wären weitere ${euroText(nurSteuerfrei / 12)} nur noch `
+    + 'steuerfrei: Auf sie zahlen Sie volle Sozialabgaben, der Vorteil beschränkt sich dann '
+    + 'auf die Steuer. Diese zweite Stufe lohnt sich nicht mehr in jedem Fall — die erste '
+    + 'fast immer.';
 
   return {
     id: 'bav',
-    titel: 'Entgeltumwandlung nicht ausgeschöpft',
+    titel: 'Entgeltumwandlung: 4 % nicht ausgeschöpft',
     rahmenMonat,
     probeMonat: probeJahr / 12,
     ersparnisJahr,
     nettoAufwandMonat: Math.max(0, probeJahr - ersparnisJahr) / 12,
     foerderquote: probeJahr > 0 ? ersparnisJahr / probeJahr : 0,
     text,
+    hinweis,
     paragraf: '§ 1 Abs. 1 Nr. 9 SvEV, § 3 Nr. 63 EStG',
   };
 }

@@ -175,3 +175,118 @@ describe('Ruhestandsfenster fuer das Gutachten', () => {
     expect(ruhestandsfenster(e, 85).at(-1)!.alterA).toBe(85);
   });
 });
+
+describe('Kinder in der Pflegeversicherung', () => {
+  /*
+    BEFUND: Der Kinderstatus wurde EINMAL aus dem Haushalt gebildet und fuer
+    jedes Jahr der Projektion verwendet. Ein heute achtjaehriges Kind senkte
+    den Pflegebeitrag damit auch noch im Ruhestand, in dem es laengst ueber
+    fuenfzig ist. Die Abschlaege des § 55 Abs. 3 SGB XI enden aber mit dem
+    25. Lebensjahr.
+  */
+  const mitKindern = (kinder: { geburtsjahr: number }[]) => szenario({
+    haushalt: {
+      verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
+      hatKinder: kinder.length > 0, kinderUnter25: kinder.length, kinder,
+      kvStatus: 'kvdr', kvErwerb: 'gesetzlich', pkv: PKV_VORGABE, zielNettoHeute: 2000,
+    },
+  });
+
+  const kvPvIm = (s: Szenario, jahr: number) =>
+    projiziere(s).zeilen.find((z) => z.jahr === jahr)!.kvPvGesamt;
+
+  it('lässt den Abschlag mit dem 25. Geburtstag auslaufen', () => {
+    const jetzt = new Date().getFullYear();
+    // Drei Kinder, das juengste wird in fuenf Jahren 25.
+    const drei = mitKindern([
+      { geburtsjahr: jetzt - 24 }, { geburtsjahr: jetzt - 22 }, { geburtsjahr: jetzt - 20 },
+    ]);
+    // Dieselbe Familie, aber alle Kinder laengst erwachsen.
+    const erwachsen = mitKindern([
+      { geburtsjahr: jetzt - 40 }, { geburtsjahr: jetzt - 38 }, { geburtsjahr: jetzt - 36 },
+    ]);
+
+    // Heute: zwei Abschlaege (ab dem zweiten Kind) — der Beitrag ist niedriger.
+    expect(kvPvIm(drei, jetzt)).toBeLessThan(kvPvIm(erwachsen, jetzt));
+    // In zehn Jahren sind auch dort alle ueber 25: kein Unterschied mehr.
+    expect(kvPvIm(drei, jetzt + 10)).toBeCloseTo(kvPvIm(erwachsen, jetzt + 10), 6);
+  });
+
+  it('behält den Wegfall des Kinderlosenzuschlags ein Leben lang', () => {
+    /*
+      Der Zuschlag entfaellt dauerhaft, sobald jemand ein Kind hat — anders
+      als die Abschlaege. Wer ihn mit dem 25. Geburtstag zurueckkehren liesse,
+      machte aus einer Verguenstigung eine Strafe.
+    */
+    const jetzt = new Date().getFullYear();
+    const erwachseneKinder = mitKindern([{ geburtsjahr: jetzt - 40 }]);
+    const kinderlos = mitKindern([]);
+    expect(kvPvIm(erwachseneKinder, jetzt + 20)).toBeLessThan(kvPvIm(kinderlos, jetzt + 20));
+  });
+
+  it('rechnet ohne erfasste Geburtsjahre unverändert mit der Anzahl', () => {
+    // Gespeicherte Dateien ohne Geburtsjahre duerfen nicht ploetzlich anders
+    // rechnen: ein Kind ohne Jahrgang laesst sich nicht altern lassen.
+    const jetzt = new Date().getFullYear();
+    const nurAnzahl = szenario({
+      haushalt: {
+        verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuer: false,
+        hatKinder: true, kinderUnter25: 3, kinder: [],
+        kvStatus: 'kvdr', kvErwerb: 'gesetzlich', pkv: PKV_VORGABE, zielNettoHeute: 2000,
+      },
+    });
+    const ohneKinder = mitKindern([]);
+    expect(kvPvIm(nurAnzahl, jetzt + 30)).toBeLessThan(kvPvIm(ohneKinder, jetzt + 30));
+  });
+});
+
+describe('Einmalige Kapitalauszahlung', () => {
+  const mitKapital = () => szenario({
+    vertraege: [{
+      id: 'k1', inhaber: 'A', schicht: 2, typ: 'bavKapital', name: 'Direktversicherung',
+      brutto: 120_000, strategie: 'kapital', altvertrag: false,
+    }],
+  });
+
+  it('trennt Steuer im Zuflussjahr von den Beiträgen über 120 Monate', () => {
+    /*
+      Die Eingabemaske zeigte das Kapital nach STEUER, der Vertrags-TUEV nach
+      Steuer UND zehn Jahren Beitraegen — dieselbe Auszahlung mit zwei
+      verschiedenen Zahlen. Beide Groessen stehen jetzt getrennt bereit, und
+      ihre Beziehung ist nachrechenbar.
+    */
+    const e = projiziere(mitKapital());
+    const a = e.kapitalauszahlungen[0]!;
+    expect(a.bruttoKapital).toBeCloseTo(120_000, 6);
+    expect(a.nettoKapital).toBeCloseTo(a.bruttoKapital - a.steuer, 6);
+    expect(a.kvPvGesamt).toBeGreaterThan(0);
+    expect(a.nettoKapital - a.kvPvGesamt).toBeLessThan(a.nettoKapital);
+  });
+
+  it('bucht die Beiträge als reinen Abzug in die Monatsrechnung', () => {
+    // Ein Posten ohne Brutto mit negativem Netto: wirtschaftlich richtig, die
+    // Beitragspflicht laeuft zehn Jahre. Die Summe der Posten muss trotzdem
+    // mit der Jahressumme zusammenpassen.
+    const e = projiziere(mitKapital());
+    const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr)!;
+    const abzug = zeile.posten.find((x) => x.id === 'k1')!;
+    expect(abzug.bruttoJahr).toBe(0);
+    expect(abzug.kvPvJahr).toBeGreaterThan(0);
+    expect(abzug.nettoJahr).toBeCloseTo(-abzug.kvPvJahr, 6);
+    for (const z of e.zeilen) {
+      const summe = z.posten.reduce((sum, x) => sum + x.kvPvJahr, 0);
+      expect(summe).toBeCloseTo(z.kvPvGesamt, 4);
+    }
+  });
+
+  it('summiert die Beiträge über die zehn Jahre, nicht länger', () => {
+    const e = projiziere(mitKapital());
+    const a = e.kapitalauszahlungen[0]!;
+    const jahre = e.zeilen.filter((z) => (z.posten.find((x) => x.id === 'k1')?.kvPvJahr ?? 0) > 0);
+    expect(jahre.length).toBeLessThanOrEqual(11);
+    const summe = jahre.reduce(
+      (s, z) => s + (z.posten.find((x) => x.id === 'k1')?.kvPvJahr ?? 0), 0,
+    );
+    expect(summe).toBeCloseTo(a.kvPvGesamt, 4);
+  });
+});

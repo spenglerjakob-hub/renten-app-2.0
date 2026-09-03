@@ -79,6 +79,14 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
             <div className="p-3 sm:p-4">
               <p className="text-[11px] leading-relaxed text-slate-600 sm:text-xs">{b.text}</p>
 
+              {/* Die Einschraenkung steht kleiner darunter — im Ausdruck
+                  entfaellt sie ganz, dort zaehlt der Befund. */}
+              {b.hinweis && (
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 sm:text-[11px]">
+                  {b.hinweis}
+                </p>
+              )}
+
               {/*
                 Die eine Zeile, auf die es ankommt. Der Rahmen sagt, was ginge;
                 erst der Netto-Aufwand sagt, was es kostet — und das ist die

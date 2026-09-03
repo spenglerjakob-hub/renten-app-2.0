@@ -20,6 +20,7 @@ const angestellt: FoerderKontext = {
   zveHeute: 50_000,
   grvBeitragJahr: 0,
   bavEigenanteilJahr: 0,
+  bavArbeitgeberJahr: 0,
   basisBeitragJahr: 0,
   grvDeckung: 0.6,
   lueckeMonat: 0,
@@ -53,18 +54,41 @@ describe('Fördercheck — betriebliche Altersvorsorge', () => {
     expect(bav({ ...angestellt, bavEigenanteilJahr: SV_FREI_QUOTE * p.bbgRvJahr })).toBeNull();
   });
 
+  it('rechnet die Arbeitgeberbeiträge gegen den Rahmen — sie gehen vor', () => {
+    /*
+      Die Grenzen gelten fuer die SUMME aus dem Dienstverhaeltnis. Ein
+      Zuschuss von 1.200 EUR verbraucht die vier Prozent mit; wer nur den
+      Eigenanteil dagegenhaelt, weist einen Rahmen aus, den es nicht gibt.
+    */
+    const ohne = bav({ ...angestellt, bavEigenanteilJahr: 1_200 })!;
+    const mit = bav({ ...angestellt, bavEigenanteilJahr: 1_200, bavArbeitgeberJahr: 1_200 })!;
+    expect(mit.rahmenMonat).toBeCloseTo(ohne.rahmenMonat - 100, 6);
+    expect(mit.text).toContain('Arbeitgeber');
+  });
+
+  it('schweigt, wenn Arbeitgeber und Eigenanteil zusammen die 4 % füllen', () => {
+    expect(bav({
+      ...angestellt,
+      bavEigenanteilJahr: SV_FREI_QUOTE * p.bbgRvJahr / 2,
+      bavArbeitgeberJahr: SV_FREI_QUOTE * p.bbgRvJahr / 2,
+    })).toBeNull();
+  });
+
   it('schweigt bei Beamten und Selbstständigen — sie können nicht umwandeln', () => {
     expect(bav({ ...angestellt, beamter: true })).toBeNull();
     expect(bav({ ...angestellt, selbststaendig: true })).toBeNull();
   });
 
-  it('nennt die zweite Stufe, ohne sie zu empfehlen', () => {
+  it('nennt die zweite Stufe im Hinweis, ohne sie zu empfehlen', () => {
+    // Der Befund traegt die Auskunft, der Hinweis die Einschraenkung — im
+    // Ausdruck steht nur der Befund, sonst sprengt er die Seite.
     const b = bav(angestellt)!;
-    expect(b.text).toContain('Steuer- UND beitragsfrei');
-    expect(b.text).toContain('nur noch steuerfrei');
-    expect(b.text).toContain('volle Sozialabgaben');
+    expect(b.text).toContain('Steuer- UND sozialversicherungsfrei');
+    expect(b.hinweis).toBeDefined();
+    expect(b.hinweis!).toContain('nur noch steuerfrei');
+    expect(b.hinweis!).toContain('volle Sozialabgaben');
     // Der genannte Zusatzrahmen ist die Differenz beider Grenzen.
-    expect(b.text).toContain(
+    expect(b.hinweis!).toContain(
       Math.round((STEUER_FREI_QUOTE - SV_FREI_QUOTE) * p.bbgRvJahr / 12).toLocaleString('de-DE'),
     );
   });

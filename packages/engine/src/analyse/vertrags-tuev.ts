@@ -132,9 +132,20 @@ export interface TuevKontext {
 
   /** BRUTTO-Kapital bei Kapitalauszahlung; 0 bei laufender Rente */
   bruttoKapital: number;
-  /** Steuer auf die Kapitalauszahlung */
+  /** Steuer auf die Kapitalauszahlung im Zuflussjahr — OHNE Beitraege */
   steuerKapital: number;
-  /** NETTO-Kapital bei Kapitalauszahlung; 0 bei laufender Rente */
+  /**
+   * Kranken- und Pflegeversicherung auf die Kapitalleistung, Summe ueber die
+   * 120 Monate des § 229 Abs. 1 S. 3 SGB V.
+   *
+   * GETRENNT von der Steuer, weil beide verschieden wirken: Die Steuer faellt
+   * im Zuflussjahr an und ist mit der Auszahlung erledigt; die Beitraege
+   * laufen zehn Jahre lang und mindern in dieser Zeit das MONATLICHE Netto.
+   * Zusammengefasst als „Steuern und Abgaben" liess sich nicht mehr erkennen,
+   * warum dieselbe Auszahlung an anderer Stelle hoeher ausgewiesen ist.
+   */
+  kvPvKapital: number;
+  /** NETTO-Kapital nach Steuer UND Beitraegen; 0 bei laufender Rente */
   nettoKapital: number;
 }
 
@@ -167,6 +178,7 @@ export interface TuevErgebnis {
   nettoRenteMonat: number;
   bruttoKapital: number;
   steuerKapital: number;
+  kvPvKapital: number;
   nettoKapital: number;
 
   /** --- Summen ueber die gesamte Laufzeit --- */
@@ -696,6 +708,7 @@ export function vertragsTuev(
     nettoRenteMonat: k.nettoRenteMonat,
     bruttoKapital: k.bruttoKapital,
     steuerKapital: k.steuerKapital,
+    kvPvKapital: k.kvPvKapital,
     nettoKapital: k.nettoKapital,
     beitragMonat,
     agZuschussMonat,

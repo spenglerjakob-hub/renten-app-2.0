@@ -125,12 +125,18 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
               ]}
             />
           )}
+          {/*
+            „Heute" ist hier woertlich zu nehmen: Die Abschlaege enden mit dem
+            25. Geburtstag, und die Rechnung laesst sie mit den Geburtsjahren
+            darunter auslaufen. Ohne diesen Zusatz sah es aus, als senke ein
+            heute kleines Kind den Beitrag bis ans Lebensende.
+          */}
           <ZahlFeld
-            label="Kinder unter 25"
+            label="Kinder unter 25 (heute)"
             wert={s.haushalt.kinderUnter25}
             onChange={setzeKinderAnzahl}
             max={15}
-            hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag."
+            hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag — bis zum 25. Geburtstag des Kindes. Danach steigt er wieder; die Rechnung berücksichtigt das über die Geburtsjahre."
           />
         </div>
 

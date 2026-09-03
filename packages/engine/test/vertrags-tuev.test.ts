@@ -64,6 +64,7 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
     nettoRenteMonat: 300,
     bruttoKapital: 0,
     steuerKapital: 0,
+    kvPvKapital: 0,
     nettoKapital: 0,
     ...over,
   };

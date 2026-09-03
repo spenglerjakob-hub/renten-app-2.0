@@ -194,7 +194,9 @@ export function Renteneinkuenfte({
               </div>
             ))}
             <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
-              Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
+              Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten —
+              die Beiträge auf die Kapitalleistung dagegen schon: Sie laufen zehn Jahre lang und
+              mindern in dieser Zeit das monatliche Netto (§ 229 SGB V).
             </p>
           </div>
         </>
