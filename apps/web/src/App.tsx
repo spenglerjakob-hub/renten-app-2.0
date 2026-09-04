@@ -435,7 +435,7 @@ export default function App() {
               </div>
 
               <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
-                <Kassenbon ergebnis={ergebnis} zeile={zeile} kaufkraftHeute={kaufkraftHeute} />
+                <Kassenbon ergebnis={ergebnis} zeile={zeile} szenario={szenario} kaufkraftHeute={kaufkraftHeute} />
               </div>
               <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                 <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />

@@ -1,6 +1,7 @@
-import type { ProjektionsErgebnis, Jahreszeile } from '@renten/engine';
+import type { ProjektionsErgebnis, Jahreszeile, Szenario } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
 import { SCHICHT_TITEL } from '../features/vertragsarten';
+import { geteilterFreibetrag, freibetragText } from '../features/bav-freibetrag';
 import {
   Seite, Untertitel, Angabe, Zweispaltig, Tabelle, Zeile, Gruppenzeile,
   GrosseZahl, Text,
@@ -20,14 +21,16 @@ import {
  * das steht auf dem Papier sichtbar schief.
  */
 export function Renteneinkuenfte({
-  ergebnis, zeile, zielNettoHeute, inflation,
+  ergebnis, zeile, szenario, zielNettoHeute, inflation,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
+  szenario: Szenario;
   /** Das gewuenschte Netto in HEUTIGER Kaufkraft, so wie es erfasst wurde */
   zielNettoHeute: number;
   inflation: number;
 }) {
+  const geteilt = geteilterFreibetrag(szenario, zeile.jahr);
   const luecke = zeile.zielNettoMonat - zeile.nettoMonat;
   const gedeckt = zeile.zielNettoMonat > 0
     ? (zeile.nettoMonat / zeile.zielNettoMonat) * 100
@@ -165,6 +168,23 @@ export function Renteneinkuenfte({
           ]}
         />
       </Tabelle>
+
+      {/*
+        Wer mehrere Betriebsrenten hat, findet in der Tabelle Beitraege, die
+        er beim einzelnen Vertrag nicht erwartet haette. Der Satz steht
+        deshalb direkt unter der Tabelle und nicht bei den Vorbehalten.
+      */}
+      {geteilt && (
+        <Text>
+          <strong>Mehrere Betriebsrenten zählen zusammen.</strong> Der Freibetrag von{' '}
+          <strong>{freibetragText(geteilt.betragMonat)}</strong> im Monat steht{' '}
+          {geteilt.personen.length > 1 ? 'jeder Person' : geteilt.personen[0]} nur{' '}
+          <strong>einmal</strong> zu und gilt für die Summe aller Versorgungsbezüge
+          (§ 226 Abs. 2 SGB V). Deshalb fallen Beiträge an, obwohl jeder Vertrag für sich
+          darunter liegt. In der Pflegeversicherung wirkt derselbe Betrag als Freigrenze:
+          oberhalb ist die volle Summe beitragspflichtig.
+        </Text>
+      )}
 
       {/*
         Einmalzahlungen stehen BEWUSST ausserhalb der Monatsrechnung. Sie in

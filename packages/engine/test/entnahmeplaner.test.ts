@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { entnahmeRate, entnahmeplanBewerten } from '../src/products/entnahmeplaner.js';
 import { projiziere } from '../src/projection/timeline.js';
 import { parameterFuer } from '../src/params/registry.js';
+import { bavFreibetragMonat } from '../src/social/kv-pv.js';
 import type { Szenario, Vertrag } from '../src/model.js';
 
 const p = parameterFuer(2026, { indexRate: 0 });
@@ -257,6 +258,55 @@ describe('Kapitalvertraege in der Zeitachse', () => {
     // Haelfte steuerpflichtig — also spuerbar weniger Steuer.
     expect(steuer(kurz)).toBeGreaterThan(0);
     expect(steuer(lang)).toBeLessThan(steuer(kurz) * 0.75);
+  });
+});
+
+describe('Kapitalleistung teilt sich den Freibetrag', () => {
+  /*
+    Die Beitraege auf eine Kapitalleistung werden ueber 120 Monate bemessen
+    (§ 229 Abs. 1 S. 3 SGB V). In diesen Monaten steht sie neben den
+    laufenden Betriebsrenten derselben Person — und den Freibetrag des
+    § 226 SGB V gibt es nur EINMAL je Mitglied. Vorher bekam die
+    Kapitalleistung ihn ungeteilt, was sie zu billig aussehen liess.
+  */
+  const kapitalvertrag = {
+    id: 'kap', schicht: 2 as const, typ: 'bav' as const,
+    kapitalAlternative: 120_000, strategie: 'kapital' as const,
+  };
+  const einmal = (vertraege: Szenario['vertraege']) =>
+    projiziere(szenario({ vertraege })).kapitalauszahlungen.find((x) => x.vertragId === 'kap')!;
+
+  it('kostet mehr, wenn daneben eine Betriebsrente laeuft', () => {
+    const allein = einmal([vertrag(kapitalvertrag)]);
+    const daneben = einmal([
+      vertrag(kapitalvertrag),
+      vertrag({ id: 'bav2', schicht: 2, typ: 'bav', brutto: 600, strategie: 'rente' }),
+    ]);
+    expect(daneben.kvPvGesamt).toBeGreaterThan(allein.kvPvGesamt);
+    expect(daneben.nettoKapital).toBeLessThan(allein.nettoKapital);
+  });
+
+  it('die laufende Rente wird dabei NICHT ein zweites Mal belastet', () => {
+    // Es geht nur um den Anteil der Kapitalleistung. Der Aufschlag darf
+    // hoechstens so gross sein wie der Freibetrag, den sie einbuesst.
+    const allein = einmal([vertrag(kapitalvertrag)]);
+    const daneben = einmal([
+      vertrag(kapitalvertrag),
+      vertrag({ id: 'bav2', schicht: 2, typ: 'bav', brutto: 600, strategie: 'rente' }),
+    ]);
+    const p2026 = parameterFuer(2026, { indexRate: 0 });
+    const hoechstens = bavFreibetragMonat(p2026) * 120 * 0.25;
+    expect(daneben.kvPvGesamt - allein.kvPvGesamt).toBeLessThan(hoechstens);
+  });
+
+  it('ohne laufende Betriebsrente bleibt es beim vollen Freibetrag', () => {
+    // Eine private Rente ist kein Versorgungsbezug und verbraucht ihn nicht.
+    const ohne = einmal([vertrag(kapitalvertrag)]);
+    const mitPrivater = einmal([
+      vertrag(kapitalvertrag),
+      vertrag({ id: 'prv', schicht: 3, typ: 'prvRente', brutto: 600, strategie: 'rente' }),
+    ]);
+    expect(mitPrivater.kvPvGesamt).toBeCloseTo(ohne.kvPvGesamt, 6);
   });
 });
 

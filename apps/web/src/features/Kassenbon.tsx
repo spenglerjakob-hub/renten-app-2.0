@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { versorgungsluecke, type ProjektionsErgebnis, type Jahreszeile } from '@renten/engine';
+import { versorgungsluecke, type ProjektionsErgebnis, type Jahreszeile, type Szenario } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
+import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
 
 /** Farbgebung der drei Schichten, wie im urspruenglichen Entwurf. */
 const SCHICHT = {
@@ -69,10 +70,11 @@ function SchichtBlock({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, kaufkraftHeute,
+  ergebnis, zeile, szenario, kaufkraftHeute,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
+  szenario: Szenario;
   kaufkraftHeute: boolean;
 }) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
@@ -99,6 +101,10 @@ export function Kassenbon({
   }));
 
   const luecke = versorgungsluecke(zeile);
+  // Mehrere Betriebsrenten bei einer Person: Der Freibetrag gilt fuer ihre
+  // Summe. Ohne diesen Hinweis wirken die Abzuege wie ein Rechenfehler, weil
+  // jeder Vertrag fuer sich unter der Grenze liegt.
+  const geteilt = geteilterFreibetrag(szenario, zeile.jahr);
   const skala = Math.max(zeile.zielNettoMonat, zeile.nettoMonat, 1);
   const anteil = (n: number) => `${Math.max(0, (n / 12 / skala) * 100)}%`;
 
@@ -156,6 +162,17 @@ export function Kassenbon({
           posten.length === 0 ? null : (
             <SchichtBlock key={schicht} schicht={schicht} netto={netto} kinder={posten} w={w} />
           ),
+        )}
+
+        {geteilt && (
+          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+            <strong>Mehrere Betriebsrenten zählen zusammen.</strong> Der Freibetrag von{' '}
+            <strong>{freibetragText(geteilt.betragMonat)}</strong> im Monat steht{' '}
+            {geteilt.personen.length > 1 ? 'jeder Person' : geteilt.personen[0]} nur{' '}
+            <strong>einmal</strong> zu und gilt für die Summe aller Bezüge (§ 226 Abs. 2 SGB V).
+            Deshalb fallen Beiträge an, obwohl jeder Vertrag für sich darunter liegt. In der
+            Pflegeversicherung ist es sogar eine Freigrenze: oberhalb trägt die volle Summe.
+          </p>
         )}
 
         <div className="flex items-baseline justify-between rounded-lg bg-slate-900 px-4 py-3 text-white">

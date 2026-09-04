@@ -88,6 +88,104 @@ describe('KV/PV im Alter: welche Einkunft was ausloest', () => {
   });
 });
 
+describe('Betriebsrenten zaehlen ZUSAMMEN', () => {
+  /*
+    DER GEMELDETE FEHLER: Der Freibetrag des § 226 Abs. 2 SGB V ging von
+    JEDEM Versorgungsbezug einzeln ab. Wer vier Betriebsrenten knapp unter
+    der Grenze hatte, zahlte im Rechner gar nichts — die Kasse rechnet
+    dagegen auf die Summe ab. Bei 197,75 EUR Freibetrag (2026) und vier
+    Vertraegen a 180 EUR waren das rund 118 EUR im Monat, die im Gutachten
+    fehlten.
+  */
+  const person = (id: string, betrag: number): Beitragspflichtig =>
+    ({ id, art: 'versorgungsbezug', monatsbetrag: betrag, person: 'A' });
+
+  it('vier Vertraege kosten dasselbe wie ein Vertrag ueber ihre Summe', () => {
+    const vier = kvPvImAlter('kvdr',
+      [person('b1', 180), person('b2', 180), person('b3', 180), person('b4', 180)],
+      kinderlos, p);
+    const einer = kvPvImAlter('kvdr', [person('b1', 720)], kinderlos, p);
+    expect(vier.gesamt).toBeCloseTo(einer.gesamt, 6);
+  });
+
+  it('und sie kosten wirklich etwas — vorher waren es null', () => {
+    const fb = bavFreibetragMonat(p);
+    const r = kvPvImAlter('kvdr',
+      [person('b1', 180), person('b2', 180), person('b3', 180), person('b4', 180)],
+      kinderlos, p);
+    // Jeder einzelne Vertrag liegt unter dem Freibetrag.
+    expect(180).toBeLessThan(fb);
+    expect(r.kv).toBeCloseTo((720 - fb) * kvSatzVoll(p), 6);
+    // PV: Freigrenze, oberhalb traegt die VOLLE Summe.
+    expect(r.pv).toBeCloseTo(720 * pvSatzMitglied(kinderlos, p), 6);
+  });
+
+  it('unter der Freigrenze bleibt auch die Summe beitragsfrei', () => {
+    const fb = bavFreibetragMonat(p);
+    const r = kvPvImAlter('kvdr',
+      [person('b1', fb / 3), person('b2', fb / 3)], kinderlos, p);
+    expect(r.gesamt).toBe(0);
+  });
+
+  it('der Freibetrag steht JEDER Person einmal zu', () => {
+    const fb = bavFreibetragMonat(p);
+    const zwei = kvPvImAlter('kvdr', [
+      { id: 'b1', art: 'versorgungsbezug', monatsbetrag: 500, person: 'A' },
+      { id: 'b2', art: 'versorgungsbezug', monatsbetrag: 500, person: 'B' },
+    ], kinderlos, p);
+    const eine = kvPvImAlter('kvdr', [person('b1', 500), person('b2', 500)], kinderlos, p);
+
+    // Zwei Mitglieder: zweimal Freibetrag. Ein Mitglied: einmal.
+    expect(zwei.kv).toBeCloseTo((1000 - 2 * fb) * kvSatzVoll(p), 6);
+    expect(eine.kv).toBeCloseTo((1000 - fb) * kvSatzVoll(p), 6);
+    expect(zwei.kv).toBeLessThan(eine.kv);
+    // Die PV kennt keinen Freibetrag — dort aendert die Aufteilung nichts.
+    expect(zwei.pv).toBeCloseTo(eine.pv, 6);
+  });
+
+  it('ohne Personenangabe gehoert alles EINEM Mitglied', () => {
+    // Der Einpersonenfall ist die richtige Vorgabe: Wer nichts angibt, darf
+    // nicht versehentlich mehrere Freibetraege bekommen.
+    const ohne = kvPvImAlter('kvdr',
+      [versorgung(400, 'b1'), versorgung(400, 'b2')], kinderlos, p);
+    const mit = kvPvImAlter('kvdr', [person('b1', 400), person('b2', 400)], kinderlos, p);
+    expect(ohne.gesamt).toBeCloseTo(mit.gesamt, 6);
+  });
+
+  it('die anteilige Verteilung geht in der Summe auf', () => {
+    const r = kvPvImAlter('kvdr',
+      [rente(1500), person('b1', 300), person('b2', 700)], kinderlos, p);
+    const summe = r.jeQuelle.reduce((x, q) => x + q.kv + q.pv, 0);
+    expect(summe).toBeCloseTo(r.gesamt, 6);
+    // Der groessere Bezug traegt mehr — die Verteilung folgt dem Betrag.
+    const b1 = r.jeQuelle.find((q) => q.id === 'b1')!;
+    const b2 = r.jeQuelle.find((q) => q.id === 'b2')!;
+    expect(b2.kv + b2.pv).toBeCloseTo((b1.kv + b1.pv) * (700 / 300), 6);
+  });
+});
+
+describe('Beitragsbemessungsgrenze je Person', () => {
+  it('eine Person allein zahlt hoechstens auf EINE Grenze', () => {
+    // Vorher war es EIN Topf aus zwei Grenzen, aus dem einer allein
+    // schoepfen konnte — ein Ehepartner mit hoher Rente zahlte auf bis zu
+    // zwei Bemessungsgrenzen.
+    const bbgMonat = p.bbgKvJahr / 12;
+    const r = kvPvImAlter('kvdr', [
+      { id: 'rA', art: 'gesetzlicheRente', monatsbetrag: bbgMonat * 2, person: 'A' },
+    ], kinderlos, p);
+    expect(r.kv).toBeCloseTo(bbgMonat * (kvSatzVoll(p) / 2), 6);
+  });
+
+  it('zwei Personen bekommen jede ihre eigene Grenze', () => {
+    const bbgMonat = p.bbgKvJahr / 12;
+    const r = kvPvImAlter('kvdr', [
+      { id: 'rA', art: 'gesetzlicheRente', monatsbetrag: bbgMonat, person: 'A' },
+      { id: 'rB', art: 'gesetzlicheRente', monatsbetrag: bbgMonat, person: 'B' },
+    ], kinderlos, p);
+    expect(r.kv).toBeCloseTo(bbgMonat * 2 * (kvSatzVoll(p) / 2), 6);
+  });
+});
+
 describe('KV/PV im Alter: die Zuordnung auf die Quellen', () => {
   it('die Einzelbetraege ergeben in der Summe den Gesamtbetrag', () => {
     const r = kvPvImAlter(

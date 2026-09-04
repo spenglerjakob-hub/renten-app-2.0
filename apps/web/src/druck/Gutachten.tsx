@@ -228,6 +228,7 @@ export function Gutachten({
         <Renteneinkuenfte
           ergebnis={ergebnis}
           zeile={zeile}
+          szenario={szenario}
           zielNettoHeute={h.zielNettoHeute}
           inflation={szenario.annahmen.inflation}
         />

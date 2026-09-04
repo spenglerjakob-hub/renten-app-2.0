@@ -517,6 +517,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         id: `person-${k.person.id}`,
         art: k.istVersorgungsbezug ? 'versorgungsbezug' : 'gesetzlicheRente',
         monatsbetrag: brutto / 12,
+        person: k.person.id,
       });
 
       // Die Person hat ihren Pauschbetrag fuer DIESE Einkunftsart oben schon
@@ -608,7 +609,9 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       }
       if (r.kvArt) {
         const monatsbetrag = r.kvMonatsbetrag ?? r.brutto / 12;
-        beitragspflichtig.push({ id: v.id, art: r.kvArt, monatsbetrag });
+        // Der Inhaber MUSS mit: Beitragsgrenze und Freibetrag gehoeren dem
+        // Mitglied. Ohne ihn bekaeme jeder Vertrag seinen eigenen Freibetrag.
+        beitragspflichtig.push({ id: v.id, art: r.kvArt, monatsbetrag, person: v.inhaber });
       }
     }
 
@@ -618,7 +621,6 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
       // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
       pkvPraemieMonat: pkvHeuer.praemieMonat,
-      personen: personen.filter((k) => jahr >= k.rentenbeginnJahr).length || 1,
     });
     const kvPvJahr = kv.gesamt * 12;
 
@@ -979,7 +981,7 @@ function kapitalNachSteuer(
       p,
     );
     // Altzusagen nach § 40b EStG a. F. sind steuerfrei, aber beitragspflichtig.
-    const kvPv = kvPvAufKapitalleistung(brutto, s, jahr, p);
+    const kvPv = kvPvAufKapitalleistung(brutto, s, k, jahr, p);
     return {
       bruttoKapital: brutto, steuer, kvPv,
       nettoKapital: Math.max(0, brutto - steuer - kvPv),
@@ -1013,7 +1015,7 @@ function kapitalNachSteuer(
       sie kein Versorgungsbezug ist.
     */
     const kvPv = s.haushalt.kvStatus === 'freiwillig'
-      ? kvPvAufKapitalleistung(brutto, s, jahr, p, 'sonstiges')
+      ? kvPvAufKapitalleistung(brutto, s, k, jahr, p, 'sonstiges')
       : 0;
     return {
       bruttoKapital: brutto, steuer, kvPv,
@@ -1039,29 +1041,69 @@ function kapitalNachSteuer(
  * einen Posten ohne Brutto mit negativem Netto und minderte das Haushaltsnetto
  * ein zweites Mal.
  *
- * VEREINFACHUNG: Der Freibetrag wird der Kapitalleistung in voller Hoehe
- * zugerechnet. Laufen daneben weitere Versorgungsbezuege, teilen sie ihn sich
- * in Wirklichkeit — derselbe offene Punkt wie in der Jahresrechnung.
+ * Der Freibetrag wird NICHT allein der Kapitalleistung zugerechnet: In den
+ * 120 Bemessungsmonaten steht sie neben den laufenden Versorgungsbezuegen
+ * derselben Person, und § 226 SGB V kennt den Freibetrag nur einmal je
+ * Mitglied. Deshalb wird die ganze Beitragsrechnung dieses Mitglieds
+ * aufgestellt und daraus der Anteil abgelesen, den die Kapitalleistung
+ * ausloest. Wer schon Betriebsrenten bezieht, hat den Freibetrag verbraucht.
  */
 function kvPvAufKapitalleistung(
   kapital: number,
   s: Szenario,
+  k: PersonKontext,
   jahr: number,
   p: ReturnType<typeof parameterFuer>,
   art: 'versorgungsbezug' | 'sonstiges' = 'versorgungsbezug',
 ): number {
   const { monatswert, monate } = bavKapitalMonatswert(kapital);
   if (monatswert <= 0) return 0;
-  const kv = kvPvImAlter(
+  const r = kvPvImAlter(
     s.haushalt.kvStatus,
-    [{ id: 'kapitalleistung', art, monatsbetrag: monatswert }],
+    [
+      ...laufendeEinkuenfte(s, k, jahr),
+      { id: 'kapitalleistung', art, monatsbetrag: monatswert, person: k.person.id },
+    ],
     kinderImJahr(s.haushalt, jahr),
     p,
     // Ohne Praemie: Bei privat Versicherten loest eine Kapitalleistung keine
     // Beitraege aus, `kvPvImAlter` liefert dann von selbst null.
     { pkvPraemieMonat: 0 },
   );
-  return kv.gesamt * monate;
+  // NUR der Anteil der Kapitalleistung. Die laufenden Bezuege stehen hier nur,
+  // damit Freibetrag und Beitragsgrenze richtig aufgeteilt werden — ihre
+  // eigenen Beitraege bucht die Jahresrechnung.
+  const eigen = r.jeQuelle.find((x) => x.id === 'kapitalleistung');
+  return eigen ? (eigen.kv + eigen.pv) * monate : 0;
+}
+
+/**
+ * Die LAUFENDEN beitragspflichtigen Einkuenfte einer Person in einem Jahr.
+ *
+ * Gebraucht, um eine Kapitalleistung in die Rechnung ihres Mitglieds
+ * einzuordnen: Beitragsgrenze und Freibetrag hat sie nicht fuer sich allein.
+ * Bewusst schlank gehalten — hier zaehlt, was Grenze und Freibetrag
+ * verbraucht, nicht die vollstaendige Jahresrechnung.
+ */
+function laufendeEinkuenfte(s: Szenario, k: PersonKontext, jahr: number): Beitragspflichtig[] {
+  if (jahr < k.rentenbeginnJahr) return [];
+  const liste: Beitragspflichtig[] = [{
+    id: `person-${k.person.id}`,
+    art: k.istVersorgungsbezug ? 'versorgungsbezug' : 'gesetzlicheRente',
+    monatsbetrag: bezugImJahr(k, jahr, s.annahmen.rentendynamik) / 12,
+    person: k.person.id,
+  }];
+
+  for (const v of s.vertraege) {
+    if (v.inhaber !== k.person.id) continue;
+    if (v.strategie === 'ignorieren') continue;
+    // Nur laufende Betriebsrenten: Was selbst als Kapital ausgezahlt wird,
+    // ist in diesem Jahr keine wiederkehrende Leistung.
+    const laufendeBav = (v.typ === 'bav' && !istKapitalauszahlung(v)) || v.typ === 'bavUkasse';
+    if (!laufendeBav || v.brutto <= 0) continue;
+    liste.push({ id: v.id, art: 'versorgungsbezug', monatsbetrag: v.brutto, person: v.inhaber });
+  }
+  return liste;
 }
 
 /**
