@@ -621,6 +621,10 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
       // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
       pkvPraemieMonat: pkvHeuer.praemieMonat,
+      // Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
+      // Restanteil weiter. Er fliesst ab, erhoeht aber den Zuschuss nach
+      // § 106 SGB VI nicht — deshalb getrennt und nicht in der Praemie.
+      pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat,
     });
     const kvPvJahr = kv.gesamt * 12;
 

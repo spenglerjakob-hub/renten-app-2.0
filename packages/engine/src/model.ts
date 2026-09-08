@@ -146,6 +146,11 @@ export interface Haushalt {
    */
   zusatzbeitrag?: number;
   /**
+   * Name der gewaehlten Krankenkasse — reine Beschriftung fuer den Ausdruck.
+   * Der Rechenkern benutzt sie nirgends; gerechnet wird mit `zusatzbeitrag`.
+   */
+  krankenkasse?: string;
+  /**
    * Krankenversicherung in der ERWERBSPHASE.
    *
    * Getrennt gefuehrt, weil beides auseinanderfallen kann: Wer als

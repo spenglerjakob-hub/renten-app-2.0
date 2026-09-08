@@ -416,3 +416,76 @@ describe('Kapitalauszahlung: Umschreibung der alten Vertragsarten', () => {
     expect(zweimal.vertraege[0]!.typ).toBe('bav');
   });
 });
+
+describe('PKV: Gesamtbeitrag statt Praemie ohne Entlastungstarif', () => {
+  /*
+    Bis 2026 stand in `pkv.praemieMonat` die Praemie OHNE den
+    Beitragsentlastungstarif; der stand daneben und wurde aufaddiert. In der
+    Maske hiessen beide Felder „Beitrag monatlich" — wer seine Rechnung
+    abtippte, zaehlte den Tarif doppelt. Heute steht oben der Gesamtbeitrag.
+
+    Gespeicherte Dateien muessen mitwandern: Der Tarifbeitrag wird beim Lesen
+    aufaddiert, damit dieselbe Datei denselben Abfluss ergibt wie zuvor.
+  */
+  const mitPkv = (pkv: Record<string, unknown>) =>
+    szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kvStatus: 'pkv', pkv },
+    }).haushalt.pkv;
+
+  const altformat = {
+    praemieMonat: 400,
+    bet: { aktiv: true, beitragMonat: 100, entlastungMonat: 250, abAlter: 67 },
+  };
+
+  it('addiert den Tarifbeitrag auf die Praemie', () => {
+    const pkv = mitPkv(altformat);
+    expect(pkv.praemieMonat).toBe(500);
+    expect(pkv.bet.beitragMonat).toBe(100);
+    expect(pkv.praemieEnthaeltBet).toBe(true);
+  });
+
+  it('addiert ihn NICHT ein zweites Mal — Export und Import sind stabil', () => {
+    // `exportiere` gibt das geparste Objekt aus; eine Datei durchlaeuft das
+    // Schema also beliebig oft. Ohne die Marke `praemieEnthaeltBet` waechse
+    // die Praemie bei jedem Speichern und Laden um den Tarifbeitrag.
+    const einmal = mitPkv(altformat);
+    const zweimal = mitPkv(JSON.parse(JSON.stringify(einmal)));
+    const dreimal = mitPkv(JSON.parse(JSON.stringify(zweimal)));
+    expect(zweimal.praemieMonat).toBe(500);
+    expect(dreimal.praemieMonat).toBe(500);
+    expect(dreimal).toEqual(einmal);
+  });
+
+  it('laesst eine Datei ohne Entlastungstarif unberuehrt', () => {
+    expect(mitPkv({ praemieMonat: 400 }).praemieMonat).toBe(400);
+  });
+
+  it('setzt den Restbeitrag im Ruhestand auf ein Viertel, wenn nichts dasteht', () => {
+    // Vorher rechnete der Kern mit null. Die Vorgabe folgt dem AXA-Tarif;
+    // gespeicherte Dateien werden im Ruhestand dadurch etwas teurer.
+    expect(mitPkv(altformat).bet.beitragImRuhestand).toBe(0.25);
+  });
+
+  it('laesst einen eingetragenen Restbeitrag stehen', () => {
+    const pkv = mitPkv({
+      ...altformat,
+      bet: { ...altformat.bet, beitragImRuhestand: 0 },
+    });
+    expect(pkv.bet.beitragImRuhestand).toBe(0);
+  });
+
+  it('bringt die Praemie ganz alter Dateien nicht zum Verschwinden', () => {
+    /*
+      Vor dem `pkv`-Block stand die Praemie unmittelbar im Haushalt. Der
+      Block ist dann leer, und die Ersatzregel traegt den alten Wert nach.
+      Wuerde die Umschreibung den leeren Block durch den Tarifbeitrag von
+      null auf einen Wert heben, liefe diese Regel ins Leere.
+    */
+    const h = szenarioSchema.parse({
+      ...vollstaendig,
+      haushalt: { ...vollstaendig.haushalt, kvStatus: 'pkv', pkvPraemieMonat: 620 },
+    }).haushalt;
+    expect(h.pkv.praemieMonat).toBe(620);
+  });
+});

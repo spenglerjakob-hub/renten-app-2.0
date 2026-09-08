@@ -93,9 +93,14 @@ export function pkvRechnen(
     heute,
     beiRente,
     mitAchtzig,
-    beiRenteHeutigesGeld: heutigesGeld(beiRente.praemieMonat, rentenjahr),
+    /*
+      `gesamtMonat`, nicht `praemieMonat`: Der Beitrag zum Entlastungstarif
+      endet mit Rentenbeginn nicht, er sinkt nur auf einen Restanteil. Wer
+      hier die blosse Praemie zeigt, nennt weniger, als abfliesst.
+    */
+    beiRenteHeutigesGeld: heutigesGeld(beiRente.gesamtMonat, rentenjahr),
     mitAchtzigHeutigesGeld: mitAchtzig
-      ? heutigesGeld(mitAchtzig.praemieMonat, geburtsjahr + 80)
+      ? heutigesGeld(mitAchtzig.gesamtMonat, geburtsjahr + 80)
       : 0,
     zuschussHeute,
     verlauf: pkvVerlauf(h.pkv, geburtsjahr, jetzt, geburtsjahr + LEBENSERWARTUNG),
@@ -104,7 +109,7 @@ export function pkvRechnen(
       der Anteil ist damit ohne Umrechnung vergleichbar.
     */
     anteilAmZiel: zielNettoMonatImRentenjahr > 0
-      ? beiRente.praemieMonat / zielNettoMonatImRentenjahr
+      ? beiRente.gesamtMonat / zielNettoMonatImRentenjahr
       : 0,
     bet: h.pkv.bet.aktiv && h.pkv.bet.entlastungMonat > 0
       ? betVergleich(h.pkv.bet, alterHeute, LEBENSERWARTUNG)

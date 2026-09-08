@@ -67,16 +67,47 @@ export interface BetAnnahmen {
    * Vertrag die Strategie "ignorieren" hat, statt geloescht zu werden.
    */
   aktiv: boolean;
-  /** Was der Entlastungstarif heute im Monat kostet */
+  /**
+   * Was der Entlastungstarif heute im Monat kostet.
+   *
+   * Er steckt bereits in `praemieMonat` — dort steht der Gesamtbeitrag, so
+   * wie ihn der Versicherer in Rechnung stellt. Diese Zahl sagt nur, welcher
+   * Teil davon auf den Entlastungstarif entfaellt.
+   */
   beitragMonat: number;
   /** Um wie viel er die Praemie ab `abAlter` senkt */
   entlastungMonat: number;
   /** Ab welchem Alter die Entlastung greift — meist 65 oder 67 */
   abAlter: number;
+  /**
+   * Welcher ANTEIL des Beitrags ab `abAlter` weiterlaeuft.
+   *
+   * Bei der AXA sinkt der Beitrag zum Entlastungstarif im Ruhestand auf ein
+   * Viertel, statt ganz zu entfallen — die Entlastung ist lebenslang, der
+   * Tarif traegt sich weiter mit. Andere Versicherer stellen ihn ab
+   * Rentenbeginn beitragsfrei; dort steht hier 0. Deshalb eine Eingabe und
+   * keine Konstante: Der Rechner soll nicht auf einen Anbieter festgelegt
+   * sein.
+   */
+  beitragImRuhestand: number;
 }
 
+/**
+ * Anteil des BET-Beitrags, der im Ruhestand weiterlaeuft, wenn nichts
+ * anderes eingetragen ist — ein Viertel, wie beim AXA-Tarif.
+ */
+export const BET_RESTBEITRAG_VORGABE = 0.25;
+
 export interface PkvAnnahmen {
-  /** Praemie heute im Monat, einschliesslich Pflegepflichtversicherung */
+  /**
+   * GESAMTBEITRAG heute im Monat: Krankheitskosten- und
+   * Pflegepflichtversicherung UND der Beitrag zum Entlastungstarif —
+   * genau der Betrag, der auf der Rechnung des Versicherers steht.
+   *
+   * Frueher stand hier die Praemie OHNE den Entlastungstarif, und beide
+   * Felder hiessen in der Maske „Beitrag monatlich". Wer seine Rechnung
+   * abtippte, zaehlte den Entlastungstarif doppelt.
+   */
   praemieMonat: number;
   /** Jaehrliche Steigerung bis 64 */
   steigerung: number;
@@ -92,15 +123,21 @@ export const PKV_VORGABE: PkvAnnahmen = {
   steigerung: 0.03,
   steigerungAb65: 0.015,
   zuschlagEnthalten: true,
-  bet: { aktiv: false, beitragMonat: 0, entlastungMonat: 0, abAlter: 67 },
+  bet: {
+    aktiv: false, beitragMonat: 0, entlastungMonat: 0, abAlter: 67,
+    beitragImRuhestand: BET_RESTBEITRAG_VORGABE,
+  },
 };
 
 /** Was die private Krankenversicherung in EINEM Jahr ausmacht, monatlich. */
 export interface PkvJahr {
   alter: number;
-  /** Krankenversicherungspraemie NACH Entlastung */
+  /** Krankenversicherungspraemie NACH Entlastung, OHNE Entlastungstarif */
   praemieMonat: number;
-  /** Beitrag zum Entlastungstarif, solange er laeuft */
+  /**
+   * Beitrag zum Entlastungstarif. Ab `abAlter` nur noch der Restanteil —
+   * bei der Vorgabe ein Viertel, nicht null.
+   */
   betBeitragMonat: number;
   /** Was der Entlastungstarif in diesem Jahr erspart */
   entlastungMonat: number;
@@ -127,7 +164,16 @@ export function pkvImJahr(a: PkvAnnahmen, alter: number, jahreAbHeute: number): 
   const jahreBis65 = Math.min(Math.max(0, DAEMPFUNG_AB_ALTER - alterHeute), Math.max(0, jahreAbHeute));
   const jahreAb65 = Math.max(0, jahreAbHeute) - jahreBis65;
 
-  let praemie = Math.max(0, a.praemieMonat)
+  /*
+    Der Entlastungstarif steckt im eingetragenen GESAMTBEITRAG und wird
+    vorweg herausgerechnet: Er folgt eigenen Regeln — sein Beitrag ist
+    nominal vereinbart, steigt also nicht mit, und ab `abAlter` sinkt er auf
+    einen Restanteil. Fortgeschrieben wird nur der Krankenversicherungsteil.
+  */
+  const betBeitragHeute = a.bet.aktiv ? Math.max(0, a.bet.beitragMonat) : 0;
+  const kvAnteilHeute = Math.max(0, Math.max(0, a.praemieMonat) - betBeitragHeute);
+
+  let praemie = kvAnteilHeute
     * Math.pow(1 + a.steigerung, jahreBis65)
     * Math.pow(1 + a.steigerungAb65, jahreAb65);
 
@@ -143,10 +189,18 @@ export function pkvImJahr(a: PkvAnnahmen, alter: number, jahreAbHeute: number): 
   }
 
   const bet = a.bet;
-  const entlastung = bet.aktiv && alter >= bet.abAlter
+  const imRuhestand = bet.aktiv && alter >= bet.abAlter;
+  const entlastung = imRuhestand
     ? Math.min(praemie, Math.max(0, bet.entlastungMonat))
     : 0;
-  const betBeitrag = bet.aktiv && alter < bet.abAlter ? Math.max(0, bet.beitragMonat) : 0;
+  /*
+    Ab `abAlter` faellt der Beitrag NICHT weg, sondern auf den vereinbarten
+    Restanteil — bei der AXA ein Viertel. Ihn dort auf null zu setzen, wie es
+    diese Rechnung frueher tat, zeigte die Belastung im Ruhestand zu niedrig.
+  */
+  const betBeitrag = !bet.aktiv ? 0
+    : imRuhestand ? betBeitragHeute * Math.max(0, bet.beitragImRuhestand)
+    : betBeitragHeute;
 
   const nachEntlastung = Math.max(0, praemie - entlastung);
   return {

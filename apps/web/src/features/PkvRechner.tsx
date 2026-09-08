@@ -72,22 +72,24 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
         <div className="grid gap-3 sm:grid-cols-3">
           <Kachel titel="Heute" wert={euro(r.heute.gesamtMonat)} hinweis={heuteHinweis} />
           <Kachel
+            /* Alles, was dann abfliesst — die Praemie UND der Restbeitrag
+               zum Entlastungstarif, der mit Rentenbeginn nicht endet. */
             titel={`Bei Rentenbeginn ${r.rentenjahr}`}
-            wert={euro(r.beiRente.praemieMonat)}
+            wert={euro(r.beiRente.gesamtMonat)}
             hinweis={`in heutigem Geld ${euro(r.beiRenteHeutigesGeld)}`}
             akzent
           />
           {r.mitAchtzig && (
             <Kachel
               titel="Mit 80"
-              wert={euro(r.mitAchtzig.praemieMonat)}
+              wert={euro(r.mitAchtzig.gesamtMonat)}
               hinweis={`in heutigem Geld ${euro(r.mitAchtzigHeutigesGeld)}`}
             />
           )}
         </div>
 
         <Verlaufskurve
-          punkte={r.verlauf.map((x) => ({ alter: x.alter, wert: x.praemieMonat }))}
+          punkte={r.verlauf.map((x) => ({ alter: x.alter, wert: x.gesamtMonat }))}
           schmal={schmal}
         />
 
@@ -139,7 +141,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
                 Ihr Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} Ihres
                 Zielnettos
               </strong>{' '}
-              — {euro(r.beiRente.praemieMonat)} von {euro(zeile.zielNettoMonat)}. Ein
+              — {euro(r.beiRente.gesamtMonat)} von {euro(zeile.zielNettoMonat)}. Ein
               Beitragsentlastungstarif senkt genau diesen Betrag: Sie zahlen heute mehr, um im
               Ruhestand dauerhaft weniger zu zahlen. Ob sich das rechnet, hängt an Beitrag,
               Entlastung und Ihrer Lebenserwartung — tragen Sie ihn oben ein, dann steht die

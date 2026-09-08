@@ -132,7 +132,21 @@ export function kvPvImAlter(
   einkuenfte: readonly Beitragspflichtig[],
   kinder: KinderStatus,
   p: LegalParameters,
-  opts: { pkvPraemieMonat?: number; pkvBasisanteil?: number } = {},
+  opts: {
+    pkvPraemieMonat?: number;
+    pkvBasisanteil?: number;
+    /**
+     * Weitere PKV-Beitraege, die NICHT zur Krankheitskostenversicherung
+     * gehoeren — heute der Beitrag zum Beitragsentlastungstarif, soweit er
+     * im Ruhestand weiterlaeuft.
+     *
+     * Getrennt gefuehrt, weil sie den Zuschuss nach § 106 SGB VI nicht
+     * erhoehen duerfen: Der bemisst sich am Krankenversicherungsbeitrag und
+     * ist auf dessen Haelfte gedeckelt. Sie werden deshalb ERST NACH der
+     * Deckelung aufgeschlagen — abfliessen tun sie trotzdem.
+     */
+    pkvWeitereBeitraegeMonat?: number;
+  } = {},
 ): KvPvErgebnis {
   const bbgMonat = p.bbgKvJahr / 12;
   const kvVoll = kvSatzVoll(p);
@@ -186,14 +200,20 @@ export function kvPvImAlter(
       return summe + Math.min(rentenSumme, bbgMonat);
     }, 0);
     const zuschuss = Math.min(bemessung * (kvVoll / 2), praemie / 2);
-    kv = Math.max(0, praemie - zuschuss);
+    // Der Entlastungstarif kommt NACH der Deckelung dazu: Er ist Aufwand,
+    // aber keine Bemessungsgrundlage fuer den Zuschuss.
+    const weitere = Math.max(0, opts.pkvWeitereBeitraegeMonat ?? 0);
+    kv = Math.max(0, praemie - zuschuss) + weitere;
     pv = 0; // in der Praemie enthalten
     const basisanteil = opts.pkvBasisanteil ?? PKV_BASISANTEIL;
     // Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
     // gesetzlichen Rente zugeordnet, aus der der Zuschuss stammt.
     const traeger = sortiert.find((e) => e.art === 'gesetzlicheRente')?.id;
     return {
-      kv, pv, gesamt: kv, abzugsfaehig: praemie * basisanteil,
+      kv, pv, gesamt: kv,
+      // Der Entlastungstarif ist ebenfalls Vorsorgeaufwand — mit demselben
+      // Basisanteil, mit dem ihn schon der PKV-Rechner ansetzt.
+      abzugsfaehig: (praemie + weitere) * basisanteil,
       jeQuelle: traeger ? [{ id: traeger, kv, pv: 0 }] : [],
     };
   }

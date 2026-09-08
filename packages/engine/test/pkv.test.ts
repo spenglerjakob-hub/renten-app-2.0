@@ -10,7 +10,9 @@ import type { Szenario } from '../src/model.js';
 
 const p = parameterFuer(2026, { indexRate: 0 });
 
-const ohneBet: BetAnnahmen = { aktiv: false, beitragMonat: 0, entlastungMonat: 0, abAlter: 67 };
+const ohneBet: BetAnnahmen = {
+  aktiv: false, beitragMonat: 0, entlastungMonat: 0, abAlter: 67, beitragImRuhestand: 0.25,
+};
 const basis: PkvAnnahmen = {
   praemieMonat: 400,
   steigerung: 0.03,
@@ -114,19 +116,50 @@ describe('Arbeitgeberzuschuss (§ 257 SGB V, § 61 SGB XI)', () => {
 });
 
 describe('Beitragsentlastungstarif', () => {
-  const bet: BetAnnahmen = { aktiv: true, beitragMonat: 100, entlastungMonat: 250, abAlter: 67 };
+  const bet: BetAnnahmen = {
+    aktiv: true, beitragMonat: 100, entlastungMonat: 250, abAlter: 67, beitragImRuhestand: 0.25,
+  };
+  // 400 EUR GESAMTBEITRAG, davon 100 EUR Entlastungstarif — bleiben 300 EUR
+  // Krankenversicherung. So steht es auf der Rechnung des Versicherers.
   const mitBet: PkvAnnahmen = { ...basis, bet, zuschlagEnthalten: false, steigerung: 0, steigerungAb65: 0 };
 
-  it('kostet vor dem Stichalter und entlastet danach', () => {
+  it('rechnet den Entlastungstarif aus dem Gesamtbeitrag heraus', () => {
+    /*
+      Frueher stand oben die Praemie OHNE den Entlastungstarif, und beide
+      Felder hiessen in der Maske „Beitrag monatlich". Wer seine Rechnung
+      abtippte, zaehlte den Tarif doppelt: aus 400 EUR wurden 500.
+    */
     const vorher = pkvImJahr(mitBet, 50, 10);
+    expect(vorher.praemieMonat).toBeCloseTo(300, 6);
     expect(vorher.betBeitragMonat).toBe(100);
     expect(vorher.entlastungMonat).toBe(0);
-    expect(vorher.gesamtMonat).toBeCloseTo(400 + 100, 6);
+    expect(vorher.gesamtMonat).toBeCloseTo(400, 6);
+  });
 
+  it('laesst den Beitrag im Ruhestand mit einem Viertel weiterlaufen', () => {
+    // Bei der AXA endet der Beitrag mit Rentenbeginn nicht, er sinkt auf ein
+    // Viertel. Ihn dort auf null zu setzen, zeigte den Ruhestand zu guenstig.
     const nachher = pkvImJahr(mitBet, 70, 30);
-    expect(nachher.betBeitragMonat).toBe(0);
+    expect(nachher.betBeitragMonat).toBeCloseTo(25, 6);
     expect(nachher.entlastungMonat).toBe(250);
-    expect(nachher.praemieMonat).toBeCloseTo(150, 6);
+    expect(nachher.praemieMonat).toBeCloseTo(50, 6);
+    expect(nachher.gesamtMonat).toBeCloseTo(75, 6);
+  });
+
+  it('faellt bei 0 Prozent ganz weg — nicht jeder Tarif laeuft weiter', () => {
+    const beitragsfrei: PkvAnnahmen = { ...mitBet, bet: { ...bet, beitragImRuhestand: 0 } };
+    const nachher = pkvImJahr(beitragsfrei, 70, 30);
+    expect(nachher.betBeitragMonat).toBe(0);
+    expect(nachher.gesamtMonat).toBeCloseTo(50, 6);
+  });
+
+  it('schreibt nur den Krankenversicherungsteil fort, nicht den Tarifbeitrag', () => {
+    // Der Beitrag zum Entlastungstarif ist nominal vereinbart; er steigt
+    // nicht mit. Wuerde er mitwachsen, waere die Rechnung zu teuer.
+    const mitSteigerung: PkvAnnahmen = { ...mitBet, steigerung: 0.03 };
+    const in10 = pkvImJahr(mitSteigerung, 50, 10);
+    expect(in10.betBeitragMonat).toBe(100);
+    expect(in10.praemieMonat).toBeCloseTo(300 * Math.pow(1.03, 10), 6);
   });
 
   it('senkt die Praemie nie unter null', () => {
@@ -233,6 +266,48 @@ describe('Zeitachse mit privater Krankenversicherung', () => {
 });
 
 /* --- Erwerbsphase und Ruhestand sind zwei Fragen --- */
+
+describe('Restbeitrag zum Entlastungstarif in der Zeitachse', () => {
+  const mitRest = (beitragImRuhestand: number): PkvAnnahmen => ({
+    ...basis,
+    bet: {
+      aktiv: true, beitragMonat: 100, entlastungMonat: 0, abAlter: 60,
+      beitragImRuhestand,
+    },
+  });
+  const kvImRuhestand = (a: PkvAnnahmen) => {
+    const e = projiziere(szenario('pkv', a));
+    return e.zeilen.find((z) => z.jahr === e.ruhestandsjahr)!.kvPvGesamt;
+  };
+
+  it('fliesst ab — er endet mit Rentenbeginn nicht', () => {
+    // Vorher fiel der Beitrag ab dem Stichalter auf null. Der Restbeitrag
+    // waere sonst aus der Rechnung verschwunden, obwohl er weiter abgeht.
+    expect(kvImRuhestand(mitRest(0.25))).toBeGreaterThan(kvImRuhestand(mitRest(0)));
+  });
+
+  it('trifft die Hoehe genau: ein Viertel von 100 EUR, zwoelfmal', () => {
+    expect(kvImRuhestand(mitRest(0.25)) - kvImRuhestand(mitRest(0)))
+      .toBeCloseTo(25 * 12, 6);
+  });
+
+  it('erhoeht den Zuschuss nach § 106 SGB VI NICHT', () => {
+    /*
+      Der Zuschuss bemisst sich am Krankenversicherungsbeitrag und ist auf
+      dessen Haelfte gedeckelt; ein Entlastungstarif gehoert nicht dazu.
+      Waere er in die Praemie gerechnet worden, stiege der Deckel mit — und
+      der Restbeitrag haette sich zur Haelfte selbst bezahlt.
+
+      Gemessen an einer Praemie, bei der der halbe Beitrag der bindende
+      Deckel ist: Dann schlaegt der Restbeitrag voll durch, nicht halb.
+      Praemie 400 = Gesamtbeitrag, davon 100 Tarif -> 300 EUR
+      Krankenversicherung, deren Haelfte den Zuschuss deckelt.
+    */
+    const knapp: PkvAnnahmen = { ...mitRest(0.25), praemieMonat: 400, zuschlagEnthalten: false };
+    const ohneRest: PkvAnnahmen = { ...knapp, bet: { ...knapp.bet, beitragImRuhestand: 0 } };
+    expect(kvImRuhestand(knapp) - kvImRuhestand(ohneRest)).toBeCloseTo(25 * 12, 6);
+  });
+});
 
 describe('Krankenversicherung je Lebensphase', () => {
   /*

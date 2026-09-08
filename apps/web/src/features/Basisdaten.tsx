@@ -13,6 +13,7 @@ import {
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
+import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -134,19 +135,61 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
             />
           )}
           {/*
+            Die Kasse waehlen, statt ihren Satz zu suchen: Die wenigsten
+            kennen ihn auswendig, und die Spanne ist gross — 2,18 % bis
+            4,39 %. Die Auswahl SCHREIBT den Satz ins Feld darunter; gerechnet
+            wird danach mit der Zahl, nicht mit der Kasse. Sonst aenderte sich
+            ein ausgedrucktes Gutachten rueckwirkend, sobald die Kasse erhoeht.
+          */}
+          {KRANKENKASSEN.length > 0 && (
+            <AuswahlFeld
+              label="Krankenkasse"
+              wert={s.haushalt.krankenkasse ?? ''}
+              onChange={(name) => {
+                const k = kasseNach(name);
+                setzeHaushalt(k
+                  ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
+                  : { krankenkasse: undefined });
+              }}
+              hilfe={`${KASSEN_STAND}. Findet sich Ihre Kasse nicht, tragen Sie den Satz unten von Hand ein.`}
+              optionen={[
+                { wert: '', text: 'Keine Angabe — Satz selbst eintragen' },
+                ...KRANKENKASSEN.map((k) => ({
+                  wert: k.name,
+                  text: `${k.name} — ${prozent(k.zusatzbeitrag, 2)}`,
+                })),
+              ]}
+            />
+          )}
+          {/*
             Der individuelle Zusatzbeitrag. Vorbelegt mit dem gesetzlichen
             Durchschnitt des Rechtsstands — wer seine Kasse kennt, traegt
             ihren Satz ein; ein Punkt Unterschied sind auf 60.000 EUR Brutto
             rund 300 EUR im Jahr.
+
+            ZWEI Nachkommastellen: Die Kassen weisen den Satz so aus (2,29 %),
+            und auf eine Stelle gerundet stuende hier ein Satz, den es nicht
+            gibt.
           */}
           <ProzentFeld
             label="Zusatzbeitrag Ihrer Krankenkasse"
             wert={s.haushalt.zusatzbeitrag ?? durchschnittlicherZusatzbeitrag(jetzt)}
-            onChange={(n) => setzeHaushalt({ zusatzbeitrag: n })}
+            /*
+              Von Hand geaendert heisst: Es ist nicht mehr der Satz der
+              gewaehlten Kasse. Der Name muss weg, sonst behauptet der
+              Ausdruck eine Kasse, deren Satz gar nicht mehr dasteht.
+            */
+            onChange={(n) => setzeHaushalt({
+              zusatzbeitrag: n,
+              krankenkasse: kasseNach(s.haushalt.krankenkasse ?? '')?.zusatzbeitrag === n
+                ? s.haushalt.krankenkasse
+                : undefined,
+            })}
             max={10}
+            stellen={2}
             hilfe={s.haushalt.zusatzbeitrag === undefined
-              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt))}. Ihre Kasse weicht davon ab.`
-              : `Zum Vergleich: Der Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt))}.`}
+              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}. Ihre Kasse weicht davon ab.`
+              : `Zum Vergleich: Der Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}.`}
           />
           {/*
             „Heute" ist hier woertlich zu nehmen: Die Abschlaege enden mit dem

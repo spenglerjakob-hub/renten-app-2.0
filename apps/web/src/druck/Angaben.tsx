@@ -75,7 +75,15 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         {/* Nur wenn er vom gesetzlichen Durchschnitt abweicht — sonst ist es
             keine Angabe des Nutzers, sondern der Rechtsstand. */}
         {h.zusatzbeitrag !== undefined && (
-          <Angabe feld="Zusatzbeitrag der Krankenkasse" wert={prozent(h.zusatzbeitrag)} />
+          <Angabe
+            feld="Zusatzbeitrag der Krankenkasse"
+            /* Die Kasse dazu, wenn sie gewaehlt wurde: Ein blosser Prozentwert
+               laesst offen, woher er stammt. Zwei Stellen, weil die Kassen ihn
+               so ausweisen. */
+            wert={h.krankenkasse
+              ? `${prozent(h.zusatzbeitrag, 2)} (${h.krankenkasse})`
+              : prozent(h.zusatzbeitrag, 2)}
+          />
         )}
         {(h.kvStatus === 'pkv' || h.kvErwerb === 'pkv') && (
           <>

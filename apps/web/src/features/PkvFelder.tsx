@@ -31,12 +31,20 @@ export function PkvFelder() {
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        {/*
+          EIN Betrag, so wie er auf der Rechnung steht — einschliesslich des
+          Entlastungstarifs. Frueher gehoerte der hier NICHT hinein und stand
+          unten noch einmal, beide Felder hiessen „Beitrag monatlich". Wer
+          seine Rechnung abtippte, zaehlte den Entlastungstarif doppelt.
+        */}
         <ZahlFeld
-          label="Beitrag monatlich"
+          label="Gesamtbeitrag monatlich"
           wert={pkv.praemieMonat}
           onChange={(n) => setze({ praemieMonat: n })}
           einheit="€"
-          hilfe="Kranken- und Pflegeversicherung zusammen, wie Sie ihn heute zahlen."
+          hilfe={pkv.bet.aktiv
+            ? 'Alles zusammen, wie auf Ihrer Rechnung — Kranken-, Pflege- und Entlastungstarif.'
+            : 'Kranken- und Pflegeversicherung zusammen, wie Sie ihn heute zahlen.'}
         />
         <ProzentFeld
           label="Steigerung p. a."
@@ -80,29 +88,52 @@ export function PkvFelder() {
           onChange={(b) => setzeBet({ aktiv: b })}
         />
         {pkv.bet.aktiv && (
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            <ZahlFeld
-              label="Beitrag monatlich"
-              wert={pkv.bet.beitragMonat}
-              onChange={(n) => setzeBet({ beitragMonat: n })}
-              einheit="€"
-            />
-            <ZahlFeld
-              label="Entlastung monatlich"
-              wert={pkv.bet.entlastungMonat}
-              onChange={(n) => setzeBet({ entlastungMonat: n })}
-              einheit="€"
-              hilfe="Fester Betrag, er wächst nicht mit."
-            />
-            <ZahlFeld
-              label="Ab Alter"
-              wert={pkv.bet.abAlter}
-              onChange={(n) => setzeBet({ abAlter: n })}
-              min={50}
-              max={90}
-              einheit="J."
-            />
-          </div>
+          <>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <ZahlFeld
+                label="Davon Entlastungstarif"
+                wert={pkv.bet.beitragMonat}
+                onChange={(n) => setzeBet({ beitragMonat: n })}
+                einheit="€"
+                hilfe="Welcher Teil des Gesamtbeitrags oben darauf entfällt."
+              />
+              <ZahlFeld
+                label="Entlastung monatlich"
+                wert={pkv.bet.entlastungMonat}
+                onChange={(n) => setzeBet({ entlastungMonat: n })}
+                einheit="€"
+                hilfe="Fester Betrag, er wächst nicht mit."
+              />
+              <ZahlFeld
+                label="Ab Alter"
+                wert={pkv.bet.abAlter}
+                onChange={(n) => setzeBet({ abAlter: n })}
+                min={50}
+                max={90}
+                einheit="J."
+              />
+              {/*
+                Der Beitrag endet dort meist NICHT. Bei der AXA sinkt er auf
+                ein Viertel und laeuft weiter — ihn auf null zu setzen, wie
+                es die Rechnung frueher tat, zeigte den Ruhestand zu guenstig.
+              */}
+              <ProzentFeld
+                label="Beitrag im Ruhestand"
+                wert={pkv.bet.beitragImRuhestand}
+                onChange={(n) => setzeBet({ beitragImRuhestand: n })}
+                max={100}
+                stellen={0}
+                hilfe="Anteil, der ab diesem Alter weiterläuft. 0 % für Tarife, die dann beitragsfrei sind."
+              />
+            </div>
+            {pkv.bet.beitragMonat > pkv.praemieMonat && (
+              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                Der Entlastungstarif ist größer als der Gesamtbeitrag oben. Tragen Sie oben den
+                <strong> vollen </strong> Beitrag ein — Kranken-, Pflege- und Entlastungstarif
+                zusammen.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

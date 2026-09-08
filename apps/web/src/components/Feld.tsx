@@ -85,11 +85,22 @@ export function ZahlFeld(props: {
 export function ProzentFeld(props: {
   label: string; wert: number; onChange: (n: number) => void;
   min?: number; max?: number; hilfe?: string;
+  /**
+   * Nachkommastellen der ANZEIGE.
+   *
+   * Eine reicht fuer Inflation und Rendite — dort ist die zweite Stelle
+   * Scheingenauigkeit. Der Zusatzbeitrag der Krankenkasse ist der Gegenfall:
+   * Die Kassen weisen ihn auf zwei Stellen aus (2,29 %, nicht 2,3 %), und
+   * gerundet stuende im Rechner ein Satz, den es so nicht gibt.
+   */
+  stellen?: number;
 }) {
+  const stellen = props.stellen ?? 1;
+  const faktor = Math.pow(10, stellen);
   return (
     <ZahlFeld
       label={props.label}
-      wert={Math.round(props.wert * 1000) / 10}
+      wert={Math.round(props.wert * 100 * faktor) / faktor}
       onChange={(n) => props.onChange(n / 100)}
       min={props.min ?? 0}
       max={props.max ?? 20}
