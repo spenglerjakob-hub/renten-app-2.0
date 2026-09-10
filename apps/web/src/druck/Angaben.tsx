@@ -184,10 +184,15 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         <Angabe feld="Gehaltsdynamik" wert={`${prozent(a.gehaltsdynamik)} pro Jahr`} />
         <Angabe feld="Steuertarif-Indexierung" wert={`${prozent(a.tarifIndex)} pro Jahr`} />
       </Zweispaltig>
+      {/*
+        Gekuerzt, weil die Seite bei einem Paar mit Kindern und Vertraegen auf
+        981 von 979 Punkten lief und an einer Zeilengrenze umbrach. Der
+        Wirkungssatz zur Inflation steht ausfuehrlich auf der Kaufkraftseite;
+        hier zaehlt, dass es Fortschreibungen sind und von wann sie stammen.
+      */}
       <Text>
-        Die Annahmen sind Fortschreibungen, keine Zusagen. Sie wirken über Jahrzehnte und
-        entscheiden das Ergebnis erheblich mit — eine um einen Prozentpunkt höhere Inflation
-        halbiert die Kaufkraft rund 25 Jahre früher. Erstellt am{' '}
+        Die Annahmen sind Fortschreibungen, keine Zusagen — sie wirken über Jahrzehnte und
+        entscheiden das Ergebnis erheblich mit. Erstellt am{' '}
         {new Date().toLocaleDateString('de-DE')}; die Rechtslage ist die von {jetzt}.
       </Text>
     </>

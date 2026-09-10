@@ -42,12 +42,22 @@ import { TuevBogen } from './TuevBogen';
  * nicht mehr versehentlich zerlegen.
  */
 export function Gutachten({
-  szenario, ergebnis, zeile,
+  szenario, ergebnis, zeile, umfang = 'ausfuehrlich',
 }: {
   szenario: SzenarioParsed;
   ergebnis: ProjektionsErgebnis | null;
   zeile: Jahreszeile;
+  /**
+   * Wie viel gedruckt wird.
+   *
+   * `kurz` ist die Fassung fuers Gespraech: Deckblatt, Angaben,
+   * Renteneinkuenfte — und der Vorbehalt. Den fuehrt auch die Kurzfassung
+   * mit: Ein Dokument mit dem Namen des Kunden darauf, das Zahlen bis in die
+   * 2070er zeigt, gibt man nicht ohne Rechtsstand aus der Hand.
+   */
+  umfang?: 'kurz' | 'ausfuehrlich';
 }) {
+  const lang = umfang === 'ausfuehrlich';
   const jetzt = new Date().getFullYear();
   const avd = useMemo(
     () => parameterFuer(Math.max(jetzt, 2027), { indexRate: szenario.annahmen.tarifIndex }).avd,
@@ -99,12 +109,14 @@ export function Gutachten({
   const abschnitte = [
     'Ihre Angaben und Verträge',
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
-    'Ihre Einkünfte im Ruhestand',
-    'Was Ihr Geld dann noch wert ist',
-    ...(pkv ? ['Ihre Krankenversicherung im Alter'] : []),
-    ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
-    ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
-    'Zum Mitnehmen',
+    ...(lang ? [
+      'Ihre Einkünfte im Ruhestand',
+      'Was Ihr Geld dann noch wert ist',
+      ...(pkv ? ['Ihre Krankenversicherung im Alter'] : []),
+      ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
+      ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
+      'Zum Mitnehmen',
+    ] : []),
     'Rechtsstand, Methodik und Vorbehalt',
   ];
 
@@ -234,10 +246,10 @@ export function Gutachten({
         />
       )}
 
-      <RuhestandVerlauf zeilen={fenster} />
-      <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />
+      {lang && <RuhestandVerlauf zeilen={fenster} />}
+      {lang && <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />}
 
-      {pkv && (
+      {lang && pkv && (
         <Krankenversicherung
           ergebnis={pkv}
           steigerung={szenario.haushalt.pkv.steigerung}
@@ -246,7 +258,7 @@ export function Gutachten({
         />
       )}
 
-      {sparziel && (
+      {lang && sparziel && (
         <>
           <Sparziel
             ergebnis={sparziel}
@@ -258,11 +270,11 @@ export function Gutachten({
         </>
       )}
 
-      {positionen.map((p) => (
+      {lang && positionen.map((p) => (
         <TuevBogen key={p.vertrag.id} position={p} szenario={szenario} />
       ))}
 
-      <Merkblatt />
+      {lang && <Merkblatt />}
 
       {/*
         Rechtsstand und Methodik stehen ans ENDE. Der vorhandene Abschnitt

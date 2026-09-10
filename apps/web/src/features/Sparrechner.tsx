@@ -237,14 +237,22 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
                   </table>
                 </div>
                 )}
-                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-                  <strong className="text-rose-700">
+                {/*
+                  DIE Aussage des ganzen Rechners — sie stand als graue
+                  11-px-Fussnote unter einer Tabelle. In Lesegroesse und mit
+                  eigenem Rahmen, wie die uebrigen Hinweiskaesten.
+                */}
+                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
+                  <p className="text-sm font-bold leading-snug text-rose-800">
                     Jedes Jahr Warten kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
-                  </strong>{' '}
-                  — und {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt, obwohl dann über
-                  weniger Jahre gezahlt wird. Die frühen Jahre sind die wertvollsten, weil ihre
-                  Erträge am längsten mitarbeiten.
-                </p>
+                    — und {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt.
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-rose-900">
+                    Und das, obwohl dann über <strong>weniger</strong> Jahre gezahlt wird. Die
+                    frühen Jahre sind die wertvollsten, weil ihre Erträge am längsten
+                    mitarbeiten.
+                  </p>
+                </div>
               </div>
             )}
 

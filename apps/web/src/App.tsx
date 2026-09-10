@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown, ChevronUp, Coins, Download, FolderOpen, List, Printer,
-  RotateCcw, Settings, TrendingUp, User, Users, Wallet,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
+  List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet,
 } from 'lucide-react';
-import { versorgungsluecke, type Jahreszeile } from '@renten/engine';
+import { versorgungsluecke, parseDatum, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from './store/szenario';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
@@ -116,10 +116,56 @@ export default function App() {
     e.target.value = '';
   };
 
+  /*
+    DAS JAHR DER UEBERSICHT.
+
+    Vorbelegt auf den Rentenbeginn des Partners, der ZUERST geht — bei Paaren
+    mit unterschiedlichem Rentenbeginn war genau die Phase unsichtbar, in der
+    einer noch arbeitet und einer schon Rente bezieht. `ruhestandsjahr` ist
+    das Jahr, in dem BEIDE im Ruhestand sind.
+  */
+  const ersterRuhestand = useMemo(() => {
+    const jahre = szenario.personen
+      .map((x) => parseDatum(x.rentenbeginn)?.jahr)
+      .filter((j): j is number => j !== undefined);
+    return jahre.length > 0 ? Math.min(...jahre) : null;
+  }, [szenario.personen]);
+
+  const [jahrWahl, setJahrWahl] = useState<number | null>(null);
+  /*
+    Die Wahl faellt zurueck, sobald sie ins Leere zeigt — nach einem Import
+    oder einer Datumsaenderung kann das gewaehlte Jahr ausserhalb der neuen
+    Zeitachse liegen.
+  */
+  const zeilenAbRuhestand = ergebnis?.zeilen.filter(
+    (z) => ersterRuhestand !== null && z.jahr >= ersterRuhestand,
+  ) ?? [];
+  const gezeigtesJahr = jahrWahl !== null && zeilenAbRuhestand.some((z) => z.jahr === jahrWahl)
+    ? jahrWahl
+    : ersterRuhestand;
+
   const echteZeile =
+    ergebnis?.zeilen.find((z) => z.jahr === gezeigtesJahr) ??
     ergebnis?.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr) ??
     ergebnis?.zeilen.find((z) => z.vollstaendigImRuhestand);
   const zeile = echteZeile ?? LEERE_ZEILE;
+
+  /*
+    DER DRUCKUMFANG. Gedruckt wird erst, wenn React die neue Seitenfolge
+    gezeichnet hat — `window.print()` unmittelbar im Klick druckte noch die
+    alte. Deshalb der Umweg ueber einen Effekt.
+  */
+  const [druckUmfang, setDruckUmfang] = useState<'kurz' | 'ausfuehrlich'>('ausfuehrlich');
+  const [druckAngefordert, setDruckAngefordert] = useState(false);
+  useEffect(() => {
+    if (!druckAngefordert) return;
+    setDruckAngefordert(false);
+    window.print();
+  }, [druckAngefordert, druckUmfang]);
+  const drucke = (umfang: 'kurz' | 'ausfuehrlich') => {
+    setDruckUmfang(umfang);
+    setDruckAngefordert(true);
+  };
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
@@ -259,12 +305,25 @@ export default function App() {
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
+                {/*
+                  Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
+                  Angaben, Renteneinkuenfte, Vorbehalt), die ausfuehrliche zum
+                  Mitgeben. Ein Dokument mit Namen darauf fuehrt den Vorbehalt
+                  in beiden Faellen mit.
+                */}
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => drucke('kurz')}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-500 px-3 py-1.5 text-[11px] font-bold text-rose-300 transition-colors hover:bg-rose-600 hover:text-white sm:flex-none sm:text-xs"
+                >
+                  <Printer className="h-3 w-3 shrink-0" aria-hidden /> Kurz
+                </button>
+                <button
+                  type="button"
+                  onClick={() => drucke('ausfuehrlich')}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-rose-500 sm:flex-none sm:text-xs"
                 >
-                  <Printer className="h-3 w-3 shrink-0" aria-hidden /> Drucken
+                  <Printer className="h-3 w-3 shrink-0" aria-hidden /> Ausführlich
                 </button>
                 <button
                   type="button"
@@ -287,7 +346,7 @@ export default function App() {
         auf Papier leere Eingabekaesten, fehlende Vertraege und
         abgeschnittene Tabellen. Alles darunter ist deshalb print:hidden.
       */}
-      <Gutachten szenario={szenario} ergebnis={ergebnis ?? null} zeile={zeile} />
+      <Gutachten szenario={szenario} ergebnis={ergebnis ?? null} zeile={zeile} umfang={druckUmfang} />
 
       {importMeldung && (
         <div
@@ -410,6 +469,68 @@ export default function App() {
                 stillschweigend weg.
               */}
               <PkvRechner zeile={zeile} />
+
+              {/*
+                DAS JAHR DER UEBERSICHT, verstellbar — aber nur bei Paaren.
+                Bei einer Person faellt der erste mit dem einzigen
+                Rentenbeginn zusammen; ein Regler haette dort nichts zu
+                zeigen ausser spaeteren Jahren derselben Rente.
+              */}
+              {verheiratet && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
+                <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Angezeigtes Jahr
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setJahrWahl(Math.max(ersterRuhestand, (gezeigtesJahr ?? ersterRuhestand) - 1))}
+                        aria-label="Ein Jahr zurück"
+                        className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                        disabled={(gezeigtesJahr ?? ersterRuhestand) <= ersterRuhestand}
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                      <span className="min-w-[3.5rem] text-center text-sm font-black tabular-nums text-slate-900">
+                        {zeile.jahr}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setJahrWahl(Math.min(
+                          zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr,
+                          (gezeigtesJahr ?? ersterRuhestand) + 1,
+                        ))}
+                        aria-label="Ein Jahr vor"
+                        className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                        disabled={(gezeigtesJahr ?? ersterRuhestand)
+                          >= zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={ersterRuhestand}
+                    max={zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+                    step={1}
+                    value={gezeigtesJahr ?? ersterRuhestand}
+                    onChange={(e) => setJahrWahl(Number(e.target.value))}
+                    aria-label="Jahr der Übersicht"
+                    className="mt-2 w-full accent-indigo-600"
+                  />
+                  {/*
+                    Ohne diesen Satz wirkt das hohe Netto einer gemischten
+                    Phase wie ein Rechenfehler: Da laeuft noch ein Gehalt.
+                  */}
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    {zeile.gemischtePhase
+                      ? 'Ein Partner arbeitet noch — im Netto steckt daher weiter ein Gehalt.'
+                      : 'Beide im Ruhestand.'}
+                  </p>
+                </div>
+              )}
 
               <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                 <button

@@ -23,7 +23,13 @@ export interface SparzielEingaben {
 
 export const SPARZIEL_VORGABE: SparzielEingaben = {
   rendite: 0.05,
-  dynamik: 0.03,
+  /*
+    OHNE Beitragsdynamik. Sie war mit 3 % vorbelegt und liess die noetige
+    Startrate kleiner aussehen, als sie ist — wer nicht jedes Jahr erhoeht,
+    verfehlt das Ziel. Die Dynamikstufen darunter zeigen weiterhin, was eine
+    Steigerung braechte; wer sie will, waehlt sie bewusst.
+  */
+  dynamik: 0,
   auszahldauer: 25,
 };
 
