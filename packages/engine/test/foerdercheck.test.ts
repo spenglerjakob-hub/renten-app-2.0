@@ -24,10 +24,15 @@ const angestellt: FoerderKontext = {
   basisBeitragJahr: 0,
   grvDeckung: 0.6,
   lueckeMonat: 0,
+  avdEigenbeitragJahr: 0,
+  kinder: [],
+  alter: 40,
+  jahr: 2026,
 };
 
 const bav = (k: FoerderKontext) => foerdercheck(k, steuerOpt, p).find((b) => b.id === 'bav') ?? null;
 const basis = (k: FoerderKontext) => foerdercheck(k, steuerOpt, p).find((b) => b.id === 'basis') ?? null;
+const avd = (k: FoerderKontext) => foerdercheck(k, steuerOpt, p).find((b) => b.id === 'avd') ?? null;
 
 describe('Fördercheck — betriebliche Altersvorsorge', () => {
   it('misst den Rahmen am BEITRAGSFREIEN Teil, nicht am steuerfreien', () => {
@@ -223,5 +228,54 @@ describe('Fördercheck — Basisrente', () => {
     expect(b.nettoAufwandMonat).toBeLessThan(b.probeMonat);
     expect(b.foerderquote).toBeGreaterThan(0);
     expect(b.foerderquote).toBeLessThan(1);
+  });
+});
+
+describe('Altersvorsorgedepot im Foerdercheck', () => {
+  /*
+    Der Check kannte nur Steuerrahmen. Beim Altersvorsorgedepot geht es um
+    GELD VOM STAAT — 50 Cent je Euro bis 360 EUR, 25 Cent bis 1 800 EUR und
+    300 EUR je Kind. Wer nichts einzahlt, bekommt nichts, und niemand traegt
+    es nach.
+  */
+  const p2027 = parameterFuer(2027, { indexRate: 0 });
+  const check = (k: Partial<FoerderKontext>) =>
+    foerdercheck({ ...angestellt, jahr: 2027, ...k }, steuerOpt, p2027)
+      .find((b) => b.id === 'avd') ?? null;
+
+  it('meldet die volle Zulage, wenn gar kein Depot erfasst ist', () => {
+    const b = check({ avdEigenbeitragJahr: 0 });
+    expect(b).not.toBeNull();
+    // 360 x 50 % + 1 440 x 25 % = 540 EUR Grundzulage beim Hoechstbetrag.
+    expect(b!.ersparnisJahr).toBeCloseTo(540, 6);
+    expect(b!.titel).toContain('bleiben ganz liegen');
+  });
+
+  it('rechnet 300 EUR je Kind mit Kindergeldanspruch dazu', () => {
+    const ohne = check({ avdEigenbeitragJahr: 0, kinder: [] })!;
+    const zwei = check({
+      avdEigenbeitragJahr: 0,
+      kinder: [{ geburtsjahr: 2020 }, { geburtsjahr: 2022 }],
+    })!;
+    expect(zwei.ersparnisJahr - ohne.ersparnisJahr).toBeCloseTo(600, 6);
+    expect(zwei.text).toContain('Kinderzulage');
+  });
+
+  it('schweigt, sobald der Hoechstbetrag ausgeschoepft ist', () => {
+    expect(check({ avdEigenbeitragJahr: p2027.avd.hoechstbetragEigenbeitrag })).toBeNull();
+  });
+
+  it('meldet nur noch die Luecke, wenn schon etwas eingezahlt wird', () => {
+    const b = check({ avdEigenbeitragJahr: 900 })!;
+    expect(b.ersparnisJahr).toBeGreaterThan(0);
+    expect(b.ersparnisJahr).toBeLessThan(540);
+    expect(b.titel).toContain('nicht ausgeschöpft');
+  });
+
+  it('verspricht vor dem Startjahr nichts, sondern nennt es', () => {
+    const b = foerdercheck({ ...angestellt, jahr: 2026, avdEigenbeitragJahr: 0 }, steuerOpt, p)
+      .find((x) => x.id === 'avd')!;
+    expect(b.titel).toContain('2027');
+    expect(b.text).toContain('Ab 2027');
   });
 });

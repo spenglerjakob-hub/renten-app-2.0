@@ -312,6 +312,20 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
     (v) => v.typ.startsWith('bav') || v.typ === 'basis',
   );
 
+  /*
+    Was heute schon in ein Altersvorsorgedepot fliesst — aus der SPARRATE des
+    Vertrags, nicht aus dem TUEV-Beitrag: Beim Depot ist die Sparrate die
+    Eingabe, und ein Depot ohne TUEV-Eintrag darf nicht als „zahlt nichts"
+    durchgehen. Mehrere Depots werden addiert; die Foerderung kennt nur die
+    Summe der Eigenbeitraege.
+  */
+  const avdEigenbeitragJahr = szenario.vertraege
+    .filter((v) => v.typ === 'avd' && v.strategie !== 'ignorieren')
+    .reduce((summe, v) => {
+      const t = szenario.tuev.find((x) => x.vertragId === v.id);
+      return summe + Math.max(v.sparrate ?? 0, t?.beitragMonat ?? 0) * 12;
+    }, 0);
+
   let bavEigenanteilJahr = 0;
   let bavArbeitgeberJahr = 0;
   let basisBeitragJahr = 0;
@@ -378,6 +392,16 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
         Rentenjahres, verglichen sich zwei verschiedene Massstaebe.
       */
       lueckeMonat: zeile ? versorgungsluecke(zeile) / zeile.kaufkraftfaktor : 0,
+      avdEigenbeitragJahr,
+      /*
+        Die Kinder aus den BASISDATEN. Wer sie oben eintraegt, soll die 300 EUR
+        je Kind im Foerdercheck wiederfinden, ohne sie ein zweites Mal zu
+        nennen — und mit den Jahrgaengen, damit die Zulage mit dem
+        Kindergeldanspruch auslaeuft statt ewig zu laufen.
+      */
+      kinder: szenario.haushalt.kinder,
+      alter: alterHeuteA(szenario),
+      jahr: new Date().getFullYear(),
     },
   };
 }

@@ -83,6 +83,13 @@ export const vertragSchema = z.object({
   altvertrag: z.boolean().default(false),
 
   beginnJahr: z.number().int().min(1900).max(2200).optional(),
+  /**
+   * Vertragsende, wenn es vor dem Rentenbeginn liegt. Ohne Angabe zahlt der
+   * Vertrag wie bisher zum Rentenbeginn aus.
+   */
+  ablaufJahr: z.number().int().min(1900).max(2200).optional(),
+  /** Verzinsung des ausgezahlten Kapitals bis zum Rentenbeginn */
+  wachstumBisRente: z.number().min(-0.2).max(0.2).optional(),
   monatsbeitrag: z.number().min(0).optional(),
   dynamik: z.number().min(-1).max(1).optional(),
   bewirtschaftungskostenProzent: z.number().min(0).max(100).optional(),
@@ -171,6 +178,11 @@ export const betSchema = z.object({
    * das ist die Korrektur, nicht ein Nebeneffekt.
    */
   beitragImRuhestand: z.number().min(0).max(1).default(0.25),
+  /**
+   * Seit wann der Tarif laeuft. Ohne Angabe rechnet der Kern, als begaenne er
+   * heute — gespeicherte Dateien bleiben damit unveraendert.
+   */
+  beginnJahr: z.number().int().min(1900).max(2200).optional(),
 });
 
 /**

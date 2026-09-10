@@ -112,7 +112,7 @@ export function pkvRechnen(
       ? beiRente.gesamtMonat / zielNettoMonatImRentenjahr
       : 0,
     bet: h.pkv.bet.aktiv && h.pkv.bet.entlastungMonat > 0
-      ? betVergleich(h.pkv.bet, alterHeute, LEBENSERWARTUNG)
+      ? betVergleich(h.pkv.bet, alterHeute, LEBENSERWARTUNG, jetzt)
       : null,
   };
 }

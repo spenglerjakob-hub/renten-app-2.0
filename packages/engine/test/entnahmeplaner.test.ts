@@ -310,6 +310,69 @@ describe('Kapitalleistung teilt sich den Freibetrag', () => {
   });
 });
 
+describe('Vertragsende vor dem Rentenbeginn', () => {
+  /*
+    Eine private Rentenversicherung mit Kapitalwahl zahlte IMMER zum
+    Rentenbeginn aus. Laeuft der Vertrag mit 60 ab und beginnt der Ruhestand
+    mit 67, fehlten sieben Jahre — und die Steuer stand im falschen Jahr.
+  */
+  const prv = (over: Partial<Vertrag>) => vertrag({
+    id: 'prv', schicht: 3, typ: 'prvRente', kapitalAlternative: 100_000,
+    strategie: 'kapital', beginnJahr: 2000, monatsbeitrag: 150, ...over,
+  });
+  const einmal = (v: Vertrag) =>
+    projiziere(szenario({ vertraege: [v] })).kapitalauszahlungen.find((x) => x.vertragId === 'prv')!;
+
+  it('ohne Ablaufjahr aendert sich NICHTS', () => {
+    const r = einmal(prv({}));
+    const e = projiziere(szenario({ vertraege: [prv({})] }));
+    expect(r.jahr).toBe(e.ruhestandsjahr);
+    expect(r.wachstumJahre).toBe(0);
+    expect(r.wertBeiRentenbeginn).toBeCloseTo(r.nettoKapital, 6);
+  });
+
+  it('zahlt im Ablaufjahr aus, nicht zum Rentenbeginn', () => {
+    const e = projiziere(szenario({ vertraege: [prv({ ablaufJahr: 2035 })] }));
+    const r = e.kapitalauszahlungen.find((x) => x.vertragId === 'prv')!;
+    expect(r.jahr).toBe(2035);
+    expect(e.ruhestandsjahr).toBeGreaterThan(2035);
+    expect(r.wachstumJahre).toBe(e.ruhestandsjahr - 2035);
+  });
+
+  it('ohne Wachstumssatz bleibt der Betrag stehen — geraten wird nichts', () => {
+    const r = einmal(prv({ ablaufJahr: 2035 }));
+    expect(r.wertBeiRentenbeginn).toBeCloseTo(r.nettoKapital, 6);
+    expect(r.steuerWachstum).toBe(0);
+  });
+
+  it('mit Wachstumssatz waechst es — abzueglich Abgeltungsteuer', () => {
+    const r = einmal(prv({ ablaufJahr: 2035, wachstumBisRente: 0.04 }));
+    const brutto = r.nettoKapital * Math.pow(1.04, r.wachstumJahre);
+    expect(r.steuerWachstum).toBeCloseTo((brutto - r.nettoKapital) * 0.25, 4);
+    expect(r.wertBeiRentenbeginn).toBeCloseTo(brutto - r.steuerWachstum, 4);
+    expect(r.wertBeiRentenbeginn).toBeGreaterThan(r.nettoKapital);
+  });
+
+  it('ein Ablauf VOR 62 kostet mehr Steuer — die 12/62-Regel greift nicht', () => {
+    /*
+      § 20 Abs. 1 Nr. 6 EStG haelt den Ertrag nur zur Haelfte steuerpflichtig,
+      wenn die Auszahlung nach dem 62. Lebensjahr erfolgt. Mit dem Alter bei
+      RENTENBEGINN gerechnet saehe ein Ablauf mit 58 so aus, als erfuelle er
+      die Regel doch.
+    */
+    const geburt = 1975;
+    const frueh = einmal(prv({ ablaufJahr: geburt + 58 }));
+    const spaet = einmal(prv({ ablaufJahr: geburt + 63 }));
+    expect(frueh.steuer).toBeGreaterThan(spaet.steuer);
+  });
+
+  it('ein Ablauf NACH dem Rentenbeginn wird darauf begrenzt', () => {
+    const e = projiziere(szenario({ vertraege: [prv({ ablaufJahr: 2099 })] }));
+    const r = e.kapitalauszahlungen.find((x) => x.vertragId === 'prv')!;
+    expect(r.jahr).toBe(e.ruhestandsjahr);
+  });
+});
+
 describe('Ein Vertrag, zwei Auszahlungswege', () => {
   /*
     Rente und Kapital waren bis 2026 zwei VERTRAGSARTEN. Derselbe Vertrag

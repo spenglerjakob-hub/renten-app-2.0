@@ -90,6 +90,15 @@ export interface BetAnnahmen {
    * sein.
    */
   beitragImRuhestand: number;
+  /**
+   * Seit wann der Tarif laeuft.
+   *
+   * Ohne Angabe rechnete `betVergleich` so, als begaenne er HEUTE — wer seit
+   * zehn Jahren einzahlt, sah zu wenig Eingezahltes und einen zu fruehen
+   * Break-even. Fehlt das Feld, bleibt es bei diesem Verhalten; gespeicherte
+   * Dateien rechnen also unveraendert weiter.
+   */
+  beginnJahr?: number;
 }
 
 /**
@@ -285,8 +294,22 @@ export function betVergleich(
   bet: BetAnnahmen,
   alterHeute: number,
   lebenserwartung: number,
+  /**
+   * Das laufende Jahr. Nur noetig, um aus `bet.beginnJahr` die bereits
+   * verstrichenen Beitragsjahre zu bestimmen — ohne beides bleibt es beim
+   * bisherigen Verhalten.
+   */
+  jetztJahr?: number,
 ): BetVergleich {
-  const jahreEinzahlung = Math.max(0, bet.abAlter - alterHeute);
+  /*
+    Die Jahre BIS zum Stichalter — und, wenn der Tarif schon laeuft, die
+    bereits verstrichenen dazu. Wer mit 35 abgeschlossen hat und heute 45 ist,
+    hat zehn Jahre eingezahlt, die in der Rechnung fehlten.
+  */
+  const bereitsGezahlt = bet.beginnJahr !== undefined && jetztJahr !== undefined
+    ? Math.max(0, jetztJahr - bet.beginnJahr)
+    : 0;
+  const jahreEinzahlung = Math.max(0, bet.abAlter - alterHeute) + bereitsGezahlt;
   const jahreEntlastung = Math.max(0, lebenserwartung - bet.abAlter);
 
   const eingezahlt = Math.max(0, bet.beitragMonat) * 12 * jahreEinzahlung;

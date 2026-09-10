@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Trash2, PlusCircle, ChevronDown } from 'lucide-react';
 import {
-  parameterFuer,
+  parameterFuer, parseDatum,
   type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
@@ -45,6 +45,12 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
   const jetzt = new Date().getFullYear();
   const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: tarifIndex }).avd;
+  /*
+    Der Rentenbeginn DES INHABERS — er ist die Vorgabe fuer das Vertragsende
+    und zugleich die Grenze, ab der ein Ablauf ueberhaupt „vorgezogen" ist.
+  */
+  const rentenbeginnJahr =
+    parseDatum(personen.find((x) => x.id === v.inhaber)?.rentenbeginn ?? '')?.jahr ?? jetzt + 20;
 
   /*
     Ein FRISCH angelegter Vertrag steht offen, ein bereits ausgefuellter
@@ -234,6 +240,25 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             <ZahlFeld label="Beitrag monatlich" wert={v.monatsbeitrag ?? 0}
               onChange={(n) => vertragAendern(v.id, { monatsbeitrag: n })} einheit="€"
               hilfe="Für die Ermittlung des steuerpflichtigen Ertrags." />
+            {/*
+              VERTRAGSENDE. Laeuft der Vertrag vor dem Ruhestand ab, fliesst
+              das Geld frueher — und wird frueher besteuert. Bis hierher lag
+              die Auszahlung immer auf dem Rentenbeginn; die 12/62-Regel des
+              § 20 Abs. 1 Nr. 6 EStG wurde damit an einem Alter geprueft, das
+              der Vertrag nie erreicht.
+            */}
+            <ZahlFeld label="Vertragsende (Jahr)"
+              wert={v.ablaufJahr ?? rentenbeginnJahr}
+              onChange={(n) => vertragAendern(v.id, { ablaufJahr: n })}
+              min={1900} max={2200}
+              hilfe="Leer lassen heißt: läuft bis zum Rentenbeginn." />
+            {(v.ablaufJahr ?? rentenbeginnJahr) < rentenbeginnJahr && (
+              <ProzentFeld label="Kapital wächst bis zur Rente mit"
+                wert={v.wachstumBisRente ?? 0}
+                onChange={(n) => vertragAendern(v.id, { wachstumBisRente: n })}
+                max={15}
+                hilfe="Der Vertrag ist dann beendet — der Zuwachs trägt Abgeltungsteuer." />
+            )}
           </>
         )}
 

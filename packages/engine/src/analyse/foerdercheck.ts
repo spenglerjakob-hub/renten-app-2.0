@@ -2,6 +2,7 @@ import type { LegalParameters } from '../params/types.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
 import { euroText } from '../util/text.js';
 import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './vertrags-tuev.js';
+import { avdZulagen, type AvdKind } from '../products/altersvorsorgedepot.js';
 
 /**
  * FOERDERCHECK — was an Foerderung LIEGEN BLEIBT.
@@ -28,6 +29,11 @@ import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './v
  */
 const BAGATELLE_BAV = 25;
 const BAGATELLE_BASIS = 100;
+/**
+ * Beim Altersvorsorgedepot zaehlt die ZULAGE im Jahr, nicht ein Rahmen im
+ * Monat: Sie ist Geld vom Staat, und schon 50 EUR sind eine Auskunft wert.
+ */
+const BAGATELLE_AVD = 50;
 
 /**
  * Beitrag, an dem die Wirkung gezeigt wird.
@@ -77,6 +83,26 @@ export interface FoerderKontext extends SvKontext {
   /** Laufende Basisrentenbeitraege im Jahr */
   basisBeitragJahr: number;
   /**
+   * Was heute schon in ein Altersvorsorgedepot fliesst, im Jahr.
+   *
+   * 0, wenn keins erfasst ist — dann liegt die ganze Zulage brach, und genau
+   * das soll der Befund sagen.
+   */
+  avdEigenbeitragJahr: number;
+  /**
+   * Die Kinder des Haushalts.
+   *
+   * Aus den Basisdaten, nicht noch einmal abgefragt: Wer sie oben eintraegt,
+   * soll die 300 EUR je Kind hier wiederfinden, ohne sie ein zweites Mal zu
+   * nennen. `avdZulagen` laesst die Kinderzulage mit dem Kindergeldanspruch
+   * auslaufen — deshalb die Jahrgaenge und nicht bloss eine Anzahl.
+   */
+  kinder: readonly AvdKind[];
+  /** Alter des Sparers — entscheidet ueber den Berufseinsteigerbonus */
+  alter: number;
+  /** Das laufende Jahr. Das Altersvorsorgedepot gibt es erst ab 2027. */
+  jahr: number;
+  /**
    * Anteil der gesetzlichen Rente bzw. Pension am Zielbedarf im Rentenjahr,
    * als Dezimalzahl. Unter der Haelfte gilt sie als schwache Grundlage.
    */
@@ -86,7 +112,7 @@ export interface FoerderKontext extends SvKontext {
 }
 
 export interface FoerderBefund {
-  id: 'bav' | 'basis';
+  id: 'bav' | 'basis' | 'avd';
   titel: string;
   /** Freier Foerderrahmen im Monat */
   rahmenMonat: number;
@@ -152,7 +178,103 @@ export function foerdercheck(
   if (bav) befunde.push(bav);
   const basis = basisBefund(k, steuerOpt, p);
   if (basis) befunde.push(basis);
+  const avd = avdBefund(k, p);
+  if (avd) befunde.push(avd);
   return befunde;
+}
+
+/**
+ * Zulagen des Altersvorsorgedepots, die liegen bleiben.
+ *
+ * ANDERS ALS DIE BEIDEN BEFUNDE DARUEBER geht es hier nicht um einen
+ * Steuerrahmen, sondern um GELD VOM STAAT: 50 Cent je Euro bis 360 EUR,
+ * 25 Cent bis 1 800 EUR, dazu 300 EUR je Kind mit Kindergeldanspruch. Wer
+ * nichts einzahlt, bekommt nichts — bei zwei Kindern sind das 600 EUR im
+ * Jahr, die niemand sonst nachtraegt.
+ *
+ * Gerechnet wird mit `avdZulagen`, derselben Funktion, die auch die
+ * Zeitachse und der Vertrags-TUEV benutzen. Zweimal aufgerufen: mit dem
+ * heutigen Eigenbeitrag und mit dem Hoechstbetrag — die Differenz ist, was
+ * liegen bleibt.
+ */
+function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null {
+  const paragraf = 'Altersvorsorgedepot (pAV-Reform)';
+  const hoechst = p.avd.hoechstbetragEigenbeitrag;
+
+  /*
+    Vor dem Startjahr gibt es das Depot nicht. Statt zu schweigen nennt der
+    Befund das Jahr: Wer 2026 plant, will wissen, dass ab 2027 etwas dazukommt
+    — eine Foerderung zu versprechen, die es noch nicht gibt, waere falsch.
+  */
+  if (k.jahr < p.avd.abJahr) {
+    const kuenftig = avdZulagen(
+      { eigenbeitragJahr: hoechst, kinder: k.kinder, alter: k.alter + (p.avd.abJahr - k.jahr), jahr: p.avd.abJahr },
+      p.avd,
+    );
+    const summe = kuenftig.grundzulage + kuenftig.kinderzulage;
+    if (summe <= 0) return null;
+    return {
+      id: 'avd',
+      titel: `Altersvorsorgedepot: ab ${p.avd.abJahr} verfügbar`,
+      rahmenMonat: hoechst / 12,
+      probeMonat: hoechst / 12,
+      ersparnisJahr: summe,
+      nettoAufwandMonat: Math.max(0, hoechst - summe) / 12,
+      foerderquote: summe / hoechst,
+      text: `Ab ${p.avd.abJahr} gibt es das geförderte Altersvorsorgedepot. Bei `
+        + `${euroText(hoechst / 12)} im Monat kämen ${euroText(summe)} Zulage im Jahr dazu`
+        + `${kuenftig.kinderMitAnspruch > 0 ? ` — darin ${euroText(kuenftig.kinderzulage)} für `
+          + `${kuenftig.kinderMitAnspruch} Kind${kuenftig.kinderMitAnspruch > 1 ? 'er' : ''}` : ''}.`,
+      hinweis: 'Die Zahlen beruhen auf dem Stand des Gesetzgebungsverfahrens und können sich noch ändern.',
+      paragraf,
+    };
+  }
+
+  const jetzt = avdZulagen(
+    { eigenbeitragJahr: k.avdEigenbeitragJahr, kinder: k.kinder, alter: k.alter, jahr: k.jahr },
+    p.avd,
+  );
+  const voll = avdZulagen(
+    { eigenbeitragJahr: hoechst, kinder: k.kinder, alter: k.alter, jahr: k.jahr },
+    p.avd,
+  );
+
+  /*
+    Ohne den Berufseinsteigerbonus: Er faellt EINMAL an, und in einem Befund
+    ueber laufende Foerderung verspraeche er sie fuer jedes Jahr.
+  */
+  const jetztLaufend = jetzt.grundzulage + jetzt.kinderzulage;
+  const vollLaufend = voll.grundzulage + voll.kinderzulage;
+  const liegenGelassen = vollLaufend - jetztLaufend;
+  if (liegenGelassen < BAGATELLE_AVD) return null;
+
+  const mehrEigen = Math.max(0, hoechst - k.avdEigenbeitragJahr);
+  const kinderSatz = voll.kinderzulage > jetzt.kinderzulage
+    ? ` Darin ${euroText(voll.kinderzulage)} Kinderzulage für `
+      + `${voll.kinderMitAnspruch} Kind${voll.kinderMitAnspruch > 1 ? 'er' : ''} — `
+      + 'sie läuft nur, solange Kindergeld fließt.'
+    : '';
+
+  return {
+    id: 'avd',
+    titel: k.avdEigenbeitragJahr > 0
+      ? 'Altersvorsorgedepot: Zulagen nicht ausgeschöpft'
+      : 'Altersvorsorgedepot: Zulagen bleiben ganz liegen',
+    rahmenMonat: mehrEigen / 12,
+    probeMonat: mehrEigen / 12,
+    ersparnisJahr: liegenGelassen,
+    nettoAufwandMonat: Math.max(0, mehrEigen - liegenGelassen) / 12,
+    foerderquote: mehrEigen > 0 ? liegenGelassen / mehrEigen : 0,
+    text: (k.avdEigenbeitragJahr > 0
+      ? `Sie zahlen ${euroText(k.avdEigenbeitragJahr / 12)} im Monat ein. `
+      : 'Ein Altersvorsorgedepot ist nicht erfasst. ')
+      + `Mit ${euroText(mehrEigen / 12)} mehr im Monat — dem Höchstbetrag von `
+      + `${euroText(hoechst / 12)} — kämen ${euroText(liegenGelassen)} Zulage im Jahr dazu, `
+      + 'die derzeit liegen bleiben.' + kinderSatz,
+    hinweis: 'Die Zulage setzt einen Mindesteigenbeitrag voraus; die Zahlen beruhen auf dem '
+      + 'Stand des Gesetzgebungsverfahrens.',
+    paragraf,
+  };
 }
 
 /**

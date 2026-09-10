@@ -112,6 +112,23 @@ export interface ProjektionsErgebnis {
     kvPvGesamt: number;
     /** Nach Steuer UND Beitraegen — der Betrag, der wirklich ankommt. */
     nettoKapital: number;
+    /**
+     * Jahre zwischen Vertragsablauf und Rentenbeginn.
+     *
+     * 0, wenn der Vertrag erst zum Rentenbeginn ablaeuft — dann sind `jahr`
+     * und Rentenbeginn dasselbe und es gibt nichts zu ueberbruecken.
+     */
+    wachstumJahre: number;
+    /** Abgeltungsteuer auf den Zuwachs zwischen Ablauf und Rentenbeginn */
+    steuerWachstum: number;
+    /**
+     * Was zum Rentenbeginn daraus geworden ist.
+     *
+     * Ohne vorgezogenen Ablauf gleich `nettoKapital`. Die Gesamtuebersicht
+     * fragt, was zum Ruhestand da ist — bei einem Vertrag, der mit 60
+     * ablaeuft, ist das nicht der Betrag von damals.
+     */
+    wertBeiRentenbeginn: number;
   }[];
   /**
    * Je Kapitalvertrag mit Strategie "rente": Steuer im Zuflussjahr und die
@@ -422,24 +439,71 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   }
 
   // --- Einmalige Kapitalauszahlungen ---
+  /**
+   * Zu versteuerndes Einkommen des Haushalts in EINEM Jahr — Renten UND, wer
+   * dann noch arbeitet, sein Erwerbseinkommen.
+   *
+   * Gebraucht fuer Vertraege, die VOR dem Rentenbeginn ablaufen: Die Steuer
+   * auf die Kapitalleistung haengt am uebrigen Einkommen desselben Jahres.
+   * `zveBasisImJahr` allein zaehlt nur Renten; wer mit 60 noch verdient,
+   * saehe seine Kapitalleistung als einziges Einkommen und damit eine
+   * Steuer, die es so nicht gibt.
+   */
+  const zveBasisMitErwerb = (jahr: number, pJahr: ReturnType<typeof parameterFuer>) => {
+    const renten = zveBasisImJahr(s, personen, jahr, pJahr);
+    const jahreAb = Math.max(0, jahr - jetzt.jahr);
+    const arbeitendeKoepfe = personen.filter((k) => jahr < k.rentenbeginnJahr).length;
+    if (arbeitendeKoepfe === 0) return renten;
+
+    const pkvJahr = pkvImJahr(pkv, alterHeuteA + jahreAb, jahreAb);
+    const arbeitend = personen
+      .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
+      .filter(({ k }) => jahr < k.rentenbeginnJahr)
+      .map(({ e }) => ({
+        jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAb),
+        beamter: e.beamter,
+        selbststaendig: e.selbststaendig,
+        grvBeitragJahr: e.grvBeitragJahr * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAb),
+        pkvPraemieMonat: privatVersichert ? pkvJahr.gesamtMonat / arbeitendeKoepfe : 0,
+      }));
+    const n = erwerbHaushalt(
+      arbeitend,
+      { ...erwerbsOpt, beamter: false, kinder: kinderImJahr(s.haushalt, jahr) },
+      pJahr,
+    );
+    return renten + n.zve;
+  };
+
   const kapitalauszahlungen: ProjektionsErgebnis['kapitalauszahlungen'] = [];
   for (const v of s.vertraege) {
     if (v.strategie !== 'kapital') continue;
     const k = personen.find((x) => x.person.id === v.inhaber) ?? personA;
 
     if (istKapitalauszahlung(v)) {
-      const zveBasis = zveBasisImJahr(s, personen, k.rentenbeginnJahr, pRuhestand);
-      const r = kapitalNachSteuer(v, k, s, zveBasis, k.rentenbeginnJahr, pRuhestand);
+      /*
+        DAS ABLAUFJAHR, nicht der Rentenbeginn. Ein Vertrag, der mit 60
+        endet, zahlt mit 60 aus — und wird dann besteuert. Alles haengt an
+        diesem Jahr: die Parameter, das uebrige Einkommen und bei der
+        privaten Kapitalwahl das Alter, an dem die 12/62-Regel geprueft wird.
+      */
+      const zufluss = auszahlungsjahr(v, k.rentenbeginnJahr, jetzt.jahr);
+      const pZufluss = parameterFuer(zufluss, fortschreibung(s));
+      const zveBasis = zveBasisMitErwerb(zufluss, pZufluss);
+      const r = kapitalNachSteuer(v, k, s, zveBasis, zufluss, pZufluss);
       if (r.bruttoKapital <= 0) continue;
+      const weiter = nachAblaufGewachsen(
+        r.nettoKapital, v.wachstumBisRente ?? 0, k.rentenbeginnJahr - zufluss, pRuhestand,
+      );
       kapitalauszahlungen.push({
         vertragId: v.id,
         bezeichnung: v.name || 'Kapitalauszahlung',
-        jahr: k.rentenbeginnJahr,
+        jahr: zufluss,
         bruttoKapital: r.bruttoKapital,
         steuer: r.steuer,
         nettoKapital: r.nettoKapital,
         // Einmalig beim Zufluss abgezogen, nicht ueber zehn Jahre verteilt.
         kvPvGesamt: r.kvPv,
+        ...weiter,
       });
       continue;
     }
@@ -454,6 +518,14 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       jahr: k.rentenbeginnJahr,
       ...r,
       kvPvGesamt: 0,   // Depotentnahmen loesen keine Beitraege aus
+      /*
+        Das Depot laeuft ohnehin bis zum Rentenbeginn — es gibt nichts zu
+        ueberbruecken. `etfNettoKapital` rechnet die Jahre bis dahin bereits
+        mit der eigenen Rendite; ein zweiter Wachstumsschritt zaehlte doppelt.
+      */
+      wachstumJahre: 0,
+      steuerWachstum: 0,
+      wertBeiRentenbeginn: r.nettoKapital,
     });
   }
 
@@ -897,6 +969,43 @@ export function kapitalBetrag(v: Vertrag): number {
 }
 
 /**
+ * In welchem Jahr die Kapitalleistung FLIESST.
+ *
+ * Ohne `ablaufJahr` zum Rentenbeginn, wie bisher — daran aendert sich fuer
+ * gespeicherte Szenarien nichts. Ein Ablauf NACH dem Rentenbeginn ergibt
+ * keinen Sinn und wird darauf begrenzt; einer in der Vergangenheit ebenso
+ * wenig, denn was schon geflossen ist, plant man nicht mehr.
+ */
+export function auszahlungsjahr(v: Vertrag, rentenbeginnJahr: number, jetztJahr: number): number {
+  if (v.ablaufJahr === undefined) return rentenbeginnJahr;
+  return Math.min(rentenbeginnJahr, Math.max(jetztJahr, v.ablaufJahr));
+}
+
+/**
+ * Was aus dem ausgezahlten Kapital bis zum Rentenbeginn wird.
+ *
+ * Der Vertrag ist beendet — und mit ihm sein Steuermantel. Der Zuwachs ist
+ * eine gewoehnliche Geldanlage und traegt Abgeltungsteuer, genau wie beim
+ * Wertpapierdepot. Ohne Wachstumssatz bleibt der Betrag stehen; erfunden
+ * wird nichts.
+ */
+export function nachAblaufGewachsen(
+  nettoKapital: number,
+  satz: number,
+  jahre: number,
+  p: ReturnType<typeof parameterFuer>,
+): { wachstumJahre: number; steuerWachstum: number; wertBeiRentenbeginn: number } {
+  const n = Math.max(0, Math.round(jahre));
+  if (n === 0 || nettoKapital <= 0 || satz === 0) {
+    return { wachstumJahre: n, steuerWachstum: 0, wertBeiRentenbeginn: Math.max(0, nettoKapital) };
+  }
+  const brutto = nettoKapital * Math.pow(1 + satz, n);
+  const zuwachs = Math.max(0, brutto - nettoKapital);
+  const steuerWachstum = zuwachs * p.abgeltungsteuersatz;
+  return { wachstumJahre: n, steuerWachstum, wertBeiRentenbeginn: brutto - steuerWachstum };
+}
+
+/**
  * Kinderstatus fuer die Pflegeversicherung IN EINEM BESTIMMTEN JAHR.
  *
  * BEFUND: Der Status wurde einmal aus dem Haushalt gebildet und fuer jedes
@@ -999,7 +1108,15 @@ function kapitalNachSteuer(
       eingezahlteBeitraege: (v.monatsbeitrag ?? 0) * 12 * Math.max(0, jahr - beginnJahr),
       vertragsbeginnJahr: beginnJahr,
       auszahlungsJahr: jahr,
-      alterBeiAuszahlung: k.alterBeiRentenbeginn,
+      /*
+        Das Alter IM ZUFLUSSJAHR, nicht beim Rentenbeginn. Die 12/62-Regel
+        des § 20 Abs. 1 Nr. 6 EStG haelt den Ertrag nur zur Haelfte
+        steuerpflichtig, wenn die Auszahlung NACH dem 62. Lebensjahr
+        erfolgt. Wer den Vertrag mit 60 ablaufen laesst, erfuellt sie nicht —
+        mit dem Alter bei Rentenbeginn gerechnet saehe es so aus, als taete
+        er es doch.
+      */
+      alterBeiAuszahlung: k.alterBeiRentenbeginn - (k.rentenbeginnJahr - jahr),
       fondsgebunden: false,
       altvertragVor2005: v.altvertrag,
     });

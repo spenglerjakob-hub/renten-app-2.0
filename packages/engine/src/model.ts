@@ -91,6 +91,27 @@ export interface Vertrag {
   beginnJahr?: number;
   monatsbeitrag?: number;
   dynamik?: number;
+  /**
+   * Wann der Vertrag ENDET, wenn nicht erst zum Rentenbeginn.
+   *
+   * Ein Vertrag mit Ablauf 60 und Ruhestand ab 67 zahlt sieben Jahre frueher
+   * aus — und wird dann auch besteuert. Bis hierher lag die Auszahlung immer
+   * auf dem Rentenbeginn; damit stand die Steuer im falschen Jahr und die
+   * 12/62-Regel des § 20 Abs. 1 Nr. 6 EStG wurde an einem Alter geprueft,
+   * das der Vertrag nie erreicht.
+   *
+   * Wirkt nur auf dem KAPITALWEG: Eine laufende Anbieterrente beginnt nicht
+   * vor dem Rentenbeginn.
+   */
+  ablaufJahr?: number;
+  /**
+   * Womit das ausgezahlte Kapital zwischen Ablauf und Rentenbeginn arbeitet.
+   *
+   * Vorgabe 0: Ohne Angabe wird nichts erfunden. Der Zuwachs ist eine
+   * gewoehnliche Geldanlage und traegt Abgeltungsteuer — der Vertrag ist zu
+   * diesem Zeitpunkt beendet, sein Steuermantel damit auch.
+   */
+  wachstumBisRente?: number;
 
   /** immobilie */
   bewirtschaftungskostenProzent?: number;

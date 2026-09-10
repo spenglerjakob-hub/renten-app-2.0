@@ -207,6 +207,13 @@ export function Renteneinkuenfte({
                     <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(a.kvPvGesamt)} />
                   )}
                   <Angabe feld="Bleibt Ihnen" wert={euro(a.nettoKapital)} />
+                  {/* Bei vorgezogenem Ablauf: was zum Rentenbeginn daraus wird. */}
+                  {a.wachstumJahre > 0 && (
+                    <Angabe
+                      feld={`Daraus bis zum Rentenbeginn (${a.wachstumJahre} Jahre)`}
+                      wert={euro(a.wertBeiRentenbeginn)}
+                    />
+                  )}
                 </Zweispaltig>
               </div>
             ))}

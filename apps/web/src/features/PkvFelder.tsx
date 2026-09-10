@@ -113,6 +113,19 @@ export function PkvFelder() {
                 einheit="J."
               />
               {/*
+                Ohne dieses Jahr rechnete die Gegenueberstellung, als begaenne
+                der Tarif heute — wer seit zehn Jahren einzahlt, sah zu wenig
+                Eingezahltes und einen zu fruehen Break-even.
+              */}
+              <ZahlFeld
+                label="Tarif läuft seit"
+                wert={pkv.bet.beginnJahr ?? new Date().getFullYear()}
+                onChange={(n) => setzeBet({ beginnJahr: n })}
+                min={1900}
+                max={new Date().getFullYear()}
+                hilfe="Abschlussjahr — sonst zählt die Rechnung nur ab heute."
+              />
+              {/*
                 Der Beitrag endet dort meist NICHT. Bei der AXA sinkt er auf
                 ein Viertel und laeuft weiter — ihn auf null zu setzen, wie
                 es die Rechnung frueher tat, zeigte den Ruhestand zu guenstig.

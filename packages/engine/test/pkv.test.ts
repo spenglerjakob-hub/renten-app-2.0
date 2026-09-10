@@ -167,6 +167,26 @@ describe('Beitragsentlastungstarif', () => {
     expect(pkvImJahr(gross, 70, 30).praemieMonat).toBe(0);
   });
 
+  it('zaehlt die bereits verstrichenen Beitragsjahre mit', () => {
+    /*
+      `betVergleich` rechnete `abAlter - alterHeute` — als begaenne der Tarif
+      HEUTE. Wer seit zehn Jahren einzahlt, sah zu wenig Eingezahltes und
+      einen zu fruehen Break-even.
+    */
+    const ohne = betVergleich(bet, 40, 85);
+    const mitVorlauf = betVergleich({ ...bet, beginnJahr: 2016 }, 40, 85, 2026);
+    expect(mitVorlauf.jahreEinzahlung - ohne.jahreEinzahlung).toBe(10);
+    expect(mitVorlauf.eingezahlt).toBeCloseTo(ohne.eingezahlt + 10 * 12 * bet.beitragMonat, 6);
+    // Mehr eingezahlt heisst: Der Tarif hat sich erst spaeter getragen.
+    expect(mitVorlauf.breakEvenAlter!).toBeGreaterThan(ohne.breakEvenAlter!);
+  });
+
+  it('ohne Beginnjahr bleibt es beim bisherigen Ergebnis', () => {
+    // Gespeicherte Dateien kennen das Feld nicht und muessen unveraendert
+    // weiterrechnen.
+    expect(betVergleich(bet, 40, 85, 2026)).toEqual(betVergleich(bet, 40, 85));
+  });
+
   it('nennt das Alter, ab dem sich der Tarif getragen hat', () => {
     // 27 Jahre a 1 200 EUR = 32 400 EUR eingezahlt, 3 000 EUR Entlastung im
     // Jahr — nach 10,8 Jahren ist er drin.

@@ -225,6 +225,23 @@ export function Kassenbon({
                     Kranken- und Pflegeversicherung: {euro(a.kvPvGesamt * kaufkraft(a.jahr))}
                   </div>
                 )}
+                {/*
+                  Laeuft der Vertrag VOR dem Ruhestand ab, ist der Betrag von
+                  damals nicht der, der zum Rentenbeginn da ist. Beide Zahlen
+                  stehen nebeneinander — sonst fragt man sich, wo die Jahre
+                  dazwischen geblieben sind.
+                */}
+                {a.wachstumJahre > 0 && (
+                  <div className="mt-1 border-t border-indigo-100 pt-1 text-[11px] leading-relaxed text-indigo-900 sm:text-[10px]">
+                    Bis zum Rentenbeginn in {a.wachstumJahre} Jahren daraus:{' '}
+                    <strong>{euro(a.wertBeiRentenbeginn * kaufkraft(a.jahr + a.wachstumJahre))}</strong>
+                    {a.steuerWachstum > 0 && (
+                      <span className="text-slate-500">
+                        {' '}(nach {euro(a.steuerWachstum * kaufkraft(a.jahr + a.wachstumJahre))} Abgeltungsteuer)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
