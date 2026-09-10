@@ -381,3 +381,94 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
     },
   };
 }
+
+/**
+ * Eine Stufe der Belastungsrechnung. `art` steuert nur die Farbe.
+ */
+export interface TreppenZeile {
+  text: string;
+  betrag: number;
+  art: 'abzug' | 'summe';
+}
+
+/**
+ * DIE BELASTUNG ALS TREPPE: von dem, was monatlich in den Vertrag fliesst,
+ * hinunter zu dem, was aus der eigenen Tasche geht.
+ *
+ * Vorher begann die Karte beim Eigenbeitrag, und was insgesamt ankommt, stand
+ * nur als Nebensatz in einem anderen Kasten. Wer 150 EUR einzahlt und 45 EUR
+ * Zulage bekommt, sieht jetzt zuerst die 195 EUR, die der Vertrag bekommt.
+ *
+ * WORAN MAN SICH HIER VERTUT: Was ganz oben steht, haengt an der Vertragsart.
+ *
+ *   Zulagenvertraege (Altersvorsorgedepot, Riester) — `beitragMonat` ist der
+ *   EIGENBEITRAG, die Zulagen kommen obendrauf. Zufluss = Beitrag + Zulagen.
+ *
+ *   bAV — `beitragMonat` ist bereits der GESAMTBEITRAG, aus dem der
+ *   Arbeitgeberzuschuss herausgerechnet wird. Zufluss = Beitrag.
+ *
+ * KEINE DOPPELZAEHLUNG: Die Zulagen mindern den Aufwand nach wie vor nicht
+ * (`avdSteuervorteil.eigenaufwandNetto` zieht sie bewusst nicht ab — sie
+ * stehen als hoeheres Kapital auf der Habenseite). Die Treppe hebt die
+ * oberste Zeile um sie an und zieht sie in der naechsten wieder ab; unten
+ * steht unveraendert `echterAufwandMonat`.
+ */
+export function belastungsTreppe(r: TuevErgebnis): {
+  zufluss: number;
+  zeilen: TreppenZeile[];
+  aufwand: number;
+} {
+  const zulagen = Math.max(0, r.zulageMonat);
+  const agZuschuss = Math.max(0, r.agZuschussMonat);
+  const zufluss = r.beitragMonat + zulagen;
+  const zeilen: TreppenZeile[] = [];
+
+  if (zulagen > 0) zeilen.push({ text: '− Zulagen vom Staat', betrag: zulagen, art: 'abzug' });
+  if (agZuschuss > 0) zeilen.push({ text: '− Arbeitgeberzuschuss', betrag: agZuschuss, art: 'abzug' });
+
+  /*
+    Erst ab einem halben Euro: Bei privat Versicherten bleiben nach dem
+    wegfallenden Arbeitgeberzuschuss manchmal Cent uebrig, und eine Zeile
+    "SV-Ersparnis 0 EUR" sagt weniger als keine.
+  */
+  const sv = r.svErsparnisMonat >= 0.5 ? r.svErsparnisMonat : 0;
+  const eigeneAbzuege: TreppenZeile[] = [];
+  if (sv > 0) eigeneAbzuege.push({ text: '− SV-Ersparnis', betrag: sv, art: 'abzug' });
+  if (r.steuerersparnisMonat > 0) {
+    eigeneAbzuege.push({ text: '− Steuerersparnis', betrag: r.steuerersparnisMonat, art: 'abzug' });
+  }
+
+  /*
+    Die Zwischensumme lohnt nur, wenn ueber ihr etwas abgezogen wurde UND
+    unter ihr noch etwas folgt. Sonst wiederholte sie bloss die Zeile darueber
+    oder die Endsumme darunter.
+  */
+  if (zeilen.length > 0 && eigeneAbzuege.length > 0) {
+    zeilen.push({
+      // "Entgeltumwandlung" trifft es nur dort, wo ein Zuschuss fliesst: Den
+      // gibt es nach § 1a Abs. 1a BetrAVG gerade deshalb, weil der
+      // Beschaeftigte Entgelt umwandelt.
+      text: agZuschuss > 0 ? '= Ihre Entgeltumwandlung' : '= Ihr Eigenbeitrag',
+      betrag: zufluss - zulagen - agZuschuss,
+      art: 'summe',
+    });
+  }
+  zeilen.push(...eigeneAbzuege);
+
+  return { zufluss, zeilen, aufwand: r.echterAufwandMonat };
+}
+
+/**
+ * Was die Zulagen JEDES Jahr ausmachen.
+ *
+ * Ohne den Berufseinsteigerbonus: Der faellt einmal an, und in einer Zeile
+ * "jedes Jahr" verspraeche er eine Foerderung fuer die ganze Laufzeit, die es
+ * nur im ersten Jahr gibt. Er steht deshalb ueberall als eigener Satz daneben.
+ *
+ * Hier und nicht zweimal in der Oberflaeche, damit Bildschirm und Ausdruck
+ * nicht mit zwei verschiedenen Jahreszahlen dastehen.
+ */
+export function laufendeZulageJahr(r: TuevErgebnis): number {
+  if (!r.zulageDetail) return r.zulageMonat * 12;
+  return (r.zulageDetail.grundzulageMonat + r.zulageDetail.kinderzulageMonat) * 12;
+}

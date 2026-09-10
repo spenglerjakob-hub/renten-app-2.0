@@ -70,6 +70,68 @@ function kontext(over: Partial<TuevKontext> = {}): TuevKontext {
   };
 }
 
+describe('Die Belastungstreppe geht auf', () => {
+  /*
+    Die Oberflaeche rechnet in der Karte "Ihre Belastung" sichtbar herunter:
+    vom Gesamtbeitrag ueber die Abzuege bis zu "Kostet Sie wirklich". Diese
+    Zeilen sind KEINE eigene Rechnung, sie zeigen die Kennzahlen von hier.
+    Passen die nicht zueinander, steht in der Karte eine Endsumme, die man
+    nachrechnen kann und die nicht stimmt — genau der Fehler, den die
+    getrennte Zulagenbuchung schon einmal erzeugt hatte.
+  */
+  const zufluss = (r: ReturnType<typeof vertragsTuev>) => r.beitragMonat + r.zulageMonat;
+
+  it('Zulagenvertraege: Zufluss − Zulagen − Steuerersparnis ergibt den Aufwand', () => {
+    for (const typ of ['avd', 'riester'] as const) {
+      // Das Altersvorsorgedepot gibt es erst ab 2027; ein frueherer Beginn
+      // ergaebe zu Recht keine Zulage und damit keine Treppe zu pruefen.
+      const r = vertragsTuev(
+        vertrag({ typ, schicht: 2 }), annahmen({ beginnJahr: 2027 }), kontext(), szenario, p,
+      );
+      expect(r.zulageMonat, typ).toBeGreaterThan(0);
+      expect(zufluss(r) - r.zulageMonat - r.steuerersparnisMonat, typ)
+        .toBeCloseTo(r.echterAufwandMonat, 6);
+    }
+  });
+
+  it('bAV: der Gesamtbeitrag ENTHAELT den Arbeitgeberzuschuss', () => {
+    // Anders als bei den Zulagen kommt der Zuschuss nicht obendrauf: Er ist
+    // Teil des Beitrags. Wer ihn addiert, zeigt oben einen zu hohen Zufluss.
+    const r = vertragsTuev(
+      vertrag({ typ: 'bav', schicht: 2 }), annahmen({ agZuschussMonat: 30 }), kontext(), szenario, p,
+    );
+    expect(r.zulageMonat).toBe(0);
+    expect(zufluss(r)).toBeCloseTo(r.beitragMonat, 6);
+    expect(r.agZuschussMonat).toBeGreaterThan(0);
+    expect(r.beitragMonat - r.agZuschussMonat - r.svErsparnisMonat - r.steuerersparnisMonat)
+      .toBeCloseTo(r.echterAufwandMonat, 6);
+  });
+
+  it('private Vertraege: ohne Zuschuss und Zulage bleibt der Beitrag stehen', () => {
+    const r = vertragsTuev(vertrag({ typ: 'prvRente' }), annahmen(), kontext(), szenario, p);
+    expect(r.zulageMonat).toBe(0);
+    expect(r.agZuschussMonat).toBe(0);
+    expect(r.echterAufwandMonat).toBeCloseTo(r.beitragMonat, 6);
+  });
+
+  it('die Zulage JE JAHR ist das Zwoelffache — ohne den einmaligen Bonus', () => {
+    /*
+      In der Oberflaeche stand unter der Ueberschrift "Jedes Jahr" die blosse
+      Summe zweier MONATSwerte: aus 540 EUR Foerderung wurden 45.
+    */
+    const r = vertragsTuev(
+      vertrag({ typ: 'avd', schicht: 2 }), annahmen({ beginnJahr: 2027 }), kontext(), szenario, p,
+    );
+    const d = r.zulageDetail!;
+    expect((d.grundzulageMonat + d.kinderzulageMonat) * 12)
+      .toBeCloseTo(d.grundzulageMonat * 12 + d.kinderzulageMonat * 12, 6);
+    // Der Bonus steckt in `zulageMonat`, aber NICHT in der Jahreszeile.
+    if (d.bonusEinmalig > 0) {
+      expect(r.zulageMonat * 12).toBeGreaterThan((d.grundzulageMonat + d.kinderzulageMonat) * 12);
+    }
+  });
+});
+
 describe('Vertrags-TUEV: Einzahlphase', () => {
   it('rechnet bei einem privaten Vertrag den vollen Beitrag als Aufwand', () => {
     // Aus versteuertem Geld: keine Ersparnis, kein Zuschuss, keine Zulage.

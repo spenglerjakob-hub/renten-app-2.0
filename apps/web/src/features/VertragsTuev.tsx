@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
-import { tuevPositionen, tuevBasis } from './tuev-berechnung';
+import { tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr } from './tuev-berechnung';
 import { kenntKapitalwahl } from './vertragsarten';
 import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
@@ -128,6 +128,7 @@ export function VertragsTuev({
             const { ergebnis: r, vergleich, istKapital, wege } = pos;
 
             const gut = r.nettoHebel >= 1;
+            const treppe = belastungsTreppe(r);
 
             return (
               <article key={t.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich">
@@ -311,44 +312,54 @@ export function VertragsTuev({
                       <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Ihre Belastung (Ansparphase)
                       </div>
+                      {/*
+                        Oben steht, was der Vertrag monatlich BEKOMMT, nicht
+                        was der Sparer einzahlt. Bei einem gefoerderten Vertrag
+                        sind das zwei verschiedene Zahlen — und die groessere
+                        stand bisher nur als Nebensatz in einem anderen Kasten.
+                      */}
                       <div className="space-y-1.5">
-                        <GegenueberZeile text="Beitrag" wert={euro(r.beitragMonat)} />
-                        {r.agZuschussMonat > 0 && (
-                          <GegenueberZeile text="− AG-Zuschuss" wert={euro(r.agZuschussMonat)} farbe="text-emerald-600" />
-                        )}
-                        {/* Erst ab einem halben Euro: bei privat
-                            Versicherten bleiben nach dem wegfallenden
-                            Arbeitgeberzuschuss manchmal Cent uebrig, und eine
-                            Zeile "SV-Ersparnis 0 \u20ac" sagt weniger als keine. */}
-                        {r.svErsparnisMonat >= 0.5 && (
-                          <GegenueberZeile text="− SV-Ersparnis" wert={euro(r.svErsparnisMonat)} farbe="text-emerald-600" />
-                        )}
-                        {r.steuerersparnisMonat > 0 && (
-                          <GegenueberZeile text="− Steuerersparnis" wert={euro(r.steuerersparnisMonat)} farbe="text-emerald-600" />
-                        )}
+                        <GegenueberZeile text="Gesamtbeitrag" wert={euro(treppe.zufluss)} />
+                        {treppe.zeilen.map((z) => (
+                          z.art === 'summe' ? (
+                            <div key={z.text} className="!mt-2 border-t border-slate-200 pt-2">
+                              <GegenueberZeile text={z.text} wert={euro(z.betrag)} />
+                            </div>
+                          ) : (
+                            <GegenueberZeile
+                              key={z.text}
+                              text={z.text}
+                              wert={euro(z.betrag)}
+                              farbe="text-emerald-600"
+                            />
+                          )
+                        ))}
                         <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
                           <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
                           <span className="text-base font-black tabular-nums text-slate-900">
-                            {euro(r.echterAufwandMonat)}
+                            {euro(treppe.aufwand)}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {/*
-                      Die Zulagen stehen BEWUSST ausserhalb des Kastens darueber.
-                      Sie mindern den Eigenaufwand nicht: sie kommen nicht vom
-                      Sparer, sondern vom Staat, und stehen bereits als hoeheres
-                      Kapital auf der Habenseite (avdSteuervorteil.eigenaufwandNetto
-                      rechnet genau so). Als Minusposten in der Belastung gebucht
-                      zaehlten sie doppelt — und die Zeile "Kostet Sie wirklich"
-                      ging sichtbar nicht mehr auf. Das war sie vorher weder beim
-                      Altersvorsorgedepot noch bei Riester.
+                      Dieser Kasten schluesselt die Zulagenzeile der Treppe auf:
+                      woraus sie sich zusammensetzt und was sie im JAHR ausmacht.
+
+                      Die Zulagen mindern den Eigenaufwand weiterhin NICHT. Sie
+                      kommen nicht vom Sparer, sondern vom Staat, und stehen
+                      bereits als hoeheres Kapital auf der Habenseite
+                      (avdSteuervorteil.eigenaufwandNetto rechnet genau so). In
+                      der Treppe heben sie die oberste Zeile an und gehen in der
+                      naechsten wieder ab — unten steht unveraendert derselbe
+                      Betrag. Als blosser Minusposten gebucht zaehlten sie
+                      doppelt, und "Kostet Sie wirklich" ginge nicht mehr auf.
                     */}
                     {r.zulageMonat > 0 && (
                       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                         <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                          Was der Staat dazugibt (1. Jahr)
+                          Was der Staat dazugibt — monatlich, 1. Jahr
                         </div>
                         <div className="space-y-1.5">
                           {r.zulageDetail ? (
@@ -363,10 +374,16 @@ export function VertragsTuev({
                                   : 'Kinderzulage — kein Kind im Kindergeldalter'}
                                 wert={euro(r.zulageDetail.kinderzulageMonat)}
                               />
+                              {/*
+                                MAL ZWOELF. Die Zeilen darueber sind
+                                Monatswerte; hier stand ihre blosse Summe unter
+                                der Ueberschrift "Jedes Jahr". Aus 540 EUR
+                                Foerderung wurden so 45.
+                              */}
                               <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-emerald-200 pt-2">
                                 <span className="text-xs font-bold text-emerald-900">Jedes Jahr</span>
                                 <span className="text-base font-black tabular-nums text-emerald-700">
-                                  {euro(r.zulageDetail.grundzulageMonat + r.zulageDetail.kinderzulageMonat)}
+                                  {euro(laufendeZulageJahr(r))}
                                 </span>
                               </div>
                               {/*
@@ -387,12 +404,10 @@ export function VertragsTuev({
                           )}
                         </div>
                         <p className="mt-2 text-[10px] leading-relaxed text-emerald-800">
-                          Die Zulagen fließen zusätzlich in den Vertrag — sie senken Ihren Beitrag
-                          nicht. Deshalb stehen sie hier getrennt und nicht in der Rechnung darüber.
-                        </p>
-                        <p className="mt-1 text-[10px] text-emerald-800">
-                          Im Vertrag kommen an:{' '}
-                          <strong>{euro(r.beitragMonat + r.zulageMonat)}</strong> im Monat.
+                          Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
+                          fließen zusätzlich in den Vertrag und senken Ihren eigenen Beitrag
+                          nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als
+                          Abzug von Ihren Kosten.
                         </p>
                       </div>
                     )}

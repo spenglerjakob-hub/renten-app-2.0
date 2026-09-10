@@ -1,4 +1,4 @@
-import type { TuevPosition } from '../features/tuev-berechnung';
+import { belastungsTreppe, laufendeZulageJahr, type TuevPosition } from '../features/tuev-berechnung';
 import { euro, prozent } from '../components/Feld';
 import { typText } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
@@ -23,6 +23,7 @@ export function TuevBogen({
 }) {
   const { vertrag: v, ergebnis: r, vergleich, istKapital, wege } = position;
   const t = szenario.tuev.find((x) => x.vertragId === v.id);
+  const treppe = belastungsTreppe(r);
   const gut = r.nettoHebel >= 1;
 
   return (
@@ -70,20 +71,18 @@ export function TuevBogen({
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Was Sie einzahlen (1. Jahr, monatlich)
           </div>
-          <Angabe feld="Beitrag" wert={euro(r.beitragMonat)} />
-          {r.agZuschussMonat > 0 && (
-            <Angabe feld="− Arbeitgeberzuschuss" wert={euro(r.agZuschussMonat)} />
-          )}
-          {r.svErsparnisMonat >= 0.5 && (
-            <Angabe feld="− Ersparnis Sozialabgaben" wert={euro(r.svErsparnisMonat)} />
-          )}
-          {r.steuerersparnisMonat > 0 && (
-            <Angabe feld="− Steuerersparnis" wert={euro(r.steuerersparnisMonat)} />
-          )}
+          {/* Dieselbe Treppe wie am Bildschirm, aus derselben Funktion: oben
+              was der Vertrag bekommt, unten was es kostet. */}
+          <Angabe feld="Gesamtbeitrag" wert={euro(treppe.zufluss)} />
+          {treppe.zeilen.map((z) => (
+            <div key={z.text} className={z.art === 'summe' ? 'border-t border-slate-300' : ''}>
+              <Angabe feld={z.text} wert={euro(z.betrag)} />
+            </div>
+          ))}
           <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
             <span className="text-[12px] font-bold text-slate-800">Kostet Sie wirklich</span>
             <span className="text-[14px] font-black tabular-nums text-slate-900">
-              {euro(r.echterAufwandMonat)}
+              {euro(treppe.aufwand)}
             </span>
           </div>
         </div>
@@ -119,9 +118,9 @@ export function TuevBogen({
       </div>
 
       {/*
-        Die Zulagen stehen BEWUSST ausserhalb der Einzahlungsrechnung: sie
-        mindern den Eigenaufwand nicht, sie kommen zusaetzlich vom Staat.
-        Als Abzugsposten gebucht zaehlten sie doppelt.
+        Dieser Kasten schluesselt die Zulagenzeile der Treppe auf. Die Zulagen
+        mindern den Eigenaufwand weiterhin nicht: Sie heben den Zufluss an und
+        gehen davon wieder ab; unten steht derselbe Betrag wie zuvor.
       */}
       {r.zulageMonat > 0 && (
         <div className="mt-4 break-inside-avoid rounded-lg border border-emerald-300 bg-emerald-50 p-3">
@@ -148,8 +147,9 @@ export function TuevBogen({
             </p>
           )}
           <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
-            Die Zulagen fließen zusätzlich in den Vertrag — sie senken Ihren Beitrag nicht.
-            Im Vertrag kommen an: <strong>{euro(r.beitragMonat + r.zulageMonat)}</strong> im Monat.
+            Die Zulagen sind der Anteil des Staates am Gesamtbeitrag — sie fließen zusätzlich in
+            den Vertrag und senken Ihren eigenen Beitrag nicht. Über das Jahr sind das{' '}
+            <strong>{euro(laufendeZulageJahr(r))}</strong>.
           </p>
         </div>
       )}
