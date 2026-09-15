@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { versorgungsluecke, type ProjektionsErgebnis, type Jahreszeile, type Szenario } from '@renten/engine';
-import { euro, prozent } from '../components/Feld';
+import {
+  versorgungsluecke, jePerson,
+  type ProjektionsErgebnis, type Jahreszeile, type Szenario,
+} from '@renten/engine';
+import { euro, prozent, Schalter } from '../components/Feld';
 import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
+import { personNameAus } from './personen';
 
 /** Farbgebung der drei Schichten, wie im urspruenglichen Entwurf. */
 const SCHICHT = {
@@ -11,16 +15,33 @@ const SCHICHT = {
   3: { titel: 'Schicht 3 (Privat)', rahmen: 'border-emerald-100', text: 'text-emerald-900', balken: 'bg-emerald-500', punkt: 'bg-emerald-500' },
 } as const;
 
-function SchichtBlock({
-  schicht, netto, kinder, w,
+/** Die beiden Personen und der Haushalt — dieselbe Machart wie die Schichten. */
+const PERSON_FARBE = [
+  { rahmen: 'border-sky-100', text: 'text-sky-900' },
+  { rahmen: 'border-amber-100', text: 'text-amber-900' },
+  { rahmen: 'border-slate-200', text: 'text-slate-700' },
+] as const;
+
+/**
+ * Ein aufklappbarer Block mit Postenzeilen.
+ *
+ * Titel und Farbe kommen von aussen, seit es ihn zweimal gibt: einmal je
+ * Schicht und einmal je Person. Klappmechanik, Kaufkraftformatierung und
+ * Zeilenlayout bleiben dabei EINE Sache.
+ */
+function PostenBlock({
+  titel, farbe, netto, kinder, w, leerText,
 }: {
-  schicht: 1 | 2 | 3;
+  titel: string;
+  farbe: { rahmen: string; text: string };
   netto: number;
   kinder: Jahreszeile['posten'];
   w: (n: number) => string;
+  /** Was dastehen soll, wenn der Block keine Zeile ueber null enthaelt. */
+  leerText?: string;
 }) {
   const [offen, setOffen] = useState(true);
-  const f = SCHICHT[schicht];
+  const f = farbe;
 
   return (
     <div className={`overflow-hidden rounded-lg border ${f.rahmen} print:border-slate-300`}>
@@ -30,7 +51,7 @@ function SchichtBlock({
         aria-expanded={offen}
         className="druck-kopf flex w-full items-center justify-between gap-3 border-b border-slate-50 bg-white p-2.5 text-left sm:p-4"
       >
-        <span className={`text-[11px] font-bold sm:text-base ${f.text}`}>{f.titel}</span>
+        <span className={`text-[11px] font-bold sm:text-base ${f.text}`}>{titel}</span>
         <span className="flex items-center gap-2">
           <span className="text-[11px] font-bold tabular-nums sm:text-base">{w(netto)}</span>
           <ChevronDown
@@ -41,6 +62,11 @@ function SchichtBlock({
       </button>
 
       <div className={`space-y-2 bg-white p-2.5 text-xs sm:p-3 ${offen ? 'block' : 'hidden'} druck-inhalt`}>
+        {kinder.length === 0 && leerText && (
+          <p className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-500 sm:p-3">
+            {leerText}
+          </p>
+        )}
         {kinder.map((p) => (
           <div key={p.id} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 sm:p-3">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -100,6 +126,25 @@ export function Kassenbon({
     netto: zeile.posten.filter((p) => p.schicht === sch).reduce((s, p) => s + p.nettoJahr, 0),
   }));
 
+  /*
+    Die zweite Sicht auf dieselben Posten: nach Person statt nach Schicht.
+
+    Nur bei Ehepaaren — allein steht ohnehin alles bei einer Person, und ein
+    Schalter, der nichts umschaltet, ist Rauschen. Er bleibt bewusst im
+    Zustand der Ansicht und wandert NICHT ins Szenario: Zod entfernt
+    unbekannte Schluessel still, ein dort abgelegter Ansichtsschalter ginge
+    beim naechsten Laden verloren.
+  */
+  const [jePersonAnsicht, setJePersonAnsicht] = useState(false);
+  const paar = szenario.haushalt.verheiratet && szenario.personen.length > 1;
+  const nachPerson = jePerson(zeile).map((b) => ({
+    ...b,
+    titel: b.person === null ? 'Haushalt' : personNameAus(szenario.personen, b.person),
+    farbe: PERSON_FARBE[b.person === 'A' ? 0 : b.person === 'B' ? 1 : 2],
+    sichtbar: b.posten.filter((p) => p.nettoJahr !== 0),
+  }));
+  const getrennt = paar && jePersonAnsicht;
+
   const luecke = versorgungsluecke(zeile);
   // Mehrere Betriebsrenten bei einer Person: Der Freibetrag gilt fuer ihre
   // Summe. Ohne diesen Hinweis wirken die Abzuege wie ein Rechenfehler, weil
@@ -157,11 +202,73 @@ export function Kassenbon({
         </div>
       </div>
 
+      {/*
+        Nur bei Ehepaaren. Der Balken darueber bleibt schichtfarbig: er
+        beantwortet die Frage "Ziel erreicht?", und die ist eine des
+        Haushalts, nicht einer Person.
+      */}
+      {paar && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
+          <Schalter
+            label="Je Person aufschlüsseln"
+            wert={jePersonAnsicht}
+            onChange={setJePersonAnsicht}
+          />
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            {jePersonAnsicht
+              ? 'Dieselben Zahlen, nach Inhaber sortiert statt nach Schicht.'
+              : 'Zeigt getrennt, womit jeder von Ihnen beiden dasteht.'}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2 sm:space-y-3">
-        {nachSchicht.map(({ schicht, posten, netto }) =>
-          posten.length === 0 ? null : (
-            <SchichtBlock key={schicht} schicht={schicht} netto={netto} kinder={posten} w={w} />
-          ),
+        {getrennt
+          /*
+            Hier wird der Block AUCH gezeigt, wenn keine Zeile ueber null
+            liegt — anders als bei den Schichten. Wer gerade auf "je Person"
+            umgeschaltet hat, sucht genau diese Person; verschwindet sie
+            stillschweigend, bleibt die Frage offen, die er gestellt hat.
+          */
+          ? nachPerson.map((b) => (
+            <PostenBlock
+              key={b.person ?? 'haushalt'}
+              titel={b.titel}
+              farbe={b.farbe}
+              netto={b.nettoJahr}
+              kinder={b.sichtbar}
+              w={w}
+              leerText="Keine eigenen Einkünfte in diesem Jahr."
+            />
+          ))
+          : nachSchicht.map(({ schicht, posten, netto }) =>
+            posten.length === 0 ? null : (
+              <PostenBlock
+                key={schicht}
+                titel={SCHICHT[schicht].titel}
+                farbe={SCHICHT[schicht]}
+                netto={netto}
+                kinder={posten}
+                w={w}
+              />
+            ),
+          )}
+
+        {/*
+          Der Satz, ohne den die Aufteilung mehr verspricht, als sie haelt.
+          Er steht nur in der getrennten Ansicht — dort, wo die Zahl steht,
+          die er einordnet.
+        */}
+        {getrennt && (
+          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+            <strong>Die Steuer je Person ist ein Anteil, keine eigene Rechnung.</strong>{' '}
+            Verheiratete werden zusammen veranlagt; die gemeinsame Steuer wird hier nach dem
+            Beitrag zum zu versteuernden Einkommen aufgeteilt. Allein veranlagt zahlte jeder
+            von beiden mehr — der Splittingvorteil entsteht nur gemeinsam und gehört beiden.
+            {nachPerson.some((b) => b.person === null) && (
+              <> Was keiner Person zuzuordnen ist, steht unter <strong>Haushalt</strong>.</>
+            )}
+          </p>
         )}
 
         {geteilt && (

@@ -16,6 +16,7 @@ import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
 import { RuhestandVerlauf } from './RuhestandVerlauf';
+import { JePersonSeite } from './JePerson';
 import { Kaufkraft } from './Kaufkraft';
 import { Krankenversicherung } from './Krankenversicherung';
 import { Sparziel } from './Sparziel';
@@ -106,9 +107,13 @@ export function Gutachten({
   const nettoHeute = heute(zeile.nettoMonat);
   const lueckeHeute = Math.max(0, bedarfHeute - nettoHeute);
 
+  // Nur bei Ehepaaren: sonst stuende auf der Seite alles bei einer Person.
+  const beidePartner = h.verheiratet && szenario.personen.length > 1;
+
   const abschnitte = [
     'Ihre Angaben und Verträge',
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
+    ...(beidePartner ? [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`] : []),
     ...(lang ? [
       'Ihre Einkünfte im Ruhestand',
       'Was Ihr Geld dann noch wert ist',
@@ -245,6 +250,14 @@ export function Gutachten({
           inflation={szenario.annahmen.inflation}
         />
       )}
+
+      {/*
+        Nur bei Ehepaaren, dafuer in BEIDEN Umfaengen: Die Aufteilung ist
+        genau das, was im Gespraech gefragt wird, und die Kurzfassung ist die
+        Gespraechsfassung. Ein Alleinstehender bekaeme eine Seite, auf der
+        alles bei einer Person steht.
+      */}
+      {ergebnis && beidePartner && <JePersonSeite zeile={zeile} szenario={szenario} />}
 
       {lang && <RuhestandVerlauf zeilen={fenster} />}
       {lang && <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />}
