@@ -125,7 +125,7 @@ export function Gutachten({
     ...(lang ? [
       'Ihre Einkünfte im Ruhestand',
       'Was Ihr Geld dann noch wert ist',
-      ...(pkv ? ['Ihre Krankenversicherung im Alter'] : []),
+      ...(pkv ? [`Die Krankenversicherung von ${pkv.person} im Alter`] : []),
       ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
       ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
       'Zum Mitnehmen',
@@ -279,7 +279,7 @@ export function Gutachten({
       {lang && pkv && (
         <Krankenversicherung
           ergebnis={pkv}
-          steigerung={szenario.haushalt.pkv.steigerung}
+          steigerung={pkv.steigerung}
           inflation={szenario.annahmen.inflation}
           zielNettoMonat={zeile.zielNettoMonat}
         />

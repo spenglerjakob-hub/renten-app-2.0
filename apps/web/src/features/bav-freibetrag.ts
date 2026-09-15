@@ -1,4 +1,4 @@
-import { bavFreibetragMonat, parameterFuer, type Szenario } from '@renten/engine';
+import { bavFreibetragMonat, parameterFuer, kvProfil, type Szenario } from '@renten/engine';
 import { istKapital } from './vertragsarten';
 import { personNameAus } from './personen';
 
@@ -48,11 +48,14 @@ function laufendeBezuege(szenario: Szenario, personId: string): number {
  * waere blosses Rauschen.
  */
 export function geteilterFreibetrag(szenario: Szenario, jahr: number): GeteilterFreibetrag | null {
-  // Privat Versicherte zahlen eine Praemie; Freibetrag und Freigrenze der
-  // gesetzlichen Kasse spielen bei ihnen keine Rolle.
-  if (szenario.haushalt.kvStatus === 'pkv') return null;
-
+  /*
+    Privat Versicherte zahlen eine Praemie; Freibetrag und Freigrenze der
+    gesetzlichen Kasse spielen bei ihnen keine Rolle. Geprueft wird das JE
+    PERSON — in einem gemischten Haushalt gilt der Hinweis nur fuer die
+    gesetzlich versicherte Haelfte.
+  */
   const betroffen = szenario.personen
+    .filter((x) => kvProfil(szenario, x).status !== 'pkv')
     .filter((x) => laufendeBezuege(szenario, x.id) > 1)
     .map((x) => personNameAus(szenario.personen, x.id));
   if (betroffen.length === 0) return null;

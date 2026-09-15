@@ -136,6 +136,22 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
             <Zweispaltig>
               <Angabe feld="Geburtsdatum" wert={p.geburtsdatum || '—'} />
               <Angabe feld="Rentenbeginn" wert={p.rentenbeginn || '—'} />
+              {/*
+                Nur wenn sie vom Haushalt abweicht — sonst stuende dieselbe
+                Angabe dreimal auf der Seite. Sie abzudrucken ist wichtig:
+                Der Unterschied zwischen KVdR und privat macht im Alter
+                mehrere hundert Euro im Monat aus.
+              */}
+              {p.kvStatus !== undefined && (
+                <Angabe
+                  feld="Krankenversicherung (abweichend)"
+                  wert={p.kvStatus === 'pkv' && p.pkv
+                    ? `${KV_TEXT.pkv}, ${euro(p.pkv.praemieMonat)} im Monat`
+                    : p.krankenkasse
+                      ? `${KV_TEXT[p.kvStatus]} (${p.krankenkasse})`
+                      : KV_TEXT[p.kvStatus]}
+                />
+              )}
               <Angabe feld="Versorgung" wert={ART_TEXT[p.art]} />
               {p.art === 'grv' ? (
                 <Angabe feld="Heutiger Rentenanspruch" wert={`${euro(p.grvBruttoHeute)} im Monat`} />

@@ -1,5 +1,12 @@
 import { ZUSCHLAG_QUOTE, ZUSCHLAG_BIS_ALTER, DAEMPFUNG_AB_ALTER } from '@renten/engine';
-import { useSzenario } from '../store/szenario';
+import { useSzenario, type SzenarioParsed } from '../store/szenario';
+
+/**
+ * Der Typ des SCHEMAS, nicht der des Rechenkerns: Das Schema fuehrt
+ * zusaetzlich die Idempotenzmarke `praemieEnthaeltBet`, und ohne sie liesse
+ * sich das Ergebnis nicht zurueck in den Speicher schreiben.
+ */
+export type PkvFelderWert = SzenarioParsed['haushalt']['pkv'];
 import { ZahlFeld, ProzentFeld, Schalter } from '../components/Feld';
 
 /**
@@ -16,18 +23,33 @@ import { ZahlFeld, ProzentFeld, Schalter } from '../components/Feld';
  *   vor, dass die angesparten Mittel ab 65 Erhoehungen daempfen, nicht um wie
  *   viel. Also gehoeren sie dem Nutzer.
  */
-export function PkvFelder() {
-  const pkv = useSzenario((x) => x.szenario.haushalt.pkv);
+/**
+ * Die Felder der privaten Krankenversicherung.
+ *
+ * Wert und Rueckgabe kommen von aussen, seit es sie zweimal gibt: einmal fuer
+ * den Haushalt und einmal je Person, die abweichend versichert ist. Vorher
+ * griff die Komponente selbst auf `haushalt.pkv` zu und liess sich deshalb
+ * nur an einer Stelle einsetzen.
+ */
+export function PkvFelder({ wert, onChange, titel }: {
+  wert?: PkvFelderWert;
+  onChange?: (p: PkvFelderWert) => void;
+  titel?: string;
+}) {
+  const haushaltsPkv = useSzenario((x) => x.szenario.haushalt.pkv);
   const setzeHaushalt = useSzenario((x) => x.setzeHaushalt);
+  const pkv = wert ?? haushaltsPkv;
+  const schreibe = (p: PkvFelderWert) =>
+    (onChange ? onChange(p) : setzeHaushalt({ pkv: p }));
 
-  const setze = (teil: Partial<typeof pkv>) => setzeHaushalt({ pkv: { ...pkv, ...teil } });
+  const setze = (teil: Partial<typeof pkv>) => schreibe({ ...pkv, ...teil });
   const setzeBet = (teil: Partial<typeof pkv.bet>) =>
-    setzeHaushalt({ pkv: { ...pkv, bet: { ...pkv.bet, ...teil } } });
+    schreibe({ ...pkv, bet: { ...pkv.bet, ...teil } });
 
   return (
     <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
       <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-        Ihre private Krankenversicherung
+        {titel ?? 'Ihre private Krankenversicherung'}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">

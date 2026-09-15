@@ -2,6 +2,8 @@ import {
   pkvImJahr, pkvVerlauf, arbeitgeberzuschuss, betVergleich, parameterFuer,
   type PkvJahr, type BetVergleich,
 } from '@renten/engine';
+import { kvProfil } from '@renten/engine';
+import { personName } from './personen';
 import type { SzenarioParsed } from '../store/szenario';
 
 /**
@@ -16,7 +18,11 @@ import type { SzenarioParsed } from '../store/szenario';
 export const LEBENSERWARTUNG = 85;
 
 export interface PkvErgebnis {
-  /** Alter von Person A heute */
+  /** Wessen Versicherung gerechnet wurde */
+  person: string;
+  /** Angenommene Steigerung DIESER Versicherung, p. a. */
+  steigerung: number;
+  /** Alter dieser Person heute */
   alterHeute: number;
   rentenjahr: number;
   alterBeiRentenbeginn: number;
@@ -50,11 +56,23 @@ export function pkvRechnen(
   szenario: SzenarioParsed,
   zielNettoMonatImRentenjahr: number,
 ): PkvErgebnis | null {
-  const h = szenario.haushalt;
-  if (h.kvStatus !== 'pkv' || h.pkv.praemieMonat <= 0) return null;
+  /*
+    DIE PERSON, um die es geht — nicht mehr zwingend Person A.
 
-  const personA = szenario.personen[0];
+    Seit die Krankenversicherung je Person gefuehrt wird, kann in einem
+    gesetzlich versicherten Haushalt die Partnerin privat versichert sein.
+    Gesucht ist deshalb die erste Person, die im Ruhestand privat versichert
+    ist und einen Beitrag eingetragen hat.
+  */
+  const kandidaten = szenario.personen
+    .filter((x) => x.id === 'A' || szenario.haushalt.verheiratet);
+  const personA = kandidaten.find((x) => {
+    const k = kvProfil(szenario, x);
+    return k.status === 'pkv' && k.pkv.praemieMonat > 0;
+  });
   if (!personA) return null;
+  const profil = kvProfil(szenario, personA);
+  const h = { ...szenario.haushalt, pkv: profil.pkv };
 
   const jetzt = new Date().getFullYear();
   const geburtsjahr = Number(personA.geburtsdatum.slice(-4));
@@ -80,13 +98,15 @@ export function pkvRechnen(
 
   const p = parameterFuer(jetzt, {
     indexRate: szenario.annahmen.tarifIndex,
-    zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
+    zusatzbeitrag: profil.zusatzbeitrag,
   });
   const beamter = szenario.einkommenHeute.modus === 'besoldung';
   const jahresbrutto = szenario.einkommenHeute.betrag * szenario.einkommenHeute.auszahlungen;
   const zuschussHeute = beamter ? 0 : arbeitgeberzuschuss(heute.praemieMonat, jahresbrutto, p);
 
   return {
+    person: personName(personA),
+    steigerung: profil.pkv.steigerung,
     alterHeute,
     rentenjahr,
     alterBeiRentenbeginn,

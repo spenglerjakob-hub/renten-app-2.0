@@ -41,7 +41,7 @@ export function Krankenversicherung({
 
   return (
     <Seite
-      titel="Ihre Krankenversicherung im Alter"
+      titel={`Die Krankenversicherung von ${ergebnis.person} im Alter`}
       nummer={`Privat versichert · ${prozent(steigerung)} angenommene Steigerung`}
     >
       <div className="grid grid-cols-3 gap-3">

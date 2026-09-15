@@ -17,6 +17,14 @@ import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
+/** Dieselben Bezeichnungen wie im Ausdruck — zwei Woerter fuer dieselbe Sache
+    verwirren mehr, als sie erklaeren. */
+const KV_TEXT = {
+  kvdr: 'gesetzlich pflichtversichert (KVdR)',
+  freiwillig: 'gesetzlich freiwillig versichert',
+  pkv: 'privat versichert',
+} as const;
+
 export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
   ergebnis?: ProjektionsErgebnis | null;
   onEhepartnerDialog?: () => void;
@@ -334,6 +342,75 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
               />
             )}
           </div>
+
+          {/*
+            ABWEICHEND VERSICHERT — nur bei Paaren, und nur auf Wunsch.
+
+            Der Regelfall ist, dass beide gleich versichert sind; dann steht
+            die Angabe einmal oben und nicht zweimal hier. Wer abweicht, ist
+            aber kein Randfall: Beamter und Angestellte, Selbststaendiger und
+            Arbeitnehmerin. Fuer die war bis hierher gar kein Platz.
+          */}
+          {s.haushalt.verheiratet && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <Schalter
+                label="Abweichend krankenversichert"
+                wert={p.kvStatus !== undefined}
+                onChange={(b) => setzePerson(p.id, b
+                  ? { kvStatus: s.haushalt.kvStatus }
+                  : { kvStatus: undefined, kvErwerb: undefined, zusatzbeitrag: undefined,
+                      krankenkasse: undefined, pkv: undefined })}
+              />
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                {p.kvStatus !== undefined
+                  ? 'Eigener Status, eigene Kasse, eigener Beitrag — unabhängig vom Haushalt.'
+                  : `Versichert wie der Haushalt: ${KV_TEXT[s.haushalt.kvStatus]}.`}
+              </p>
+
+              {p.kvStatus !== undefined && (
+                <>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <AuswahlFeld
+                      label="Krankenversicherung im Ruhestand"
+                      wert={p.kvStatus}
+                      onChange={(v) => setzePerson(p.id, { kvStatus: v })}
+                      optionen={[
+                        { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
+                        { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
+                        { wert: 'pkv', text: 'Privat versichert' },
+                      ]}
+                    />
+                    {p.kvStatus !== 'pkv' && KRANKENKASSEN.length > 0 && (
+                      <AuswahlFeld
+                        label="Krankenkasse"
+                        wert={p.krankenkasse ?? ''}
+                        onChange={(name) => {
+                          const k = kasseNach(name);
+                          setzePerson(p.id, k
+                            ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
+                            : { krankenkasse: undefined });
+                        }}
+                        hilfe={KASSEN_STAND}
+                        optionen={[
+                          { wert: '', text: 'Wie der Haushalt' },
+                          ...KRANKENKASSEN.map((k) => ({
+                            wert: k.name, text: `${k.name} — ${prozent(k.zusatzbeitrag, 2)}`,
+                          })),
+                        ]}
+                      />
+                    )}
+                  </div>
+                  {p.kvStatus === 'pkv' && (
+                    <PkvFelder
+                      titel={`Private Krankenversicherung von ${personName(p)}`}
+                      wert={p.pkv ?? s.haushalt.pkv}
+                      onChange={(neu) => setzePerson(p.id, { pkv: neu })}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </Abschnitt>
       ))}
 

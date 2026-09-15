@@ -20,9 +20,18 @@ import type { SzenarioParsed } from '../store/szenario';
 export function KvdrHinweis({ szenario }: { szenario: SzenarioParsed }) {
   const unterschied = useMemo(() => {
     const rechne = (kvStatus: 'kvdr' | 'freiwillig') => {
+      /*
+        Der Haushaltswert wird umgestellt UND die abweichenden Angaben der
+        Personen mit. Sonst rechnete der Vergleich fuer jemanden, der eigens
+        "freiwillig" gewaehlt hat, zweimal dasselbe und wiese einen
+        Unterschied von null aus — obwohl es ihn gibt.
+      */
       const klon: Szenario = {
         ...szenario,
         haushalt: { ...szenario.haushalt, kvStatus },
+        personen: szenario.personen.map((p) => (
+          p.kvStatus === 'pkv' ? p : { ...p, kvStatus: undefined }
+        )),
       };
       const e = projiziere(klon);
       return e.zeilen.find((z) => z.jahr === e.ruhestandsjahr) ?? null;
