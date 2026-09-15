@@ -57,6 +57,16 @@ export interface Person {
   /** GRV: heutiger monatlicher Bruttoanspruch */
   grvBruttoHeute: number;
 
+  /**
+   * Gewuenschtes Netto dieser Person ALLEIN, in heutiger Kaufkraft.
+   *
+   * Nur fuer die Einzelbetrachtung. Ohne Angabe gilt ein Anteil am
+   * Haushaltsziel (`EINZELQUOTE`): Ein Einpersonenhaushalt braucht nicht die
+   * Haelfte, sondern rund zwei Drittel — Miete, Strom und Grundgebuehren
+   * fallen einmal an.
+   */
+  zielNettoHeute?: number;
+
   /** Pension */
   besoldungsgruppe: string;
   besoldungsstufe: number;

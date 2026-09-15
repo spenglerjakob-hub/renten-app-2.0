@@ -51,6 +51,15 @@ export const personSchema = z.object({
   rentenbeginnManuell: z.boolean().default(false),
   art: z.enum(['grv', 'pension']).default('grv'),
   grvBruttoHeute: z.number().min(0).default(0),
+  /**
+   * Gewuenschtes Netto dieser Person ALLEIN, in heutiger Kaufkraft.
+   *
+   * `.optional()` und nicht `.default(...)`: Ohne Angabe leitet die
+   * Einzelbetrachtung den Wert aus dem Haushaltsziel ab. Ein Default muesste
+   * hier eine Zahl erfinden, die vom Haushaltsziel nichts weiss — und die
+   * bliebe dann stehen, wenn der Nutzer das Haushaltsziel spaeter aendert.
+   */
+  zielNettoHeute: z.number().min(0).optional(),
   besoldungsgruppe: z.string().default('A13'),
   besoldungsstufe: z.number().int().min(1).max(12).default(4),
   ruhegehaltssatz: z.number().min(0).max(71.75).default(71.75),

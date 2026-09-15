@@ -82,6 +82,7 @@ export {
   type Sparziel,
 } from './analyse/sparziel.js';
 export { jePerson, type PersonenBlock } from './analyse/je-person.js';
+export { nurPerson, EINZELQUOTE } from './analyse/allein.js';
 export {
   vertragsTuev, renteOderKapital, svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE,
   type TuevAnnahmen, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
