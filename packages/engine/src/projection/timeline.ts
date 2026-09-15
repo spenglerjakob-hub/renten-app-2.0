@@ -1,4 +1,4 @@
-import type { Szenario, Person, Vertrag, EinkommenHeute } from '../model.js';
+import type { Szenario, Person, PersonId, Vertrag, EinkommenHeute } from '../model.js';
 import { parameterFuer, rechtsstandInfo, type RechtsstandInfo } from '../params/registry.js';
 import {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer, type Einkunftsquelle,
@@ -32,6 +32,19 @@ export interface JahresPosten {
   kvPvJahr: number;
   steuerJahr: number;
   nettoJahr: number;
+  /**
+   * Wem der Posten gehoert — fehlt er, gehoert er dem HAUSHALT.
+   *
+   * OPTIONAL und nicht `PersonId | 'haushalt'`: Der Entnahmeplan gehoert
+   * wirklich keinem von beiden, und ein Pflichtfeld zwaenge jede kuenftige
+   * Postenquelle zu einer Erfindung.
+   *
+   * Gefuellt wird er ausschliesslich aus der Zuordnung, die die Zeitachse
+   * ohnehin schon aufloest (`personen.find(...) ?? personA`). Ihn hier aus
+   * der Kennung zurueckzurechnen waere eine zweite Regel neben jener — und
+   * genau daran ist die Beitragspflicht schon einmal gescheitert.
+   */
+  person?: PersonId;
 }
 
 export interface Jahreszeile {
@@ -537,6 +550,13 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const kaufkraftfaktor = Math.pow(1 + s.annahmen.inflation, jahreAbHeute);
 
     const quellen: Einkunftsquelle[] = [];
+    /*
+      Welche Quelle wem gehoert. Gefuellt beim Anlegen, aus der dort bereits
+      aufgeloesten Person — nicht spaeter aus `s.vertraege` zurueckgesucht.
+      Eine zweite Zuordnungsregel waere eine Regel zu viel, und der Umweg
+      ueber `find` lief ausserdem je Quelle und Jahr.
+    */
+    const quelleZuPerson = new Map<string, PersonId>();
     const beitragspflichtig: Beitragspflichtig[] = [];
     const posten: JahresPosten[] = [];
 
@@ -590,6 +610,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         bezeichnung: k.istVersorgungsbezug ? `Pension ${k.person.name || k.person.id}` : `Gesetzliche Rente ${k.person.name || k.person.id}`,
         brutto, zveBeitrag, kvPv: 0,
       });
+      quelleZuPerson.set(`person-${k.person.id}`, k.person.id);
       beitragspflichtig.push({
         id: `person-${k.person.id}`,
         art: k.istVersorgungsbezug ? 'versorgungsbezug' : 'gesetzlicheRente',
@@ -677,6 +698,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           kvPv: a.sv,
         });
         erwerbSv.set(id, a.sv);
+        quelleZuPerson.set(id, k.person.id);
       });
     }
 
@@ -712,6 +734,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           id: v.id, bezeichnung, brutto: r.brutto,
           zveBeitrag: Math.max(0, r.zveBeitrag - pausch), kvPv: 0,
         });
+        quelleZuPerson.set(v.id, k.person.id);
       }
       if (r.kvArt) {
         const monatsbetrag = r.kvMonatsbetrag ?? r.brutto / 12;
@@ -858,6 +881,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         kvPvJahr: anteilKv,
         steuerJahr: steuer,
         nettoJahr: q.brutto - anteilKv - steuer,
+        person: quelleZuPerson.get(q.id),
       });
     }
 
@@ -899,6 +923,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         kvPvJahr,
         steuerJahr: steuer,
         nettoJahr: e.bruttoProJahr - steuer - kvPvJahr,
+        person: k.person.id,
       });
     }
 
@@ -946,6 +971,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         kvPvJahr: kvPvVertrag,
         steuerJahr,
         nettoJahr: bruttoJahr - steuerJahr - kvPvVertrag,
+        person: k.person.id,
       });
     }
 
