@@ -489,3 +489,55 @@ describe('PKV: Gesamtbeitrag statt Praemie ohne Entlastungstarif', () => {
     expect(h.pkv.praemieMonat).toBe(620);
   });
 });
+
+describe('Das Zielnetto der Person: vom Allein-Bedarf zum Anteil', () => {
+  /*
+    Das Feld hiess `zielNettoHeute` und meinte den Bedarf dieser Person
+    ALLEIN. Jetzt heisst es `zielAnteilHeute` und meint ihren Anteil am
+    Haushaltsziel — dieselbe Zahl mit anderer Aussage. Ungeprueft gelesen
+    haette sie das Haushaltsziel um ein Drittel zu hoch angesetzt.
+  */
+  const mitAltfeld = {
+    ...vollstaendig,
+    personen: [
+      { ...vollstaendig.personen[0]!, zielNettoHeute: 2000 },
+      vollstaendig.personen[1]!,
+    ],
+  };
+
+  it('rechnet den frueheren Allein-Bedarf in einen Anteil um', () => {
+    const r = szenarioSchema.safeParse(mitAltfeld);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    // 2.000 EUR Allein-Bedarf entstehen aus einem Anteil von 1.500 EUR
+    // (drei Viertel — die Umkehrung der vier Drittel).
+    expect(r.data.personen[0]!.zielAnteilHeute).toBeCloseTo(1500, 6);
+    // Das Altfeld existiert danach nicht mehr.
+    expect('zielNettoHeute' in r.data.personen[0]!).toBe(false);
+  });
+
+  it('ein zweiter Durchlauf aendert nichts mehr', () => {
+    const einmal = szenarioSchema.parse(mitAltfeld);
+    const zweimal = szenarioSchema.parse(JSON.parse(exportiere(einmal)));
+    expect(zweimal.personen[0]!.zielAnteilHeute)
+      .toBeCloseTo(einmal.personen[0]!.zielAnteilHeute!, 6);
+  });
+
+  it('ein bereits gesetzter Anteil bleibt unberuehrt', () => {
+    const r = szenarioSchema.parse({
+      ...vollstaendig,
+      personen: [
+        { ...vollstaendig.personen[0]!, zielAnteilHeute: 1800, zielNettoHeute: 2000 },
+        vollstaendig.personen[1]!,
+      ],
+    });
+    expect(r.personen[0]!.zielAnteilHeute).toBe(1800);
+  });
+
+  it('ohne beide Felder bleibt der Anteil offen', () => {
+    // Offen heisst: Die Oberflaeche zeigt die Haelfte des Haushaltsziels, und
+    // die Summe bleibt genau das, was dort steht.
+    const r = szenarioSchema.parse(vollstaendig);
+    expect(r.personen[0]!.zielAnteilHeute).toBeUndefined();
+  });
+});

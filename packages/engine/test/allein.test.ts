@@ -1,7 +1,7 @@
 import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import { projiziere } from '../src/projection/timeline.js';
-import { nurPerson, EINZELQUOTE } from '../src/analyse/allein.js';
+import { nurPerson, alleinBedarf, EINZELQUOTE } from '../src/analyse/allein.js';
 import { jePerson } from '../src/analyse/je-person.js';
 import type { Szenario } from '../src/model.js';
 
@@ -138,14 +138,31 @@ describe('Was das Alleinsein kostet', () => {
     expect(allein.kvPvGesamt).toBeGreaterThan(0);
   });
 
-  it('das eigene Ziel ersetzt das des Haushalts', () => {
-    const ohneEigenes = nurPerson(paar(), 'A');
-    expect(ohneEigenes.haushalt.zielNettoHeute).toBeCloseTo(3000 * EINZELQUOTE, 6);
+  it('der eigene Anteil wird auf einen Einpersonenhaushalt hochgerechnet', () => {
+    /*
+      Ohne eigenen Anteil ist er die Haelfte des Haushaltsziels. Die Probe,
+      die den ganzen Umbau traegt: Daraus kommt genau der Wert heraus, mit dem
+      die Einzelbetrachtung vorher gerechnet hat.
+    */
+    const ohneEigenen = nurPerson(paar(), 'A');
+    expect(ohneEigenen.haushalt.zielNettoHeute).toBeCloseTo(3000 * EINZELQUOTE, 6);
 
+    // Ein Anteil von 1.800 EUR bedeutet allein 2.400 EUR — vier Drittel.
     const mitEigenem = nurPerson(paar({
-      personen: [{ ...paar().personen[0]!, zielNettoHeute: 2400 }, paar().personen[1]!],
+      personen: [{ ...paar().personen[0]!, zielAnteilHeute: 1800 }, paar().personen[1]!],
     }), 'A');
-    expect(mitEigenem.haushalt.zielNettoHeute).toBe(2400);
+    expect(mitEigenem.haushalt.zielNettoHeute).toBeCloseTo(2400, 6);
+    expect(alleinBedarf(1800)).toBeCloseTo(2400, 6);
+  });
+
+  it('zwei unveraenderte Anteile ergeben wieder das Haushaltsziel', () => {
+    // Die Eingabe ist der Anteil, die Summe das Ergebnis. Solange niemand
+    // etwas eintraegt, ist jeder Anteil die Haelfte — und die Summe genau das,
+    // was vorher dastand.
+    const h = paar().haushalt.zielNettoHeute;
+    const anteil = (id: 'A' | 'B') =>
+      paar().personen.find((x) => x.id === id)!.zielAnteilHeute ?? h / 2;
+    expect(anteil('A') + anteil('B')).toBeCloseTo(h, 6);
   });
 
   it('die Praemie haelftig, das Planerkapital draussen', () => {

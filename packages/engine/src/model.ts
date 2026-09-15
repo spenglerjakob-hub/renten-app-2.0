@@ -58,14 +58,18 @@ export interface Person {
   grvBruttoHeute: number;
 
   /**
-   * Gewuenschtes Netto dieser Person ALLEIN, in heutiger Kaufkraft.
+   * ANTEIL dieser Person am Zielnetto des Haushalts, in heutiger Kaufkraft.
    *
-   * Nur fuer die Einzelbetrachtung. Ohne Angabe gilt ein Anteil am
-   * Haushaltsziel (`EINZELQUOTE`): Ein Einpersonenhaushalt braucht nicht die
-   * Haelfte, sondern rund zwei Drittel — Miete, Strom und Grundgebuehren
-   * fallen einmal an.
+   * Die beiden Anteile ergeben zusammen das Haushaltsziel — sie sind die
+   * Eingabe, die Summe ist das Ergebnis. Ohne Angabe gilt die Haelfte.
+   *
+   * ACHTUNG, DAS IST NICHT DER ALLEIN-BEDARF. Wer allein lebt, zahlt Miete
+   * und Grundgebuehren nicht mehr geteilt; die Einzelbetrachtung rechnet den
+   * Anteil deshalb hoch (`analyse/allein.ts`). Das Feld hiess frueher
+   * `zielNettoHeute` und meinte den Allein-Bedarf — das Schema rechnet alte
+   * Dateien um, damit aus einer Zahl nicht still eine andere Aussage wird.
    */
-  zielNettoHeute?: number;
+  zielAnteilHeute?: number;
 
   /*
     KRANKENVERSICHERUNG JE PERSON.

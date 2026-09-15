@@ -1,5 +1,5 @@
 import {
-  BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag, EINZELQUOTE,
+  BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag,
   type ProjektionsErgebnis,
 } from '@renten/engine';
 import { RotateCcw, Target } from 'lucide-react';
@@ -36,12 +36,17 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
   const rentenbeginnZuruecksetzen = useSzenario((x) => x.rentenbeginnZuruecksetzen);
   const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
   const setzeKind = useSzenario((x) => x.setzeKind);
+  const setzeZielAnteil = useSzenario((x) => x.setzeZielAnteil);
 
   // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
   const jetzt = new Date().getFullYear();
   const avdParam = parameterFuer(Math.max(jetzt, 2027), { indexRate: s.annahmen.tarifIndex }).avd;
 
   const nameVon = (id: string) => personNameAus(s.personen, id);
+  // Dieselbe Auswahl, die auch der Rechenkern trifft: Person B bleibt beim
+  // Umschalten auf "Single" erhalten, wird aber nicht mitgerechnet.
+  const gerechnetePersonen = s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet);
+  const paar = s.haushalt.verheiratet && gerechnetePersonen.length > 1;
   const selbststaendig = s.einkommenHeute.modus === 'selbststaendig';
 
   /*
@@ -74,13 +79,49 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
           <Target className="h-3.5 w-3.5" aria-hidden /> Ihr Ziel
         </h3>
-        <ZahlFeld
-          label="Zielnetto im Alter (Kaufkraft heute)"
-          wert={s.haushalt.zielNettoHeute}
-          onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
-          einheit="€"
-          gross
-        />
+        {/*
+          BEI PAAREN ZWEI FELDER, darunter die Summe.
+
+          Erfasst wird, welchen Anteil am gemeinsamen Ziel jeder beansprucht;
+          das Haushaltsziel ist ihr Ergebnis und kein Eingabefeld mehr. Eine
+          Zahl, die man nicht aendern kann, soll auch nicht wie ein Feld
+          aussehen — deshalb steht sie darunter als Zeile und nicht als
+          gesperrtes Eingabefeld.
+
+          Alleinstehende sehen unveraendert das eine Feld: Ein Anteil an
+          nichts waere dort nur eine Rechenstufe ohne Aussage.
+        */}
+        {paar ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {gerechnetePersonen.map((p) => (
+                <ZahlFeld
+                  key={p.id}
+                  label={`Zielnetto ${personName(p)}`}
+                  wert={Math.round(p.zielAnteilHeute ?? s.haushalt.zielNettoHeute / 2)}
+                  onChange={(n) => setzeZielAnteil(p.id, n)}
+                  einheit="€"
+                />
+              ))}
+            </div>
+            <div className="mt-3 flex items-baseline justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
+                Haushaltsziel gesamt
+              </span>
+              <span className="text-xl font-bold tabular-nums text-indigo-900">
+                {euro(s.haushalt.zielNettoHeute)}
+              </span>
+            </div>
+          </>
+        ) : (
+          <ZahlFeld
+            label="Zielnetto im Alter (Kaufkraft heute)"
+            wert={s.haushalt.zielNettoHeute}
+            onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
+            einheit="€"
+            gross
+          />
+        )}
         {zielAnteil !== null && (
           <p className="mt-2 text-xs leading-relaxed text-slate-600">
             Das sind <strong className="text-indigo-800">{prozent(zielAnteil, 0)}</strong> Ihres
@@ -90,6 +131,11 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
           An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
           die nötig wäre, um sie zu schließen.
+          {paar && (
+            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>. In
+              der Einzelbetrachtung wird der Anteil auf einen Einpersonenhaushalt hochgerechnet
+              — allein fallen Miete und Grundgebühren nicht mehr geteilt an.</>
+          )}
         </p>
       </section>
 
@@ -326,20 +372,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
                   onChange={(n) => setzePerson(p.id, { ruhegehaltssatz: n })} max={71.75} einheit="%"
                   hilfe="Maximal 71,75 % (§ 14 BeamtVG)." />
               </>
-            )}
-            {/*
-              Nur bei Paaren, und nur fuer die Einzelbetrachtung. Das
-              Haushaltsziel gegen die Einkuenfte einer Person gehalten ergaebe
-              eine Luecke, die niemand so hat.
-            */}
-            {s.haushalt.verheiratet && (
-              <ZahlFeld
-                label="Gewünschtes Netto allein"
-                wert={p.zielNettoHeute ?? Math.round(s.haushalt.zielNettoHeute * EINZELQUOTE)}
-                onChange={(n) => setzePerson(p.id, { zielNettoHeute: n })}
-                einheit="€"
-                hilfe={`Für die Einzelbetrachtung. Vorbelegt mit zwei Dritteln des Haushaltsziels — Miete und Grundgebühren fallen einmal an.`}
-              />
             )}
           </div>
 

@@ -64,6 +64,20 @@ export interface SzenarioStore {
    * laeuft sicher auseinander.
    */
   setzeKinderAnzahl: (n: number) => void;
+  /**
+   * Den Zielanteil EINER Person setzen — und das Haushaltsziel als Summe.
+   *
+   * Bei Paaren sind die beiden Anteile die Eingabe, das Haushaltsziel ist
+   * ihr Ergebnis. Als Aktion im Store und nicht in der Oberflaeche, aus dem
+   * gleichen Grund wie bei `setzeKinderAnzahl`: Es sind zwei Felder, die
+   * zusammenpassen muessen, und eine kopierte Regel laeuft auseinander.
+   *
+   * Festgeschrieben wird dabei AUCH der nicht angefasste Anteil. Bliebe er
+   * offen, zeigte die Oberflaeche fuer ihn die halbe Haushaltssumme — und die
+   * aendert sich ja gerade. Beim Tippen in das eine Feld spraenge der Wert im
+   * anderen.
+   */
+  setzeZielAnteil: (id: 'A' | 'B', betrag: number) => void;
   setzeKind: (index: number, p: Partial<AvdKind>) => void;
   setzeAnnahmen: (p: Partial<SzenarioParsed['annahmen']>) => void;
   setzeEinkommen: (p: Partial<SzenarioParsed['einkommenHeute']>) => void;
@@ -136,6 +150,26 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     return {
       ...s,
       haushalt: { ...s.haushalt, kinder, kinderUnter25: anzahl, hatKinder: anzahl > 0 },
+    };
+  }),
+
+  setzeZielAnteil: (id, betrag) => get().setze((s) => {
+    const haelfte = s.haushalt.zielNettoHeute / 2;
+    const anteile = new Map(s.personen.map((x) => [
+      x.id,
+      x.id === id ? Math.max(0, betrag) : (x.zielAnteilHeute ?? haelfte),
+    ]));
+    /*
+      Nur die gerechneten Personen zaehlen. Person B bleibt beim Umschalten
+      auf "Single" erhalten, wird aber nicht mitgerechnet — ihr Anteil darf
+      das Haushaltsziel dann nicht anheben.
+    */
+    const gerechnet = s.personen.filter((x) => x.id === 'A' || s.haushalt.verheiratet);
+    const summe = gerechnet.reduce((sum, x) => sum + (anteile.get(x.id) ?? 0), 0);
+    return {
+      ...s,
+      haushalt: { ...s.haushalt, zielNettoHeute: summe },
+      personen: s.personen.map((x) => ({ ...x, zielAnteilHeute: anteile.get(x.id) })),
     };
   }),
 

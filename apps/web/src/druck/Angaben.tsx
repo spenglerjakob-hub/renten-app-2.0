@@ -98,7 +98,19 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
           </>
         )}
         {grvZeile && <Angabe feld="Gesetzliche Rentenversicherung" wert={grvZeile} />}
-        <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
+        {/*
+          Bei Paaren die beiden Anteile mit, aber in EINER Zeile: Diese Seite
+          bricht bei drei und mehr Vertraegen ohnehin schon um.
+        */}
+        <Angabe
+          feld="Gewünschtes Netto im Monat (heute)"
+          wert={h.verheiratet && szenario.personen.length > 1
+            ? `${euro(h.zielNettoHeute)} — ${szenario.personen
+              .filter((p) => p.id === 'A' || h.verheiratet)
+              .map((p) => `${personName(p)} ${euro(p.zielAnteilHeute ?? h.zielNettoHeute / 2)}`)
+              .join(', ')}`
+            : euro(h.zielNettoHeute)}
+        />
       </Zweispaltig>
 
       {h.kinder.length > 0 && (

@@ -295,6 +295,11 @@ export function Kassenbon({
                 zählt die <strong>Hälfte</strong>.</>
             )}
             {' '}Ein Startkapital des Entnahmeplans bleibt außen vor — es gehört beiden.
+            {' '}Und das Ziel ist ein anderes: Der eingetragene <strong>Anteil</strong> am
+            gemeinsamen Budget wird auf einen Einpersonenhaushalt hochgerechnet, weil Miete
+            und Grundgebühren allein nicht mehr geteilt anfallen — hier{' '}
+            <strong>{euro(zeile.zielNettoMonat / (kaufkraftHeute ? zeile.kaufkraftfaktor : 1))}</strong>{' '}
+            im Jahr {zeile.jahr}.
           </p>
         )}
 

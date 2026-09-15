@@ -133,12 +133,18 @@ export const personSchema = z.object({
   art: z.enum(['grv', 'pension']).default('grv'),
   grvBruttoHeute: z.number().min(0).default(0),
   /**
-   * Gewuenschtes Netto dieser Person ALLEIN, in heutiger Kaufkraft.
+   * ANTEIL dieser Person am Zielnetto des Haushalts, in heutiger Kaufkraft.
    *
-   * `.optional()` und nicht `.default(...)`: Ohne Angabe leitet die
-   * Einzelbetrachtung den Wert aus dem Haushaltsziel ab. Ein Default muesste
-   * hier eine Zahl erfinden, die vom Haushaltsziel nichts weiss — und die
-   * bliebe dann stehen, wenn der Nutzer das Haushaltsziel spaeter aendert.
+   * `.optional()` und nicht `.default(...)`: Ohne Angabe gilt die Haelfte des
+   * Haushaltsziels. Ein Default muesste hier eine Zahl erfinden, die vom
+   * Haushaltsziel nichts weiss — und die bliebe dann stehen, wenn der Nutzer
+   * es spaeter aendert.
+   */
+  zielAnteilHeute: z.number().min(0).optional(),
+  /**
+   * ALTLAST, nur noch gelesen: Das Feld hiess so und meinte etwas anderes —
+   * den Bedarf dieser Person ALLEIN. Die Umschreibung unten macht daraus den
+   * Anteil, der ihn erzeugt.
    */
   zielNettoHeute: z.number().min(0).optional(),
   /*
@@ -159,7 +165,23 @@ export const personSchema = z.object({
   ruhegehaltssatz: z.number().min(0).max(71.75).default(71.75),
   dienstbeginn: datumString.default('2020-01-01'),
   teilzeitphasen: z.array(teilzeitphaseSchema).default([]),
-});
+}).transform(({ zielNettoHeute, ...p }) => ({
+  ...p,
+  /*
+    Aus dem frueheren Allein-Bedarf wird der Anteil, der ihn erzeugt.
+
+    Die Einzelbetrachtung rechnet einen Anteil mit vier Dritteln hoch (zwei
+    mal `EINZELQUOTE`); der Faktor drei Viertel ist genau die Umkehrung. Ein
+    Wert, der als Allein-Bedarf eingetragen wurde, bedeutet danach dasselbe
+    wie vorher — waehrend dieselbe Zahl ungeprueft als Anteil gelesen das
+    Haushaltsziel um ein Drittel zu hoch angesetzt haette.
+
+    Idempotent ohne Marke: Nach dem Transform gibt es das Altfeld nicht mehr,
+    weder im Wert noch im Typ, und `exportiere` schreibt das geparste Objekt.
+  */
+  zielAnteilHeute: p.zielAnteilHeute
+    ?? (zielNettoHeute !== undefined ? zielNettoHeute * 0.75 : undefined),
+}));
 
 export const vertragSchema = z.object({
   id: z.string(),

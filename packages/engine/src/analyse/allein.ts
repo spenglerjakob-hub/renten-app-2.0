@@ -36,10 +36,25 @@ import type { Szenario, PersonId, EinkommenHeute } from '../model.js';
  * Zwei Drittel, nicht die Haelfte: Miete, Strom und Grundgebuehren fallen
  * einmal an. Die OECD-Aequivalenzskala setzt die zweite erwachsene Person mit
  * 0,5 an — ein Einpersonenhaushalt braucht also 1/1,5 des Paarbedarfs.
- *
- * Nur die Vorbelegung; `Person.zielNettoHeute` sticht sie.
  */
 export const EINZELQUOTE = 2 / 3;
+
+/**
+ * Was ein ANTEIL am Paarbudget allein bedeutet.
+ *
+ * Erfasst wird, welchen Teil des gemeinsamen Ziels jeder beansprucht; die
+ * beiden Anteile ergeben zusammen das Haushaltsziel. Allein zu leben kostet
+ * aber mehr als der eigene Anteil an einem Paarhaushalt — Miete und
+ * Grundgebuehren fallen dann nicht mehr geteilt an.
+ *
+ * Der Faktor ist zweimal `EINZELQUOTE`, also vier Drittel. Die Probe: Bei
+ * gleichen Anteilen (je die Haelfte des Haushaltsziels) kommt genau
+ * `Haushaltsziel x EINZELQUOTE` heraus — der Wert, mit dem die
+ * Einzelbetrachtung vorher gerechnet hat.
+ */
+export function alleinBedarf(anteil: number): number {
+  return anteil * 2 * EINZELQUOTE;
+}
 
 /**
  * Das Szenario auf EINE Person zusammengestrichen.
@@ -100,7 +115,13 @@ export function nurPerson<T extends Szenario>(s: T, id: PersonId): T {
         daran aendert das Alleinsein nichts.
       */
       verheiratet: false,
-      zielNettoHeute: person.zielNettoHeute ?? s.haushalt.zielNettoHeute * EINZELQUOTE,
+      /*
+        Der eigene Anteil, auf einen Einpersonenhaushalt hochgerechnet. Ohne
+        Angabe ist der Anteil die Haelfte des Haushaltsziels — und `2` ist
+        hier kein `personen.length`: Die Quote beschreibt einen
+        Zweipersonenhaushalt, und `nurPerson` wird nur bei Paaren aufgerufen.
+      */
+      zielNettoHeute: alleinBedarf(person.zielAnteilHeute ?? s.haushalt.zielNettoHeute / 2),
       pkv: {
         ...s.haushalt.pkv,
         /*
