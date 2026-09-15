@@ -118,8 +118,11 @@ export function Gutachten({
   // Nur bei Ehepaaren: sonst stuende auf der Seite alles bei einer Person.
   const beidePartner = h.verheiratet && szenario.personen.length > 1;
 
+  /* Entscheidet ueber EINE oder ZWEI Grundlagenseiten — siehe unten. */
+  const hatVertraege = szenario.vertraege.length > 0;
+
   const abschnitte = [
-    'Ihre Angaben und Verträge',
+    ...(hatVertraege ? ['Ihre Angaben', 'Ihre Verträge'] : ['Ihre Angaben und Verträge']),
     `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
     ...(beidePartner ? [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`] : []),
     ...(lang ? [
@@ -244,15 +247,42 @@ export function Gutachten({
       </Seite>
 
       {/*
-        Angaben und Vertraege auf EINER Seite: einzeln fuellte keiner der
-        beiden Bloecke auch nur die halbe Seite. Passt es bei vielen
-        Vertraegen doch nicht, bricht der Browser zwischen ihnen um — also
-        genau das alte Bild, aber nur dann, wenn es noetig ist.
+        ANGABEN UND VERTRAEGE GETRENNT, sobald es Vertraege gibt.
+
+        Sie standen auf EINER Seite, weil einzeln keiner der beiden Bloecke
+        die halbe Seite fuellte. Das galt einmal. Seither sind Kinderblock,
+        Krankenversicherung je Person und die Zielanteile dazugekommen: Die
+        Angaben allein messen im unguenstigen Fall (vier Kinder, private
+        Krankenversicherung mit Entlastungstarif, Selbststaendigkeit, beide
+        Partner abweichend versichert) 1.114 von 979 Punkten — die Seite lief
+        also ueber, BEVOR ein einziger Vertrag erfasst war. Dazu kommen je
+        Vertrag rund 50 Punkte.
+
+        Der Browser brach das bisher selbst um, aber an beliebiger Stelle und
+        ohne Kopfzeile auf dem zweiten Blatt. Jetzt ist der Schnitt gesetzt:
+        Wer Vertraege hat, bekommt sie auf eigenem Blatt mit eigenem Titel.
+        Wer keine hat, behaelt den einzeiligen Hinweis bei den Angaben — dafuer
+        lohnt kein Blatt.
       */}
-      <Seite titel="Ihre Angaben und Verträge" nummer="Grundlage der Berechnung">
+      <Seite
+        titel={hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'}
+        nummer="Grundlage der Berechnung"
+      >
         <Angaben szenario={szenario} avd={avd} />
-        <Vertragsliste szenario={szenario} hinweise={ergebnis?.vertragsHinweise ?? []} />
+        {!hatVertraege && (
+          <Vertragsliste szenario={szenario} hinweise={ergebnis?.vertragsHinweise ?? []} />
+        )}
       </Seite>
+
+      {hatVertraege && (
+        <Seite titel="Ihre Verträge" nummer="Grundlage der Berechnung">
+          <Vertragsliste
+            szenario={szenario}
+            hinweise={ergebnis?.vertragsHinweise ?? []}
+            eigeneSeite
+          />
+        </Seite>
+      )}
 
       {ergebnis && (
         <Renteneinkuenfte

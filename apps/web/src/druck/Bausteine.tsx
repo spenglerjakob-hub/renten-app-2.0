@@ -56,10 +56,16 @@ export function Seite({
   );
 }
 
-/** Ueberschrift innerhalb einer Seite. Bleibt bei ihrem Absatz. */
+/**
+ * Ueberschrift innerhalb einer Seite. Bleibt bei ihrem Absatz.
+ *
+ * Der obere Abstand ist `mt-4` und nicht `mt-5`: Auf der Angabenseite stehen
+ * sechs davon, das waren 24 Punkte allein an Luft zwischen den Bloecken. Die
+ * Trennung traegt ohnehin die Versalschrift, nicht der Abstand.
+ */
 export function Untertitel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 mt-5 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-slate-500 first:mt-0">
+    <h3 className="mb-2 mt-4 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-slate-500 first:mt-0">
       {children}
     </h3>
   );

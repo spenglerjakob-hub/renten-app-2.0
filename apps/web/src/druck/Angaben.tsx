@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { avdKinderzulageBis, type AvdParameter } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
@@ -17,6 +18,16 @@ const KV_ERWERB_TEXT = {
 } as const;
 
 const ART_TEXT = { grv: 'Gesetzliche Rente', pension: 'Beamtenpension' } as const;
+
+/**
+ * Gegenstueck zu `Zweispaltig` fuer den Fall, dass die Spalte selbst schon
+ * eine Haelfte der Seite ist. Ein blosses Fragment taete es auch; als
+ * benannter Baustein steht neben `Zweispaltig` aber, dass die Entscheidung
+ * zwischen beiden absichtlich getroffen wird.
+ */
+function Einspaltig({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
 
 const EINKOMMEN_TEXT = {
   brutto: 'Brutto', netto: 'Netto', besoldung: 'Besoldung', selbststaendig: 'Gewinn',
@@ -38,6 +49,9 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
   const h = szenario.haushalt;
   const a = szenario.annahmen;
   const jetzt = new Date().getFullYear();
+
+  /* Wer ueberhaupt gerechnet wird — Person B nur bei Verheirateten. */
+  const gerechnete = szenario.personen.filter((p) => p.id === 'A' || h.verheiratet);
 
   const einkommen = (e: SzenarioParsed['einkommenHeute']) =>
     e.modus === 'besoldung'
@@ -98,19 +112,8 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
           </>
         )}
         {grvZeile && <Angabe feld="Gesetzliche Rentenversicherung" wert={grvZeile} />}
-        {/*
-          Bei Paaren die beiden Anteile mit, aber in EINER Zeile: Diese Seite
-          bricht bei drei und mehr Vertraegen ohnehin schon um.
-        */}
-        <Angabe
-          feld="Gewünschtes Netto im Monat (heute)"
-          wert={h.verheiratet && szenario.personen.length > 1
-            ? `${euro(h.zielNettoHeute)} — ${szenario.personen
-              .filter((p) => p.id === 'A' || h.verheiratet)
-              .map((p) => `${personName(p)} ${euro(p.zielAnteilHeute ?? h.zielNettoHeute / 2)}`)
-              .join(', ')}`
-            : euro(h.zielNettoHeute)}
-        />
+        {/* Nur die Summe; die beiden Anteile stehen bei den Personen. */}
+        <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
       </Zweispaltig>
 
       {h.kinder.length > 0 && (
@@ -129,25 +132,51 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
               />
             ))}
           </Zweispaltig>
+          {/* Auf eine Zeile gekuerzt: der Satz stand ueber zwei und sagte in
+              der zweiten nur, was die Spalte „Zulage bis“ schon zeigt. */}
           <Text>
-            Die Kinderzulage des Altersvorsorgedepots läuft, solange Kindergeld fließt: bis{' '}
-            {avd.kinderzulageBisAlter} — und bei Ausbildung oder Studium so lange, wie diese dauert,
-            längstens bis {avd.kinderzulageBisAlterAusbildung}.
+            Die Kinderzulage läuft, solange Kindergeld fließt — bis {avd.kinderzulageBisAlter},
+            bei Ausbildung längstens bis {avd.kinderzulageBisAlterAusbildung}.
           </Text>
         </>
       )}
 
+      {/*
+        BEI EINEM PAAR DIE BEIDEN PERSONEN NEBENEINANDER, je eine Spalte.
+
+        Vorher stand jede Person untereinander und war fuer sich zweispaltig.
+        Das kostet die SUMME beider Hoehen; nebeneinander kostet es nur die
+        groessere von beiden — der groesste einzelne Posten dieser Seite, die
+        dadurch ueberlief, ohne dass ein einziger Vertrag erfasst war.
+
+        Ein Alleinstehender behaelt die zweispaltige Darstellung: Eine Person
+        in EINE Spalte zu zwingen liesse die halbe Seitenbreite leer und machte
+        den Block dabei doppelt so hoch.
+      */}
       <Untertitel>Personen</Untertitel>
-      {szenario.personen
-        .filter((p) => p.id === 'A' || h.verheiratet)
-        .map((p) => (
-          <div key={p.id} className="mb-3 break-inside-avoid">
-            <div className="mb-1 text-[12px] font-bold text-slate-800">
-              {personName(p)}
-            </div>
-            <Zweispaltig>
+      <div className={gerechnete.length > 1 ? 'grid grid-cols-2 gap-x-8' : ''}>
+        {gerechnete.map((p) => {
+          const Spalte = gerechnete.length > 1 ? Einspaltig : Zweispaltig;
+          return (
+            <div key={p.id} className="break-inside-avoid">
+              <div className="mb-1 text-[12px] font-bold text-slate-800">
+                {personName(p)}
+              </div>
+              <Spalte>
               <Angabe feld="Geburtsdatum" wert={p.geburtsdatum || '—'} />
               <Angabe feld="Rentenbeginn" wert={p.rentenbeginn || '—'} />
+              {/*
+                Der Zielanteil stand bisher im Haushaltsblock, wo er beide
+                Namen in EINE Zeile zwang — bei langen Namen brach die auf
+                drei um. Hier traegt ihn die Spalte, unter deren Namen er
+                ohnehin gehoert; im Haushalt bleibt die Summe.
+              */}
+              {gerechnete.length > 1 && (
+                <Angabe
+                  feld="Eigener Zielanteil"
+                  wert={`${euro(p.zielAnteilHeute ?? h.zielNettoHeute / 2)} im Monat`}
+                />
+              )}
               {/*
                 Nur wenn sie vom Haushalt abweicht — sonst stuende dieselbe
                 Angabe dreimal auf der Seite. Sie abzudrucken ist wichtig:
@@ -156,7 +185,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
               */}
               {p.kvStatus !== undefined && (
                 <Angabe
-                  feld="Krankenversicherung (abweichend)"
+                  feld="Krankenversicherung"
                   wert={p.kvStatus === 'pkv' && p.pkv
                     ? `${KV_TEXT.pkv}, ${euro(p.pkv.praemieMonat)} im Monat`
                     : p.krankenkasse
@@ -166,16 +195,18 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
               )}
               <Angabe feld="Versorgung" wert={ART_TEXT[p.art]} />
               {p.art === 'grv' ? (
-                <Angabe feld="Heutiger Rentenanspruch" wert={`${euro(p.grvBruttoHeute)} im Monat`} />
+                <Angabe feld="Rentenanspruch heute" wert={`${euro(p.grvBruttoHeute)} im Monat`} />
               ) : (
                 <Angabe
-                  feld="End-Besoldung / Ruhegehaltssatz"
+                  feld="Besoldung / Ruhegehalt"
                   wert={`${p.besoldungsgruppe} · ${prozent(p.ruhegehaltssatz / 100)}`}
                 />
               )}
-            </Zweispaltig>
-          </div>
-        ))}
+              </Spalte>
+            </div>
+          );
+        })}
+      </div>
 
       {/*
         Name UEBER dem Betrag, nicht daneben: ein Name und ein Satz wie
@@ -213,15 +244,13 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         <Angabe feld="Steuertarif-Indexierung" wert={`${prozent(a.tarifIndex)} pro Jahr`} />
       </Zweispaltig>
       {/*
-        Gekuerzt, weil die Seite bei einem Paar mit Kindern und Vertraegen auf
-        981 von 979 Punkten lief und an einer Zeilengrenze umbrach. Der
-        Wirkungssatz zur Inflation steht ausfuehrlich auf der Kaufkraftseite;
-        hier zaehlt, dass es Fortschreibungen sind und von wann sie stammen.
+        Auf EINE Zeile gekuerzt. Dass Fortschreibungen ueber Jahrzehnte wirken,
+        steht ausfuehrlich auf der Kaufkraftseite; hier zaehlt, dass es
+        Annahmen sind und von wann sie stammen.
       */}
       <Text>
-        Die Annahmen sind Fortschreibungen, keine Zusagen — sie wirken über Jahrzehnte und
-        entscheiden das Ergebnis erheblich mit. Erstellt am{' '}
-        {new Date().toLocaleDateString('de-DE')}; die Rechtslage ist die von {jetzt}.
+        Die Annahmen sind Fortschreibungen, keine Zusagen. Erstellt am{' '}
+        {new Date().toLocaleDateString('de-DE')}; Rechtslage {jetzt}.
       </Text>
     </>
   );

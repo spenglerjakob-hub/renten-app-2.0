@@ -49,7 +49,7 @@ function detailText(v: Vertrag): string {
  * den Angaben.
  */
 export function Vertragsliste({
-  szenario, hinweise = [],
+  szenario, hinweise = [], eigeneSeite = false,
 }: {
   szenario: SzenarioParsed;
   /**
@@ -58,6 +58,13 @@ export function Vertragsliste({
    * beziehen.
    */
   hinweise?: ProjektionsErgebnis['vertragsHinweise'];
+  /**
+   * Steht die Liste allein auf einem Blatt, traegt dessen Kopfzeile den Titel
+   * schon — ein „Vertraege" direkt darunter waere dieselbe Ueberschrift
+   * zweimal. Unter den Angaben dagegen trennt sie die Bloecke und muss
+   * bleiben.
+   */
+  eigeneSeite?: boolean;
 }) {
   const verheiratet = szenario.haushalt.verheiratet;
   const spaltenzahl = verheiratet ? 5 : 4;
@@ -74,7 +81,7 @@ export function Vertragsliste({
 
   return (
     <>
-      <Untertitel>Verträge</Untertitel>
+      {!eigeneSeite && <Untertitel>Verträge</Untertitel>}
       {/*
         EINE Tabelle mit Zwischenueberschriften statt drei Tabellen: drei
         Tabellen richten ihre Spalten unabhaengig voneinander aus, und das
