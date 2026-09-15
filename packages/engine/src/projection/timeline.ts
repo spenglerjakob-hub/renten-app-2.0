@@ -6,9 +6,10 @@ import {
 import { kirchensteuersatz } from '../tax/estg.js';
 import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied,
-  type Beitragspflichtig, type KinderStatus, type KvPvErgebnis,
+  type Beitragspflichtig, type KinderStatus, type KvPvErgebnis, type MitgliedsKv,
 } from '../social/kv-pv.js';
 import { pkvImJahr, type PkvAnnahmen } from '../social/pkv.js';
+import { kvProfil } from '../social/kv-profil.js';
 import {
   versorgungsfreibetrag, rentenfreibetrag, ertragsanteil,
   altersentlastungsbetrag, type EingefrorenerFreibetrag,
@@ -250,14 +251,6 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   const ruhestandsjahr = Math.max(...personen.map((k) => k.rentenbeginnJahr));
   const personA = personen[0]!;
   const letztesJahr = personA.geburt.jahr + 100;
-  /*
-    Das Alter von Person A steuert den Praemienverlauf: den Wegfall des
-    gesetzlichen Zuschlags (§ 149 VAG) und die Daempfung ab 65
-    (§ 150 Abs. 3 VAG). Die Praemie ist ein HAUSHALTSbetrag; bei zwei Personen
-    ist das eine Naeherung, und zwar eine bewusste — ein zweites Alter haette
-    zwei Praemien gebraucht, die es im Szenario nicht gibt.
-  */
-  const alterHeuteA = alterExakt(personA.geburt, { jahr: jetzt.jahr, monat: 7, tag: 1 });
 
   // --- Erwerbseinkommen heute ---
   const pHeute = parameterFuer(jetzt.jahr, fortschreibung(s));
@@ -281,17 +274,69 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     damit es keinen Zustand geben kann, in dem beide Felder einander
     widersprechen.
   */
-  const privatVersichert = s.einkommenHeute.modus === 'selbststaendig'
-    ? s.haushalt.kvErwerb === 'pkv'
-    : s.haushalt.kvStatus === 'pkv';
+  /*
+    DIE VERSICHERUNG JE PERSON, in der Reihenfolge von `personen`.
 
-  // Die Praemie zaehlt in einer Phase nur, wenn sie dort auch privat sind.
-  const pkvGebraucht = privatVersichert || s.haushalt.kvStatus === 'pkv';
-  const pkv: PkvAnnahmen = pkvGebraucht
-    ? s.haushalt.pkv
-    // Ohne PKV ist die Praemie null — und der Entlastungstarif dazu: er senkt
-    // eine Praemie, die es dann nicht gibt.
-    : { ...s.haushalt.pkv, praemieMonat: 0, bet: { ...s.haushalt.pkv.bet, aktiv: false } };
+    Bis hierher galt ein Status fuer den ganzen Haushalt und EINE Praemie,
+    deren Verlauf am Alter von Person A haengt. Ein Paar aus Beamtem und
+    Angestellter war damit nicht abbildbar, und das Alter des Partners fiel
+    unter den Tisch: Der Wegfall des gesetzlichen Zuschlags (§ 149 VAG) und
+    die Daempfung ab 65 (§ 150 Abs. 3 VAG) trafen beide Praemien im selben
+    Jahr, auch wenn zehn Jahre dazwischenliegen.
+
+    `kvProfil` haelt die Regel „Person, sonst Haushalt" an einer Stelle.
+  */
+  const kvRoh = personen.map((k) => {
+    const profil = kvProfil(s, k.person);
+    return {
+      k,
+      profil,
+      privat: s.einkommenHeute.modus === 'selbststaendig'
+        ? profil.erwerb === 'pkv'
+        : profil.status === 'pkv',
+      // Eine Praemie, die bei DIESER Person steht — nicht die des Haushalts.
+      eigene: k.person.pkv !== undefined,
+    };
+  });
+  /*
+    Der Haushaltsbetrag deckt alle, die keine eigene Praemie eingetragen
+    haben; er wird deshalb unter ihnen geteilt. Wer eine eigene hat, traegt
+    sie ganz. Ohne diese Quote zahlte bei zwei privat Versicherten jeder die
+    volle Haushaltspraemie, der Haushalt also die doppelte.
+  */
+  const teilen = Math.max(1, kvRoh.filter((x) => (x.privat || x.profil.status === 'pkv') && !x.eigene).length);
+
+  const kvJePerson = kvRoh.map(({ k, profil, privat, eigene }) => {
+    // Die Praemie zaehlt in einer Phase nur, wenn sie dort auch privat sind.
+    const gebraucht = privat || profil.status === 'pkv';
+    const quote = !gebraucht ? 0 : eigene ? 1 : 1 / teilen;
+    const b = profil.pkv;
+    return {
+      id: k.person.id,
+      profil,
+      privat,
+      /*
+        Die Quote wirkt auf die EINGABE, nicht auf das Ergebnis: Die
+        Entlastung des Beitragsentlastungstarifs ist ein fester Betrag, den
+        nachtraeglich zu skalieren etwas anderes ergaebe.
+      */
+      annahmen: {
+        ...b,
+        praemieMonat: b.praemieMonat * quote,
+        bet: {
+          ...b.bet,
+          aktiv: b.bet.aktiv && quote > 0,
+          beitragMonat: b.bet.beitragMonat * quote,
+          entlastungMonat: b.bet.entlastungMonat * quote,
+        },
+      } as PkvAnnahmen,
+      // Der Praemienverlauf haengt am Alter DIESER Person.
+      alterHeute: alterExakt(k.geburt, { jahr: jetzt.jahr, monat: 7, tag: 1 }),
+    };
+  });
+  const kvA = kvJePerson[0]!;
+  /** Ist in dieser Phase ueberhaupt jemand privat versichert? */
+  const privatVersichert = kvJePerson.some((x) => x.privat);
 
   const erwerbsOpt = {
     verheiratet: s.haushalt.verheiratet,
@@ -303,8 +348,13 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     privatVersichert,
   };
 
-  /** Jahresbrutto aus einer Einkommensangabe, egal in welcher Form erfasst. */
-  const bruttoAus = (e: EinkommenHeute): number => {
+  /**
+   * Jahresbrutto aus einer Einkommensangabe, egal in welcher Form erfasst.
+   *
+   * `kv` ist die Versicherung DIESER Person — beim Umkehren von Netto auf
+   * Brutto zaehlt ihre Praemie, nicht die eines anderen Haushaltsmitglieds.
+   */
+  const bruttoAus = (e: EinkommenHeute, kv: typeof kvA): number => {
     if (e.modus === 'besoldung') {
       const b = besoldung(e.besoldungsgruppe, e.besoldungsstufe, e.besoldungsland, jetzt.jahr, {
         verheiratet: s.haushalt.verheiratet,
@@ -321,9 +371,10 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     if (e.modus === 'netto') {
       return nettoZuBrutto(e.betrag * e.auszahlungen, {
         ...erwerbsOpt, beamter: false,
+        privatVersichert: kv.privat,
         // Beim Umkehren zaehlt die Praemie von HEUTE: das eingegebene Netto
         // ist ein heutiges.
-        pkvPraemieMonat: pkvImJahr(pkv, alterHeuteA, 0).gesamtMonat,
+        pkvPraemieMonat: pkvImJahr(kv.annahmen, kv.alterHeute, 0).gesamtMonat,
       }, pHeute).jahresbrutto;
     }
     return e.betrag * e.auszahlungen;
@@ -362,10 +413,10 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       const zweites = s.einkommenPartner ?? s.einkommenHeute;
       return personen.map((_, i) => {
         const e = i === 0 ? s.einkommenHeute : zweites;
-        return art(e, bruttoAus(e));
+        return art(e, bruttoAus(e, kvJePerson[i] ?? kvA));
       });
     }
-    const gesamt = bruttoAus(s.einkommenHeute);
+    const gesamt = bruttoAus(s.einkommenHeute, kvA);
     return personen.map(() => art(s.einkommenHeute, gesamt / personen.length));
   })();
 
@@ -468,16 +519,19 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const arbeitendeKoepfe = personen.filter((k) => jahr < k.rentenbeginnJahr).length;
     if (arbeitendeKoepfe === 0) return renten;
 
-    const pkvJahr = pkvImJahr(pkv, alterHeuteA + jahreAb, jahreAb);
     const arbeitend = personen
-      .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
+      .map((k, i) => ({ k, e: einkommenJePerson[i]!, kv: kvJePerson[i] ?? kvA }))
       .filter(({ k }) => jahr < k.rentenbeginnJahr)
-      .map(({ e }) => ({
+      .map(({ e, kv }) => ({
         jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAb),
         beamter: e.beamter,
         selbststaendig: e.selbststaendig,
         grvBeitragJahr: e.grvBeitragJahr * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAb),
-        pkvPraemieMonat: privatVersichert ? pkvJahr.gesamtMonat / arbeitendeKoepfe : 0,
+        privatVersichert: kv.privat,
+        zusatzbeitrag: kv.profil.zusatzbeitrag,
+        pkvPraemieMonat: kv.privat
+          ? pkvImJahr(kv.annahmen, kv.alterHeute + jahreAb, jahreAb).gesamtMonat
+          : 0,
       }));
     const n = erwerbHaushalt(
       arbeitend,
@@ -560,9 +614,16 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const beitragspflichtig: Beitragspflichtig[] = [];
     const posten: JahresPosten[] = [];
 
-    // Die private Krankenversicherung DIESES Jahres — sie wird in der
-    // Erwerbsphase wie im Ruhestand gebraucht.
-    const pkvHeuer = pkvImJahr(pkv, alterHeuteA + jahreAbHeute, jahreAbHeute);
+    /*
+      Die private Krankenversicherung DIESES Jahres, JE PERSON — sie wird in
+      der Erwerbsphase wie im Ruhestand gebraucht. Je Person, weil der
+      Wegfall des gesetzlichen Zuschlags (§ 149 VAG) und die Daempfung ab 65
+      (§ 150 Abs. 3 VAG) am Alter haengen, und das ist bei zwei Partnern
+      selten dasselbe.
+    */
+    const pkvHeuerJe = kvJePerson.map(
+      (x) => pkvImJahr(x.annahmen, x.alterHeute + jahreAbHeute, jahreAbHeute),
+    );
 
     /**
      * Werbungskosten-Pauschbetrag, je Person und Einkunftsart EINMAL:
@@ -634,21 +695,22 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
     if (nochErwerbstaetig) {
       /*
-        Der PKV-Aufwand ist ein HAUSHALTSbetrag und wird nach KOEPFEN geteilt,
-        nicht auf die Erwerbstaetigen allein. In der gemischten Phase zahlte
-        der noch Arbeitende sonst die volle Praemie — und der Rentner daneben
-        ueber `kvPvImAlter` noch einmal dieselbe. Bei einem Paar mit einer
-        Praemie von 800 EUR waren das 800 EUR im Monat zu viel.
-      */
-      const koepfe = personen.length || 1;
-      const pkvAufwandMonat = privatVersichert ? pkvHeuer.gesamtMonat / koepfe : 0;
+        Jede arbeitende Person traegt IHRE Praemie — kein Haushaltsbetrag
+        mehr, der nach Koepfen geteilt wird. Die Aufteilung steckt bereits in
+        `kvJePerson`: Wer eine eigene Praemie eingetragen hat, traegt sie
+        ganz; sonst deckt der Haushaltsbetrag alle privat Versicherten und
+        wird unter ihnen geteilt.
 
+        Damit entfaellt auch der frueheren Doppelzaehlung die Grundlage: Ein
+        Rentner bekommt seine Praemie ueber `kvPvImAlter`, ein Arbeitender
+        ueber diesen Weg — und niemand steht in beiden.
+      */
       const amArbeiten = personen
-        .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
+        .map((k, i) => ({ k, e: einkommenJePerson[i]!, kv: kvJePerson[i] ?? kvA, i }))
         .filter(({ k }) => jahr < k.rentenbeginnJahr);
 
       const n = erwerbHaushalt(
-        amArbeiten.map(({ e }) => ({
+        amArbeiten.map(({ e, kv, i }) => ({
           jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           beamter: e.beamter,
           selbststaendig: e.selbststaendig,
@@ -656,7 +718,9 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           // Satz darauf oder ein Betrag, den man mit steigendem Gewinn
           // ebenfalls anhebt.
           grvBeitragJahr: e.grvBeitragJahr * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
-          pkvPraemieMonat: pkvAufwandMonat,
+          privatVersichert: kv.privat,
+          zusatzbeitrag: kv.profil.zusatzbeitrag,
+          pkvPraemieMonat: kv.privat ? (pkvHeuerJe[i]?.gesamtMonat ?? 0) : 0,
         })),
         // Der Kinderstatus gilt JE JAHR: waehrend der Erwerbsphase wachsen
         // Kinder aus der Beruecksichtigung heraus, und der Pflegebeitrag
@@ -767,24 +831,30 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       Doppelt belastet wuerde er, nicht richtig.
     */
     /*
-      Der Anteil der Praemie, der auf die schon im Ruhestand Lebenden
-      entfaellt. Den Rest tragen die noch Arbeitenden ueber `erwerbHaushalt`;
-      zusammen ergeben beide Teile genau eine Praemie. Solange alle arbeiten,
-      ist er null — und die Rechnung des ALTERS greift dann gar nicht.
+      Die Versicherung JE MITGLIED. Der Anteil der Praemie, der frueher hier
+      nach Koepfen abgespalten werden musste, entfaellt: Ein Arbeitender ist
+      in `beitragspflichtig` gar nicht vertreten und bekommt seine Praemie
+      ueber `erwerbHaushalt`. Niemand steht in beiden Wegen.
+
+      NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
+      Praemie gedeckelt; senkt ein Entlastungstarif sie, greift der Deckel
+      frueher. Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
+      Restanteil weiter — er fliesst ab, erhoeht den Zuschuss aber nicht und
+      steht deshalb getrennt.
     */
-    const ruhestandsAnteil = personen.length > 0
-      ? (personen.length - arbeitende.length) / personen.length
-      : 1;
+    const jeMitglied: Record<string, MitgliedsKv> = {};
+    kvJePerson.forEach((x, i) => {
+      jeMitglied[x.id] = {
+        status: x.profil.status,
+        zusatzbeitrag: x.profil.zusatzbeitrag,
+        pkvPraemieMonat: pkvHeuerJe[i]?.praemieMonat ?? 0,
+        pkvWeitereBeitraegeMonat: pkvHeuerJe[i]?.betBeitragMonat ?? 0,
+      };
+    });
+
     const kv: KvPvErgebnis = jemandImRuhestand
       ? kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinderImJahr(s.haushalt, jahr), p, {
-        // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
-        // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
-        // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
-        pkvPraemieMonat: pkvHeuer.praemieMonat * ruhestandsAnteil,
-        // Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
-        // Restanteil weiter. Er fliesst ab, erhoeht aber den Zuschuss nach
-        // § 106 SGB VI nicht — deshalb getrennt und nicht in der Praemie.
-        pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat * ruhestandsAnteil,
+        jeMitglied,
         // Entscheidet ueber die beitragsfreie Familienversicherung eines
         // Partners ohne nennenswerte eigene Einkuenfte (§ 10 SGB V).
         verheiratet: s.haushalt.verheiratet,
@@ -908,10 +978,21 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
         p,
       );
 
-      // Nur freiwillig gesetzlich Versicherte zahlen auf Kapitalertraege
-      // KV/PV-Beitraege; in der KVdR bleiben sie beitragsfrei.
-      const kvPvJahr = s.haushalt.kvStatus === 'freiwillig'
-        ? e.bruttoProJahr * (kvSatzVoll(p) + pvSatzMitglied(kinderImJahr(s.haushalt, jahr), p))
+      /*
+        Nur freiwillig gesetzlich Versicherte zahlen auf Kapitalertraege
+        KV/PV-Beitraege; in der KVdR bleiben sie beitragsfrei.
+
+        Massgeblich ist die Versicherung des DEPOTINHABERS, nicht die des
+        Haushalts: In einem gemischten Paar entscheidet, wem das Depot
+        gehoert.
+      */
+      const kvDepot = kvProfil(s, k.person);
+      const kvPvJahr = kvDepot.status === 'freiwillig'
+        ? e.bruttoProJahr * (
+          (kvDepot.zusatzbeitrag === undefined
+            ? kvSatzVoll(p)
+            : p.kv.allgemeinerSatz + kvDepot.zusatzbeitrag)
+          + pvSatzMitglied(kinderImJahr(s.haushalt, jahr), p))
         : 0;
 
       posten.push({
@@ -1276,7 +1357,7 @@ function kapitalNachSteuer(
       beitragspflichtig; in der KVdR bleibt die Leistung beitragsfrei, weil
       sie kein Versorgungsbezug ist.
     */
-    const kvPv = s.haushalt.kvStatus === 'freiwillig'
+    const kvPv = kvProfil(s, k.person).status === 'freiwillig'
       ? kvPvAufKapitalleistung(brutto, s, k, jahr, p, 'sonstiges')
       : 0;
     return {
@@ -1320,8 +1401,9 @@ function kvPvAufKapitalleistung(
 ): number {
   const { monatswert, monate } = bavKapitalMonatswert(kapital);
   if (monatswert <= 0) return 0;
+  // Der Status des EMPFAENGERS, nicht der des Haushalts.
   const r = kvPvImAlter(
-    s.haushalt.kvStatus,
+    kvProfil(s, k.person).status,
     [
       ...laufendeEinkuenfte(s, k, jahr),
       { id: 'kapitalleistung', art, monatsbetrag: monatswert, person: k.person.id },
@@ -1721,7 +1803,7 @@ function vertragImJahr(
       const brutto = v.brutto * 12;
       return {
         brutto, zveBeitrag: brutto, pauschbetragArt: 'sonstige',
-        kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
+        kvArt: kvProfil(s, k.person).status === 'freiwillig' ? 'sonstiges' : null,
       };
     }
     case 'avd': {
@@ -1740,7 +1822,7 @@ function vertragImJahr(
         brutto: lauf.bruttoJahr,
         zveBeitrag: lauf.bruttoJahr,
         pauschbetragArt: 'sonstige',
-        kvArt: s.haushalt.kvStatus === 'freiwillig' ? 'sonstiges' : null,
+        kvArt: kvProfil(s, k.person).status === 'freiwillig' ? 'sonstiges' : null,
       };
     }
     case 'prvRente': {

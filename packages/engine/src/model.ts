@@ -67,6 +67,27 @@ export interface Person {
    */
   zielNettoHeute?: number;
 
+  /*
+    KRANKENVERSICHERUNG JE PERSON.
+
+    Alle vier Felder sind AUSNAHMEN vom Haushalt: Fehlen sie, gilt, was oben
+    steht. Das ist der Regelfall — die meisten Paare sind gleich versichert —,
+    und es haelt gespeicherte Dateien ohne Migration lesbar.
+
+    Ohne diese Ausnahme war ein Paar aus Beamtem und Angestellter nicht
+    abbildbar: ein Status galt fuer beide, eine Praemie fuer den Haushalt.
+  */
+  /** Krankenversicherung im Ruhestand, wenn sie vom Haushalt abweicht. */
+  kvStatus?: KvStatus;
+  /** Krankenversicherung in der Erwerbsphase, wenn sie abweicht. */
+  kvErwerb?: KvErwerb;
+  /** Zusatzbeitrag der eigenen Kasse, z. B. 0.031 fuer 3,1 %. */
+  zusatzbeitrag?: number;
+  /** Name der eigenen Kasse — reine Beschriftung, gerechnet wird mit dem Satz. */
+  krankenkasse?: string;
+  /** Eigene private Krankenversicherung mit eigener Praemie. */
+  pkv?: PkvAnnahmen;
+
   /** Pension */
   besoldungsgruppe: string;
   besoldungsstufe: number;

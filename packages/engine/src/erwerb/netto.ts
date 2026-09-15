@@ -69,18 +69,42 @@ function personAnteil(
   jahresbrutto: number,
   o: ErwerbsOptionen,
   p: LegalParameters,
-  beamter: boolean,
-  pkvPraemieMonat: number,
-  selbststaendig = false,
-  grvBeitragJahr = 0,
+  /**
+   * Was an DIESER Person haengt.
+   *
+   * Als Objekt und nicht als weitere Positionsparameter: Es waren schon
+   * sieben, und mit Versicherungsstatus und Kassenbeitrag waeren es neun
+   * geworden — eine Aufrufzeile, an der man die Reihenfolge nachzaehlen muss.
+   */
+  eigen: {
+    beamter: boolean;
+    pkvPraemieMonat: number;
+    selbststaendig?: boolean;
+    grvBeitragJahr?: number;
+    /** Privat versichert; ohne Angabe wie der Haushalt. */
+    privat?: boolean;
+    /** Zusatzbeitrag der eigenen Kasse; ohne Angabe der des Rechtsstands. */
+    zusatzbeitrag?: number;
+  },
 ): { brutto: number; sv: number; zveBeitrag: number; zveVorSonderausgaben: number } {
   const brutto = Math.max(0, jahresbrutto);
-  const privat = o.privatVersichert ?? false;
+  const beamter = eigen.beamter;
+  const pkvPraemieMonat = eigen.pkvPraemieMonat;
+  const selbststaendig = eigen.selbststaendig ?? false;
+  const grvBeitragJahr = eigen.grvBeitragJahr ?? 0;
+  const privat = eigen.privat ?? o.privatVersichert ?? false;
 
   let sv: number;
   let vorsorgeAbzug: number;
 
-  const gesetzlich = kvPvArbeitnehmer(brutto, o.kinder, p, { sachsen: o.bundesland === 'Sachsen' });
+  const gesetzlich = kvPvArbeitnehmer(brutto, o.kinder, p, {
+    sachsen: o.bundesland === 'Sachsen',
+    zusatzbeitrag: eigen.zusatzbeitrag,
+  });
+  // Voller Satz mit dem Zusatzbeitrag der EIGENEN Kasse.
+  const kvVollEigen = eigen.zusatzbeitrag === undefined
+    ? kvSatzVoll(p)
+    : p.kv.allgemeinerSatz + eigen.zusatzbeitrag;
 
   if (selbststaendig) {
     /*
@@ -114,7 +138,7 @@ function personAnteil(
         Math.max(brutto, mindestbemessungMonat(p) * 12),
         p.bbgKvJahr,
       );
-      const kv = bemessung * kvSatzVoll(p);
+      const kv = bemessung * kvVollEigen;
       const pv = bemessung * pvSatzMitglied(o.kinder, p);
       sv = rv + kv + pv;
       vorsorgeAbzug = rv + kv * 0.96 + pv;
@@ -151,7 +175,7 @@ function personAnteil(
       Mitglied den vollen Satz.
     */
     const bemessung = Math.min(brutto, p.bbgKvJahr);
-    const kv = bemessung * kvSatzVoll(p);
+    const kv = bemessung * kvVollEigen;
     const pv = bemessung * pvSatzMitglied(o.kinder, p);
     sv = kv + pv;
     // Wie bei Angestellten: der auf das Krankengeld entfallende Anteil ist
@@ -191,10 +215,12 @@ export function bruttoZuNetto(
   o: ErwerbsOptionen,
   p: LegalParameters,
 ): ErwerbsNetto {
-  const a = personAnteil(
-    jahresbrutto, o, p, o.beamter ?? false, o.pkvPraemieMonat ?? 0,
-    o.selbststaendig ?? false, o.grvBeitragJahr ?? 0,
-  );
+  const a = personAnteil(jahresbrutto, o, p, {
+    beamter: o.beamter ?? false,
+    pkvPraemieMonat: o.pkvPraemieMonat ?? 0,
+    selbststaendig: o.selbststaendig ?? false,
+    grvBeitragJahr: o.grvBeitragJahr ?? 0,
+  });
   const brutto = a.brutto;
   const sv = a.sv;
   const zve = a.zveBeitrag;
@@ -228,6 +254,15 @@ export interface HaushaltsPerson {
    * genau das tat die Zeitachse bisher.
    */
   pkvPraemieMonat?: number;
+  /**
+   * Privat versichert — JE PERSON.
+   *
+   * Ohne Angabe gilt der Haushalt. Ein Paar aus Beamtem und Angestellter
+   * war vorher nicht abbildbar: Ein Flag entschied fuer beide.
+   */
+  privatVersichert?: boolean;
+  /** Zusatzbeitrag der eigenen Kasse; ohne Angabe der des Rechtsstands. */
+  zusatzbeitrag?: number;
 }
 
 export interface ErwerbHaushaltErgebnis {
@@ -272,10 +307,14 @@ export function erwerbHaushalt(
   p: LegalParameters,
 ): ErwerbHaushaltErgebnis {
   const proPerson = personen.map((x) =>
-    personAnteil(
-      x.jahresbrutto, o, p, x.beamter, x.pkvPraemieMonat ?? 0,
-      x.selbststaendig ?? false, x.grvBeitragJahr ?? 0,
-    ),
+    personAnteil(x.jahresbrutto, o, p, {
+      beamter: x.beamter,
+      pkvPraemieMonat: x.pkvPraemieMonat ?? 0,
+      selbststaendig: x.selbststaendig ?? false,
+      grvBeitragJahr: x.grvBeitragJahr ?? 0,
+      privat: x.privatVersichert,
+      zusatzbeitrag: x.zusatzbeitrag,
+    }),
   );
 
   const jahresbrutto = proPerson.reduce((sum, x) => sum + x.brutto, 0);

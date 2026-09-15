@@ -46,6 +46,22 @@ export interface Beitragspflichtig {
   person?: string;
 }
 
+/**
+ * Die Versicherung EINES Mitglieds.
+ *
+ * Steht neben dem Haushaltsstatus, weil sich beide Ehepartner darin
+ * unterscheiden koennen — bis hin zur eigenen Praemie.
+ */
+export interface MitgliedsKv {
+  status: KvStatus;
+  /** Zusatzbeitrag der eigenen Kasse; ohne Angabe der des Rechtsstands. */
+  zusatzbeitrag?: number;
+  /** Nur bei `pkv`: die eigene Praemie, monatlich. */
+  pkvPraemieMonat?: number;
+  /** Nur bei `pkv`: weitere Beitraege (Entlastungstarif), monatlich. */
+  pkvWeitereBeitraegeMonat?: number;
+}
+
 export interface KinderStatus {
   /** Mitglied hat mindestens ein Kind (entfaellt Kinderlosenzuschlag) */
   hatKinder: boolean;
@@ -169,13 +185,37 @@ export function kvPvImAlter(
      * jede bestehende Rechnung bleibt damit unveraendert.
      */
     verheiratet?: boolean;
+    /**
+     * Versicherung JE MITGLIED, wenn sie sich unterscheidet.
+     *
+     * Bis hierher galt EIN Status fuer den ganzen Haushalt. Ein Paar, bei dem
+     * einer in der KVdR und einer privat versichert ist, war damit nicht
+     * abbildbar — und das ist keine Randerscheinung: Beamter und Angestellte,
+     * Selbststaendiger und Arbeitnehmerin.
+     *
+     * Wer hier nicht steht, folgt dem Status im ersten Argument. Der bleibt
+     * damit die Vorgabe des Haushalts, und jeder bestehende Aufruf rechnet
+     * unveraendert weiter.
+     */
+    jeMitglied?: Readonly<Record<string, MitgliedsKv>>;
   } = {},
 ): KvPvErgebnis {
   const bbgMonat = p.bbgKvJahr / 12;
-  const kvVoll = kvSatzVoll(p);
-  const kvHalb = kvVoll / 2;
-  const pvSatz = pvSatzMitglied(kinder, p);
   const freibetrag = bavFreibetragMonat(p);
+  const pvSatz = pvSatzMitglied(kinder, p);
+
+  /*
+    Die Saetze haengen am MITGLIED, nicht am Haushalt: Der Zusatzbeitrag ist
+    der ihrer Kasse, und zwei Ehepartner koennen bei verschiedenen Kassen
+    sein. Der Pflegesatz dagegen haengt an den Kindern und ist damit fuer
+    beide gleich.
+  */
+  const saetze = (m: MitgliedsKv) => {
+    const kvVoll = m.zusatzbeitrag === undefined
+      ? kvSatzVoll(p)
+      : p.kv.allgemeinerSatz + m.zusatzbeitrag;
+    return { kvVoll, kvHalb: kvVoll / 2 };
+  };
 
   const rang: Record<BeitragsArt, number> = { gesetzlicheRente: 0, versorgungsbezug: 1, sonstiges: 2 };
   const sortiert = [...einkuenfte].sort((a, b) => rang[a.art] - rang[b.art]);
@@ -218,27 +258,36 @@ export function kvPvImAlter(
     Kopf seine eigene Praemie. Die Pruefung steht deshalb VOR dem
     PKV-Zweig und wirkt nur auf die gesetzlichen Faelle.
   */
-  if (status !== 'pkv' && opts.verheiratet && gruppen.size > 1) {
+  /** Die Versicherung dieses Mitglieds — sonst die des Haushalts. */
+  const kvVon = (schluessel: string): MitgliedsKv =>
+    opts.jeMitglied?.[schluessel] ?? { status };
+
+  if (opts.verheiratet && gruppen.size > 1) {
     const grenze = familienversicherungsgrenzeMonat(p);
     const einkommen = (eigene: Beitragspflichtig[]) =>
       eigene.reduce((s, e) => s + Math.max(0, e.monatsbetrag), 0);
 
-    const mitversichert = [...gruppen.entries()]
-      .filter(([, eigene]) => einkommen(eigene) <= grenze)
-      .map(([schluessel]) => schluessel);
+    const kandidaten = [...gruppen.entries()]
+      .filter(([k, eigene]) => kvVon(k).status !== 'pkv' && einkommen(eigene) <= grenze)
+      .map(([k]) => k);
 
     /*
-      Mitversichert sein kann nur, wer bei jemandem mitversichert IST.
-      Liegen alle unter der Grenze, bleibt die einkommensstaerkste Gruppe
-      Mitglied — sonst zahlte ein Haushalt ohne jede Einkunft gar nichts,
-      und die Mindestbemessung, die es genau dafuer gibt, liefe ins Leere.
+      Mitversichert sein kann nur, wer bei jemandem mitversichert IST — und
+      zwar bei einem GESETZLICH versicherten Mitglied. Ist der Partner privat
+      versichert, gibt es niemanden, bei dem die Mitversicherung bestuende;
+      dann versichert sie sich selbst, und die Mindestbemessung greift.
+
+      Bleibt sonst niemand uebrig, bleibt die einkommensstaerkste Gruppe
+      Mitglied: Ein Haushalt ohne jede Einkunft zahlte sonst gar nichts.
     */
-    if (mitversichert.length === gruppen.size) {
+    const traegerDa = [...gruppen.keys()].some(
+      (k) => !kandidaten.includes(k) && kvVon(k).status !== 'pkv',
+    );
+    const mitversichert = traegerDa ? kandidaten : kandidaten.filter((k) => {
       const staerkste = [...gruppen.entries()]
         .sort((a, b) => einkommen(b[1]) - einkommen(a[1]))[0]?.[0];
-      const i = mitversichert.indexOf(staerkste ?? '');
-      if (i >= 0) mitversichert.splice(i, 1);
-    }
+      return k !== staerkste;
+    });
 
     for (const schluessel of mitversichert) gruppen.delete(schluessel);
   }
@@ -255,55 +304,78 @@ export function kvPvImAlter(
     else jeQuelle.push({ id, kv: kvBetrag, pv: pvBetrag });
   };
 
-  if (status === 'pkv') {
-    // Zuschuss des Rentenversicherungstraegers: halber allgemeiner Satz ZZGL.
-    // des halben durchschnittlichen Zusatzbeitrags (§ 106 Abs. 2 SGB VI in der
-    // Fassung seit dem GKV-Versichertenentlastungsgesetz 2019), begrenzt auf
-    // die Haelfte der Praemie. Ohne den Zusatzbeitrag fiel der Zuschuss 2026
-    // um 1,45 % der Rente zu niedrig aus — bei 2.000 EUR Rente rund 29 EUR.
-    const praemie = opts.pkvPraemieMonat ?? 0;
-    // Die Grenze wirkt JE RENTNER: Zwei Renten von je 2.000 EUR bleiben
-    // beide voll bemessen, eine einzelne von 4.000 EUR nicht.
-    const bemessung = [...gruppen.values()].reduce((summe, eigene) => {
+  /**
+   * Als Sonderausgabe abzugsfaehig — je Mitglied gesammelt.
+   *
+   * In der GKV ist das der ganze Beitrag, in der PKV nur der Basisanteil der
+   * Praemie. In einem gemischten Haushalt kommt beides vor, deshalb wird es
+   * nicht mehr am Ende aus der Summe abgeleitet.
+   */
+  let abzugsfaehig = 0;
+  const basisanteil = opts.pkvBasisanteil ?? PKV_BASISANTEIL;
+
+  /** Die groesste Einkunft einer Auswahl — Traeger fuer Betraege ohne Quelle. */
+  const groesste = (xs: readonly Beitragspflichtig[]) =>
+    xs.filter((e) => e.monatsbetrag > 0)
+      .sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0]?.id;
+
+  /*
+    Die Praemie aus `opts` ist ein HAUSHALTSbetrag — es gibt dort nur einen.
+    Sind zwei Mitglieder privat versichert, wird er nach Koepfen geteilt;
+    sonst zahlte ihn jedes Mitglied in voller Hoehe, und der Haushalt
+    zweimal. Wer eine eigene Praemie in `jeMitglied` mitgibt, umgeht die
+    Teilung — dort steht ja der echte Beitrag dieser Person.
+  */
+  const privatVersicherte = [...gruppen.keys()]
+    .filter((k) => kvVon(k).status === 'pkv').length;
+  const haushaltsPraemie = (betrag: number) => betrag / Math.max(1, privatVersicherte);
+
+  for (const [schluessel, eigene] of gruppen) {
+    const mitglied = kvVon(schluessel);
+    const { kvVoll, kvHalb } = saetze(mitglied);
+
+    if (mitglied.status === 'pkv') {
+      /*
+        Zuschuss des Rentenversicherungstraegers: halber allgemeiner Satz
+        ZZGL. des halben Zusatzbeitrags (§ 106 Abs. 2 SGB VI in der Fassung
+        seit dem GKV-Versichertenentlastungsgesetz 2019), begrenzt auf die
+        Haelfte der Praemie.
+
+        Bemessen wird er aus der EIGENEN Rente dieses Mitglieds. Vorher lief
+        er ueber die Renten des ganzen Haushalts gegen eine einzige Praemie —
+        bei einem gemischten Paar zahlte der gesetzlich Versicherte damit auf
+        den Zuschuss des anderen ein.
+      */
+      const praemie = Math.max(0, mitglied.pkvPraemieMonat
+        ?? haushaltsPraemie(opts.pkvPraemieMonat ?? 0));
+      // Der Entlastungstarif kommt NACH der Deckelung dazu: Er ist Aufwand,
+      // aber keine Bemessungsgrundlage fuer den Zuschuss.
+      const weitere = Math.max(0, mitglied.pkvWeitereBeitraegeMonat
+        ?? haushaltsPraemie(opts.pkvWeitereBeitraegeMonat ?? 0));
       const rentenSumme = eigene
         .filter((e) => e.art === 'gesetzlicheRente')
-        .reduce((s, e) => s + e.monatsbetrag, 0);
-      return summe + Math.min(rentenSumme, bbgMonat);
-    }, 0);
-    const zuschuss = Math.min(bemessung * (kvVoll / 2), praemie / 2);
-    // Der Entlastungstarif kommt NACH der Deckelung dazu: Er ist Aufwand,
-    // aber keine Bemessungsgrundlage fuer den Zuschuss.
-    const weitere = Math.max(0, opts.pkvWeitereBeitraegeMonat ?? 0);
-    kv = Math.max(0, praemie - zuschuss) + weitere;
-    pv = 0; // in der Praemie enthalten
-    const basisanteil = opts.pkvBasisanteil ?? PKV_BASISANTEIL;
-    /*
-      Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
-      GROESSTEN gesetzlichen Rente zugeordnet — aus ihr wird der Zuschuss
-      nach § 106 SGB VI tatsaechlich mit ausgezahlt.
+        .reduce((s, e) => s + Math.max(0, e.monatsbetrag), 0);
+      const zuschuss = Math.min(Math.min(rentenSumme, bbgMonat) * (kvVoll / 2), praemie / 2);
+      const eigenerAnteil = Math.max(0, praemie - zuschuss) + weitere;
 
-      Vorher stand hier die ERSTE Rente der Rangfolge. Hatte ein Ehepaar
-      eine Pension bei A (Rang 1) und eine Rente von 0 EUR bei B (Rang 0),
-      landete die volle Haushaltspraemie auf einem Posten ohne Brutto — als
-      negative Rente von mehreren hundert Euro. Nullbetraege scheiden jetzt
-      aus; gibt es gar keine gesetzliche Rente, traegt sie die groesste
-      Einkunft ueberhaupt.
-    */
-    const groesste = (xs: readonly Beitragspflichtig[]) =>
-      xs.filter((e) => e.monatsbetrag > 0)
-        .sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0]?.id;
-    const traeger = groesste(sortiert.filter((e) => e.art === 'gesetzlicheRente'))
-      ?? groesste(sortiert);
-    return {
-      kv, pv, gesamt: kv,
       // Der Entlastungstarif ist ebenfalls Vorsorgeaufwand — mit demselben
       // Basisanteil, mit dem ihn schon der PKV-Rechner ansetzt.
-      abzugsfaehig: (praemie + weitere) * basisanteil,
-      jeQuelle: traeger ? [{ id: traeger, kv, pv: 0 }] : [],
-    };
-  }
+      abzugsfaehig += (praemie + weitere) * basisanteil;
 
-  for (const eigene of gruppen.values()) {
+      /*
+        Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
+        GROESSTEN gesetzlichen Rente dieses Mitglieds zugeordnet — aus ihr
+        wird der Zuschuss tatsaechlich mit ausgezahlt. Nullbetraege scheiden
+        aus, sonst landete die Praemie auf einem Posten ohne Brutto.
+      */
+      const traeger = groesste(eigene.filter((e) => e.art === 'gesetzlicheRente'))
+        ?? groesste(eigene);
+      if (traeger) buche(traeger, eigenerAnteil, 0);
+      else kv += eigenerAnteil; // Praemie ohne jede Einkunft: der Aufrufer verteilt sie
+      continue;
+    }
+
+    const vorGruppe = kv + pv;
     let restBbg = bbgMonat;
 
     /*
@@ -337,7 +409,7 @@ export function kvPvImAlter(
       // Sonstige Einkuenfte: nur freiwillig Versicherte zahlen darauf Beitraege.
       // Fuer Pflichtversicherte in der KVdR sind Ruerup, private Renten und
       // Mieteinkuenfte beitragsfrei — hier faellt bewusst gar nichts an.
-      if (status === 'freiwillig') {
+      if (mitglied.status === 'freiwillig') {
         const anrechenbar = Math.min(betrag, restBbg);
         restBbg -= anrechenbar;
         buche(e.id, anrechenbar * kvVoll, anrechenbar * pvSatz);
@@ -365,22 +437,24 @@ export function kvPvImAlter(
 
     // Freiwillig Versicherte zahlen mindestens auf die Mindestbemessungsgrundlage
     // (1/3 der monatlichen Bezugsgroesse, § 240 Abs. 4 SGB V). Fehlte im Prototyp.
-    if (status === 'freiwillig') {
+    if (mitglied.status === 'freiwillig') {
       const mindestBemessung = mindestbemessungMonat(p);
       const bemessen = bbgMonat - restBbg;
       if (bemessen < mindestBemessung) {
         const fehlend = mindestBemessung - bemessen;
         // Der Mindestbeitrag haengt an keiner Einkunft. Er wird der groessten
         // dieses Mitglieds zugeordnet, damit die Einzelbetraege aufgehen.
-        const groesste = [...eigene].sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0];
-        if (groesste) buche(groesste.id, fehlend * kvVoll, fehlend * pvSatz);
+        const traeger = [...eigene].sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0];
+        if (traeger) buche(traeger.id, fehlend * kvVoll, fehlend * pvSatz);
         else { kv += fehlend * kvVoll; pv += fehlend * pvSatz; }
       }
     }
+
+    // In der gesetzlichen Kasse ist der ganze Beitrag Vorsorgeaufwand.
+    abzugsfaehig += (kv + pv) - vorGruppe;
   }
 
-  const gesamt = kv + pv;
-  return { kv, pv, gesamt, abzugsfaehig: gesamt, jeQuelle };
+  return { kv, pv, gesamt: kv + pv, abzugsfaehig, jeQuelle };
 }
 
 /**
@@ -392,12 +466,15 @@ export function kvPvArbeitnehmer(
   jahresbrutto: number,
   kinder: KinderStatus,
   p: LegalParameters,
-  opts: { sachsen?: boolean } = {},
+  opts: { sachsen?: boolean; zusatzbeitrag?: number } = {},
 ): { kv: number; pv: number; rv: number; av: number; gesamt: number; abzugsfaehig: number } {
   const bemessungKv = Math.min(jahresbrutto, p.bbgKvJahr);
   const bemessungRv = Math.min(jahresbrutto, p.bbgRvJahr);
 
-  const kv = bemessungKv * (p.kv.allgemeinerSatz / 2 + p.kv.zusatzbeitrag / 2);
+  // Der Zusatzbeitrag der eigenen Kasse, wenn er abweicht: Zwei Ehepartner
+  // koennen bei verschiedenen Kassen sein, und die Spanne ist erheblich.
+  const zusatz = opts.zusatzbeitrag ?? p.kv.zusatzbeitrag;
+  const kv = bemessungKv * (p.kv.allgemeinerSatz / 2 + zusatz / 2);
 
   // PV: Der Grundsatz wird paritaetisch getragen. Kinderlosenzuschlag UND
   // Kinderabschlaege wirken dagegen ausschliesslich auf den Mitgliedsanteil.

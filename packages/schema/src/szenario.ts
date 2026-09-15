@@ -37,6 +37,87 @@ const datumString = z
   .string()
   .refine(istKalendarischGueltig, 'Kein gueltiges Datum (erwartet TT.MM.JJJJ oder JJJJ-MM-TT)');
 
+
+/**
+ * Beitragsentlastungstarif: ein Beitrag heute, eine feste Entlastung spaeter.
+ *
+ * `aktiv` statt eines optionalen Blocks, damit eingetragene Betraege beim
+ * Abschalten erhalten bleiben — dieselbe Ueberlegung wie bei Person B, die
+ * beim Umschalten auf "Single" ebenfalls nicht geloescht wird.
+ */
+export const betSchema = z.object({
+  aktiv: z.boolean().default(false),
+  beitragMonat: z.number().min(0).default(0),
+  entlastungMonat: z.number().min(0).default(0),
+  abAlter: z.number().int().min(50).max(90).default(67),
+  /**
+   * Anteil des Beitrags, der ab `abAlter` weiterlaeuft.
+   *
+   * Vorgabe ein Viertel — so ist der Tarif bei der AXA gebaut: Die Entlastung
+   * ist lebenslang, der Beitrag sinkt, statt ganz zu entfallen. Wer einen ab
+   * Rentenbeginn beitragsfreien Tarif rechnet, traegt 0 ein.
+   *
+   * Bis hierher rechnete der Kern mit null. Gespeicherte Dateien ohne dieses
+   * Feld bekommen deshalb die Vorgabe und werden im Ruhestand etwas teurer —
+   * das ist die Korrektur, nicht ein Nebeneffekt.
+   */
+  beitragImRuhestand: z.number().min(0).max(1).default(0.25),
+  /**
+   * Seit wann der Tarif laeuft. Ohne Angabe rechnet der Kern, als begaenne er
+   * heute — gespeicherte Dateien bleiben damit unveraendert.
+   */
+  beginnJahr: z.number().int().min(1900).max(2200).optional(),
+});
+
+/**
+ * Die private Krankenversicherung.
+ *
+ * Die beiden Steigerungssaetze sind ANNAHMEN und deshalb Eingaben: § 150
+ * Abs. 3 VAG schreibt vor, dass die angesparten Mittel ab 65 Erhoehungen
+ * daempfen — nicht, um wie viel. Der Wegfall des gesetzlichen Zuschlags mit
+ * 61 ist dagegen Rechtsstand (§ 149 VAG) und keine Stellschraube; nur ob er
+ * in der eingetragenen Praemie ueberhaupt steckt, muss der Nutzer wissen.
+ */
+export const pkvSchema = z.object({
+  praemieMonat: z.number().min(0).default(0),
+  steigerung: z.number().min(-0.1).max(0.2).default(0.03),
+  steigerungAb65: z.number().min(-0.1).max(0.2).default(0.015),
+  zuschlagEnthalten: z.boolean().default(true),
+  bet: betSchema.default({}),
+  /**
+   * Steckt der Beitrag zum Entlastungstarif in `praemieMonat`?
+   *
+   * ALTLAST und zugleich Schutz vor doppelter Umschreibung. Bis 2026 stand
+   * in `praemieMonat` die Praemie OHNE den Entlastungstarif; heute steht dort
+   * der Gesamtbeitrag, so wie er auf der Rechnung des Versicherers erscheint.
+   *
+   * Die Umschreibung unten addiert den BET-Beitrag auf — sie darf das aber
+   * nur EINMAL tun. `exportiere` gibt das geparste Objekt aus, eine Datei
+   * durchlaeuft das Schema also beliebig oft. Ohne diese Marke waechst die
+   * Praemie bei jedem Speichern und Laden um den Entlastungstarif.
+   */
+  praemieEnthaeltBet: z.boolean().default(false),
+}).transform((v) => {
+  if (v.praemieEnthaeltBet) return v;
+  return {
+    ...v,
+    /*
+      Ohne aktiven Entlastungstarif gibt es nichts zu addieren; die Marke
+      wird trotzdem gesetzt, damit die Datei von nun an eindeutig ist.
+
+      `praemieMonat > 0` ist kein Schoenheitsfehler: Ganz alte Dateien tragen
+      die Praemie noch im Haushalt statt hier, und der Block ist dann leer.
+      Ihn durch den BET-Beitrag von null auf einen Wert zu heben, brachte die
+      Ersatzregel weiter unten um ihren Ansatzpunkt — die Praemie waere
+      verschwunden.
+    */
+    praemieMonat: v.bet.aktiv && v.praemieMonat > 0
+      ? v.praemieMonat + v.bet.beitragMonat
+      : v.praemieMonat,
+    praemieEnthaeltBet: true,
+  };
+});
+
 export const personSchema = z.object({
   id: z.enum(['A', 'B']),
   name: z.string().default(''),
@@ -60,6 +141,19 @@ export const personSchema = z.object({
    * bliebe dann stehen, wenn der Nutzer das Haushaltsziel spaeter aendert.
    */
   zielNettoHeute: z.number().min(0).optional(),
+  /*
+    Krankenversicherung je Person — alle als AUSNAHME vom Haushalt.
+
+    Durchweg `.optional()`: Fehlt die Angabe, gilt die des Haushalts. Damit
+    laden gespeicherte Dateien unveraendert weiter, und es braucht keine
+    Migration, die einen Wert auf beide Personen kopiert und danach zwei
+    Quellen fuer dieselbe Wahrheit hinterliesse.
+  */
+  kvStatus: z.enum(['kvdr', 'freiwillig', 'pkv']).optional(),
+  kvErwerb: z.enum(['gesetzlich', 'pkv']).optional(),
+  zusatzbeitrag: z.number().min(0).max(0.1).optional(),
+  krankenkasse: z.string().max(120).optional(),
+  pkv: pkvSchema.optional(),
   besoldungsgruppe: z.string().default('A13'),
   besoldungsstufe: z.number().int().min(1).max(12).default(4),
   ruhegehaltssatz: z.number().min(0).max(71.75).default(71.75),
@@ -161,86 +255,6 @@ export const kindSchema = z.object({
   geburtsjahr: z.number().int().min(1900).max(2200),
   /** Bis einschliesslich diesem Jahr in Ausbildung/Studium; fehlt = keine */
   ausbildungBisJahr: z.number().int().min(1900).max(2200).optional(),
-});
-
-/**
- * Beitragsentlastungstarif: ein Beitrag heute, eine feste Entlastung spaeter.
- *
- * `aktiv` statt eines optionalen Blocks, damit eingetragene Betraege beim
- * Abschalten erhalten bleiben — dieselbe Ueberlegung wie bei Person B, die
- * beim Umschalten auf "Single" ebenfalls nicht geloescht wird.
- */
-export const betSchema = z.object({
-  aktiv: z.boolean().default(false),
-  beitragMonat: z.number().min(0).default(0),
-  entlastungMonat: z.number().min(0).default(0),
-  abAlter: z.number().int().min(50).max(90).default(67),
-  /**
-   * Anteil des Beitrags, der ab `abAlter` weiterlaeuft.
-   *
-   * Vorgabe ein Viertel — so ist der Tarif bei der AXA gebaut: Die Entlastung
-   * ist lebenslang, der Beitrag sinkt, statt ganz zu entfallen. Wer einen ab
-   * Rentenbeginn beitragsfreien Tarif rechnet, traegt 0 ein.
-   *
-   * Bis hierher rechnete der Kern mit null. Gespeicherte Dateien ohne dieses
-   * Feld bekommen deshalb die Vorgabe und werden im Ruhestand etwas teurer —
-   * das ist die Korrektur, nicht ein Nebeneffekt.
-   */
-  beitragImRuhestand: z.number().min(0).max(1).default(0.25),
-  /**
-   * Seit wann der Tarif laeuft. Ohne Angabe rechnet der Kern, als begaenne er
-   * heute — gespeicherte Dateien bleiben damit unveraendert.
-   */
-  beginnJahr: z.number().int().min(1900).max(2200).optional(),
-});
-
-/**
- * Die private Krankenversicherung.
- *
- * Die beiden Steigerungssaetze sind ANNAHMEN und deshalb Eingaben: § 150
- * Abs. 3 VAG schreibt vor, dass die angesparten Mittel ab 65 Erhoehungen
- * daempfen — nicht, um wie viel. Der Wegfall des gesetzlichen Zuschlags mit
- * 61 ist dagegen Rechtsstand (§ 149 VAG) und keine Stellschraube; nur ob er
- * in der eingetragenen Praemie ueberhaupt steckt, muss der Nutzer wissen.
- */
-export const pkvSchema = z.object({
-  praemieMonat: z.number().min(0).default(0),
-  steigerung: z.number().min(-0.1).max(0.2).default(0.03),
-  steigerungAb65: z.number().min(-0.1).max(0.2).default(0.015),
-  zuschlagEnthalten: z.boolean().default(true),
-  bet: betSchema.default({}),
-  /**
-   * Steckt der Beitrag zum Entlastungstarif in `praemieMonat`?
-   *
-   * ALTLAST und zugleich Schutz vor doppelter Umschreibung. Bis 2026 stand
-   * in `praemieMonat` die Praemie OHNE den Entlastungstarif; heute steht dort
-   * der Gesamtbeitrag, so wie er auf der Rechnung des Versicherers erscheint.
-   *
-   * Die Umschreibung unten addiert den BET-Beitrag auf — sie darf das aber
-   * nur EINMAL tun. `exportiere` gibt das geparste Objekt aus, eine Datei
-   * durchlaeuft das Schema also beliebig oft. Ohne diese Marke waechst die
-   * Praemie bei jedem Speichern und Laden um den Entlastungstarif.
-   */
-  praemieEnthaeltBet: z.boolean().default(false),
-}).transform((v) => {
-  if (v.praemieEnthaeltBet) return v;
-  return {
-    ...v,
-    /*
-      Ohne aktiven Entlastungstarif gibt es nichts zu addieren; die Marke
-      wird trotzdem gesetzt, damit die Datei von nun an eindeutig ist.
-
-      `praemieMonat > 0` ist kein Schoenheitsfehler: Ganz alte Dateien tragen
-      die Praemie noch im Haushalt statt hier, und der Block ist dann leer.
-      Ihn durch den BET-Beitrag von null auf einen Wert zu heben, brachte die
-      Ersatzregel weiter unten um ihren Ansatzpunkt — die Praemie waere
-      verschwunden.
-    */
-    praemieMonat: v.bet.aktiv && v.praemieMonat > 0
-      ? v.praemieMonat + v.bet.beitragMonat
-      : v.praemieMonat,
-    praemieEnthaeltBet: true,
-  };
 });
 
 export const haushaltSchema = z.object({

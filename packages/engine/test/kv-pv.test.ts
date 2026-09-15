@@ -426,6 +426,8 @@ describe('Traeger der PKV-Praemie', () => {
     0 EUR landete die volle Haushaltspraemie auf einem Posten ohne Brutto.
   */
   it('nicht auf einer Rente von null', () => {
+    // Die Praemie aus den Optionen ist ein HAUSHALTSbetrag; bei zwei privat
+    // versicherten Mitgliedern wird sie nach Koepfen geteilt.
     const r = kvPvImAlter(
       'pkv',
       [
@@ -434,21 +436,52 @@ describe('Traeger der PKV-Praemie', () => {
       ],
       kinderlos, p, { verheiratet: true, pkvPraemieMonat: 800 },
     );
+    // Auf der Rente von null steht nichts.
+    expect(r.jeQuelle.find((x) => x.id === 'rente-B')).toBeUndefined();
     expect(r.jeQuelle).toHaveLength(1);
     expect(r.jeQuelle[0]!.id).toBe('pension-A');
-    expect(r.jeQuelle[0]!.kv).toBeCloseTo(800, 6);
+    expect(r.jeQuelle[0]!.kv).toBeCloseTo(400, 6);
+    // Abfliessen tut trotzdem die ganze Praemie — der Anteil von B haengt an
+    // keiner Einkunft und wird vom Aufrufer als eigener Posten gefuehrt.
+    expect(r.gesamt).toBeCloseTo(800, 6);
   });
 
-  it('auf die GROESSTE gesetzliche Rente, nicht auf die erste', () => {
+  it('auf die GROESSTE gesetzliche Rente DESSELBEN Mitglieds', () => {
+    // Zwei Renten EINER Person: Die Praemie haengt an der groesseren, aus
+    // der der Zuschuss nach § 106 SGB VI tatsaechlich mit ausgezahlt wird.
+    const r = kvPvImAlter(
+      'pkv',
+      [
+        { id: 'klein', art: 'gesetzlicheRente', monatsbetrag: 400, person: 'A' },
+        { id: 'gross', art: 'gesetzlicheRente', monatsbetrag: 2200, person: 'A' },
+      ],
+      kinderlos, p, { pkvPraemieMonat: 800 },
+    );
+    expect(r.jeQuelle).toHaveLength(1);
+    expect(r.jeQuelle[0]!.id).toBe('gross');
+  });
+
+  it('jedes privat versicherte Mitglied traegt seine eigene Praemie', () => {
     const r = kvPvImAlter(
       'pkv',
       [
         { id: 'rente-A', art: 'gesetzlicheRente', monatsbetrag: 400, person: 'A' },
         { id: 'rente-B', art: 'gesetzlicheRente', monatsbetrag: 2200, person: 'B' },
       ],
-      kinderlos, p, { verheiratet: true, pkvPraemieMonat: 800 },
+      kinderlos, p, {
+        verheiratet: true,
+        jeMitglied: {
+          A: { status: 'pkv', pkvPraemieMonat: 300 },
+          B: { status: 'pkv', pkvPraemieMonat: 800 },
+        },
+      },
     );
-    expect(r.jeQuelle[0]!.id).toBe('rente-B');
+    const a = r.jeQuelle.find((x) => x.id === 'rente-A')!;
+    const b = r.jeQuelle.find((x) => x.id === 'rente-B')!;
+    // Der Zuschuss bemisst sich an der EIGENEN Rente und ist auf die halbe
+    // eigene Praemie gedeckelt: A 400 x 8,75 % = 35; B 2.200 x 8,75 % = 192,50.
+    expect(a.kv).toBeCloseTo(300 - 35, 2);
+    expect(b.kv).toBeCloseTo(800 - 192.5, 2);
   });
 });
 
