@@ -562,14 +562,19 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       return genutzt;
     };
 
-    let nochErwerbstaetig = false;
+    /*
+      Wer in diesem Jahr arbeitet und wer schon Rente bezieht — einmal
+      bestimmt, statt im Vorbeigehen in einer Schleife gesetzt. Beide Mengen
+      entscheiden weiter unten ueber die Veranlagung und darueber, ob die
+      Krankenversicherung des Alters ueberhaupt greift.
+    */
+    const arbeitende = personen.filter((k) => jahr < k.rentenbeginnJahr);
+    const nochErwerbstaetig = arbeitende.length > 0;
+    const jemandImRuhestand = arbeitende.length < personen.length;
 
     // --- Schicht 1: Renten und Pensionen ---
     for (const k of personen) {
-      if (jahr < k.rentenbeginnJahr) {
-        nochErwerbstaetig = true;
-        continue;
-      }
+      if (jahr < k.rentenbeginnJahr) continue;
       const brutto = bezugImJahr(k, jahr, s.annahmen.rentendynamik);
 
       // Der EINGEFRORENE Freibetrag wird gegen den GESTIEGENEN Bruttobezug
@@ -603,24 +608,26 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     // --- Erwerbseinkommen der noch arbeitenden Personen ---
     // Der Prototyp sprang von "alle arbeiten" direkt auf "alle in Rente" und
     // liess die gemischte Phase aus.
-    if (nochErwerbstaetig) {
-      // Nur die Personen, die in DIESEM Jahr noch arbeiten. Frueher wurde das
-      // Haushaltseinkommen pauschal nach Koepfen geteilt — unabhaengig davon,
-      // wer wie viel verdient hat.
-      const nochAmArbeiten = personen.filter((k) => jahr < k.rentenbeginnJahr).length || 1;
-      /*
-        Der PKV-Aufwand ist ein HAUSHALTSbetrag und wird auf die
-        Erwerbstaetigen verteilt. Ihn jeder Person voll zu uebergeben
-        verdoppelte ihn bei zwei Verdienern — genau das geschah hier bisher.
-        Enthalten ist auch der Beitrag zum Entlastungstarif: er faellt in der
-        Erwerbsphase tatsaechlich an.
-      */
-      const pkvAufwandMonat = privatVersichert ? pkvHeuer.gesamtMonat / nochAmArbeiten : 0;
+    /** Sozialabgaben der Erwerbstaetigen, je Quelle — siehe unten. */
+    const erwerbSv = new Map<string, number>();
 
-      const arbeitend = personen
+    if (nochErwerbstaetig) {
+      /*
+        Der PKV-Aufwand ist ein HAUSHALTSbetrag und wird nach KOEPFEN geteilt,
+        nicht auf die Erwerbstaetigen allein. In der gemischten Phase zahlte
+        der noch Arbeitende sonst die volle Praemie — und der Rentner daneben
+        ueber `kvPvImAlter` noch einmal dieselbe. Bei einem Paar mit einer
+        Praemie von 800 EUR waren das 800 EUR im Monat zu viel.
+      */
+      const koepfe = personen.length || 1;
+      const pkvAufwandMonat = privatVersichert ? pkvHeuer.gesamtMonat / koepfe : 0;
+
+      const amArbeiten = personen
         .map((k, i) => ({ k, e: einkommenJePerson[i]! }))
-        .filter(({ k }) => jahr < k.rentenbeginnJahr)
-        .map(({ e }) => ({
+        .filter(({ k }) => jahr < k.rentenbeginnJahr);
+
+      const n = erwerbHaushalt(
+        amArbeiten.map(({ e }) => ({
           jahresbrutto: e.brutto * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           beamter: e.beamter,
           selbststaendig: e.selbststaendig,
@@ -629,20 +636,47 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           // ebenfalls anhebt.
           grvBeitragJahr: e.grvBeitragJahr * Math.pow(1 + s.annahmen.gehaltsdynamik, jahreAbHeute),
           pkvPraemieMonat: pkvAufwandMonat,
-        }));
-
-      const n = erwerbHaushalt(
-        arbeitend,
+        })),
         // Der Kinderstatus gilt JE JAHR: waehrend der Erwerbsphase wachsen
         // Kinder aus der Beruecksichtigung heraus, und der Pflegebeitrag
         // steigt entsprechend wieder.
         { ...erwerbsOpt, beamter: false, kinder: kinderImJahr(s.haushalt, jahr) },
         p,
       );
-      posten.push({
-        id: 'erwerb', bezeichnung: 'Erwerbseinkommen', schicht: 1,
-        bruttoJahr: n.jahresbrutto, zveBeitrag: n.zve, kvPvJahr: n.sv,
-        steuerJahr: n.est + n.soli + n.kirchensteuer, nettoJahr: n.jahresnetto,
+
+      /*
+        Das Erwerbseinkommen geht als QUELLE in die Veranlagung, nicht als
+        fertig versteuerter Posten.
+
+        Vorher rechnete `erwerbHaushalt` seine Steuer selbst, und
+        `haushaltssteuer` rechnete daneben die der Renten — in einem Jahr, in
+        dem einer arbeitet und der andere schon Rente bezieht, lief der Tarif
+        damit ZWEIMAL: zwei Grundfreibetraege, zweimal Splitting. Bei
+        24 000 EUR Rente neben 45 000 EUR Erwerbs-zvE fehlten dadurch 5 640 EUR
+        Steuer im Jahr, also 470 EUR im Monat. Genau die Jahre zeigt der
+        Jahresregler der Uebersicht.
+
+        Die Sozialabgaben bleiben, wo sie sind: `erwerbHaushalt` rechnet sie
+        je Person mit eigener Beitragsbemessungsgrenze. Sie kommen ueber
+        `erwerbSv` an den Posten, damit sie nicht in den Verteilungsschluessel
+        der Alters-Beitraege geraten.
+      */
+      amArbeiten.forEach(({ k }, i) => {
+        const a = n.proPerson[i];
+        if (!a) return;
+        const id = `erwerb-${k.person.id}`;
+        quellen.push({
+          id,
+          bezeichnung: personen.length > 1
+            ? `Erwerbseinkommen ${k.person.name || k.person.id}`
+            : 'Erwerbseinkommen',
+          brutto: a.brutto,
+          // Ohne den Sonderausgaben-Pauschbetrag: den zieht `haushaltssteuer`
+          // einmal fuer den Haushalt ab.
+          zveBeitrag: a.zveVorSonderausgaben,
+          kvPv: a.sv,
+        });
+        erwerbSv.set(id, a.sv);
       });
     }
 
@@ -709,17 +743,25 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       Restposten unten nichts mehr verschwinden laesst, wird er sichtbar.
       Doppelt belastet wuerde er, nicht richtig.
     */
-    const jemandImRuhestand = personen.some((k) => jahr >= k.rentenbeginnJahr);
+    /*
+      Der Anteil der Praemie, der auf die schon im Ruhestand Lebenden
+      entfaellt. Den Rest tragen die noch Arbeitenden ueber `erwerbHaushalt`;
+      zusammen ergeben beide Teile genau eine Praemie. Solange alle arbeiten,
+      ist er null — und die Rechnung des ALTERS greift dann gar nicht.
+    */
+    const ruhestandsAnteil = personen.length > 0
+      ? (personen.length - arbeitende.length) / personen.length
+      : 1;
     const kv: KvPvErgebnis = jemandImRuhestand
       ? kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinderImJahr(s.haushalt, jahr), p, {
         // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
         // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
         // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
-        pkvPraemieMonat: pkvHeuer.praemieMonat,
+        pkvPraemieMonat: pkvHeuer.praemieMonat * ruhestandsAnteil,
         // Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
         // Restanteil weiter. Er fliesst ab, erhoeht aber den Zuschuss nach
         // § 106 SGB VI nicht — deshalb getrennt und nicht in der Praemie.
-        pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat,
+        pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat * ruhestandsAnteil,
         // Entscheidet ueber die beitragsfreie Familienversicherung eines
         // Partners ohne nennenswerte eigene Einkuenfte (§ 10 SGB V).
         verheiratet: s.haushalt.verheiratet,
@@ -742,7 +784,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const beguenstigt = new Set<Vertrag['typ']>(['prvRente', 'immobilie', 'etf']);
     const sonstigeEinkuenfte = quellen
       .filter((q) => {
-        if (q.id === 'erwerb' || q.id.startsWith('person-')) return false;
+        if (q.id.startsWith('erwerb') || q.id.startsWith('person-')) return false;
         const vertrag = s.vertraege.find((x) => x.id === q.id);
         // Der Entnahmeplaner traegt Kapitalertraege — ebenfalls beguenstigt.
         return vertrag ? beguenstigt.has(vertrag.typ) : true;
@@ -782,14 +824,29 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const jeQuelle = new Map(kv.jeQuelle.map((x) => [x.id, (x.kv + x.pv) * 12]));
     const zugeordnet = [...jeQuelle.values()].reduce((sum, x) => sum + x, 0);
     const offen = kvPvJahr - zugeordnet;
-    const bruttoSumme = quellen.reduce((sum, q) => sum + q.brutto, 0);
+    /*
+      ERST JETZT die Sozialabgaben der Erwerbstaetigen dazu. Sie sind keine
+      Beitraege des Alters und duerfen deshalb weder in `zugeordnet` noch in
+      `offen` eingehen — sonst verteilte der Rueckfall unten sie ein zweites
+      Mal auf die Renten.
+    */
+    for (const [id, sv] of erwerbSv) jeQuelle.set(id, sv);
+    // Der Rueckfall verteilt NUR auf Alterseinkuenfte. Ein Erwerbseinkommen
+    // traegt seine eigenen Sozialabgaben und keinen Anteil an den Beitraegen
+    // des Ruhestands.
+    const altersQuelle = (id: string) => !id.startsWith('erwerb');
+    const bruttoSumme = quellen
+      .filter((q) => altersQuelle(q.id))
+      .reduce((sum, q) => sum + q.brutto, 0);
     for (const q of quellen) {
       // Verbraucht: Was hier gebucht ist, darf am Ende nicht noch einmal als
       // unverteilter Rest erscheinen.
       const eigener = jeQuelle.get(q.id) ?? 0;
       jeQuelle.delete(q.id);
       const anteilKv = eigener
-        + (offen > 0.005 && bruttoSumme > 0 ? (q.brutto / bruttoSumme) * offen : 0);
+        + (offen > 0.005 && bruttoSumme > 0 && altersQuelle(q.id)
+          ? (q.brutto / bruttoSumme) * offen
+          : 0);
       const steuer = st.aufteilung.find((a) => a.id === q.id)?.gesamt ?? 0;
       const vertrag = s.vertraege.find((v) => v.id === q.id);
       posten.push({

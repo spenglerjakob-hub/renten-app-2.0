@@ -1,6 +1,8 @@
 import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
-import { projiziere } from '../src/projection/timeline.js';
+import { projiziere, type Jahreszeile } from '../src/projection/timeline.js';
+import { einkommensteuer } from '../src/tax/estg.js';
+import { parameterFuer } from '../src/params/registry.js';
 import { ruhestandsfenster } from '../src/analyse/ruhestandsfenster.js';
 import type { Szenario } from '../src/model.js';
 
@@ -95,7 +97,7 @@ describe('Projektion', () => {
     expect(gemischt[0]!.jahr).toBe(2042);
     // In dieser Phase gibt es sowohl Erwerbseinkommen als auch Rente
     const z = gemischt[0]!;
-    expect(z.posten.some((x) => x.id === 'erwerb')).toBe(true);
+    expect(z.posten.some((x) => x.id.startsWith('erwerb'))).toBe(true);
     expect(z.posten.some((x) => x.id === 'person-A')).toBe(true);
   });
 
@@ -305,5 +307,73 @@ describe('Einmalige Kapitalauszahlung', () => {
     const a = e.kapitalauszahlungen[0]!;
     expect(a.kvPvGesamt).toBeLessThan(a.bruttoKapital * 0.2);
     expect(a.kvPvGesamt).toBeGreaterThan(a.bruttoKapital * 0.1);
+  });
+});
+
+describe('Gemischte Phase: EINE Veranlagung', () => {
+  /*
+    BEFUND: Der Posten "Erwerbseinkommen" lief nie ueber die Quellen der
+    Haushaltssteuer — er brachte seine Steuer fertig mit. In einem Jahr, in
+    dem einer schon Rente bezieht und der andere noch arbeitet, wurde der
+    Tarif deshalb ZWEIMAL angewandt: zwei Grundfreibetraege, zweimal
+    Splitting. Bei 24 000 EUR Rente neben 45 000 EUR Erwerbs-zvE waren das
+    5 640 EUR Steuer im Jahr zu wenig.
+  */
+  const paar = (over: Partial<Szenario['haushalt']> = {}): Szenario => szenario({
+    haushalt: { ...szenario().haushalt, verheiratet: true, ...over },
+    personen: [
+      { ...szenario().personen[0]!, id: 'A', rentenbeginn: '2042-01-01' },
+      {
+        ...szenario().personen[0]!, id: 'B', name: 'Partner',
+        geburtsdatum: '1980-01-01', rentenbeginn: '2047-01-01',
+      },
+    ],
+  });
+
+  const imJahr = (s: Szenario, jahr: number) =>
+    projiziere(s).zeilen.find((z) => z.jahr === jahr)!;
+
+  const summe = (z: Jahreszeile, praefix: string, feld: 'zveBeitrag' | 'kvPvJahr') =>
+    z.posten.filter((x) => x.id.startsWith(praefix)).reduce((s, x) => s + x[feld], 0);
+
+  it('den Grundfreibetrag gibt es einmal, nicht zweimal', () => {
+    const z = imJahr(paar(), 2042);
+    expect(z.gemischtePhase).toBe(true);
+
+    const p = parameterFuer(2042, { indexRate: 0.02 });
+    const zveRente = summe(z, 'person-', 'zveBeitrag');
+    const zveErwerb = summe(z, 'erwerb', 'zveBeitrag');
+    expect(zveRente).toBeGreaterThan(0);
+    expect(zveErwerb).toBeGreaterThan(0);
+
+    // So rechnete es die Zeitachse vorher: jede Einkunftsart fuer sich.
+    const zweimal = einkommensteuer(zveRente, true, p) + einkommensteuer(zveErwerb, true, p);
+    expect(z.steuerGesamt).toBeGreaterThan(zweimal);
+  });
+
+  it('reine Ruhestandsjahre bleiben unberuehrt', () => {
+    const z = imJahr(paar(), 2048);
+    expect(z.vollstaendigImRuhestand).toBe(true);
+    expect(summe(z, 'erwerb', 'zveBeitrag')).toBe(0);
+  });
+
+  it('die PKV-Praemie faellt in der gemischten Phase nur EINMAL an', () => {
+    /*
+      Vorher trug der noch Arbeitende die volle Haushaltspraemie ueber die
+      Sozialabgaben — und der Rentner daneben noch einmal dieselbe ueber
+      `kvPvImAlter`.
+    */
+    const praemie = 600;
+    const ohne = imJahr(paar({ kvStatus: 'pkv', kvErwerb: 'pkv' }), 2042);
+    const mit = imJahr(paar({
+      kvStatus: 'pkv', kvErwerb: 'pkv',
+      pkv: { ...PKV_VORGABE, praemieMonat: praemie },
+    }), 2042);
+
+    const mehr = mit.kvPvGesamt - ohne.kvPvGesamt;
+    // Eine Praemie im Jahr, abzueglich des Zuschusses auf den Rentneranteil —
+    // also deutlich weniger als zwei Praemien.
+    expect(mehr).toBeLessThan(praemie * 12 * 1.05);
+    expect(mehr).toBeGreaterThan(0);
   });
 });

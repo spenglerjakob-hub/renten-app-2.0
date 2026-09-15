@@ -73,7 +73,7 @@ function personAnteil(
   pkvPraemieMonat: number,
   selbststaendig = false,
   grvBeitragJahr = 0,
-): { brutto: number; sv: number; zveBeitrag: number } {
+): { brutto: number; sv: number; zveBeitrag: number; zveVorSonderausgaben: number } {
   const brutto = Math.max(0, jahresbrutto);
   const privat = o.privatVersichert ?? false;
 
@@ -171,12 +171,18 @@ function personAnteil(
   */
   const arbeitnehmerPauschbetrag = selbststaendig ? 0 : p.pauschbetraege.arbeitnehmer;
 
-  const zveBeitrag = Math.max(
-    0,
-    brutto - arbeitnehmerPauschbetrag - p.pauschbetraege.sonderausgaben - vorsorgeAbzug,
-  );
+  /*
+    Zweimal derselbe Beitrag, einmal ohne den Sonderausgaben-Pauschbetrag.
 
-  return { brutto, sv, zveBeitrag };
+    Wer das Erwerbseinkommen ZUSAMMEN mit Renten veranlagt — und das muss er,
+    sobald einer von beiden schon im Ruhestand ist —, zieht den Pauschbetrag
+    des § 10c fuer den HAUSHALT ab, nicht je Einkunftsart. Zoege ihn jede
+    Quelle fuer sich ab, stuende er mehrfach in derselben Veranlagung.
+  */
+  const zveVorSonderausgaben = Math.max(0, brutto - arbeitnehmerPauschbetrag - vorsorgeAbzug);
+  const zveBeitrag = Math.max(0, zveVorSonderausgaben - p.pauschbetraege.sonderausgaben);
+
+  return { brutto, sv, zveBeitrag, zveVorSonderausgaben };
 }
 
 /** Brutto -> Netto fuer die Erwerbsphase, EINE Person. */
@@ -234,8 +240,17 @@ export interface ErwerbHaushaltErgebnis {
   est: number;
   soli: number;
   kirchensteuer: number;
-  /** Brutto und SV je Person, in der uebergebenen Reihenfolge */
-  proPerson: { brutto: number; sv: number; zveBeitrag: number }[];
+  /**
+   * Brutto und SV je Person, in der uebergebenen Reihenfolge.
+   *
+   * `zveVorSonderausgaben` fuer Aufrufer, die das Erwerbseinkommen mit
+   * WEITEREN Einkuenften zusammen veranlagen muessen — in der gemischten
+   * Phase, in der einer schon Rente bezieht. Sie ziehen den Pauschbetrag des
+   * § 10c dann einmal fuer den Haushalt ab und nicht je Einkunftsart.
+   */
+  proPerson: {
+    brutto: number; sv: number; zveBeitrag: number; zveVorSonderausgaben: number;
+  }[];
 }
 
 /**

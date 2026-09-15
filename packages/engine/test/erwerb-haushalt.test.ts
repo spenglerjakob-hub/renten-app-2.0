@@ -169,8 +169,24 @@ describe('Erwerbseinkommen in der Projektion', () => {
     ...over,
   });
 
-  const erwerbIm = (s: Szenario, jahr: number) =>
-    projiziere(s).zeilen.find((z) => z.jahr === jahr)!.posten.find((x) => x.id === 'erwerb');
+  /*
+    Das Erwerbseinkommen steht seit der gemeinsamen Veranlagung als EIN
+    Posten JE ARBEITENDER PERSON da — sonst liefe der Steuertarif in der
+    gemischten Phase zweimal. Fuer die Zusicherungen hier zaehlt weiterhin
+    der Haushalt, also die Summe.
+  */
+  const erwerbIm = (s: Szenario, jahr: number) => {
+    const teile = projiziere(s).zeilen.find((z) => z.jahr === jahr)!
+      .posten.filter((x) => x.id.startsWith('erwerb'));
+    if (teile.length === 0) return undefined;
+    const summe = (feld: 'bruttoJahr' | 'kvPvJahr' | 'steuerJahr' | 'nettoJahr' | 'zveBeitrag') =>
+      teile.reduce((s, x) => s + x[feld], 0);
+    return {
+      bruttoJahr: summe('bruttoJahr'), kvPvJahr: summe('kvPvJahr'),
+      steuerJahr: summe('steuerJahr'), nettoJahr: summe('nettoJahr'),
+      zveBeitrag: summe('zveBeitrag'),
+    };
+  };
 
   it('teilt das Haushaltseinkommen auch pauschal auf zwei Personen auf', () => {
     // 120 000 EUR als EINE Person ergaeben zu niedrige Sozialabgaben.
