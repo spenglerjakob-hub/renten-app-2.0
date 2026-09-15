@@ -93,6 +93,19 @@ export function mindestbemessungMonat(p: LegalParameters): number {
   return p.bezugsgroesseMonat / 3;
 }
 
+/**
+ * Einkommensgrenze der beitragsfreien Familienversicherung, monatlich
+ * (§ 10 Abs. 1 S. 1 Nr. 5 SGB V: ein Siebtel der monatlichen Bezugsgroesse).
+ *
+ * Abgeleitet und nicht als eigener Rechtsstandswert gefuehrt — aus demselben
+ * Grund wie die Mindestbemessung: Die Bezugsgroesse wird bei der
+ * Fortschreibung bereits indexiert, eine Ableitung waechst kostenlos mit und
+ * kann nicht davon wegdriften.
+ */
+export function familienversicherungsgrenzeMonat(p: LegalParameters): number {
+  return p.bezugsgroesseMonat / 7;
+}
+
 /** Voller allgemeiner KV-Satz inkl. Zusatzbeitrag. */
 export function kvSatzVoll(p: LegalParameters): number {
   return p.kv.allgemeinerSatz + p.kv.zusatzbeitrag;
@@ -146,6 +159,16 @@ export function kvPvImAlter(
      * Deckelung aufgeschlagen — abfliessen tun sie trotzdem.
      */
     pkvWeitereBeitraegeMonat?: number;
+    /**
+     * Ob die Personen miteinander verheiratet sind.
+     *
+     * Entscheidet ueber die beitragsfreie Familienversicherung des
+     * § 10 SGB V — ohne Ehe gibt es sie zwischen Erwachsenen nicht.
+     *
+     * Vorgabe `false`: Der Einpersonenfall ist der haeufigere Aufruf, und
+     * jede bestehende Rechnung bleibt damit unveraendert.
+     */
+    verheiratet?: boolean;
   } = {},
 ): KvPvErgebnis {
   const bbgMonat = p.bbgKvJahr / 12;
@@ -171,6 +194,54 @@ export function kvPvImAlter(
   // Ohne jede Einkunft bleibt EIN Mitglied uebrig: Ein freiwillig
   // Versicherter zahlt auch dann den Mindestbeitrag.
   if (gruppen.size === 0) gruppen.set('', []);
+
+  /*
+    FAMILIENVERSICHERUNG (§ 10 SGB V) — beitragsfrei mitversichert.
+
+    Ohne sie bekam ein Ehegatte OHNE eigene Rente einen eigenen
+    Mindestbeitrag aufgebuerdet (§ 240 Abs. 4 SGB V, rund 286 EUR im Monat
+    2026). In der Zeitachse steht diesem Beitrag keine Einkunft gegenueber,
+    er erschien deshalb als NEGATIVE Rente dieser Person — ein Minusbetrag,
+    der im Haushaltsnetto landete. Rechtlich existiert er nicht: Wer als
+    Ehegatte eines Mitglieds hoechstens ein Siebtel der Bezugsgroesse an
+    Gesamteinkommen hat, zahlt weder KV- noch PV-Beitraege (§ 25 SGB XI
+    fuer die Pflegeversicherung).
+
+    Geprueft wird ausschliesslich das Einkommen. Ob im Einzelfall statt der
+    Mitversicherung eine eigene Versicherungspflicht als Rentner besteht
+    (§ 5 Abs. 1 Nr. 11 SGB V), haengt an der Vorversicherungszeit — neun
+    Zehntel der zweiten Haelfte des Erwerbslebens. Die laesst sich aus den
+    erfassten Daten nicht ableiten, und sie zu raten waere schlechter, als
+    dem Wortlaut der Einkommensgrenze zu folgen.
+
+    In der PKV gibt es keine beitragsfreie Mitversicherung — dort hat jeder
+    Kopf seine eigene Praemie. Die Pruefung steht deshalb VOR dem
+    PKV-Zweig und wirkt nur auf die gesetzlichen Faelle.
+  */
+  if (status !== 'pkv' && opts.verheiratet && gruppen.size > 1) {
+    const grenze = familienversicherungsgrenzeMonat(p);
+    const einkommen = (eigene: Beitragspflichtig[]) =>
+      eigene.reduce((s, e) => s + Math.max(0, e.monatsbetrag), 0);
+
+    const mitversichert = [...gruppen.entries()]
+      .filter(([, eigene]) => einkommen(eigene) <= grenze)
+      .map(([schluessel]) => schluessel);
+
+    /*
+      Mitversichert sein kann nur, wer bei jemandem mitversichert IST.
+      Liegen alle unter der Grenze, bleibt die einkommensstaerkste Gruppe
+      Mitglied — sonst zahlte ein Haushalt ohne jede Einkunft gar nichts,
+      und die Mindestbemessung, die es genau dafuer gibt, liefe ins Leere.
+    */
+    if (mitversichert.length === gruppen.size) {
+      const staerkste = [...gruppen.entries()]
+        .sort((a, b) => einkommen(b[1]) - einkommen(a[1]))[0]?.[0];
+      const i = mitversichert.indexOf(staerkste ?? '');
+      if (i >= 0) mitversichert.splice(i, 1);
+    }
+
+    for (const schluessel of mitversichert) gruppen.delete(schluessel);
+  }
 
   let kv = 0;
   let pv = 0;
@@ -206,9 +277,23 @@ export function kvPvImAlter(
     kv = Math.max(0, praemie - zuschuss) + weitere;
     pv = 0; // in der Praemie enthalten
     const basisanteil = opts.pkvBasisanteil ?? PKV_BASISANTEIL;
-    // Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
-    // gesetzlichen Rente zugeordnet, aus der der Zuschuss stammt.
-    const traeger = sortiert.find((e) => e.art === 'gesetzlicheRente')?.id;
+    /*
+      Die Praemie haengt an keiner einzelnen Einkunft; sie wird deshalb der
+      GROESSTEN gesetzlichen Rente zugeordnet — aus ihr wird der Zuschuss
+      nach § 106 SGB VI tatsaechlich mit ausgezahlt.
+
+      Vorher stand hier die ERSTE Rente der Rangfolge. Hatte ein Ehepaar
+      eine Pension bei A (Rang 1) und eine Rente von 0 EUR bei B (Rang 0),
+      landete die volle Haushaltspraemie auf einem Posten ohne Brutto — als
+      negative Rente von mehreren hundert Euro. Nullbetraege scheiden jetzt
+      aus; gibt es gar keine gesetzliche Rente, traegt sie die groesste
+      Einkunft ueberhaupt.
+    */
+    const groesste = (xs: readonly Beitragspflichtig[]) =>
+      xs.filter((e) => e.monatsbetrag > 0)
+        .sort((a, b) => b.monatsbetrag - a.monatsbetrag)[0]?.id;
+    const traeger = groesste(sortiert.filter((e) => e.art === 'gesetzlicheRente'))
+      ?? groesste(sortiert);
     return {
       kv, pv, gesamt: kv,
       // Der Entlastungstarif ist ebenfalls Vorsorgeaufwand — mit demselben

@@ -2,6 +2,7 @@ import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied, bavFreibetragMonat,
+  mindestbemessungMonat, familienversicherungsgrenzeMonat,
   type Beitragspflichtig,
 } from '../src/social/kv-pv.js';
 import { parameterFuer, durchschnittlicherZusatzbeitrag } from '../src/params/registry.js';
@@ -325,5 +326,237 @@ describe('Individueller Zusatzbeitrag', () => {
       indexRate: 0, zusatzbeitrag: durchschnittlicherZusatzbeitrag(2026),
     });
     expect(ohne.kv.zusatzbeitrag).toBe(mitDurchschnitt.kv.zusatzbeitrag);
+  });
+});
+
+describe('Familienversicherung (§ 10 SGB V)', () => {
+  /*
+    Der Befund, der dieses Kapitel ausgeloest hat: Wer beim Ehepartner 0 EUR
+    Rente eintrug, bekam einen MINUSBETRAG zu sehen. Die Gruppierung nach
+    Mitglied legte fuer den Partner eine eigene Gruppe an, und die
+    Mindestbemessung des § 240 Abs. 4 SGB V bescherte ihm einen vollen
+    Mindestbeitrag auf gar keine Einkunft.
+
+    Rechtlich gibt es diesen Beitrag nicht: Ein Ehegatte mit hoechstens einem
+    Siebtel der Bezugsgroesse an Gesamteinkommen ist beitragsfrei
+    mitversichert.
+  */
+  const von = (person: string, e: Beitragspflichtig): Beitragspflichtig =>
+    ({ ...e, id: `${e.id}-${person}`, person });
+
+  const paar = (eigeneB: Beitragspflichtig[], opts: { verheiratet?: boolean } = {}) =>
+    kvPvImAlter(
+      'freiwillig',
+      [von('A', rente(2000)), ...eigeneB.map((e) => von('B', e))],
+      kinderlos, p, { verheiratet: true, ...opts },
+    );
+
+  it('der Partner ohne eigene Rente zahlt nichts', () => {
+    const r = paar([rente(0)]);
+    // 12,95 % auf die Rente von A — und sonst nichts.
+    expect(r.gesamt).toBeCloseTo(2000 * 0.1295, 4);
+    expect(r.jeQuelle.find((x) => x.id === 'rente-B')).toBeUndefined();
+  });
+
+  it('ohne Ehe bleibt es beim Mindestbeitrag — die Vorgabe aendert nichts', () => {
+    const r = paar([rente(0)], { verheiratet: false });
+    const mindestbeitrag = mindestbemessungMonat(p)
+      * (kvSatzVoll(p) + pvSatzMitglied(kinderlos, p));
+    expect(r.gesamt).toBeCloseTo(2000 * 0.1295 + mindestbeitrag, 4);
+    // Genau der Betrag, der frueher als negative Rente im Kassenbon stand.
+    expect(mindestbeitrag).toBeCloseTo(286.08, 2);
+  });
+
+  it('die Grenze ist ein Siebtel der Bezugsgroesse', () => {
+    expect(familienversicherungsgrenzeMonat(p)).toBeCloseTo(3955 / 7, 6);
+    expect(familienversicherungsgrenzeMonat(p)).toBeCloseTo(565, 2);
+  });
+
+  it('knapp darunter mitversichert, knapp darueber nicht', () => {
+    const grenze = familienversicherungsgrenzeMonat(p);
+    const drunter = paar([versorgung(grenze - 5)]);
+    const drueber = paar([versorgung(grenze + 5)]);
+
+    expect(drunter.gesamt).toBeCloseTo(2000 * 0.1295, 4);
+    expect(drunter.jeQuelle.find((x) => x.id === 'bav-B')).toBeUndefined();
+    expect(drueber.jeQuelle.find((x) => x.id === 'bav-B')).toBeDefined();
+    expect(drueber.gesamt).toBeGreaterThan(drunter.gesamt);
+  });
+
+  it('mehrere kleine Bezuege zaehlen zusammen gegen die Grenze', () => {
+    // 300 + 300 liegen einzeln darunter, zusammen darueber. § 10 fragt nach
+    // dem GESAMTeinkommen, nicht nach dem einzelnen Bezug.
+    const r = paar([versorgung(300, 'bav1'), versorgung(300, 'bav2')]);
+    expect(r.gesamt).toBeGreaterThan(2000 * 0.1295);
+  });
+
+  it('haben beide nichts, bleibt genau EIN Mindestbeitrag', () => {
+    // Mitversichert sein kann nur, wer bei jemandem mitversichert ist.
+    const r = kvPvImAlter(
+      'freiwillig',
+      [von('A', rente(0)), von('B', rente(0))],
+      kinderlos, p, { verheiratet: true },
+    );
+    expect(r.gesamt).toBeCloseTo(286.08, 2);
+  });
+
+  it('in der KVdR aendert sich nichts', () => {
+    const allein = kvPvImAlter('kvdr', [von('A', rente(2000))], kinderlos, p);
+    const zuZweit = kvPvImAlter(
+      'kvdr', [von('A', rente(2000)), von('B', rente(0))],
+      kinderlos, p, { verheiratet: true },
+    );
+    expect(zuZweit.gesamt).toBeCloseTo(allein.gesamt, 6);
+  });
+
+  it('in der PKV gibt es sie nicht — jeder Kopf hat seine Praemie', () => {
+    const r = kvPvImAlter(
+      'pkv', [von('A', rente(2000)), von('B', rente(0))],
+      kinderlos, p, { verheiratet: true, pkvPraemieMonat: 800 },
+    );
+    expect(r.gesamt).toBeGreaterThan(0);
+  });
+});
+
+describe('Traeger der PKV-Praemie', () => {
+  /*
+    Die Praemie haengt an keiner einzelnen Einkunft und wird deshalb einer
+    zugeordnet. Frueher war das die ERSTE gesetzliche Rente der Rangfolge —
+    auch wenn sie 0 EUR betrug. Bei einer Pension neben einer Rente von
+    0 EUR landete die volle Haushaltspraemie auf einem Posten ohne Brutto.
+  */
+  it('nicht auf einer Rente von null', () => {
+    const r = kvPvImAlter(
+      'pkv',
+      [
+        { id: 'pension-A', art: 'versorgungsbezug', monatsbetrag: 3000, person: 'A' },
+        { id: 'rente-B', art: 'gesetzlicheRente', monatsbetrag: 0, person: 'B' },
+      ],
+      kinderlos, p, { verheiratet: true, pkvPraemieMonat: 800 },
+    );
+    expect(r.jeQuelle).toHaveLength(1);
+    expect(r.jeQuelle[0]!.id).toBe('pension-A');
+    expect(r.jeQuelle[0]!.kv).toBeCloseTo(800, 6);
+  });
+
+  it('auf die GROESSTE gesetzliche Rente, nicht auf die erste', () => {
+    const r = kvPvImAlter(
+      'pkv',
+      [
+        { id: 'rente-A', art: 'gesetzlicheRente', monatsbetrag: 400, person: 'A' },
+        { id: 'rente-B', art: 'gesetzlicheRente', monatsbetrag: 2200, person: 'B' },
+      ],
+      kinderlos, p, { verheiratet: true, pkvPraemieMonat: 800 },
+    );
+    expect(r.jeQuelle[0]!.id).toBe('rente-B');
+  });
+});
+
+describe('Der 0-EUR-Partner an der Zeitachse', () => {
+  /*
+    Genau der Weg, auf dem der Minusbetrag beim Nutzer erschien: Um beide
+    Partner getrennt zu betrachten, trug er beim zweiten 0 EUR Rente ein.
+  */
+  const paarSzenario = (grvB: number, kvStatus: 'kvdr' | 'freiwillig'): Szenario => ({
+    schemaVersion: 1,
+    haushalt: {
+      verheiratet: true, bundesland: 'Baden-Württemberg', kirchensteuer: false,
+      hatKinder: false, kinderUnter25: 0, kinder: [],
+      kvStatus, kvErwerb: 'gesetzlich', pkv: PKV_VORGABE, zielNettoHeute: 3000,
+    },
+    annahmen: { inflation: 0, rentendynamik: 0, tarifIndex: 0, gehaltsdynamik: 0 },
+    einkommenHeute: {
+      modus: 'brutto', betrag: 4000, auszahlungen: 12,
+      besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+      grvPflicht: false, grvBeitragMonat: 0,
+    },
+    personen: [
+      {
+        id: 'A', name: 'Anna', geburtsdatum: '01.04.1975', rentenbeginn: '01.04.2042',
+        art: 'grv', grvBruttoHeute: 2000,
+        besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+        dienstbeginn: '01.01.2000', teilzeitphasen: [],
+      },
+      {
+        id: 'B', name: 'Bernd', geburtsdatum: '01.04.1977', rentenbeginn: '01.04.2044',
+        art: 'grv', grvBruttoHeute: grvB,
+        besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+        dienstbeginn: '01.01.2000', teilzeitphasen: [],
+      },
+    ],
+    vertraege: [],
+    planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
+  });
+
+  const imJahr = (s: Szenario, jahr: number) =>
+    projiziere(s).zeilen.find((x) => x.jahr === jahr)!;
+
+  it('kein Posten geht ins Minus', () => {
+    const z = imJahr(paarSzenario(0, 'freiwillig'), 2045);
+    expect(z.vollstaendigImRuhestand).toBe(true);
+    for (const x of z.posten) expect(x.nettoJahr).toBeGreaterThanOrEqual(0);
+  });
+
+  it('der Partner ohne Rente kostet keine Beitraege', () => {
+    const z = imJahr(paarSzenario(0, 'freiwillig'), 2045);
+    const b = z.posten.find((x) => x.id === 'person-B')!;
+    expect(b.kvPvJahr).toBeCloseTo(0, 6);
+    // Der ganze Beitrag haengt an der Rente von A — 12,95 % davon.
+    const a = z.posten.find((x) => x.id === 'person-A')!;
+    expect(z.kvPvGesamt / a.bruttoJahr).toBeCloseTo(0.1295, 4);
+  });
+
+  it('eine eigene Rente ueber der Grenze kostet wieder', () => {
+    const mit = imJahr(paarSzenario(1200, 'freiwillig'), 2045);
+    const ohne = imJahr(paarSzenario(0, 'freiwillig'), 2045);
+    expect(mit.kvPvGesamt).toBeGreaterThan(ohne.kvPvGesamt);
+  });
+
+  it('die Summe der Posten ergibt weiterhin die Jahreszeile', () => {
+    const z = imJahr(paarSzenario(0, 'freiwillig'), 2045);
+    const summe = z.posten.reduce((s, x) => s + x.nettoJahr, 0);
+    expect(summe).toBeCloseTo(z.nettoGesamt, 4);
+    expect(z.posten.reduce((s, x) => s + x.kvPvJahr, 0)).toBeCloseTo(z.kvPvGesamt, 4);
+  });
+});
+
+describe('Vertragsinhaber ohne Partner', () => {
+  /*
+    Ein Alleinstehender, dessen Vertrag noch auf 'B' steht — etwa weil der
+    Haken "verheiratet" wieder entfernt wurde. Die Zeitachse rechnet den
+    Vertrag dann Person A zu; die Beitragspflicht meldete ihn aber weiter
+    unter 'B' und oeffnete damit eine zweite Mitgliedsgruppe mit eigener
+    Beitragsbemessungsgrenze und eigenem Versorgungsfreibetrag.
+  */
+  const mitInhaber = (inhaber: 'A' | 'B'): Szenario => ({
+    schemaVersion: 1,
+    haushalt: {
+      verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
+      hatKinder: false, kinderUnter25: 0, kinder: [],
+      kvStatus: 'freiwillig', kvErwerb: 'gesetzlich', pkv: PKV_VORGABE, zielNettoHeute: 2000,
+    },
+    annahmen: { inflation: 0, rentendynamik: 0, tarifIndex: 0, gehaltsdynamik: 0 },
+    einkommenHeute: {
+      modus: 'brutto', betrag: 4000, auszahlungen: 12,
+      besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
+      grvPflicht: false, grvBeitragMonat: 0,
+    },
+    personen: [{
+      id: 'A', name: 'Anna', geburtsdatum: '01.04.1975', rentenbeginn: '01.04.2042',
+      art: 'grv', grvBruttoHeute: 1800,
+      besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
+      dienstbeginn: '01.01.2000', teilzeitphasen: [],
+    }],
+    vertraege: [{
+      id: 'v1', inhaber, schicht: 2, typ: 'bav', name: 'Direktversicherung',
+      brutto: 300, strategie: 'rente', altvertrag: false,
+    }],
+    planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
+  });
+
+  it('oeffnet keine zweite Mitgliedschaft', () => {
+    const jahr = (s: Szenario) => projiziere(s).zeilen.find((x) => x.jahr === 2043)!;
+    expect(jahr(mitInhaber('B')).kvPvGesamt)
+      .toBeCloseTo(jahr(mitInhaber('A')).kvPvGesamt, 6);
   });
 });

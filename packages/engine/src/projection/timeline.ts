@@ -6,7 +6,7 @@ import {
 import { kirchensteuersatz } from '../tax/estg.js';
 import {
   kvPvImAlter, kvSatzVoll, pvSatzMitglied,
-  type Beitragspflichtig, type KinderStatus,
+  type Beitragspflichtig, type KinderStatus, type KvPvErgebnis,
 } from '../social/kv-pv.js';
 import { pkvImJahr, type PkvAnnahmen } from '../social/pkv.js';
 import {
@@ -681,23 +681,50 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       }
       if (r.kvArt) {
         const monatsbetrag = r.kvMonatsbetrag ?? r.brutto / 12;
-        // Der Inhaber MUSS mit: Beitragsgrenze und Freibetrag gehoeren dem
-        // Mitglied. Ohne ihn bekaeme jeder Vertrag seinen eigenen Freibetrag.
-        beitragspflichtig.push({ id: v.id, art: r.kvArt, monatsbetrag, person: v.inhaber });
+        /*
+          Der Inhaber MUSS mit: Beitragsgrenze und Freibetrag gehoeren dem
+          Mitglied. Ohne ihn bekaeme jeder Vertrag seinen eigenen Freibetrag.
+
+          `k.person.id` und nicht `v.inhaber`: Oben faellt `k` auf Person A
+          zurueck, wenn der Inhaber gar nicht mitgerechnet wird — bei einem
+          Alleinstehenden, dessen Vertrag noch auf 'B' steht. Mit `v.inhaber`
+          entstand daraus eine zweite Mitgliedsgruppe, die es nicht gibt:
+          zweite Beitragsbemessungsgrenze, zweiter Versorgungsfreibetrag und
+          bei freiwillig Versicherten ein zweiter Mindestbeitrag.
+        */
+        beitragspflichtig.push({ id: v.id, art: r.kvArt, monatsbetrag, person: k.person.id });
       }
     }
 
     // --- KV/PV ---
-    const kv = kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinderImJahr(s.haushalt, jahr), p, {
-      // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
-      // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
-      // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
-      pkvPraemieMonat: pkvHeuer.praemieMonat,
-      // Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
-      // Restanteil weiter. Er fliesst ab, erhoeht aber den Zuschuss nach
-      // § 106 SGB VI nicht — deshalb getrennt und nicht in der Praemie.
-      pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat,
-    });
+    /*
+      NUR, wenn ueberhaupt jemand im Ruhestand ist. Solange alle arbeiten,
+      stecken die Beitraege im Erwerbsnetto (`erwerbHaushalt`) — die Rechnung
+      hier ist die des ALTERS.
+
+      Bisher lief sie in jedem Jahr mit und lieferte in reinen Erwerbsjahren
+      einen Mindestbeitrag (freiwillig Versicherte) oder eine volle Praemie
+      (privat Versicherte) auf gar keine Einkunft. Das fiel nicht auf, weil
+      der Betrag mangels Brutto still unter den Tisch fiel — erst seit der
+      Restposten unten nichts mehr verschwinden laesst, wird er sichtbar.
+      Doppelt belastet wuerde er, nicht richtig.
+    */
+    const jemandImRuhestand = personen.some((k) => jahr >= k.rentenbeginnJahr);
+    const kv: KvPvErgebnis = jemandImRuhestand
+      ? kvPvImAlter(s.haushalt.kvStatus, beitragspflichtig, kinderImJahr(s.haushalt, jahr), p, {
+        // NACH Entlastung: der Zuschuss nach § 106 SGB VI ist auf die halbe
+        // Praemie gedeckelt, senkt ein Entlastungstarif sie, greift der Deckel
+        // frueher. Der BET-Beitrag selbst laeuft im Alter nicht mehr.
+        pkvPraemieMonat: pkvHeuer.praemieMonat,
+        // Der Beitrag zum Entlastungstarif laeuft im Ruhestand mit einem
+        // Restanteil weiter. Er fliesst ab, erhoeht aber den Zuschuss nach
+        // § 106 SGB VI nicht — deshalb getrennt und nicht in der Praemie.
+        pkvWeitereBeitraegeMonat: pkvHeuer.betBeitragMonat,
+        // Entscheidet ueber die beitragsfreie Familienversicherung eines
+        // Partners ohne nennenswerte eigene Einkuenfte (§ 10 SGB V).
+        verheiratet: s.haushalt.verheiratet,
+      })
+      : { kv: 0, pv: 0, gesamt: 0, abzugsfaehig: 0, jeQuelle: [] };
     const kvPvJahr = kv.gesamt * 12;
 
     // --- Altersentlastungsbetrag ---
@@ -757,7 +784,11 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
     const offen = kvPvJahr - zugeordnet;
     const bruttoSumme = quellen.reduce((sum, q) => sum + q.brutto, 0);
     for (const q of quellen) {
-      const anteilKv = (jeQuelle.get(q.id) ?? 0)
+      // Verbraucht: Was hier gebucht ist, darf am Ende nicht noch einmal als
+      // unverteilter Rest erscheinen.
+      const eigener = jeQuelle.get(q.id) ?? 0;
+      jeQuelle.delete(q.id);
+      const anteilKv = eigener
         + (offen > 0.005 && bruttoSumme > 0 ? (q.brutto / bruttoSumme) * offen : 0);
       const steuer = st.aufteilung.find((a) => a.id === q.id)?.gesamt ?? 0;
       const vertrag = s.vertraege.find((v) => v.id === q.id);
@@ -835,6 +866,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
       if (jahr < k.rentenbeginnJahr) continue;
 
       const kvPvVertrag = jeQuelle.get(v.id) ?? 0;
+      jeQuelle.delete(v.id);
       const e = verrentungen.get(v.id);
       const jahreSeitRente = jahr - k.rentenbeginnJahr;
       const laeuft = e !== undefined && jahreSeitRente < e.dauerJahre;
@@ -881,6 +913,32 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
           nettoJahr: bruttoJahr - steuerJahr,
         });
       }
+    }
+
+    /*
+      Was keiner Einkunft zugeordnet werden konnte, bleibt trotzdem faellig.
+
+      Der Rueckfall weiter oben verteilt den offenen Rest nach Bruttoanteil —
+      das setzt voraus, dass es ueberhaupt ein Brutto gibt. Bei einem privat
+      versicherten Paar ohne gesetzliche Rente gibt es keines: Dort fiel die
+      Praemie bisher ERSATZLOS aus dem Haushaltsnetto heraus, und weil
+      `kvPvGesamt` ebenfalls aus den Posten summiert wird, fiel es nicht
+      einmal auf. Diese Zeile ist die einzige Stelle, die die Zusicherung
+      "Summe der Posten = kv.gesamt x 12" tatsaechlich einloest.
+    */
+    const restKvPv = [...jeQuelle.values()].reduce((sum, x) => sum + x, 0)
+      + (bruttoSumme > 0 ? 0 : Math.max(0, offen));
+    if (restKvPv > 0.005) {
+      posten.push({
+        id: 'kv-pv-haushalt',
+        bezeichnung: 'Kranken- und Pflegeversicherung',
+        schicht: 1,
+        bruttoJahr: 0,
+        zveBeitrag: 0,
+        kvPvJahr: restKvPv,
+        steuerJahr: 0,
+        nettoJahr: -restKvPv,
+      });
     }
 
     const bruttoGesamt = posten.reduce((sum, x) => sum + x.bruttoJahr, 0);
