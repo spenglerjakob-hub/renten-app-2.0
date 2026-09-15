@@ -21,7 +21,7 @@ import {
  * das steht auf dem Papier sichtbar schief.
  */
 export function Renteneinkuenfte({
-  ergebnis, zeile, szenario, zielNettoHeute, inflation,
+  ergebnis, zeile, szenario, zielNettoHeute, inflation, einzelperson,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
@@ -29,6 +29,15 @@ export function Renteneinkuenfte({
   /** Das gewuenschte Netto in HEUTIGER Kaufkraft, so wie es erfasst wurde */
   zielNettoHeute: number;
   inflation: number;
+  /**
+   * Gesetzt in der Einzelbetrachtung: der Name der Person.
+   *
+   * Der Vorbehalt dazu steht HIER und nicht auf der Vorbehaltsseite, obwohl
+   * er dorthin gehoerte: Die ist mit 925 von 979 Punkten so gut wie voll und
+   * brach mit dem Absatz auf 1 022 um. Bei den Zahlen, die er einordnet, ist
+   * er ohnehin besser aufgehoben.
+   */
+  einzelperson?: string;
 }) {
   const geteilt = geteilterFreibetrag(szenario, zeile.jahr);
   const luecke = zeile.zielNettoMonat - zeile.nettoMonat;
@@ -160,7 +169,7 @@ export function Renteneinkuenfte({
         <Zeile
           fett
           zellen={[
-            'Haushalt gesamt',
+            einzelperson ? `${einzelperson} gesamt` : 'Haushalt gesamt',
             monat(zeile.bruttoGesamt),
             `− ${monat(zeile.kvPvGesamt)}`,
             `− ${monat(zeile.steuerGesamt)}`,
@@ -243,6 +252,17 @@ export function Renteneinkuenfte({
           })}
           Nach Ablauf dieser Jahre entfällt der Betrag — anders als eine lebenslange Rente ist ein
           Auszahlplan endlich.
+        </Text>
+      )}
+
+      {einzelperson && (
+        <Text>
+          <strong>Diese Fassung rechnet {einzelperson} allein.</strong> Nur die eigenen Verträge
+          und Einkünfte, mit dem Grundtarif statt des Splittings und ohne die beitragsfreie
+          Mitversicherung des § 10 SGB V. Die private Krankenversicherung ist im Szenario ein
+          Haushaltsbeitrag und hier hälftig angesetzt; ein Startkapital des Entnahmeplans bleibt
+          außen vor, weil es beiden gehört. Es ist <strong>nicht</strong> die Rechnung für den
+          Todesfall — eine Witwen- oder Witwerrente nach § 46 SGB VI ist nicht enthalten.
         </Text>
       )}
 

@@ -3,7 +3,10 @@ import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet,
 } from 'lucide-react';
-import { versorgungsluecke, parseDatum, type Jahreszeile } from '@renten/engine';
+import {
+  versorgungsluecke, parseDatum, nurPerson,
+  type Jahreszeile, type PersonId,
+} from '@renten/engine';
 import { useSzenario } from './store/szenario';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
@@ -21,6 +24,7 @@ import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
+import { personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro, TON } from './components/Feld';
 
 type Reiter = 's1' | 's2' | 's3' | 'planer';
@@ -97,7 +101,37 @@ export default function App() {
   const [ehepartnerDialog, setEhepartnerDialog] = useState(false);
   const dateiRef = useRef<HTMLInputElement>(null);
 
-  const { ergebnis, rechnet, fehler, dauerMs } = useProjektion(szenario);
+  /*
+    GESAMT ODER EINZELN.
+
+    Die ganze rechte Spalte haengt an EINEM Aufruf. Wird dort ein anderes
+    Szenario uebergeben, folgen Kopfzahlen, Kassenbon, Verlauf, Steuer-Engine,
+    Sparrechner, Foerdercheck und Vertrags-Pruefung von selbst — genau das ist
+    gewollt: wirklich nur die Vertraege und Einkuenfte einer Person.
+
+    Die EINGABEspalte behaelt dagegen den Wert aus dem Speicher. Bekaeme sie
+    das zusammengestrichene Szenario, bearbeitete man ein Phantom, dessen
+    Aenderungen beim naechsten Umschalten verschwaenden.
+
+    Beides ist Zustand der ANSICHT und wandert nicht ins Szenario: Zod
+    entfernt unbekannte Schluessel still, ein dort abgelegter Schalter ginge
+    beim naechsten Laden verloren.
+  */
+  const [betrachtung, setBetrachtung] = useState<'haushalt' | 'einzeln'>('haushalt');
+  const [wer, setWer] = useState<PersonId>('A');
+  const paar = szenario.haushalt.verheiratet && szenario.personen.length > 1;
+  const einzeln = paar && betrachtung === 'einzeln';
+  /*
+    `useMemo` ist hier Pflicht, nicht Kosmetik: `useProjektion` hat das
+    Szenario in seiner Abhaengigkeitsliste. Ein bei jedem Rendern neu gebautes
+    Objekt loeste dort eine Endlosschleife von Worker-Laeufen aus.
+  */
+  const ansichtSzenario = useMemo(
+    () => (einzeln ? nurPerson(szenario, wer) : szenario),
+    [szenario, einzeln, wer],
+  );
+
+  const { ergebnis, rechnet, fehler, dauerMs } = useProjektion(ansichtSzenario);
 
   const exportieren = () => {
     const blob = new Blob([alsJsonExportieren()], { type: 'application/json' });
@@ -125,11 +159,14 @@ export default function App() {
     das Jahr, in dem BEIDE im Ruhestand sind.
   */
   const ersterRuhestand = useMemo(() => {
-    const jahre = szenario.personen
+    // Aus dem ANSICHTSszenario: In der Einzelbetrachtung zaehlt allein der
+    // Rentenbeginn der gewaehlten Person. Naehme man hier weiter beide, boete
+    // der Regler Jahre an, in denen die Zeitachse noch gar nichts zeigt.
+    const jahre = ansichtSzenario.personen
       .map((x) => parseDatum(x.rentenbeginn)?.jahr)
       .filter((j): j is number => j !== undefined);
     return jahre.length > 0 ? Math.min(...jahre) : null;
-  }, [szenario.personen]);
+  }, [ansichtSzenario.personen]);
 
   const [jahrWahl, setJahrWahl] = useState<number | null>(null);
   /*
@@ -346,7 +383,13 @@ export default function App() {
         auf Papier leere Eingabekaesten, fehlende Vertraege und
         abgeschnittene Tabellen. Alles darunter ist deshalb print:hidden.
       */}
-      <Gutachten szenario={szenario} ergebnis={ergebnis ?? null} zeile={zeile} umfang={druckUmfang} />
+      <Gutachten
+        szenario={ansichtSzenario}
+        ergebnis={ergebnis ?? null}
+        zeile={zeile}
+        umfang={druckUmfang}
+        einzelperson={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+      />
 
       {importMeldung && (
         <div
@@ -429,6 +472,41 @@ export default function App() {
             </div>
           )}
 
+          {/*
+            GESAMT ODER EINZELN — der Umschalter steht ganz oben, weil er
+            alles darunter betrifft: Kopfzahlen, Kassenbon, Verlauf, Steuer,
+            Sparrechner, Vertrags-Pruefung und den Ausdruck. Gerechnet wird
+            dafuer nicht anders, sondern ein anderes Szenario.
+          */}
+          {paar && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
+              <Reiterleiste
+                reiter={[
+                  { id: 'haushalt' as const, text: 'Gesamt' },
+                  { id: 'einzeln' as const, text: 'Einzeln' },
+                ]}
+                aktiv={betrachtung}
+                onWechsel={setBetrachtung}
+                beschriftung="Haushalt oder einzelne Person"
+              />
+              {betrachtung === 'einzeln' && (
+                <Reiterleiste
+                  reiter={szenario.personen
+                    .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
+                    .map((p) => ({ id: p.id, text: personName(p) }))}
+                  aktiv={wer}
+                  onWechsel={setWer}
+                  beschriftung="Welche Person"
+                />
+              )}
+              <p className="px-3 py-2 text-xs leading-relaxed text-slate-500">
+                {betrachtung === 'einzeln'
+                  ? `Nur die Verträge und Einkünfte von ${personNameAus(szenario.personen, wer)} — allein veranlagt, mit Grundtarif statt Splitting.`
+                  : 'Beide Partner zusammen, wie bisher: eine Veranlagung mit Splittingtarif.'}
+              </p>
+            </div>
+          )}
+
           {ergebnis ? (
             <>
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -476,7 +554,7 @@ export default function App() {
                 Rentenbeginn zusammen; ein Regler haette dort nichts zu
                 zeigen ausser spaeteren Jahren derselben Rente.
               */}
-              {verheiratet && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
+              {paar && !einzeln && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
                 <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -556,7 +634,13 @@ export default function App() {
               </div>
 
               <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
-                <Kassenbon ergebnis={ergebnis} zeile={zeile} szenario={szenario} kaufkraftHeute={kaufkraftHeute} />
+                <Kassenbon
+                  ergebnis={ergebnis}
+                  zeile={zeile}
+                  szenario={ansichtSzenario}
+                  kaufkraftHeute={kaufkraftHeute}
+                  person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+                />
               </div>
               <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                 <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
@@ -584,7 +668,7 @@ export default function App() {
       <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
 
       <div className="print:hidden">
-        <VertragsTuev ergebnis={ergebnis ?? null} szenario={szenario} />
+        <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
       </div>
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500 print:hidden">

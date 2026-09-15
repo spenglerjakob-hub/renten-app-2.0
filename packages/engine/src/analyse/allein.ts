@@ -65,7 +65,7 @@ export const EINZELQUOTE = 2 / 3;
  *     Das eigene Einkommen wird deshalb hier bestimmt und nach
  *     `einkommenHeute` gelegt.
  */
-export function nurPerson(s: Szenario, id: PersonId): Szenario {
+export function nurPerson<T extends Szenario>(s: T, id: PersonId): T {
   const person = s.personen.find((p) => p.id === id);
   if (!person) return s;
 
@@ -80,6 +80,15 @@ export function nurPerson(s: Szenario, id: PersonId): Szenario {
     ? (id === 'A' ? s.einkommenHeute : (s.einkommenPartner ?? s.einkommenHeute))
     : { ...s.einkommenHeute, betrag: s.einkommenHeute.betrag / Math.max(1, beide.length) };
 
+  /*
+    GENERISCH und mit einer Zusicherung am Ende: Die Oberflaeche reicht ein
+    Szenario herein, das MEHR Felder hat als das Modell des Rechenkerns — das
+    Schema haengt noch die Vertrags-Pruefliste daran. Ohne `T` fielen die
+    beim Durchreichen aus dem Typ heraus, und der Aufrufer bekaeme ein
+    Szenario zurueck, das er nicht mehr dort einsetzen kann, wo er es her
+    hatte. Zur Laufzeit traegt der Spread sie ohnehin mit; die Zusicherung
+    sagt nur, was der Spread schon tut.
+  */
   return {
     ...s,
     haushalt: {
@@ -122,5 +131,5 @@ export function nurPerson(s: Szenario, id: PersonId): Szenario {
       */
       startkapital: 0,
     },
-  };
+  } as T;
 }

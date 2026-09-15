@@ -43,7 +43,7 @@ import { TuevBogen } from './TuevBogen';
  * nicht mehr versehentlich zerlegen.
  */
 export function Gutachten({
-  szenario, ergebnis, zeile, umfang = 'ausfuehrlich',
+  szenario, ergebnis, zeile, umfang = 'ausfuehrlich', einzelperson,
 }: {
   szenario: SzenarioParsed;
   ergebnis: ProjektionsErgebnis | null;
@@ -57,6 +57,14 @@ export function Gutachten({
    * 2070er zeigt, gibt man nicht ohne Rechtsstand aus der Hand.
    */
   umfang?: 'kurz' | 'ausfuehrlich';
+  /**
+   * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.
+   *
+   * Das Szenario ist dann zusammengestrichen und sieht aus wie das eines
+   * Alleinstehenden — ohne diese Angabe gaebe das Deckblatt ein Gutachten
+   * ueber einen Haushalt aus, den es so nicht gibt.
+   */
+  einzelperson?: string;
 }) {
   const lang = umfang === 'ausfuehrlich';
   const jetzt = new Date().getFullYear();
@@ -138,9 +146,14 @@ export function Gutachten({
         </div>
 
         <h1 className="mt-6 text-3xl font-black tracking-tight text-slate-900">
-          Altersvorsorge-Analyse
+          {einzelperson ? 'Altersvorsorge-Analyse — Einzelbetrachtung' : 'Altersvorsorge-Analyse'}
         </h1>
         <p className="mt-2 text-lg text-slate-700">für {name}</p>
+        {einzelperson && (
+          <p className="mt-1 text-xs font-semibold text-slate-600">
+            Nur die eigenen Verträge und Einkünfte von {einzelperson} — allein veranlagt.
+          </p>
+        )}
         <p className="mt-1 text-xs text-slate-500">
           Erstellt am {new Date().toLocaleDateString('de-DE')}
         </p>
@@ -248,6 +261,7 @@ export function Gutachten({
           szenario={szenario}
           zielNettoHeute={h.zielNettoHeute}
           inflation={szenario.annahmen.inflation}
+          einzelperson={einzelperson}
         />
       )}
 

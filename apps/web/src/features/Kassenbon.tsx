@@ -96,12 +96,20 @@ function PostenBlock({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, szenario, kaufkraftHeute,
+  ergebnis, zeile, szenario, kaufkraftHeute, person,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
   szenario: Szenario;
   kaufkraftHeute: boolean;
+  /**
+   * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.
+   *
+   * Das Szenario selbst weiss davon nichts — es ist zusammengestrichen und
+   * sieht aus wie das eines Alleinstehenden. Ohne diese Angabe stuende ueber
+   * einer Einzelrechnung weiter "Ihr Haushalts-Netto".
+   */
+  person?: string;
 }) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
@@ -156,7 +164,7 @@ export function Kassenbon({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
       <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
-        Ihr Haushalts-Netto im Jahr {zeile.jahr}
+        {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
         <span className="ml-2 font-normal text-slate-500">
           {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
         </span>
@@ -268,6 +276,25 @@ export function Kassenbon({
             {nachPerson.some((b) => b.person === null) && (
               <> Was keiner Person zuzuordnen ist, steht unter <strong>Haushalt</strong>.</>
             )}
+          </p>
+        )}
+
+        {/*
+          Der Satz zur Einzelbetrachtung. Er steht hier und nicht oben beim
+          Umschalter, weil er die Zahlen einordnet, die daneben stehen — und
+          weil die beiden Naeherungen sonst nirgends benannt waeren.
+        */}
+        {person && (
+          <p className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-[11px] leading-relaxed text-sky-900">
+            <strong>Allein gerechnet, nicht anteilig.</strong> Hier stehen nur die eigenen
+            Verträge und Einkünfte von {person} — mit dem <strong>Grundtarif</strong> statt des
+            Splittings, mit einfachen Pauschbeträgen, und ohne die beitragsfreie Mitversicherung
+            des § 10 SGB V: Wer wenig eigene Rente hat, zahlt allein den Mindestbeitrag.
+            {szenario.haushalt.pkv.praemieMonat > 0 && (
+              <> Die private Krankenversicherung ist im Szenario ein Haushaltsbeitrag; hier
+                zählt die <strong>Hälfte</strong>.</>
+            )}
+            {' '}Ein Startkapital des Entnahmeplans bleibt außen vor — es gehört beiden.
           </p>
         )}
 

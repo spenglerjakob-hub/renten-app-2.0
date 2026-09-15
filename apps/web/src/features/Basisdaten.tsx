@@ -1,5 +1,5 @@
 import {
-  BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag,
+  BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag, EINZELQUOTE,
   type ProjektionsErgebnis,
 } from '@renten/engine';
 import { RotateCcw, Target } from 'lucide-react';
@@ -318,6 +318,20 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
                   onChange={(n) => setzePerson(p.id, { ruhegehaltssatz: n })} max={71.75} einheit="%"
                   hilfe="Maximal 71,75 % (§ 14 BeamtVG)." />
               </>
+            )}
+            {/*
+              Nur bei Paaren, und nur fuer die Einzelbetrachtung. Das
+              Haushaltsziel gegen die Einkuenfte einer Person gehalten ergaebe
+              eine Luecke, die niemand so hat.
+            */}
+            {s.haushalt.verheiratet && (
+              <ZahlFeld
+                label="Gewünschtes Netto allein"
+                wert={p.zielNettoHeute ?? Math.round(s.haushalt.zielNettoHeute * EINZELQUOTE)}
+                onChange={(n) => setzePerson(p.id, { zielNettoHeute: n })}
+                einheit="€"
+                hilfe={`Für die Einzelbetrachtung. Vorbelegt mit zwei Dritteln des Haushaltsziels — Miete und Grundgebühren fallen einmal an.`}
+              />
             )}
           </div>
         </Abschnitt>
