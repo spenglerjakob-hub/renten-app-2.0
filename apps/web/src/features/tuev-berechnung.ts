@@ -1,6 +1,6 @@
 import {
   vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke, projiziere, kenntKapitalwahl, mehrbelastungJeVertrag,
+  versorgungsluecke, projiziere, kenntKapitalwahl,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario,
   type LegalParameters, type FoerderKontext,
@@ -112,19 +112,7 @@ function andererWeg(
   szenario: SzenarioParsed,
   v: Vertrag,
   strategie: Vertrag['strategie'],
-): {
-  posten: Jahreszeile['posten'][number] | undefined;
-  einmal: ProjektionsErgebnis['kapitalauszahlungen'][number] | undefined;
-  /**
-   * Die Mehrbelastung IN DIESEM Klon.
-   *
-   * Sie muss aus dem umgestellten Szenario kommen und nicht aus dem echten:
-   * Ein Vertrag, der dort als Kapital ausgezahlt wird, steht hier als laufende
-   * Rente und veraendert damit das zu versteuernde Einkommen des Jahres — also
-   * auch den Grenzsatz, mit dem er selbst belastet wird.
-   */
-  mehr: ReturnType<typeof mehrbelastungJeVertrag> | null;
-} {
+): { posten: Jahreszeile['posten'][number] | undefined; einmal: ProjektionsErgebnis['kapitalauszahlungen'][number] | undefined } {
   const klon: Szenario = {
     ...szenario,
     vertraege: szenario.vertraege.map((x) => (x.id === v.id ? { ...x, strategie } : x)),
@@ -134,7 +122,6 @@ function andererWeg(
   return {
     posten: zeile?.posten.find((x) => x.id === v.id),
     einmal: e.kapitalauszahlungen.find((x) => x.vertragId === v.id),
-    mehr: zeile ? mehrbelastungJeVertrag(klon, zeile.jahr) : null,
   };
 }
 
@@ -150,22 +137,6 @@ export function tuevPositionen(
 ): TuevPosition[] {
   const basis = tuevBasis(szenario);
   const jetzt = new Date().getFullYear();
-
-  /*
-    WAS DER VERTRAG TATSAECHLICH KOSTET, nicht was ihm anteilig zugerechnet
-    wird. Die Zeitachse verteilt die Haushaltssteuer nach dem Beitrag jeder
-    Quelle zum zu versteuernden Einkommen — fuer den Kassenbon richtig, fuer
-    die Frage dieses Bogens falsch: Eine Betriebsrente kommt OBENDRAUF auf den
-    progressiven Tarif und traegt den Grenzsatz, nicht den Durchschnitt.
-
-    Nachgemessen an einem Alleinstehenden mit 1.500 EUR gesetzlicher Rente
-    erschien eine bAV von 500 EUR mit 399 EUR netto statt mit 339 — knapp
-    60 EUR im Monat zu guenstig, und ueber `kennzahlen()` auch in Rendite und
-    Amortisationsdauer hinein.
-
-    Kostet N+1 Projektionen; beide Aufrufer memoisieren diese Funktion bereits.
-  */
-  const mehr = zeile ? mehrbelastungJeVertrag(szenario, zeile.jahr) : null;
 
   return szenario.tuev.flatMap((t) => {
     const v = szenario.vertraege.find((x) => x.id === t.vertragId);
@@ -184,31 +155,37 @@ export function tuevPositionen(
       Abzuege, nicht nur das Netto. Nur so koennen Bildschirm, Gutachten und
       Zeitachse nicht auseinanderlaufen.
 
-      Die ABZUEGE als Mehrbelastung, und zwar fuer JEDE laufende Rente: siehe
-      oben. Hier stand zuerst eine Einschraenkung auf die Betriebsrente. Die
-      Messung hat sie erledigt — bei 300 EUR Monatsbrutto neben 1.500 EUR
-      gesetzlicher Rente:
+      DIE STEUER IST DER ANTEILIGE WERT, und das ist eine bewusste
+      Entscheidung, keine Nachlaessigkeit. Es gab den Gegenversuch: Die
+      Auszahlseite rechnete eine Zeit lang die MEHRBELASTUNG — Steuer des
+      Haushalts mit diesem Vertrag minus Steuer ohne ihn. Bei 500 EUR
+      Betriebsrente neben 1.575 EUR gesetzlicher Rente sind das 86,75 statt
+      27,10 EUR im Monat, also 339 statt 399 EUR Nettorente.
 
-        Ruerup        13,51 -> 55,25    Riester      17,33 -> 66,17
-        Altersvors.   15,15 -> 60,08    Immobilie    11,25 -> 43,92
-        Privatrente    1,31 ->  7,50 (nur der Ertragsanteil traegt Steuer)
+      Beide Zahlen sind fuer sich richtig; sie beantworten nur verschiedene
+      Fragen. Die Mehrbelastung sagt, was der Vertrag dem Haushalt
+      ZUSAETZLICH bringt — nachpruefbar, aber sie haengt daran, in welcher
+      Reihenfolge man die Einkuenfte betrachtet: Dieselbe Rente allein waere
+      steuerfrei, als letzte gerechnet kostet sie den Grenzsatz. Bei mehreren
+      Vertraegen traegt jeder den Grenzsatz, und die Einzelwerte addieren
+      sich nicht mehr zur Haushaltssteuer.
 
-      Das FREIE DEPOT ist der aufschlussreiche Fall: Seine Abgeltungsteuer
-      steckt zwar in `steuerGesamt`, anteilige Zurechnung und Mehrbelastung
-      sind dort aber auf den Cent identisch (13,29 gegen 13,29). Ein linearer
-      Pauschsatz hat keine Progressionswirkung, die sich verteilen liesse —
-      die Umstellung ist fuer das Depot ein No-Op, kein vergessener Fall.
-      `mehrbelastung.test.ts` haelt beides fest.
+      Gewaehlt ist deshalb die anteilige Zurechnung: EINE Zahl, die im
+      Kassenbon, im Gutachten und hier dieselbe ist, und die sich ueber alle
+      Vertraege zur tatsaechlichen Steuer aufaddiert. Der Kunde kann sie
+      nachrechnen, ohne den Begriff „Grenzsteuersatz" zu kennen.
 
-      KAPITALAUSZAHLUNGEN bleiben aussen vor (`!istKapital`): Sie rechnen ueber
-      `bavKapitalSteuer` ohnehin schon als Differenz.
+      DER PREIS, offen benannt: Die EINZAHLseite rechnet weiterhin marginal
+      (`zusatzsteuer`, also Differenz — siehe Befund B3 im Kopf von
+      `analyse/vertrags-tuev.ts`). Ersparnis zum Grenzsatz gegen Last zum
+      Durchschnitt faellt zugunsten des Vertrags aus; die ausgewiesene
+      Rendite ist damit eher die obere Kante. Wer das aendern will, aendert
+      BEIDE Seiten — eine allein zu drehen macht es nur schiefer.
     */
-    const m = istKapital ? undefined : mehr?.get(v.id);
-
+    const nettoRenteMonat = !istKapital && posten ? posten.nettoJahr / 12 : 0;
     const bruttoRenteMonat = !istKapital && posten ? posten.bruttoJahr / 12 : 0;
-    const nettoRenteMonat = m ? m.nettoJahr / 12 : (!istKapital && posten ? posten.nettoJahr / 12 : 0);
-    const kvPvMonat = m ? m.kvPvJahr / 12 : (!istKapital && posten ? posten.kvPvJahr / 12 : 0);
-    const steuerMonat = m ? m.steuerJahr / 12 : (!istKapital && posten ? posten.steuerJahr / 12 : 0);
+    const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
+    const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
 
     /*
       Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
@@ -300,31 +277,11 @@ export function tuevPositionen(
       const rentePosten = istKapital ? gegen.posten : posten;
       const kapitalEinmal = istKapital ? einmal : gegen.einmal;
 
-      /*
-        DIE RENTENSEITE TRAEGT DIESELBE MEHRBELASTUNG wie der gewaehlte Weg
-        oben. Sie wurde hier ein zweites Mal zusammengebaut und blieb beim
-        anteiligen Posten stehen, als der obere Weg umgestellt wurde — im
-        Ausdruck standen dadurch zwei verschiedene Renditen fuer DENSELBEN Weg
-        (5,1 gegen 6,5 Prozent).
-
-        Wichtiger als der sichtbare Widerspruch ist aber, was er aufgedeckt
-        hat: Die KAPITALSEITE rechnet laengst nach der Mehrbelastung —
-        `bavKapitalSteuer` bildet die Differenz aus der Steuer mit und ohne die
-        Kapitalleistung. Solange die Rentenseite anteilig blieb, verglich
-        dieser Block den Durchschnittssatz der einen mit dem Grenzsatz der
-        anderen Seite und fiel damit systematisch zugunsten der Rente aus.
-
-        Die Quelle haengt daran, welcher Weg gewaehlt ist: Steht der Vertrag
-        auf Rente, ist es die Karte des echten Szenarios — also Wert fuer Wert
-        dieselbe wie oben. Steht er auf Kapital, kommt sie aus dem Klon.
-      */
-      const renteMehr = istKapital ? gegen.mehr?.get(v.id) : mehr?.get(v.id);
-
       const renteSeite = {
         bruttoRenteMonat: (rentePosten?.bruttoJahr ?? 0) / 12,
-        kvPvMonat: (renteMehr?.kvPvJahr ?? rentePosten?.kvPvJahr ?? 0) / 12,
-        steuerMonat: (renteMehr?.steuerJahr ?? rentePosten?.steuerJahr ?? 0) / 12,
-        nettoRenteMonat: (renteMehr?.nettoJahr ?? rentePosten?.nettoJahr ?? 0) / 12,
+        kvPvMonat: (rentePosten?.kvPvJahr ?? 0) / 12,
+        steuerMonat: (rentePosten?.steuerJahr ?? 0) / 12,
+        nettoRenteMonat: (rentePosten?.nettoJahr ?? 0) / 12,
         bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
       };
       const kapitalSeite = {

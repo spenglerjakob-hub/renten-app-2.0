@@ -461,20 +461,6 @@ export function VertragsTuev({
                             {!istKapital && <span className="text-xs font-normal"> / Monat</span>}
                           </span>
                         </div>
-                        {/*
-                          Ohne diesen Satz wirkt die Zahl wie ein Rechenfehler,
-                          sobald jemand die Abzuege mehrerer Vertraege
-                          zusammenzaehlt und mit dem Kassenbon vergleicht.
-                        */}
-                        {!istKapital && r.steuerMonat > 0 && (
-                          <p className="mt-2 text-[11px] leading-relaxed text-amber-800">
-                            Abgezogen ist, was dieser Vertrag <strong>zusätzlich</strong> kostet —
-                            was ohne ihn wegfiele. Eine zusätzliche Rente kommt oben auf den Tarif
-                            und trägt deshalb den höheren Grenzsteuersatz, nicht den Durchschnitt.
-                            Bei mehreren Verträgen ergeben die Einzelabzüge zusammen darum mehr,
-                            als der Kassenbon ihnen anteilig zuweist.
-                          </p>
-                        )}
                       </div>
                     </div>
 
