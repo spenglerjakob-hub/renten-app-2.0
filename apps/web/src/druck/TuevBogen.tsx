@@ -116,7 +116,7 @@ export function TuevBogen({
           </div>
           {/* Eine Zeile, nicht zwei: Der Bogen steht bei mehreren Vertraegen
               mehrfach im Dokument, jede Zeile zaehlt dort mehrfach. */}
-          {!istKapital && (v.typ === 'bav' || v.typ === 'bavUkasse') && r.steuerMonat > 0 && (
+          {!istKapital && r.steuerMonat > 0 && (
             <div className="mt-1 text-[10px] leading-snug text-slate-500">
               Abgezogen ist die Mehrbelastung dieses Vertrags — er trägt den Grenzsteuersatz,
               nicht den Durchschnitt.

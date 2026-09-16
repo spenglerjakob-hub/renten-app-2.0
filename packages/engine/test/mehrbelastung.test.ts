@@ -19,6 +19,26 @@ const bav = (id: string, brutto: number, over: Partial<Vertrag> = {}): Vertrag =
   name: id, brutto, strategie: 'rente', altvertrag: false, ...over,
 });
 
+/** Basisrente (Ruerup) — tariflich wie die bAV, nur ohne Beitragspflicht. */
+const ruerup = (id: string, brutto: number): Vertrag => ({
+  id, inhaber: 'A', schicht: 1, typ: 'basis',
+  name: id, brutto, strategie: 'rente', altvertrag: false,
+  beginnJahr: 2010, monatsbeitrag: 150,
+});
+
+/**
+ * Freies Wertpapierdepot mit laufender Entnahme.
+ *
+ * Gross genug, dass der Sparerpauschbetrag (§ 20 Abs. 9 EStG) ueberschritten
+ * wird — sonst waere die Steuer null und der Vergleich unten trivial wahr.
+ */
+const depot = (id: string, kapital: number): Vertrag => ({
+  id, inhaber: 'A', schicht: 3, typ: 'etf',
+  name: id, brutto: 0, strategie: 'rente', altvertrag: false,
+  kapitalHeute: kapital, sparrate: 0,
+  renditeAnsparphase: 0.05, renditeEntnahme: 0.04, ter: 0.002, entnahmedauer: 20,
+});
+
 const szenario = (vertraege: Vertrag[]): Szenario => ({
   schemaVersion: 1,
   haushalt: {
@@ -119,6 +139,53 @@ describe('Mehrbelastung je Vertrag', () => {
     // Gesamtsteuer exakt — das ist die Zusicherung des Kassenbons.
     const alle = zeile.posten.reduce((x, p) => x + p.steuerJahr, 0);
     expect(alle).toBeCloseTo(zeile.steuerGesamt, 6);
+  });
+
+  it('gilt genauso fuer eine Basisrente — die bAV ist kein Sonderfall', () => {
+    /*
+      Die Umstellung galt zuerst nur fuer die Betriebsrente. Gemessen wurde
+      dann, dass JEDE tariflich besteuerte Rente denselben Abstand zeigt:
+      Ruerup, Riester, Altersvorsorgedepot und Mieteinkuenfte liegen alle etwa
+      beim Vierfachen, die private Rente hoeher (dort traegt nur der
+      Ertragsanteil ueberhaupt Steuer, die Ausgangszahl ist also winzig).
+    */
+    const s = szenario([ruerup('rue1', 500)]);
+    const m = mehrbelastungJeVertrag(s, JAHR).get('rue1')!;
+    const posten = projiziere(s).zeilen.find((z) => z.jahr === JAHR)!
+      .posten.find((x) => x.id === 'rue1')!;
+
+    expect(m.steuerJahr).toBeGreaterThan(posten.steuerJahr * 2);
+
+    // Und in der KVdR beitragsfrei: eine Basisrente ist kein Versorgungsbezug.
+    expect(m.kvPvJahr).toBeCloseTo(0, 6);
+  });
+
+  it('laesst das freie Depot unveraendert — Abgeltungsteuer ist linear', () => {
+    /*
+      DER GEGENPROBEFALL, und er ist kein vergessener Zweig: Die
+      Abgeltungsteuer ist ein PAUSCHSATZ. Sie hat keine Progressionswirkung,
+      die sich auf Quellen verteilen liesse — anteilige Zurechnung und
+      Differenz muessen deshalb denselben Betrag ergeben.
+
+      Wer das spaeter als Luecke liest und das Depot „nachzieht", aendert
+      nichts; wer die Gleichheit bricht, hat einen Fehler gebaut.
+    */
+    /*
+      1,2 Mio und nicht 300.000: Im zweiten Rentenjahr deckt der
+      Sparerpauschbetrag den steuerpflichtigen Ertragsanteil einer kleineren
+      Entnahme noch vollstaendig ab — die Steuer waere null und der Vergleich
+      unten trivial wahr. Die Zusicherung darunter faengt genau das ab.
+    */
+    const s = szenario([depot('dep1', 1200000)]);
+    const zeile = projiziere(s).zeilen.find((z) => z.jahr === JAHR)!;
+    const posten = zeile.posten.find((x) => x.id === 'dep1')!;
+    const m = mehrbelastungJeVertrag(s, JAHR).get('dep1')!;
+
+    // Erst sicherstellen, dass ueberhaupt Steuer anfaellt — sonst waere die
+    // Gleichheit darunter nichtssagend.
+    expect(posten.steuerJahr).toBeGreaterThan(0);
+    expect(m.steuerJahr).toBeCloseTo(posten.steuerJahr, 6);
+    expect(m.nettoJahr).toBeCloseTo(posten.nettoJahr, 6);
   });
 
   it('traegt Vertraege ohne Auszahlung mit Nullen', () => {

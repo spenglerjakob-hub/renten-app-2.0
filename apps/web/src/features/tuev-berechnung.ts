@@ -184,15 +184,26 @@ export function tuevPositionen(
       Abzuege, nicht nur das Netto. Nur so koennen Bildschirm, Gutachten und
       Zeitachse nicht auseinanderlaufen.
 
-      Die ABZUEGE einer laufenden Betriebsrente aber als Mehrbelastung: siehe
-      oben. Vorerst nur dort. Die uebrigen Arten teilen denselben anteiligen
-      Schluessel und sind in dem Mass betroffen, in dem ihr Beitrag zum zu
-      versteuernden Einkommen vom Grenzsatz abweicht — Ruerup, Riester und das
-      Altersvorsorgedepot voll, die private Rente nur mit ihrem Ertragsanteil,
-      das freie Depot gar nicht (Abgeltungsteuer statt Tarif).
+      Die ABZUEGE als Mehrbelastung, und zwar fuer JEDE laufende Rente: siehe
+      oben. Hier stand zuerst eine Einschraenkung auf die Betriebsrente. Die
+      Messung hat sie erledigt — bei 300 EUR Monatsbrutto neben 1.500 EUR
+      gesetzlicher Rente:
+
+        Ruerup        13,51 -> 55,25    Riester      17,33 -> 66,17
+        Altersvors.   15,15 -> 60,08    Immobilie    11,25 -> 43,92
+        Privatrente    1,31 ->  7,50 (nur der Ertragsanteil traegt Steuer)
+
+      Das FREIE DEPOT ist der aufschlussreiche Fall: Seine Abgeltungsteuer
+      steckt zwar in `steuerGesamt`, anteilige Zurechnung und Mehrbelastung
+      sind dort aber auf den Cent identisch (13,29 gegen 13,29). Ein linearer
+      Pauschsatz hat keine Progressionswirkung, die sich verteilen liesse —
+      die Umstellung ist fuer das Depot ein No-Op, kein vergessener Fall.
+      `mehrbelastung.test.ts` haelt beides fest.
+
+      KAPITALAUSZAHLUNGEN bleiben aussen vor (`!istKapital`): Sie rechnen ueber
+      `bavKapitalSteuer` ohnehin schon als Differenz.
     */
-    const laufendeBav = !istKapital && (v.typ === 'bav' || v.typ === 'bavUkasse');
-    const m = laufendeBav ? mehr?.get(v.id) : undefined;
+    const m = istKapital ? undefined : mehr?.get(v.id);
 
     const bruttoRenteMonat = !istKapital && posten ? posten.bruttoJahr / 12 : 0;
     const nettoRenteMonat = m ? m.nettoJahr / 12 : (!istKapital && posten ? posten.nettoJahr / 12 : 0);
@@ -307,9 +318,7 @@ export function tuevPositionen(
         auf Rente, ist es die Karte des echten Szenarios — also Wert fuer Wert
         dieselbe wie oben. Steht er auf Kapital, kommt sie aus dem Klon.
       */
-      const renteMehr = (v.typ === 'bav' || v.typ === 'bavUkasse')
-        ? (istKapital ? gegen.mehr?.get(v.id) : mehr?.get(v.id))
-        : undefined;
+      const renteMehr = istKapital ? gegen.mehr?.get(v.id) : mehr?.get(v.id);
 
       const renteSeite = {
         bruttoRenteMonat: (rentePosten?.bruttoJahr ?? 0) / 12,
