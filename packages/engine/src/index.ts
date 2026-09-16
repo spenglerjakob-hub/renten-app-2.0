@@ -82,7 +82,7 @@ export {
   type Sparziel,
 } from './analyse/sparziel.js';
 export { jePerson, type PersonenBlock } from './analyse/je-person.js';
-export { nurPerson, alleinBedarf, EINZELQUOTE } from './analyse/allein.js';
+export { nurPerson } from './analyse/allein.js';
 export {
   kvProfil, kvProfilVon, irgendwerPrivat, type KvProfil,
 } from './social/kv-profil.js';

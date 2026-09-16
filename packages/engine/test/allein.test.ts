@@ -1,7 +1,7 @@
 import { PKV_VORGABE } from '../src/social/pkv.js';
 import { describe, it, expect } from 'vitest';
 import { projiziere } from '../src/projection/timeline.js';
-import { nurPerson, alleinBedarf, EINZELQUOTE } from '../src/analyse/allein.js';
+import { nurPerson } from '../src/analyse/allein.js';
 import { jePerson } from '../src/analyse/je-person.js';
 import type { Szenario } from '../src/model.js';
 
@@ -138,21 +138,24 @@ describe('Was das Alleinsein kostet', () => {
     expect(allein.kvPvGesamt).toBeGreaterThan(0);
   });
 
-  it('der eigene Anteil wird auf einen Einpersonenhaushalt hochgerechnet', () => {
+  it('der eigene Anteil gilt unveraendert als Ziel', () => {
     /*
-      Ohne eigenen Anteil ist er die Haelfte des Haushaltsziels. Die Probe,
-      die den ganzen Umbau traegt: Daraus kommt genau der Wert heraus, mit dem
-      die Einzelbetrachtung vorher gerechnet hat.
+      KEINE Hochrechnung: Was oben als Zielnetto der Person eingetragen ist,
+      ist der Bedarf, an dem die Einzelbetrachtung misst. Hier stand vorher
+      eine Multiplikation mit vier Dritteln (OECD-Aequivalenzskala); sie ist
+      entfallen, weil zwei verschiedene Zahlen fuer dieselbe Sache in der
+      Anzeige nur verwirren.
     */
+    // Ohne eigenen Anteil die Haelfte des Haushaltsziels — der Wert, den die
+    // Karte „Ihr Ziel" dann auch anzeigt.
     const ohneEigenen = nurPerson(paar(), 'A');
-    expect(ohneEigenen.haushalt.zielNettoHeute).toBeCloseTo(3000 * EINZELQUOTE, 6);
+    expect(ohneEigenen.haushalt.zielNettoHeute).toBeCloseTo(1500, 6);
 
-    // Ein Anteil von 1.800 EUR bedeutet allein 2.400 EUR — vier Drittel.
+    // Und mit eigenem Anteil genau dieser, nicht mehr.
     const mitEigenem = nurPerson(paar({
       personen: [{ ...paar().personen[0]!, zielAnteilHeute: 1800 }, paar().personen[1]!],
     }), 'A');
-    expect(mitEigenem.haushalt.zielNettoHeute).toBeCloseTo(2400, 6);
-    expect(alleinBedarf(1800)).toBeCloseTo(2400, 6);
+    expect(mitEigenem.haushalt.zielNettoHeute).toBeCloseTo(1800, 6);
   });
 
   it('zwei unveraenderte Anteile ergeben wieder das Haushaltsziel', () => {

@@ -132,9 +132,9 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
           An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
           die nötig wäre, um sie zu schließen.
           {paar && (
-            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>. In
-              der Einzelbetrachtung wird der Anteil auf einen Einpersonenhaushalt hochgerechnet
-              — allein fallen Miete und Grundgebühren nicht mehr geteilt an.</>
+            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>; in
+              der Einzelbetrachtung gilt jeder <strong>unverändert</strong> als Ziel der
+              jeweiligen Person.</>
           )}
         </p>
       </section>

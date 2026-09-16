@@ -168,19 +168,20 @@ export const personSchema = z.object({
 }).transform(({ zielNettoHeute, ...p }) => ({
   ...p,
   /*
-    Aus dem frueheren Allein-Bedarf wird der Anteil, der ihn erzeugt.
+    Das frueher `zielNettoHeute` genannte Feld wird UNVERAENDERT uebernommen.
 
-    Die Einzelbetrachtung rechnet einen Anteil mit vier Dritteln hoch (zwei
-    mal `EINZELQUOTE`); der Faktor drei Viertel ist genau die Umkehrung. Ein
-    Wert, der als Allein-Bedarf eingetragen wurde, bedeutet danach dasselbe
-    wie vorher — waehrend dieselbe Zahl ungeprueft als Anteil gelesen das
-    Haushaltsziel um ein Drittel zu hoch angesetzt haette.
+    Hier stand einmal ein Faktor drei Viertel — die Umkehrung der Hochrechnung,
+    mit der die Einzelbetrachtung einen Anteil auf einen Einpersonenhaushalt
+    brachte. Diese Hochrechnung gibt es nicht mehr (siehe `analyse/allein.ts`):
+    Der Zielanteil einer Person IST ihr Bedarf in der Einzelbetrachtung. Damit
+    bedeuten altes und neues Feld dasselbe — einen Monatsbedarf dieser Person —,
+    und jede Umrechnung waere jetzt die Verfaelschung, die sie vorher
+    verhindert hat.
 
     Idempotent ohne Marke: Nach dem Transform gibt es das Altfeld nicht mehr,
     weder im Wert noch im Typ, und `exportiere` schreibt das geparste Objekt.
   */
-  zielAnteilHeute: p.zielAnteilHeute
-    ?? (zielNettoHeute !== undefined ? zielNettoHeute * 0.75 : undefined),
+  zielAnteilHeute: p.zielAnteilHeute ?? zielNettoHeute,
 }));
 
 export const vertragSchema = z.object({

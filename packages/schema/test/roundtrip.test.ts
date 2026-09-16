@@ -490,12 +490,13 @@ describe('PKV: Gesamtbeitrag statt Praemie ohne Entlastungstarif', () => {
   });
 });
 
-describe('Das Zielnetto der Person: vom Allein-Bedarf zum Anteil', () => {
+describe('Das Zielnetto der Person: vom alten Feldnamen zum Anteil', () => {
   /*
-    Das Feld hiess `zielNettoHeute` und meinte den Bedarf dieser Person
-    ALLEIN. Jetzt heisst es `zielAnteilHeute` und meint ihren Anteil am
-    Haushaltsziel — dieselbe Zahl mit anderer Aussage. Ungeprueft gelesen
-    haette sie das Haushaltsziel um ein Drittel zu hoch angesetzt.
+    Das Feld hiess `zielNettoHeute` und heisst jetzt `zielAnteilHeute`. Es
+    bedeutet in beiden Faellen einen Monatsbedarf DIESER Person: Der Anteil am
+    Haushaltsziel ist zugleich der Wert, an dem die Einzelbetrachtung misst.
+    Hier stand einmal ein Faktor drei Viertel — die Umkehrung einer
+    Hochrechnung, die es nicht mehr gibt. Uebernommen wird jetzt unveraendert.
   */
   const mitAltfeld = {
     ...vollstaendig,
@@ -505,13 +506,11 @@ describe('Das Zielnetto der Person: vom Allein-Bedarf zum Anteil', () => {
     ],
   };
 
-  it('rechnet den frueheren Allein-Bedarf in einen Anteil um', () => {
+  it('uebernimmt den Wert des alten Feldes unveraendert', () => {
     const r = szenarioSchema.safeParse(mitAltfeld);
     expect(r.success).toBe(true);
     if (!r.success) return;
-    // 2.000 EUR Allein-Bedarf entstehen aus einem Anteil von 1.500 EUR
-    // (drei Viertel — die Umkehrung der vier Drittel).
-    expect(r.data.personen[0]!.zielAnteilHeute).toBeCloseTo(1500, 6);
+    expect(r.data.personen[0]!.zielAnteilHeute).toBeCloseTo(2000, 6);
     // Das Altfeld existiert danach nicht mehr.
     expect('zielNettoHeute' in r.data.personen[0]!).toBe(false);
   });
