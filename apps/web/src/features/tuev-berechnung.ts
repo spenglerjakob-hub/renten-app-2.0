@@ -112,7 +112,19 @@ function andererWeg(
   szenario: SzenarioParsed,
   v: Vertrag,
   strategie: Vertrag['strategie'],
-): { posten: Jahreszeile['posten'][number] | undefined; einmal: ProjektionsErgebnis['kapitalauszahlungen'][number] | undefined } {
+): {
+  posten: Jahreszeile['posten'][number] | undefined;
+  einmal: ProjektionsErgebnis['kapitalauszahlungen'][number] | undefined;
+  /**
+   * Die Mehrbelastung IN DIESEM Klon.
+   *
+   * Sie muss aus dem umgestellten Szenario kommen und nicht aus dem echten:
+   * Ein Vertrag, der dort als Kapital ausgezahlt wird, steht hier als laufende
+   * Rente und veraendert damit das zu versteuernde Einkommen des Jahres — also
+   * auch den Grenzsatz, mit dem er selbst belastet wird.
+   */
+  mehr: ReturnType<typeof mehrbelastungJeVertrag> | null;
+} {
   const klon: Szenario = {
     ...szenario,
     vertraege: szenario.vertraege.map((x) => (x.id === v.id ? { ...x, strategie } : x)),
@@ -122,6 +134,7 @@ function andererWeg(
   return {
     posten: zeile?.posten.find((x) => x.id === v.id),
     einmal: e.kapitalauszahlungen.find((x) => x.vertragId === v.id),
+    mehr: zeile ? mehrbelastungJeVertrag(klon, zeile.jahr) : null,
   };
 }
 
@@ -276,11 +289,33 @@ export function tuevPositionen(
       const rentePosten = istKapital ? gegen.posten : posten;
       const kapitalEinmal = istKapital ? einmal : gegen.einmal;
 
+      /*
+        DIE RENTENSEITE TRAEGT DIESELBE MEHRBELASTUNG wie der gewaehlte Weg
+        oben. Sie wurde hier ein zweites Mal zusammengebaut und blieb beim
+        anteiligen Posten stehen, als der obere Weg umgestellt wurde — im
+        Ausdruck standen dadurch zwei verschiedene Renditen fuer DENSELBEN Weg
+        (5,1 gegen 6,5 Prozent).
+
+        Wichtiger als der sichtbare Widerspruch ist aber, was er aufgedeckt
+        hat: Die KAPITALSEITE rechnet laengst nach der Mehrbelastung —
+        `bavKapitalSteuer` bildet die Differenz aus der Steuer mit und ohne die
+        Kapitalleistung. Solange die Rentenseite anteilig blieb, verglich
+        dieser Block den Durchschnittssatz der einen mit dem Grenzsatz der
+        anderen Seite und fiel damit systematisch zugunsten der Rente aus.
+
+        Die Quelle haengt daran, welcher Weg gewaehlt ist: Steht der Vertrag
+        auf Rente, ist es die Karte des echten Szenarios — also Wert fuer Wert
+        dieselbe wie oben. Steht er auf Kapital, kommt sie aus dem Klon.
+      */
+      const renteMehr = (v.typ === 'bav' || v.typ === 'bavUkasse')
+        ? (istKapital ? gegen.mehr?.get(v.id) : mehr?.get(v.id))
+        : undefined;
+
       const renteSeite = {
         bruttoRenteMonat: (rentePosten?.bruttoJahr ?? 0) / 12,
-        kvPvMonat: (rentePosten?.kvPvJahr ?? 0) / 12,
-        steuerMonat: (rentePosten?.steuerJahr ?? 0) / 12,
-        nettoRenteMonat: (rentePosten?.nettoJahr ?? 0) / 12,
+        kvPvMonat: (renteMehr?.kvPvJahr ?? rentePosten?.kvPvJahr ?? 0) / 12,
+        steuerMonat: (renteMehr?.steuerJahr ?? rentePosten?.steuerJahr ?? 0) / 12,
+        nettoRenteMonat: (renteMehr?.nettoJahr ?? rentePosten?.nettoJahr ?? 0) / 12,
         bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
       };
       const kapitalSeite = {
