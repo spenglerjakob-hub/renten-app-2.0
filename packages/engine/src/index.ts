@@ -83,6 +83,7 @@ export {
 } from './analyse/sparziel.js';
 export { jePerson, type PersonenBlock } from './analyse/je-person.js';
 export { nurPerson } from './analyse/allein.js';
+export { mehrbelastungJeVertrag, type Mehrbelastung } from './analyse/mehrbelastung.js';
 export {
   kvProfil, kvProfilVon, irgendwerPrivat, type KvProfil,
 } from './social/kv-profil.js';

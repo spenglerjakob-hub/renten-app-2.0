@@ -1,6 +1,6 @@
 import {
   vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke, projiziere, kenntKapitalwahl,
+  versorgungsluecke, projiziere, kenntKapitalwahl, mehrbelastungJeVertrag,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario,
   type LegalParameters, type FoerderKontext,
@@ -138,6 +138,22 @@ export function tuevPositionen(
   const basis = tuevBasis(szenario);
   const jetzt = new Date().getFullYear();
 
+  /*
+    WAS DER VERTRAG TATSAECHLICH KOSTET, nicht was ihm anteilig zugerechnet
+    wird. Die Zeitachse verteilt die Haushaltssteuer nach dem Beitrag jeder
+    Quelle zum zu versteuernden Einkommen — fuer den Kassenbon richtig, fuer
+    die Frage dieses Bogens falsch: Eine Betriebsrente kommt OBENDRAUF auf den
+    progressiven Tarif und traegt den Grenzsatz, nicht den Durchschnitt.
+
+    Nachgemessen an einem Alleinstehenden mit 1.500 EUR gesetzlicher Rente
+    erschien eine bAV von 500 EUR mit 399 EUR netto statt mit 339 — knapp
+    60 EUR im Monat zu guenstig, und ueber `kennzahlen()` auch in Rendite und
+    Amortisationsdauer hinein.
+
+    Kostet N+1 Projektionen; beide Aufrufer memoisieren diese Funktion bereits.
+  */
+  const mehr = zeile ? mehrbelastungJeVertrag(szenario, zeile.jahr) : null;
+
   return szenario.tuev.flatMap((t) => {
     const v = szenario.vertraege.find((x) => x.id === t.vertragId);
     if (!v) return [];
@@ -150,13 +166,25 @@ export function tuevPositionen(
     const einmal = kapitalauszahlungen.find((x) => x.vertragId === v.id);
     const istKapital = einmal !== undefined;
 
-    // Die Auszahlseite kommt VOLLSTAENDIG aus der Projektion — Brutto und
-    // Abzuege, nicht nur das Netto. Nur so koennen Bildschirm, Gutachten und
-    // Zeitachse nicht auseinanderlaufen.
-    const nettoRenteMonat = !istKapital && posten ? posten.nettoJahr / 12 : 0;
+    /*
+      Die Auszahlseite kommt VOLLSTAENDIG aus der Projektion — Brutto und
+      Abzuege, nicht nur das Netto. Nur so koennen Bildschirm, Gutachten und
+      Zeitachse nicht auseinanderlaufen.
+
+      Die ABZUEGE einer laufenden Betriebsrente aber als Mehrbelastung: siehe
+      oben. Vorerst nur dort. Die uebrigen Arten teilen denselben anteiligen
+      Schluessel und sind in dem Mass betroffen, in dem ihr Beitrag zum zu
+      versteuernden Einkommen vom Grenzsatz abweicht — Ruerup, Riester und das
+      Altersvorsorgedepot voll, die private Rente nur mit ihrem Ertragsanteil,
+      das freie Depot gar nicht (Abgeltungsteuer statt Tarif).
+    */
+    const laufendeBav = !istKapital && (v.typ === 'bav' || v.typ === 'bavUkasse');
+    const m = laufendeBav ? mehr?.get(v.id) : undefined;
+
     const bruttoRenteMonat = !istKapital && posten ? posten.bruttoJahr / 12 : 0;
-    const kvPvMonat = !istKapital && posten ? posten.kvPvJahr / 12 : 0;
-    const steuerMonat = !istKapital && posten ? posten.steuerJahr / 12 : 0;
+    const nettoRenteMonat = m ? m.nettoJahr / 12 : (!istKapital && posten ? posten.nettoJahr / 12 : 0);
+    const kvPvMonat = m ? m.kvPvJahr / 12 : (!istKapital && posten ? posten.kvPvJahr / 12 : 0);
+    const steuerMonat = m ? m.steuerJahr / 12 : (!istKapital && posten ? posten.steuerJahr / 12 : 0);
 
     /*
       Bei der Einmalzahlung mindern zwei Posten den Betrag: die Steuer im
