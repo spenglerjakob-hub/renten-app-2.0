@@ -294,7 +294,21 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         </div>
       </Abschnitt>
 
-      <Abschnitt titel={s.einkommenGetrennt ? `Einkommen — ${nameVon('A')}` : 'Heutiges Einkommen'}>
+      {/*
+        Einklappbar wie der Haushalt darueber, und aus demselben Grund: Die
+        Bloecke werden einmal ausgefuellt und danach selten wieder angefasst,
+        stehen aber jedes Mal zwischen dem Ziel oben und den Vertraegen unten.
+        Offen als Vorgabe — wer Platz will, klappt zu.
+
+        ACHTUNG beim Aendern: Der Schalter „Einkommen je Partner getrennt
+        erfassen" steht IN diesem Block und entscheidet, ob es einen Block fuer
+        Person B ueberhaupt gibt. Zugeklappt ist er mit weg. Das ist
+        hinnehmbar, solange der Block offen startet.
+      */}
+      <Abschnitt
+        titel={s.einkommenGetrennt ? `Einkommen — ${nameVon('A')}` : 'Heutiges Einkommen'}
+        einklappbar
+      >
         <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} />
 
         {s.haushalt.verheiratet && (
@@ -314,7 +328,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
       </Abschnitt>
 
       {s.haushalt.verheiratet && s.einkommenGetrennt && (
-        <Abschnitt titel={`Einkommen — ${nameVon('B')}`}>
+        <Abschnitt titel={`Einkommen — ${nameVon('B')}`} einklappbar>
           <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} />
         </Abschnitt>
       )}
@@ -327,7 +341,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         "Verheiratet", sind alle Eingaben von Person B noch da.
       */}
       {s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
-        <Abschnitt key={p.id} titel={personName(p)}>
+        <Abschnitt key={p.id} titel={personName(p)} einklappbar>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
               platzhalter={`Person ${p.id}`} />
