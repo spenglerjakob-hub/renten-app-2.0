@@ -407,12 +407,36 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         </div>
       )}
 
+      {/*
+        JE SCHICHT EIN ANDERER HINWEIS. Hier stand einer fuer alle, und der
+        beschrieb die Betriebsrente: voll steuerpflichtig nach § 22 Nr. 5 EStG
+        und Beitraege ueber 120 Monate. Bei einer privaten Rentenversicherung
+        der Schicht 3 ist beides falsch — steuerpflichtig ist nur der ERTRAG,
+        und Beitraege fallen gar nicht an. Sie ist kein Versorgungsbezug; die
+        Zeitachse setzt dort folgerichtig `kvArt: null`.
+      */}
       {istKapital(v) && !v.altvertrag && (
         <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600">
-          Kapitalauszahlungen aus Direktversicherung, Pensionskasse und Pensionsfonds sind im
-          Zuflussjahr <strong>voll steuerpflichtig</strong> (§ 22 Nr. 5 EStG). Die Fünftelregelung
-          wird dafür nach ständiger BFH-Rechtsprechung regelmäßig nicht gewährt. Zusätzlich fallen
-          über 120 Monate volle KV/PV-Beiträge auf je 1/120 des Betrags an.
+          {v.typ === 'prvRente' ? (
+            <>
+              Steuerpflichtig ist nicht die Auszahlung, sondern nur der <strong>Ertrag</strong> —
+              die Auszahlung abzüglich Ihrer eingezahlten Beiträge (§ 20 Abs. 1 Nr. 6 EStG).
+              Läuft der Vertrag mindestens <strong>12 Jahre</strong> und wird nach dem{' '}
+              <strong>62. Lebensjahr</strong> ausgezahlt (bei Abschluss bis 2011: nach dem 60.),
+              zählt davon nur die <strong>Hälfte</strong>, versteuert mit Ihrem persönlichen Satz.
+              Wird eine der beiden Bedingungen verfehlt, ist der ganze Ertrag steuerpflichtig.
+              Kranken- und Pflegeversicherungsbeiträge fallen <strong>nicht</strong> an — anders
+              als bei einer Betriebsrente.
+            </>
+          ) : (
+            <>
+              Kapitalauszahlungen aus Direktversicherung, Pensionskasse und Pensionsfonds sind im
+              Zuflussjahr <strong>voll steuerpflichtig</strong> (§ 22 Nr. 5 EStG). Die
+              Fünftelregelung wird dafür nach ständiger BFH-Rechtsprechung regelmäßig nicht
+              gewährt. Zusätzlich fallen über 120 Monate volle KV/PV-Beiträge auf je 1/120 des
+              Betrags an.
+            </>
+          )}
         </p>
       )}
       </div>
