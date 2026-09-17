@@ -19,7 +19,7 @@ export {
 // Sozialversicherung
 export {
   kvPvImAlter, kvPvArbeitnehmer, pvSatzMitglied, kvSatzVoll, bavFreibetragMonat,
-  mindestbemessungMonat,
+  mindestbemessungMonat, kinderImJahr,
   type KvStatus, type BeitragsArt, type Beitragspflichtig, type KinderStatus, type KvPvErgebnis,
 } from './social/kv-pv.js';
 export {
@@ -33,6 +33,11 @@ export {
   bruttoZuNetto, nettoZuBrutto, erwerbHaushalt,
   type ErwerbsNetto, type ErwerbsOptionen, type HaushaltsPerson, type ErwerbHaushaltErgebnis,
 } from './erwerb/netto.js';
+export {
+  erwerbsBasisHeute, personenHeute, kvJePersonHeute, einkommenJePersonHeute,
+  bruttoAusEinkommen,
+  type ErwerbsBasisHeute, type ErwerbsPersonHeute, type PersonHeute, type KvHeute,
+} from './erwerb/heute.js';
 
 // Altersversorgung
 export {

@@ -83,6 +83,18 @@ export interface FoerderKontext extends SvKontext {
   /** Laufende Basisrentenbeitraege im Jahr */
   basisBeitragJahr: number;
   /**
+   * Erwerbsart und Brutto JE PERSON — fuer den Verbrauch am Hoechstbetrag.
+   *
+   * Der Fördercheck bilanziert je Haushalt, und bei Zusammenveranlagung steht
+   * der doppelte Hoechstbetrag des § 10 Abs. 3 EStG bereit. Verbraucht wird er
+   * dann aber auch von beiden, und zwar nach der Formel, die zur jeweiligen
+   * Erwerbsart passt: Ein Paar aus Angestellter und Selbststaendigem laesst
+   * sich mit EINEM Bruttobetrag und EINEM `selbststaendig`-Schalter nicht
+   * abbilden. Fehlt die Angabe, bleibt es bei der Einzelrechnung aus
+   * `jahresbrutto` und `selbststaendig`.
+   */
+  jePerson?: readonly { selbststaendig: boolean; grvBeitragJahr: number; brutto: number }[];
+  /**
    * Was heute schon in ein Altersvorsorgedepot fliesst, im Jahr.
    *
    * 0, wenn keins erfasst ist — dann liegt die ganze Zulage brach, und genau
@@ -146,6 +158,16 @@ export interface SteuerOptionen {
   kirchensteuerpflichtig: boolean;
 }
 
+/** Der Beitragsverbrauch EINER Person am Hoechstbetrag. */
+function verbrauchtVon(
+  e: { selbststaendig: boolean; grvBeitragJahr: number; brutto: number },
+  p: LegalParameters,
+): number {
+  return e.selbststaendig
+    ? Math.max(0, e.grvBeitragJahr)
+    : Math.min(Math.max(0, e.brutto), p.bbgRvJahr) * p.rvSatzGesamt;
+}
+
 /**
  * Der Hoechstbetrag des § 10 Abs. 3 EStG, soweit er noch FREI ist.
  *
@@ -154,15 +176,24 @@ export interface SteuerOptionen {
  * Angestellten Arbeitnehmer- UND Arbeitgeberanteil, beim Beamten der fiktive
  * Gesamtbeitrag (§ 10 Abs. 3 S. 3), beim Selbststaendigen allein sein eigener
  * Beitrag. Genau daran haengt, ob eine Basisrente ueberhaupt etwas bringt.
+ *
+ * BEI ZUSAMMENVERANLAGUNG ZAEHLEN BEIDE SEITEN. Der Hoechstbetrag verdoppelt
+ * sich, verbraucht wird er aber auch von BEIDEN — und ein Haushalt kann aus
+ * einer Angestellten und einem Selbststaendigen bestehen, fuer die zwei
+ * verschiedene Formeln gelten. Liegen die Personen vor, wird deshalb je Kopf
+ * gerechnet und summiert; sonst bleibt es bei der Einzelrechnung. Ohne das
+ * stuende bei zwei Angestellten mit je 60.000 EUR ein Verbrauch von 18.860
+ * statt 22.320 EUR — der freie Rahmen waere um 3.460 EUR zu gross.
  */
 export function basisrahmenJahr(
-  k: Pick<FoerderKontext, 'selbststaendig' | 'grvBeitragJahr' | 'jahresbrutto' | 'basisBeitragJahr'>,
+  k: Pick<FoerderKontext,
+    'selbststaendig' | 'grvBeitragJahr' | 'jahresbrutto' | 'basisBeitragJahr' | 'jePerson'>,
   verheiratet: boolean,
   p: LegalParameters,
 ): { rahmen: number; verbraucht: number; hoechstbetrag: number } {
-  const verbraucht = k.selbststaendig
-    ? Math.max(0, k.grvBeitragJahr)
-    : Math.min(Math.max(0, k.jahresbrutto), p.bbgRvJahr) * p.rvSatzGesamt;
+  const verbraucht = k.jePerson && k.jePerson.length > 0
+    ? k.jePerson.reduce((summe, e) => summe + verbrauchtVon(e, p), 0)
+    : verbrauchtVon({ ...k, brutto: k.jahresbrutto }, p);
   const hoechstbetrag = p.hoechstbetragAltersvorsorge * (verheiratet ? 2 : 1);
   const rahmen = Math.max(0, hoechstbetrag - verbraucht - Math.max(0, k.basisBeitragJahr));
   return { rahmen, verbraucht, hoechstbetrag };

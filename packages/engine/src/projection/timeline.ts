@@ -1,22 +1,23 @@
-import type { Szenario, Person, PersonId, Vertrag, EinkommenHeute } from '../model.js';
+import type { Szenario, Person, PersonId, Vertrag } from '../model.js';
 import { parameterFuer, rechtsstandInfo, type RechtsstandInfo } from '../params/registry.js';
 import {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer, type Einkunftsquelle,
 } from '../tax/haushalt.js';
 import { kirchensteuersatz } from '../tax/estg.js';
 import {
-  kvPvImAlter, kvSatzVoll, pvSatzMitglied,
+  kvPvImAlter, kvSatzVoll, pvSatzMitglied, kinderImJahr,
   type Beitragspflichtig, type KinderStatus, type KvPvErgebnis, type MitgliedsKv,
 } from '../social/kv-pv.js';
-import { pkvImJahr, type PkvAnnahmen } from '../social/pkv.js';
+import { pkvImJahr } from '../social/pkv.js';
 import { kvProfil } from '../social/kv-profil.js';
+import { kvJePersonHeute, einkommenJePersonHeute } from '../erwerb/heute.js';
 import {
   versorgungsfreibetrag, rentenfreibetrag, ertragsanteil,
   altersentlastungsbetrag, type EingefrorenerFreibetrag,
 } from '../pension/freibetraege.js';
 import { zugangsfaktor } from '../pension/grv.js';
 import { besoldung } from '../pension/beamte.js';
-import { bruttoZuNetto, nettoZuBrutto, erwerbHaushalt } from '../erwerb/netto.js';
+import { erwerbHaushalt } from '../erwerb/netto.js';
 import { bavKapitalMonatswert, bavKapitalSteuer } from '../products/bav.js';
 import { kapitalversicherungErtrag, ansparphase, entnahmeplan } from '../products/kapitalanlage.js';
 import { entnahmeplanBewerten } from '../products/entnahmeplaner.js';
@@ -286,54 +287,7 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
 
     `kvProfil` haelt die Regel „Person, sonst Haushalt" an einer Stelle.
   */
-  const kvRoh = personen.map((k) => {
-    const profil = kvProfil(s, k.person);
-    return {
-      k,
-      profil,
-      privat: s.einkommenHeute.modus === 'selbststaendig'
-        ? profil.erwerb === 'pkv'
-        : profil.status === 'pkv',
-      // Eine Praemie, die bei DIESER Person steht — nicht die des Haushalts.
-      eigene: k.person.pkv !== undefined,
-    };
-  });
-  /*
-    Der Haushaltsbetrag deckt alle, die keine eigene Praemie eingetragen
-    haben; er wird deshalb unter ihnen geteilt. Wer eine eigene hat, traegt
-    sie ganz. Ohne diese Quote zahlte bei zwei privat Versicherten jeder die
-    volle Haushaltspraemie, der Haushalt also die doppelte.
-  */
-  const teilen = Math.max(1, kvRoh.filter((x) => (x.privat || x.profil.status === 'pkv') && !x.eigene).length);
-
-  const kvJePerson = kvRoh.map(({ k, profil, privat, eigene }) => {
-    // Die Praemie zaehlt in einer Phase nur, wenn sie dort auch privat sind.
-    const gebraucht = privat || profil.status === 'pkv';
-    const quote = !gebraucht ? 0 : eigene ? 1 : 1 / teilen;
-    const b = profil.pkv;
-    return {
-      id: k.person.id,
-      profil,
-      privat,
-      /*
-        Die Quote wirkt auf die EINGABE, nicht auf das Ergebnis: Die
-        Entlastung des Beitragsentlastungstarifs ist ein fester Betrag, den
-        nachtraeglich zu skalieren etwas anderes ergaebe.
-      */
-      annahmen: {
-        ...b,
-        praemieMonat: b.praemieMonat * quote,
-        bet: {
-          ...b.bet,
-          aktiv: b.bet.aktiv && quote > 0,
-          beitragMonat: b.bet.beitragMonat * quote,
-          entlastungMonat: b.bet.entlastungMonat * quote,
-        },
-      } as PkvAnnahmen,
-      // Der Praemienverlauf haengt am Alter DIESER Person.
-      alterHeute: alterExakt(k.geburt, { jahr: jetzt.jahr, monat: 7, tag: 1 }),
-    };
-  });
+  const kvJePerson = kvJePersonHeute(s, personen, jetzt.jahr);
   const kvA = kvJePerson[0]!;
   /** Ist in dieser Phase ueberhaupt jemand privat versichert? */
   const privatVersichert = kvJePerson.some((x) => x.privat);
@@ -349,76 +303,16 @@ export function projiziere(s: Szenario): ProjektionsErgebnis {
   };
 
   /**
-   * Jahresbrutto aus einer Einkommensangabe, egal in welcher Form erfasst.
-   *
-   * `kv` ist die Versicherung DIESER Person — beim Umkehren von Netto auf
-   * Brutto zaehlt ihre Praemie, nicht die eines anderen Haushaltsmitglieds.
-   */
-  const bruttoAus = (e: EinkommenHeute, kv: typeof kvA): number => {
-    if (e.modus === 'besoldung') {
-      const b = besoldung(e.besoldungsgruppe, e.besoldungsstufe, e.besoldungsland, jetzt.jahr, {
-        verheiratet: s.haushalt.verheiratet,
-        kinder: s.haushalt.kinderUnter25,
-      });
-      if (!b.belegt) {
-        hinweise.push(
-          'Die Besoldung beruht auf einer Naeherung, nicht auf der amtlichen Tabelle des Dienstherrn. ' +
-          'Der ausgewiesene Betrag kann um mehrere hundert Euro im Monat abweichen.',
-        );
-      }
-      return b.brutto * 12;
-    }
-    if (e.modus === 'netto') {
-      return nettoZuBrutto(e.betrag * e.auszahlungen, {
-        ...erwerbsOpt, beamter: false,
-        privatVersichert: kv.privat,
-        // Beim Umkehren zaehlt die Praemie von HEUTE: das eingegebene Netto
-        // ist ein heutiges.
-        pkvPraemieMonat: pkvImJahr(kv.annahmen, kv.alterHeute, 0).gesamtMonat,
-      }, pHeute).jahresbrutto;
-    }
-    return e.betrag * e.auszahlungen;
-  };
-
-  /**
    * Erwerbseinkommen je Person, in der Reihenfolge von `personen`.
    *
-   * BEFUND: Frueher lief das gesamte Haushaltseinkommen als EINE Person durch
-   * bruttoZuNetto. Die Beitragsbemessungsgrenzen gelten aber je Person; die
-   * Sozialabgaben fielen dadurch bei Doppelverdienern deutlich zu niedrig aus.
-   * Deshalb wird das Einkommen jetzt in jedem Fall auf Personen verteilt —
-   * bei getrennter Erfassung mit den echten Betraegen, sonst haelftig.
+   * Die Ableitung steht in `erwerb/heute.ts` — sie loest die Besoldung aus
+   * der Tabelle auf, kehrt ein eingegebenes Netto um, nimmt bei getrennter
+   * Erfassung das zweite Einkommen dazu und verteilt einen Haushaltsbetrag
+   * sonst auf die Koepfe. Der Vertrags-TUEV rechnet mit derselben Funktion;
+   * vorher hatte er eine eigene, verkuerzte Fassung, die an vier Stellen
+   * davon abwich (siehe den Kopf jener Datei).
    */
-  const einkommenJePerson: {
-    brutto: number; beamter: boolean; selbststaendig: boolean; grvBeitragJahr: number;
-  }[] = (() => {
-    /** Erwerbsart und GRV-Beitrag EINER Einkommensangabe. */
-    const art = (e: EinkommenHeute, brutto: number) => ({
-      brutto,
-      beamter: e.modus === 'besoldung',
-      selbststaendig: e.modus === 'selbststaendig',
-      /*
-        Der EINGETRAGENE Beitrag, nicht ein Satz darauf. Die Oberflaeche
-        belegt das Feld mit dem vollen Satz vor; wer freiwillig einen anderen
-        Betrag zahlt, traegt ihn ein. Was hier steht, ist deshalb, was
-        tatsaechlich fliesst.
-      */
-      grvBeitragJahr: e.modus === 'selbststaendig' && e.grvPflicht
-        ? Math.max(0, e.grvBeitragMonat) * 12
-        : 0,
-    });
-
-    const getrennt = s.einkommenGetrennt === true && personen.length > 1;
-    if (getrennt) {
-      const zweites = s.einkommenPartner ?? s.einkommenHeute;
-      return personen.map((_, i) => {
-        const e = i === 0 ? s.einkommenHeute : zweites;
-        return art(e, bruttoAus(e, kvJePerson[i] ?? kvA));
-      });
-    }
-    const gesamt = bruttoAus(s.einkommenHeute, kvA);
-    return personen.map(() => art(s.einkommenHeute, gesamt / personen.length));
-  })();
+  const einkommenJePerson = einkommenJePersonHeute(s, kvJePerson, pHeute, jetzt.jahr, hinweise);
 
   // --- Auszahlungs-Planer ---
   // Kapital aus Vertraegen mit Strategie "planer" wird im Zuflussjahr
@@ -1225,34 +1119,6 @@ export function nachAblaufGewachsen(
   const zuwachs = Math.max(0, brutto - nettoKapital);
   const steuerWachstum = zuwachs * p.abgeltungsteuersatz;
   return { wachstumJahre: n, steuerWachstum, wertBeiRentenbeginn: brutto - steuerWachstum };
-}
-
-/**
- * Kinderstatus fuer die Pflegeversicherung IN EINEM BESTIMMTEN JAHR.
- *
- * BEFUND: Der Status wurde einmal aus dem Haushalt gebildet und fuer jedes
- * Jahr der Projektion verwendet. Ein heute fuenfjaehriges Kind senkte den
- * Pflegebeitrag damit auch noch im Jahr 2070, in dem es fast fuenfzig ist.
- * Die Abschlaege des § 55 Abs. 3 SGB XI gelten aber nur, solange das Kind das
- * 25. Lebensjahr nicht vollendet hat.
- *
- * `hatKinder` bleibt dagegen dauerhaft: Der Kinderlosenzuschlag entfaellt ein
- * Leben lang, sobald jemand ein Kind hat. Nur die ZAHL der beruecksichtigten
- * Kinder sinkt mit der Zeit.
- *
- * Sind keine Geburtsjahre erfasst — moeglich bei sehr alten gespeicherten
- * Dateien —, bleibt es bei der eingetragenen Anzahl. Ein Kind ohne
- * Geburtsjahr laesst sich nicht altern lassen, und stillschweigend eines zu
- * raten waere schlechter als die bekannte Vereinfachung.
- */
-function kinderImJahr(h: Szenario['haushalt'], jahr: number): KinderStatus {
-  if (h.kinder.length === 0) {
-    return { hatKinder: h.hatKinder, kinderUnter25: h.kinderUnter25 };
-  }
-  return {
-    hatKinder: h.hatKinder || h.kinder.length > 0,
-    kinderUnter25: h.kinder.filter((k) => jahr - k.geburtsjahr < 25).length,
-  };
 }
 
 /**

@@ -128,6 +128,41 @@ export function kvSatzVoll(p: LegalParameters): number {
 }
 
 /**
+ * Kinderstatus fuer die Pflegeversicherung IN EINEM BESTIMMTEN JAHR.
+ *
+ * BEFUND: Der Status wurde einmal aus dem Haushalt gebildet und fuer jedes
+ * Jahr der Projektion verwendet. Ein heute fuenfjaehriges Kind senkte den
+ * Pflegebeitrag damit auch noch im Jahr 2070, in dem es fast fuenfzig ist.
+ * Die Abschlaege des § 55 Abs. 3 SGB XI gelten aber nur, solange das Kind das
+ * 25. Lebensjahr nicht vollendet hat.
+ *
+ * `hatKinder` bleibt dagegen dauerhaft: Der Kinderlosenzuschlag entfaellt ein
+ * Leben lang, sobald jemand ein Kind hat. Nur die ZAHL der beruecksichtigten
+ * Kinder sinkt mit der Zeit.
+ *
+ * Sind keine Geburtsjahre erfasst — moeglich bei sehr alten gespeicherten
+ * Dateien —, bleibt es bei der eingetragenen Anzahl. Ein Kind ohne
+ * Geburtsjahr laesst sich nicht altern lassen, und stillschweigend eines zu
+ * raten waere schlechter als die bekannte Vereinfachung.
+ *
+ * Steht hier und nicht mehr bei der Zeitachse, weil inzwischen drei
+ * Rechnungen ihn brauchen: Zeitachse, Erwerbseinkommen von heute und die
+ * Umkehrung eines eingegebenen Nettos.
+ */
+export function kinderImJahr(
+  h: { hatKinder: boolean; kinderUnter25: number; kinder: readonly { geburtsjahr: number }[] },
+  jahr: number,
+): KinderStatus {
+  if (h.kinder.length === 0) {
+    return { hatKinder: h.hatKinder, kinderUnter25: h.kinderUnter25 };
+  }
+  return {
+    hatKinder: h.hatKinder || h.kinder.length > 0,
+    kinderUnter25: h.kinder.filter((k) => jahr - k.geburtsjahr < 25).length,
+  };
+}
+
+/**
  * Freibetrag auf Versorgungsbezuege in der KV: 1/20 der monatlichen
  * Bezugsgroesse (§ 226 Abs. 2 SGB V).
  *

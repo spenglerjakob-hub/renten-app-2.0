@@ -1,9 +1,9 @@
 import {
-  vertragsTuev, renteOderKapital, bruttoZuNetto, parameterFuer, parseDatum, pkvImJahr,
+  vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
   versorgungsluecke, projiziere, kenntKapitalwahl,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario,
-  type LegalParameters, type FoerderKontext,
+  type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -40,9 +40,33 @@ export interface TuevPosition {
   } | null;
 }
 
-/** Bemessungsgrundlage: das tatsaechliche Bruttogehalt und das zvE. */
+/**
+ * Bemessungsgrundlage: das tatsaechliche Bruttogehalt und das zvE.
+ *
+ * BEFUND: Hier stand eine EIGENE, verkuerzte Fassung der Einkommens-
+ * ableitung — `betrag × auszahlungen` durch `bruttoZuNetto`. Sie war an vier
+ * Stellen falsch, und alle vier trafen das zu versteuernde Einkommen, mit dem
+ * der TUEV die Foerderung misst:
+ *
+ *  - ein eingegebenes NETTO ging als Brutto durch (die Vorbelegung der
+ *    Eingabemaske, also der Regelfall),
+ *  - eine BESOLDUNG ergab null, weil dort `betrag` gar nicht gefuellt ist,
+ *  - das ZWEITE EINKOMMEN fehlte ganz, waehrend `verheiratet` den
+ *    Splittingtarif ausloeste,
+ *  - ein gemeinsames Haushaltseinkommen lief als EINE Person, womit
+ *    Beitragsbemessungsgrenzen und Pauschbetraege nur einmal griffen.
+ *
+ * Gemessen an einem Steuerblatt der AXA (Basisrente, 3.600 EUR im Jahr,
+ * verheiratet): 217 EUR Nettoaufwand im Monat statt 171 EUR. Die
+ * Steuerrechnung selbst traf das Blatt dabei auf den Cent.
+ *
+ * Gerechnet wird deshalb mit `erwerbsBasisHeute` — derselben Funktion, die
+ * auch die Zeitachse benutzt. Eine zweite Fassung derselben Ableitung laeuft
+ * frueher oder spaeter auseinander; diese hier hatte es getan.
+ */
 export function tuevBasis(szenario: SzenarioParsed): {
   p: LegalParameters; jahresbrutto: number; zve: number; monatsbrutto: number;
+  jePerson: ErwerbsPersonHeute[];
 } {
   const jahr = new Date().getFullYear();
   const p = parameterFuer(jahr, {
@@ -51,27 +75,35 @@ export function tuevBasis(szenario: SzenarioParsed): {
     // Ersparnis einer Entgeltumwandlung an genau diesen Saetzen.
     zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
   });
-  const brutto = szenario.einkommenHeute.betrag * szenario.einkommenHeute.auszahlungen;
-  const n = bruttoZuNetto(brutto, {
-    verheiratet: szenario.haushalt.verheiratet,
-    bundesland: szenario.haushalt.bundesland,
-    kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
-    kinder: { hatKinder: szenario.haushalt.hatKinder, kinderUnter25: szenario.haushalt.kinderUnter25 },
-    beamter: szenario.einkommenHeute.modus === 'besoldung',
-    selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
-    grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
-      && szenario.einkommenHeute.grvPflicht
-      ? szenario.einkommenHeute.grvBeitragMonat * 12
-      : 0,
-    // Der Vertrags-TUEV rechnet mit dem HEUTIGEN Netto, also auch mit der
-    // heutigen Praemie — inklusive eines laufenden Entlastungstarifs, denn der
-    // belastet das Budget genauso.
-    privatVersichert: privatImErwerb(szenario),
-    pkvPraemieMonat: privatImErwerb(szenario)
-      ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).gesamtMonat
-      : 0,
-  }, p);
-  return { p, jahresbrutto: n.jahresbrutto, zve: n.zve, monatsbrutto: n.monatsbrutto };
+  const b = erwerbsBasisHeute(szenario, p, jahr);
+  return {
+    p,
+    jahresbrutto: b.jahresbrutto,
+    zve: b.zve,
+    monatsbrutto: b.jahresbrutto / 12,
+    jePerson: b.jePerson,
+  };
+}
+
+/**
+ * Die Erwerbslage EINER Person — fuer die Groessen, die am Vertragsinhaber
+ * haengen und nicht am Haushalt.
+ *
+ * Das zvE ist eine Haushaltsgroesse (Splitting), Brutto und Erwerbsart sind
+ * es nicht: Wieviel Entgeltumwandlung sozialabgabenfrei bleibt und wieviel
+ * vom Hoechstbetrag des § 10 Abs. 3 EStG schon belegt ist, entscheidet sich
+ * an der Person, der der Vertrag gehoert. Vorher galten fuer JEDEN Vertrag
+ * die Angaben von Person A — auch fuer einen, der Person B gehoert.
+ *
+ * Faellt die Person aus (kein Geburtsdatum), bleibt Person A die Vorgabe;
+ * dieselbe Regel, nach der die Zeitachse Vertraege ohne auffindbaren Inhaber
+ * zuordnet.
+ */
+function erwerbVon(
+  basis: ReturnType<typeof tuevBasis>,
+  inhaber: string,
+): ErwerbsPersonHeute | undefined {
+  return basis.jePerson.find((x) => x.id === inhaber) ?? basis.jePerson[0];
 }
 
 /**
@@ -202,6 +234,8 @@ export function tuevPositionen(
     const person = szenario.personen.find((x) => x.id === v.inhaber) ?? szenario.personen[0]!;
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
     const alterBeiRentenbeginn = rentenbeginnJahr - jahrAus(person.geburtsdatum, 1980);
+    // Brutto, Erwerbsart und GRV-Beitrag DIESER Person — nicht die von A.
+    const erwerb = erwerbVon(basis, v.inhaber);
 
     /**
      * Eine TUEV-Rechnung fuer diesen Vertrag mit EINER bestimmten Auszahlseite.
@@ -225,9 +259,17 @@ export function tuevPositionen(
         lebenserwartung: t.lebenserwartung,
       },
       {
-        jahresbrutto: basis.jahresbrutto,
+        /*
+          DAS zvE KOMMT VOM HAUSHALT, BRUTTO UND ERWERBSART VOM INHABER.
+          Die Einkommensteuer wird bei Verheirateten gemeinsam veranlagt —
+          dafuer zaehlt das zusammengerechnete zvE. Wieviel Entgeltumwandlung
+          beitragsfrei bleibt und wieviel vom Hoechstbetrag des § 10 Abs. 3
+          EStG belegt ist, entscheidet sich dagegen an der Person, der der
+          Vertrag gehoert. Vorher galten beide Male die Angaben von Person A.
+        */
+        jahresbrutto: erwerb?.brutto ?? basis.jahresbrutto,
         zveHeute: basis.zve,
-        beamter: szenario.einkommenHeute.modus === 'besoldung',
+        beamter: erwerb?.beamter ?? false,
         /*
           Ohne diese beiden Angaben rechnete der TUEV jedem Nicht-Beamten den
           KV/PV-Anteil als Ersparnis an — bei einem privat Versicherten das
@@ -245,11 +287,8 @@ export function tuevPositionen(
           absetzbar ist. Ohne diese Angabe unterstellte der TUEV jedem den
           fiktiven Arbeitnehmer- UND Arbeitgeberanteil.
         */
-        selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
-        grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
-          && szenario.einkommenHeute.grvPflicht
-          ? szenario.einkommenHeute.grvBeitragMonat * 12
-          : 0,
+        selbststaendig: erwerb?.selbststaendig ?? false,
+        grvBeitragJahr: erwerb?.grvBeitragJahr ?? 0,
         rentenbeginnJahr,
         alterBeiRentenbeginn,
         ...auszahlseite,
@@ -401,12 +440,17 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
     kontext: {
       jahresbrutto: basis.jahresbrutto,
       zveHeute: basis.zve,
-      beamter: szenario.einkommenHeute.modus === 'besoldung',
-      selbststaendig: szenario.einkommenHeute.modus === 'selbststaendig',
-      grvBeitragJahr: szenario.einkommenHeute.modus === 'selbststaendig'
-        && szenario.einkommenHeute.grvPflicht
-        ? szenario.einkommenHeute.grvBeitragMonat * 12
-        : 0,
+      /*
+        DER FOERDERCHECK BILANZIERT JE HAUSHALT. Die Bezugsgroessen von
+        Person A bleiben deshalb als Vorgabe stehen — an ihnen haengen die
+        Befunde zur Entgeltumwandlung, die es nur beim Angestellten gibt.
+        Der Hoechstbetrag des § 10 Abs. 3 EStG wird dagegen bei
+        Zusammenveranlagung von BEIDEN verbraucht; dafuer ist `jePerson` da.
+      */
+      beamter: basis.jePerson[0]?.beamter ?? false,
+      selbststaendig: basis.jePerson[0]?.selbststaendig ?? false,
+      grvBeitragJahr: basis.jePerson[0]?.grvBeitragJahr ?? 0,
+      jePerson: basis.jePerson,
       privatVersichert: privatImErwerb(szenario),
       pkvPraemieMonat: privatImErwerb(szenario)
         ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
