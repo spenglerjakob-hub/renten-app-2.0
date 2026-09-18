@@ -104,6 +104,23 @@ export function typText(t: VertragsTyp): string {
   return t;
 }
 
+/**
+ * Die Bezeichnung eines Vertrags im GUTACHTEN.
+ *
+ * BEFUND: Ein namenloser Vertrag hiess ueberall „ohne Bezeichnung". Im
+ * Inhaltsverzeichnis standen dadurch bei mehreren namenlosen Vertraegen
+ * mehrere identische Zeilen — fuer den Leser nichtssagend, und als React-Key
+ * (der Titel WAR der Key) obendrein nicht eindeutig.
+ *
+ * Statt eines Platzhalters also die Art: „Rürup / Basisrente, Schicht 1" sagt
+ * einem Leser, worum es geht, und unterscheidet Vertraege verschiedener Art
+ * nebenbei voneinander. Zwei namenlose Vertraege DERSELBEN Art heissen weiter
+ * gleich — deshalb haengt die Eindeutigkeit der Keys nicht mehr am Titel.
+ */
+export function vertragsBezeichnung(v: Pick<Vertrag, 'name' | 'typ' | 'schicht'>): string {
+  return v.name.trim() || `${typText(v.typ)}, Schicht ${v.schicht}`;
+}
+
 /** Klartext fuer die gewaehlte Verwendung. */
 export function strategieText(v: Vertrag): string {
   const treffer = STRATEGIEN[strategieGruppe(v.typ)].find((x) => x.wert === v.strategie);

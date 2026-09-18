@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
 import {
   ruhestandsfenster, parameterFuer, versorgungsluecke,
   type ProjektionsErgebnis, type Jahreszeile,
@@ -8,6 +8,7 @@ import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { tuevPositionen } from '../features/tuev-berechnung';
+import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
 import { personNameAus } from '../features/personen';
@@ -121,20 +122,171 @@ export function Gutachten({
   /* Entscheidet ueber EINE oder ZWEI Grundlagenseiten — siehe unten. */
   const hatVertraege = szenario.vertraege.length > 0;
 
-  const abschnitte = [
-    ...(hatVertraege ? ['Ihre Angaben', 'Ihre Verträge'] : ['Ihre Angaben und Verträge']),
-    `Ihre Renteneinkünfte im Jahr ${zeile.jahr}`,
-    ...(beidePartner ? [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`] : []),
+  /**
+   * DIE SEITEN DES GUTACHTENS — EINE Liste, aus der BEIDES entsteht: das
+   * Inhaltsverzeichnis auf dem Deckblatt und die Seiten selbst.
+   *
+   * BEFUND, der das ausgeloest hat: Hier standen ZWEI Listen nebeneinander —
+   * eine Titelliste fuer das Verzeichnis und daneben das Seiten-JSX, jede mit
+   * ihren eigenen Bedingungen von Hand gepflegt. Sie sind auseinandergelaufen.
+   * In einem Gutachten vom 18.9.2026 fuehrte das Verzeichnis 32 Abschnitte,
+   * darunter 23 Vertrags-Pruefungen; gedruckt wurden 12 Seiten mit EINER
+   * Pruefung. Drei weitere Abweichungen steckten unbemerkt darin: Ohne
+   * Rechenergebnis nannte das Verzeichnis „Ihre Renteneinkünfte", „Die
+   * Versorgung beider Partner" und „Rechtsstand und Methodik", obwohl alle
+   * drei Seiten dann entfallen.
+   *
+   * Aus einer Liste kann das nicht mehr passieren: Was keinen Eintrag hat,
+   * wird nicht gedruckt, und was gedruckt wird, steht im Verzeichnis.
+   *
+   * `titel` ist ein ARRAY, weil zwei Eintraege mehr als eine Seite rendern
+   * (Sparziel und Stellschrauben haengen an derselben Bedingung). Zwei Titel
+   * an einem Eintrag sind ehrlicher als zwei Eintraege, die dieselbe
+   * Bedingung doppelt tragen muessten — genau so fing das Auseinanderlaufen
+   * an.
+   *
+   * DER TITEL TAUGT NICHT ALS REACT-KEY. Er war es, und bei mehreren
+   * namenlosen Vertraegen hiessen alle Pruefungen gleich. Gezaehlt wird
+   * deshalb der Index.
+   */
+  const seiten: { titel: string[]; knoten: ReactNode }[] = [
+    {
+      titel: [hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'],
+      knoten: (
+        <Seite
+          titel={hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'}
+          nummer="Grundlage der Berechnung"
+        >
+          <Angaben szenario={szenario} avd={avd} />
+          {!hatVertraege && (
+            <Vertragsliste szenario={szenario} hinweise={ergebnis?.vertragsHinweise ?? []} />
+          )}
+        </Seite>
+      ),
+    },
+
+    /*
+      ANGABEN UND VERTRAEGE GETRENNT, sobald es Vertraege gibt.
+
+      Sie standen auf EINER Seite, weil einzeln keiner der beiden Bloecke
+      die halbe Seite fuellte. Das galt einmal. Seither sind Kinderblock,
+      Krankenversicherung je Person und die Zielanteile dazugekommen: Die
+      Angaben allein messen im unguenstigen Fall (vier Kinder, private
+      Krankenversicherung mit Entlastungstarif, Selbststaendigkeit, beide
+      Partner abweichend versichert) 1.114 von 979 Punkten — die Seite lief
+      also ueber, BEVOR ein einziger Vertrag erfasst war. Dazu kommen je
+      Vertrag rund 50 Punkte.
+
+      Der Browser brach das bisher selbst um, aber an beliebiger Stelle und
+      ohne Kopfzeile auf dem zweiten Blatt. Jetzt ist der Schnitt gesetzt:
+      Wer Vertraege hat, bekommt sie auf eigenem Blatt mit eigenem Titel.
+      Wer keine hat, behaelt den einzeiligen Hinweis bei den Angaben — dafuer
+      lohnt kein Blatt.
+    */
+    ...(hatVertraege ? [{
+      titel: ['Ihre Verträge'],
+      knoten: (
+        <Seite titel="Ihre Verträge" nummer="Grundlage der Berechnung">
+          <Vertragsliste
+            szenario={szenario}
+            hinweise={ergebnis?.vertragsHinweise ?? []}
+            eigeneSeite
+          />
+        </Seite>
+      ),
+    }] : []),
+
+    ...(ergebnis ? [{
+      titel: [`Ihre Renteneinkünfte im Jahr ${zeile.jahr}`],
+      knoten: (
+        <Renteneinkuenfte
+          ergebnis={ergebnis}
+          zeile={zeile}
+          szenario={szenario}
+          zielNettoHeute={h.zielNettoHeute}
+          inflation={szenario.annahmen.inflation}
+          einzelperson={einzelperson}
+        />
+      ),
+    }] : []),
+
+    /*
+      Nur bei Ehepaaren, dafuer in BEIDEN Umfaengen: Die Aufteilung ist
+      genau das, was im Gespraech gefragt wird, und die Kurzfassung ist die
+      Gespraechsfassung. Ein Alleinstehender bekaeme eine Seite, auf der
+      alles bei einer Person steht.
+    */
+    ...(ergebnis && beidePartner ? [{
+      titel: [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`],
+      knoten: <JePersonSeite zeile={zeile} szenario={szenario} />,
+    }] : []),
+
     ...(lang ? [
-      'Ihre Einkünfte im Ruhestand',
-      'Was Ihr Geld dann noch wert ist',
-      ...(pkv ? [`Die Krankenversicherung von ${pkv.person} im Alter`] : []),
-      ...(sparziel ? ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'] : []),
-      ...positionen.map((p) => `Vertrags-Prüfung: ${p.vertrag.name || 'ohne Bezeichnung'}`),
-      'Zum Mitnehmen',
+      {
+        titel: ['Ihre Einkünfte im Ruhestand'],
+        knoten: <RuhestandVerlauf zeilen={fenster} />,
+      },
+      {
+        titel: ['Was Ihr Geld dann noch wert ist'],
+        knoten: <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />,
+      },
+      ...(pkv ? [{
+        titel: [`Die Krankenversicherung von ${pkv.person} im Alter`],
+        knoten: (
+          <Krankenversicherung
+            ergebnis={pkv}
+            steigerung={pkv.steigerung}
+            inflation={szenario.annahmen.inflation}
+            zielNettoMonat={zeile.zielNettoMonat}
+          />
+        ),
+      }] : []),
+      ...(sparziel ? [{
+        titel: ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'],
+        knoten: (
+          <>
+            <Sparziel
+              ergebnis={sparziel}
+              eingaben={SPARZIEL_VORGABE}
+              rentenjahr={zeile.jahr}
+              inflation={szenario.annahmen.inflation}
+            />
+            <Stellschrauben szenario={szenario} zeile={zeile} eingaben={SPARZIEL_VORGABE} />
+          </>
+        ),
+      }] : []),
+      ...positionen.map((p) => ({
+        titel: [`Vertrags-Prüfung: ${vertragsBezeichnung(p.vertrag)}`],
+        knoten: <TuevBogen position={p} szenario={szenario} />,
+      })),
+      {
+        titel: ['Zum Mitnehmen'],
+        knoten: <Merkblatt />,
+      },
     ] : []),
-    'Rechtsstand, Methodik und Vorbehalt',
+
+    /*
+      Rechtsstand und Methodik stehen ans ENDE. Der vorhandene Abschnitt
+      traegt bereits eine ausfuehrliche Druckfassung; sie wird uebernommen,
+      statt sie ein zweites Mal zu schreiben.
+    */
+    ...(ergebnis ? [{
+      titel: ['Rechtsstand, Methodik und Vorbehalt'],
+      knoten: (
+        <Seite titel="Rechtsstand, Methodik und Vorbehalt" nummer="Wie die Zahlen zustande kommen">
+          <Rechtsstand
+            ergebnis={ergebnis}
+            tarifIndex={szenario.annahmen.tarifIndex}
+            rentendynamik={szenario.annahmen.rentendynamik}
+            inflation={szenario.annahmen.inflation}
+            ohneTitel
+          />
+        </Seite>
+      ),
+    }] : []),
   ];
+
+  const abschnitte = seiten.flatMap((s) => s.titel);
 
   return (
     <div className="hidden bg-white text-slate-800 print:block">
@@ -232,7 +384,7 @@ export function Gutachten({
         <div className="mt-6">
           <Untertitel>Inhalt</Untertitel>
           <ol className="list-inside list-decimal space-y-0.5 text-[12px] text-slate-700">
-            {abschnitte.map((a) => <li key={a}>{a}</li>)}
+            {abschnitte.map((a, i) => <li key={i}>{a}</li>)}
           </ol>
         </div>
 
@@ -247,108 +399,12 @@ export function Gutachten({
       </Seite>
 
       {/*
-        ANGABEN UND VERTRAEGE GETRENNT, sobald es Vertraege gibt.
-
-        Sie standen auf EINER Seite, weil einzeln keiner der beiden Bloecke
-        die halbe Seite fuellte. Das galt einmal. Seither sind Kinderblock,
-        Krankenversicherung je Person und die Zielanteile dazugekommen: Die
-        Angaben allein messen im unguenstigen Fall (vier Kinder, private
-        Krankenversicherung mit Entlastungstarif, Selbststaendigkeit, beide
-        Partner abweichend versichert) 1.114 von 979 Punkten — die Seite lief
-        also ueber, BEVOR ein einziger Vertrag erfasst war. Dazu kommen je
-        Vertrag rund 50 Punkte.
-
-        Der Browser brach das bisher selbst um, aber an beliebiger Stelle und
-        ohne Kopfzeile auf dem zweiten Blatt. Jetzt ist der Schnitt gesetzt:
-        Wer Vertraege hat, bekommt sie auf eigenem Blatt mit eigenem Titel.
-        Wer keine hat, behaelt den einzeiligen Hinweis bei den Angaben — dafuer
-        lohnt kein Blatt.
+        Die Seiten in derselben Reihenfolge, in der das Verzeichnis sie
+        nennt — weil es dieselbe Liste ist. Der Index ist der Key: Der Titel
+        war es einmal, und bei gleichnamigen Vertrags-Pruefungen ist er nicht
+        eindeutig.
       */}
-      <Seite
-        titel={hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'}
-        nummer="Grundlage der Berechnung"
-      >
-        <Angaben szenario={szenario} avd={avd} />
-        {!hatVertraege && (
-          <Vertragsliste szenario={szenario} hinweise={ergebnis?.vertragsHinweise ?? []} />
-        )}
-      </Seite>
-
-      {hatVertraege && (
-        <Seite titel="Ihre Verträge" nummer="Grundlage der Berechnung">
-          <Vertragsliste
-            szenario={szenario}
-            hinweise={ergebnis?.vertragsHinweise ?? []}
-            eigeneSeite
-          />
-        </Seite>
-      )}
-
-      {ergebnis && (
-        <Renteneinkuenfte
-          ergebnis={ergebnis}
-          zeile={zeile}
-          szenario={szenario}
-          zielNettoHeute={h.zielNettoHeute}
-          inflation={szenario.annahmen.inflation}
-          einzelperson={einzelperson}
-        />
-      )}
-
-      {/*
-        Nur bei Ehepaaren, dafuer in BEIDEN Umfaengen: Die Aufteilung ist
-        genau das, was im Gespraech gefragt wird, und die Kurzfassung ist die
-        Gespraechsfassung. Ein Alleinstehender bekaeme eine Seite, auf der
-        alles bei einer Person steht.
-      */}
-      {ergebnis && beidePartner && <JePersonSeite zeile={zeile} szenario={szenario} />}
-
-      {lang && <RuhestandVerlauf zeilen={fenster} />}
-      {lang && <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />}
-
-      {lang && pkv && (
-        <Krankenversicherung
-          ergebnis={pkv}
-          steigerung={pkv.steigerung}
-          inflation={szenario.annahmen.inflation}
-          zielNettoMonat={zeile.zielNettoMonat}
-        />
-      )}
-
-      {lang && sparziel && (
-        <>
-          <Sparziel
-            ergebnis={sparziel}
-            eingaben={SPARZIEL_VORGABE}
-            rentenjahr={zeile.jahr}
-            inflation={szenario.annahmen.inflation}
-          />
-          <Stellschrauben szenario={szenario} zeile={zeile} eingaben={SPARZIEL_VORGABE} />
-        </>
-      )}
-
-      {lang && positionen.map((p) => (
-        <TuevBogen key={p.vertrag.id} position={p} szenario={szenario} />
-      ))}
-
-      {lang && <Merkblatt />}
-
-      {/*
-        Rechtsstand und Methodik stehen ans ENDE. Der vorhandene Abschnitt
-        traegt bereits eine ausfuehrliche Druckfassung; sie wird uebernommen,
-        statt sie ein zweites Mal zu schreiben.
-      */}
-      {ergebnis && (
-        <Seite titel="Rechtsstand, Methodik und Vorbehalt" nummer="Wie die Zahlen zustande kommen">
-          <Rechtsstand
-            ergebnis={ergebnis}
-            tarifIndex={szenario.annahmen.tarifIndex}
-            rentendynamik={szenario.annahmen.rentendynamik}
-            inflation={szenario.annahmen.inflation}
-            ohneTitel
-          />
-        </Seite>
-      )}
+      {seiten.map((s, i) => <Fragment key={i}>{s.knoten}</Fragment>)}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { belastungsTreppe, laufendeZulageJahr, type TuevPosition } from '../features/tuev-berechnung';
 import { euro, prozent } from '../components/Feld';
-import { typText } from '../features/vertragsarten';
+import { typText, vertragsBezeichnung } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
 import { Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text } from './Bausteine';
@@ -28,7 +28,7 @@ export function TuevBogen({
 
   return (
     <Seite
-      titel={`Vertrags-Prüfung: ${v.name || 'ohne Bezeichnung'}`}
+      titel={`Vertrags-Prüfung: ${vertragsBezeichnung(v)}`}
       nummer={`${typText(v.typ)} · Schicht ${v.schicht}`}
     >
       <div className="grid grid-cols-3 gap-3">

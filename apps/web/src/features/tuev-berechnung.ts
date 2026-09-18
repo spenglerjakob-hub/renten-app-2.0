@@ -170,9 +170,24 @@ export function tuevPositionen(
   const basis = tuevBasis(szenario);
   const jetzt = new Date().getFullYear();
 
+  /*
+    JE VERTRAG HOECHSTENS EINE PRUEFUNG.
+
+    Das Schema kennt keine Eindeutigkeit auf `vertragId` (siehe
+    `tuevPositionSchema`), und die Oberflaeche verhindert Duplikate nur beim
+    Hinzufuegen — eine importierte oder von aussen bearbeitete Datei kann
+    denselben Vertrag mehrfach in der Pruefliste fuehren. Zwei Pruefungen
+    desselben Vertrags sind aber keine zwei Pruefungen, sondern eine doppelt
+    erfasste: Sie ergeben zeichengleiche Gutachtenseiten, und im
+    Inhaltsverzeichnis mehrfach dieselbe Zeile.
+  */
+  const gesehen = new Set<string>();
+
   return szenario.tuev.flatMap((t) => {
     const v = szenario.vertraege.find((x) => x.id === t.vertragId);
     if (!v) return [];
+    if (gesehen.has(v.id)) return [];
+    gesehen.add(v.id);
 
     const posten = zeile?.posten.find((x) => x.id === v.id);
     // Nicht die Vertragsart entscheidet, sondern die gewaehlte Verwendung:
