@@ -223,8 +223,15 @@ function Foerderabschnitt({ szenario, zeile }: { szenario: SzenarioParsed; zeile
               euro(b.probeMonat),
               <>
                 {euro(b.nettoAufwandMonat)}
+                {/*
+                  Eine Zulage ist ein AUFSCHLAG auf den Beitrag, keine
+                  Minderung — „47 % gefördert" las sich wie „47 % zahlt der
+                  Staat davon".
+                */}
                 <span className="block text-slate-500">
-                  {Math.round(b.foerderquote * 100)} % gefördert
+                  {b.foerderArt === 'zulage'
+                    ? `+ ${Math.round(b.foerderquote * 100)} % Zulage`
+                    : `${Math.round(b.foerderquote * 100)} % gefördert`}
                 </span>
               </>,
             ]}

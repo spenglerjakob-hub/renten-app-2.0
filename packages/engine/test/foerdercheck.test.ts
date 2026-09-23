@@ -3,6 +3,7 @@ import {
   foerdercheck, basisrahmenJahr, type FoerderKontext,
 } from '../src/analyse/foerdercheck.js';
 import { SV_FREI_QUOTE, STEUER_FREI_QUOTE } from '../src/analyse/vertrags-tuev.js';
+import { avdSteuervorteil } from '../src/products/altersvorsorgedepot.js';
 import { parameterFuer } from '../src/params/registry.js';
 
 const p = parameterFuer(2026, { indexRate: 0 });
@@ -306,5 +307,60 @@ describe('Fördercheck — Zulage oder Steuerersparnis', () => {
       jahresbrutto: 90_000, zveHeute: 80_000,
     };
     expect(basis(selbst)!.foerderArt).toBe('steuer');
+  });
+});
+
+describe('Altersvorsorgedepot — die Zulage kommt obendrauf', () => {
+  /*
+    BEFUND: Der Check rechnete „Eigenbeitrag minus Zulage" und schrieb
+    „150 EUR kosten Sie nur 80 EUR — der Staat traegt 70 davon". Wer 150 EUR
+    einzahlt, zahlt aber 150 EUR; die Zulage wird dem Depot ZUSAETZLICH
+    gutgeschrieben. Dieselbe Doppelzaehlung, die `avdSteuervorteil`
+    ausdruecklich ausschliesst.
+  */
+  const p2027 = parameterFuer(2027, { indexRate: 0 });
+  const kind = [{ geburtsjahr: 2020 }];
+  const check = (k: Partial<FoerderKontext>) =>
+    foerdercheck({ ...angestellt, jahr: 2027, kinder: kind, ...k }, steuerOpt, p2027)
+      .find((b) => b.id === 'avd')!;
+
+  it('mindert den eigenen Beitrag NICHT um die Zulage', () => {
+    /*
+      zvE 35.000 — der Fall aus dem Screenshot (2.500 EUR netto). Der
+      Sonderausgabenabzug bringt dort nicht mehr als die Zulage; der Beitrag
+      kostet also genau, was man einzahlt. (Bei 50.000 waeren es schon 75 EUR
+      im Jahr darueber — das prueft der Test weiter unten.)
+    */
+    const b = check({ zveHeute: 35_000, avdEigenbeitragJahr: 0 });
+    expect(b.probeMonat).toBeCloseTo(150, 6);
+    expect(b.ersparnisJahr).toBeCloseTo(840, 6);        // 540 Grund + 300 Kind
+    expect(b.nettoAufwandMonat).toBeCloseTo(b.probeMonat, 6);
+  });
+
+  it('weist aus, was im Depot ankommt: Beitrag PLUS Zulage', () => {
+    const b = check({ avdEigenbeitragJahr: 0 });
+    expect(b.zuflussMonat).toBeCloseTo(150 + 70, 6);
+    // Die Quote ist ein Aufschlag auf den Beitrag, kein Anteil daran.
+    expect(b.foerderquote).toBeCloseTo(840 / 1800, 6);
+  });
+
+  it('mindert ihn nur um den Steuervorteil UEBER die Zulage — wie der TUEV', () => {
+    for (const zveHeute of [50_000, 80_000, 200_000]) {
+      const b = check({ zveHeute, avdEigenbeitragJahr: 0 });
+      const v = avdSteuervorteil(
+        { eigenbeitragJahr: 1_800, zulagenJahr: 840, zveHeute }, steuerOpt, p2027,
+      );
+      expect(v.ueberZulagen).toBeGreaterThan(0);
+      expect(b.nettoAufwandMonat).toBeCloseTo(v.eigenaufwandNetto / 12, 6);
+      // Niemals wieder „Beitrag minus Zulage":
+      expect(b.nettoAufwandMonat).toBeGreaterThan(b.probeMonat - b.ersparnisJahr / 12);
+    }
+  });
+
+  it('gilt auch vor dem Startjahr', () => {
+    const b = foerdercheck({ ...angestellt, zveHeute: 35_000, jahr: 2026, kinder: kind }, steuerOpt, p)
+      .find((x) => x.id === 'avd')!;
+    expect(b.nettoAufwandMonat).toBeCloseTo(b.probeMonat, 6);
+    expect(b.zuflussMonat).toBeCloseTo(b.probeMonat + b.ersparnisJahr / 12, 6);
   });
 });

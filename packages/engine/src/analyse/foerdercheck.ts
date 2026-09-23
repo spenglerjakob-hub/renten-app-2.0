@@ -2,7 +2,7 @@ import type { LegalParameters } from '../params/types.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
 import { euroText } from '../util/text.js';
 import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './vertrags-tuev.js';
-import { avdZulagen, type AvdKind } from '../products/altersvorsorgedepot.js';
+import { avdZulagen, avdSteuervorteil, type AvdKind } from '../products/altersvorsorgedepot.js';
 
 /**
  * FOERDERCHECK — was an Foerderung LIEGEN BLEIBT.
@@ -148,9 +148,27 @@ export interface FoerderBefund {
   probeMonat: number;
   /** Was dieser Beitrag im Jahr an Steuern und Sozialabgaben spart */
   ersparnisJahr: number;
-  /** Was er nach Foerderung netto im Monat kostet */
+  /**
+   * Was er nach Foerderung netto im Monat kostet.
+   *
+   * Bei einer ZULAGE ist das nicht „Beitrag minus Zulage": Die Zulage kommt
+   * obendrauf und mindert den eigenen Beitrag nicht. Gemindert wird er nur um
+   * einen Steuervorteil, der ueber die Zulage hinausgeht.
+   */
   nettoAufwandMonat: number;
-  /** Foerderquote: Ersparnis je eingesetztem Euro */
+  /**
+   * Nur bei Zulagen: was im Monat im Vertrag ankommt — Eigenbeitrag PLUS
+   * Zulage. Hier und nicht in der Oberflaeche addiert, damit Bildschirm und
+   * Gutachten nicht zwei Summen bilden.
+   */
+  zuflussMonat?: number;
+  /**
+   * Foerderquote: Foerderung je eingesetztem Euro.
+   *
+   * Bei einer Steuerersparnis ein ANTEIL des Beitrags, bei einer Zulage ein
+   * AUFSCHLAG darauf — 47 % heisst dort „47 Cent kommen je Euro dazu", nicht
+   * „47 Cent zahlt der Staat davon".
+   */
   foerderquote: number;
   /** Der Befund selbst: was frei ist und warum. */
   text: string;
@@ -225,9 +243,31 @@ export function foerdercheck(
   if (bav) befunde.push(bav);
   const basis = basisBefund(k, steuerOpt, p);
   if (basis) befunde.push(basis);
-  const avd = avdBefund(k, p);
+  const avd = avdBefund(k, steuerOpt, p);
   if (avd) befunde.push(avd);
   return befunde;
+}
+
+/**
+ * Was ein Eigenbeitrag zum Altersvorsorgedepot NETTO kostet, im Jahr.
+ *
+ * Mit `avdSteuervorteil` — derselben Rechnung wie im Vertrags-TUEV: Der
+ * Eigenbeitrag, gemindert nur um das, was der Sonderausgabenabzug UEBER die
+ * Zulage hinaus bringt. Die Zulage selbst mindert ihn nicht; sie kommt
+ * obendrauf und steht als hoeheres Depot auf der Habenseite.
+ */
+function avdNettoAufwandJahr(
+  eigenbeitragJahr: number,
+  zulagenJahr: number,
+  k: Pick<FoerderKontext, 'zveHeute'>,
+  steuerOpt: SteuerOptionen,
+  p: LegalParameters,
+): number {
+  return avdSteuervorteil(
+    { eigenbeitragJahr, zulagenJahr, zveHeute: k.zveHeute },
+    steuerOpt,
+    p,
+  ).eigenaufwandNetto;
 }
 
 /**
@@ -243,8 +283,20 @@ export function foerdercheck(
  * Zeitachse und der Vertrags-TUEV benutzen. Zweimal aufgerufen: mit dem
  * heutigen Eigenbeitrag und mit dem Hoechstbetrag — die Differenz ist, was
  * liegen bleibt.
+ *
+ * BEFUND: Der Netto-Aufwand stand hier als „Eigenbeitrag minus Zulage" —
+ * 150 EUR Beitrag kosteten danach „nur 80 EUR", und „der Staat traegt 70
+ * davon". Beides falsch: Wer 150 EUR einzahlt, zahlt 150 EUR, und die 70 EUR
+ * Zulage kommen OBENDRAUF, im Depot landen 220 EUR. Es war dieselbe
+ * Doppelzaehlung, die der Vertrags-TUEV schon einmal hatte und die
+ * `avdSteuervorteil.eigenaufwandNetto` ausdruecklich ausschliesst. Der
+ * Aufwand kommt deshalb jetzt aus eben dieser Funktion.
  */
-function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null {
+function avdBefund(
+  k: FoerderKontext,
+  steuerOpt: SteuerOptionen,
+  p: LegalParameters,
+): FoerderBefund | null {
   const paragraf = 'Altersvorsorgedepot (pAV-Reform)';
   const hoechst = p.avd.hoechstbetragEigenbeitrag;
 
@@ -267,7 +319,8 @@ function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null 
       rahmenMonat: hoechst / 12,
       probeMonat: hoechst / 12,
       ersparnisJahr: summe,
-      nettoAufwandMonat: Math.max(0, hoechst - summe) / 12,
+      nettoAufwandMonat: avdNettoAufwandJahr(hoechst, summe, k, steuerOpt, p) / 12,
+      zuflussMonat: (hoechst + summe) / 12,
       foerderquote: summe / hoechst,
       text: `Ab ${p.avd.abJahr} gibt es das geförderte Altersvorsorgedepot. Bei `
         + `${euroText(hoechst / 12)} im Monat kämen ${euroText(summe)} Zulage im Jahr dazu`
@@ -312,7 +365,15 @@ function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null 
     rahmenMonat: mehrEigen / 12,
     probeMonat: mehrEigen / 12,
     ersparnisJahr: liegenGelassen,
-    nettoAufwandMonat: Math.max(0, mehrEigen - liegenGelassen) / 12,
+    /*
+      Was der ZUSAETZLICHE Beitrag netto kostet: der Aufwand beim
+      Hoechstbetrag minus der von heute. So faellt ein Steuervorteil, der schon
+      heute greift, nicht noch einmal auf den Mehrbeitrag.
+    */
+    nettoAufwandMonat: Math.max(0,
+      avdNettoAufwandJahr(hoechst, vollLaufend, k, steuerOpt, p)
+      - avdNettoAufwandJahr(k.avdEigenbeitragJahr, jetztLaufend, k, steuerOpt, p)) / 12,
+    zuflussMonat: (mehrEigen + liegenGelassen) / 12,
     foerderquote: mehrEigen > 0 ? liegenGelassen / mehrEigen : 0,
     text: (k.avdEigenbeitragJahr > 0
       ? `Sie zahlen ${euroText(k.avdEigenbeitragJahr / 12)} im Monat ein. `

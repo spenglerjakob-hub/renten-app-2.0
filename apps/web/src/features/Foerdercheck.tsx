@@ -103,10 +103,15 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 Voraussetzung („so viel muessten Sie einzahlen"), nicht das
                 Ergebnis.
               */}
+              {/*
+                OBENDRAUF, nicht „davon". Hier stand „70 EUR davon traegt der
+                Staat" — als zahle man selbst nur 80. Die Zulage kommt aber
+                ZUSAETZLICH in den Vertrag; der eigene Beitrag bleibt, was er ist.
+              */}
               {b.foerderArt === 'zulage' && (
                 <p className="mb-2 text-[11px] font-semibold text-emerald-800 sm:text-xs">
-                  {euro(b.rahmenMonat)} im Monat einzahlen — {euro(b.ersparnisJahr / 12)} davon
-                  trägt der Staat.
+                  {euro(b.rahmenMonat)} im Monat einzahlen — der Staat legt{' '}
+                  {euro(b.ersparnisJahr / 12)} obendrauf.
                 </p>
               )}
 
@@ -126,17 +131,42 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 Zahl, nach der jemand entscheidet.
               */}
               <p className="mt-2.5 rounded-lg bg-emerald-50 px-2.5 py-2 text-[11px] leading-relaxed text-emerald-900 sm:text-xs">
-                <strong>{euro(b.probeMonat)}</strong> im Monat kosten Sie nach Förderung nur{' '}
-                <strong>{euro(b.nettoAufwandMonat)}</strong> — der Staat trägt{' '}
-                {Math.round(b.foerderquote * 100)} % ({euro(b.ersparnisJahr / 12)} im Monat).
+                {b.foerderArt === 'zulage' ? (
+                  /*
+                    Die Zulage SENKT den Beitrag nicht, sie VERGROESSERT das Depot.
+                    Deshalb die Rechnung in diese Richtung: aus 150 werden 220.
+                    Nur ein Steuervorteil, der ueber die Zulage hinausgeht, mindert
+                    den eigenen Aufwand — und nur dann steht das auch da.
+                  */
+                  <>
+                    Aus <strong>{euro(b.probeMonat)}</strong> Eigenbeitrag werden{' '}
+                    <strong>{euro(b.zuflussMonat ?? b.probeMonat + b.ersparnisJahr / 12)}</strong>{' '}
+                    im Depot: Der Staat legt <strong>{euro(b.ersparnisJahr / 12)}</strong> im
+                    Monat obendrauf — {Math.round(b.foerderquote * 100)} % auf Ihren Beitrag.
+                    {b.probeMonat - b.nettoAufwandMonat >= 0.5 && (
+                      <>
+                        {' '}Über die Zulage hinaus spart der Sonderausgabenabzug{' '}
+                        {euro(b.probeMonat - b.nettoAufwandMonat)} Steuer im Monat; netto kostet
+                        Sie der Beitrag dann <strong>{euro(b.nettoAufwandMonat)}</strong>.
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <strong>{euro(b.probeMonat)}</strong> im Monat kosten Sie nach Förderung nur{' '}
+                    <strong>{euro(b.nettoAufwandMonat)}</strong> — der Staat trägt{' '}
+                    {Math.round(b.foerderquote * 100)} % ({euro(b.ersparnisJahr / 12)} im Monat).
+                  </>
+                )}
                 <InfoPunkt titel="Wie die Förderquote entsteht">
                   {b.foerderArt === 'zulage' ? (
                     <>
                       Auf {euro(b.probeMonat)} im Monat ({euro(b.probeMonat * 12)} im Jahr) gibt
                       es {euro(b.ersparnisJahr)} Zulage. Das ist <strong>Geld vom Staat</strong>,
                       keine Steuerersparnis — es fließt unabhängig von Ihrem Steuersatz und wird
-                      dem Vertrag gutgeschrieben. {Math.round(b.foerderquote * 100)} % bezogen
-                      auf Ihren Eigenbeitrag.
+                      dem Vertrag <strong>zusätzlich</strong> gutgeschrieben. Ihr eigener Beitrag
+                      wird dadurch nicht kleiner, Ihr Depot aber um{' '}
+                      {Math.round(b.foerderquote * 100)} % größer als das, was Sie einzahlen.
                     </>
                   ) : (
                     <>
