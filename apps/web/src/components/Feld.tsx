@@ -414,11 +414,14 @@ export function AkkordeonKarte(props: {
  */
 export function Kennzahl(props: {
   titel: string; wert: string; farbe?: string; fussnote?: string;
+  /** Herleitung der Zahl; erscheint als Fragezeichen hinter der Ueberschrift. */
+  info?: ReactNode;
 }) {
   return (
     <div>
-      <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
+      <div className="mb-0.5 flex items-center text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
         {props.titel}
+        {props.info && <InfoPunkt titel={props.titel}>{props.info}</InfoPunkt>}
       </div>
       <div className={`text-base font-black tabular-nums sm:text-lg ${props.farbe ?? 'text-slate-800'}`}>
         {props.wert}
@@ -429,10 +432,19 @@ export function Kennzahl(props: {
 }
 
 /** Eine Zeile einer Gegenueberstellung: Beschriftung links, Betrag rechts. */
-export function GegenueberZeile(props: { text: string; wert: string; farbe?: string }) {
+export function GegenueberZeile(props: {
+  text: string;
+  wert: string;
+  farbe?: string;
+  /** Herleitung der Zahl; erscheint als Fragezeichen hinter der Beschriftung. */
+  info?: ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="text-slate-600">{props.text}</span>
+      <span className="text-slate-600">
+        {props.text}
+        {props.info && <InfoPunkt titel={props.text.replace(/^[−=]\s*/, '')}>{props.info}</InfoPunkt>}
+      </span>
       <span className={`shrink-0 font-semibold tabular-nums ${props.farbe ?? 'text-slate-800'}`}>
         {props.wert}
       </span>
@@ -447,3 +459,100 @@ export const euro = (n: number) =>
 
 export const prozent = (n: number, stellen = 1) =>
   `${(Number.isFinite(n) ? n * 100 : 0).toLocaleString('de-DE', { maximumFractionDigits: stellen, minimumFractionDigits: stellen })} %`;
+
+/**
+ * Ein Fragezeichen neben einer Zahl, das ihre Herleitung zeigt.
+ *
+ * WARUM NICHT `title`: Das Attribut des Browsers erscheint erst nach einer
+ * Sekunde Verharren, laesst sich nicht gestalten und ist auf einem Handy
+ * ueberhaupt nicht erreichbar — dort gibt es kein Verharren.
+ *
+ * Deshalb ein echter Knopf: Er oeffnet bei Mauskontakt UND bei Tipp, und er
+ * bleibt offen, bis man ihn schliesst. Auf dem Handy ist der Tipp der einzige
+ * Weg; ohne ihn waere der Hinweis dort schlicht nicht vorhanden. Escape und
+ * ein Klick daneben schliessen ihn wieder.
+ *
+ * DER TEXT SOLL DIE ECHTEN ZAHLEN TRAGEN, nicht die Regel im Allgemeinen.
+ * „Der Grenzsteuersatz mindert den Beitrag" ist ein Lehrbuchsatz, den niemand
+ * nachrechnen kann; „Ihr Beitrag von 150 EUR mindert Ihr zu versteuerndes
+ * Einkommen von 35.216 EUR, der letzte Euro kostet dort 30 %" laesst sich
+ * pruefen. Die Aufrufer setzen ihre Werte deshalb in den Text ein.
+ *
+ * Im Ausdruck entfaellt der Knopf: Auf Papier gibt es nichts aufzuklappen.
+ */
+export function InfoPunkt(props: {
+  /** Worum es geht — steht fett ueber dem Text und im Vorlesetext des Knopfes. */
+  titel: string;
+  children: ReactNode;
+}) {
+  const [offen, setOffen] = useState(false);
+  const eigen = useId();
+  const id = `info${eigen}`;
+
+  /*
+    Ein offener Hinweis schliesst bei Escape und bei einem Klick irgendwo
+    sonst. Beide Zuhoerer haengen NUR solange dran, wie er offen ist — sonst
+    laegen bei einem Dutzend Infopunkten auf der Seite ein Dutzend Zuhoerer
+    auf dem Dokument, die alle nichts tun.
+  */
+  useEffect(() => {
+    if (!offen) return;
+    const zu = () => setOffen(false);
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('click', zu);
+    document.addEventListener('keydown', taste);
+    return () => {
+      document.removeEventListener('click', zu);
+      document.removeEventListener('keydown', taste);
+    };
+  }, [offen]);
+
+  return (
+    <span className="relative inline-flex print:hidden">
+      <button
+        type="button"
+        aria-label={`Erklärung: ${props.titel}`}
+        aria-expanded={offen}
+        aria-controls={offen ? id : undefined}
+        /*
+          `stopPropagation`, weil der Zuhoerer oben JEDEN Klick im Dokument
+          zum Schliessen nimmt — ohne ihn schloesse der eigene Klick den
+          Hinweis im selben Moment wieder, in dem er aufgeht.
+
+          UND ER OEFFNET, ER TOGGELT NICHT. Mit einem Toggle war der Hinweis
+          nach jedem Klick ZU statt auf: Der Browser feuert vor dem Klick ein
+          `mouseenter` — auch beim Tippen auf dem Handy —, das ihn bereits
+          geoeffnet hat; der Klick kehrte das prompt wieder um. Geschlossen
+          wird ueber Escape, einen Klick daneben oder das Verlassen mit der
+          Maus; dafuer braucht es den Knopf nicht.
+        */
+        onClick={(e) => { e.stopPropagation(); setOffen(true); }}
+        onMouseEnter={() => setOffen(true)}
+        onMouseLeave={() => setOffen(false)}
+        onFocus={() => setOffen(true)}
+        onBlur={() => setOffen(false)}
+        className="ml-1 inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[9px] font-bold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700"
+      >
+        ?
+      </button>
+      {offen && (
+        /*
+          `left-1/2 -translate-x-1/2` mittet die Blase ueber dem Knopf; die
+          feste Breite verhindert, dass ein langer Text sie ueber den
+          Bildschirmrand zieht. `pointer-events-none`, damit die Blase den
+          Mauszeiger nicht abfaengt und `onMouseLeave` zuverlaessig feuert.
+        */
+        <span
+          id={id}
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-60 -translate-x-1/2 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-[11px] font-normal leading-relaxed text-slate-700 shadow-lg sm:w-72"
+        >
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            {props.titel}
+          </span>
+          {props.children}
+        </span>
+      )}
+    </span>
+  );
+}

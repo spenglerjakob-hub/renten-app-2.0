@@ -1,6 +1,6 @@
 import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke, projiziere, kenntKapitalwahl,
+  versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, SV_FREI_QUOTE, euroText,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute,
@@ -66,6 +66,16 @@ export interface TuevPosition {
  */
 export function tuevBasis(szenario: SzenarioParsed): {
   p: LegalParameters; jahresbrutto: number; zve: number; monatsbrutto: number;
+  /**
+   * Das geschaetzte Netto des Haushalts — fuer den Einkommensblock im TUEV.
+   *
+   * Es kommt aus derselben Rechnung wie das Brutto und ist damit in beide
+   * Richtungen belastbar: Wer Brutto eintraegt, sieht hier sein Netto; wer
+   * Netto eintraegt, sieht oben das Brutto, das `nettoZuBrutto` dazu
+   * ermittelt hat. Beides ist dieselbe Funktion, einmal vorwaerts und einmal
+   * rueckwaerts — die Zahlen koennen deshalb nicht auseinanderlaufen.
+   */
+  jahresnetto: number;
   jePerson: ErwerbsPersonHeute[];
 } {
   const jahr = new Date().getFullYear();
@@ -81,6 +91,7 @@ export function tuevBasis(szenario: SzenarioParsed): {
     jahresbrutto: b.jahresbrutto,
     zve: b.zve,
     monatsbrutto: b.jahresbrutto / 12,
+    jahresnetto: b.haushalt.jahresnetto,
     jePerson: b.jePerson,
   };
 }
@@ -501,6 +512,20 @@ export interface TreppenZeile {
   text: string;
   betrag: number;
   art: 'abzug' | 'summe';
+  /**
+   * Woher der Betrag kommt — fuer den Infopunkt am Bildschirm.
+   *
+   * MIT DEN ECHTEN ZAHLEN, nicht als Lehrbuchsatz: „Der Grenzsteuersatz
+   * mindert den Beitrag" kann niemand nachrechnen, „150 EUR mindern Ihr zu
+   * versteuerndes Einkommen von 35.216 EUR" schon. Die Werte stehen hier
+   * ohnehin alle bereit, und der Text entsteht deshalb hier — nicht in der
+   * Oberflaeche, wo er ein zweites Mal stuende: einmal am Bildschirm, einmal
+   * im Gutachten.
+   *
+   * Optional, weil nicht jede Zeile eine Erklaerung braucht. Eine
+   * Zwischensumme erklaert sich aus den Zeilen darueber.
+   */
+  erklaerung?: string;
 }
 
 /**
@@ -525,7 +550,24 @@ export interface TreppenZeile {
  * oberste Zeile um sie an und zieht sie in der naechsten wieder ab; unten
  * steht unveraendert `echterAufwandMonat`.
  */
-export function belastungsTreppe(r: TuevErgebnis): {
+export function belastungsTreppe(
+  r: TuevErgebnis,
+  /**
+   * Was zum Erklaeren gebraucht wird, aber nicht im Ergebnis steht: das zu
+   * versteuernde Einkommen, der Rechtsstand und die Erwerbsart des Inhabers.
+   *
+   * Optional, weil die Treppe ohne Erklaerungen vollstaendig ist — der
+   * Ausdruck zeigt sie ohnehin nicht. Fehlt die Angabe, bleiben die Zeilen
+   * einfach ohne `erklaerung`.
+   */
+  fuerErklaerung?: {
+    zve: number;
+    p: LegalParameters;
+    beamter: boolean;
+    selbststaendig: boolean;
+    privatVersichert: boolean;
+  },
+): {
   zufluss: number;
   zeilen: TreppenZeile[];
   aufwand: number;
@@ -535,8 +577,26 @@ export function belastungsTreppe(r: TuevErgebnis): {
   const zufluss = r.beitragMonat + zulagen;
   const zeilen: TreppenZeile[] = [];
 
-  if (zulagen > 0) zeilen.push({ text: '− Zulagen vom Staat', betrag: zulagen, art: 'abzug' });
-  if (agZuschuss > 0) zeilen.push({ text: '− Arbeitgeberzuschuss', betrag: agZuschuss, art: 'abzug' });
+  if (zulagen > 0) {
+    zeilen.push({
+      text: '− Zulagen vom Staat',
+      betrag: zulagen,
+      art: 'abzug',
+      erklaerung: `${euroText(zulagen * 12)} im Jahr, die der Staat dem Vertrag gutschreibt — `
+        + 'unabhängig von Ihrem Steuersatz. Sie erhöhen das Kapital und senken Ihren eigenen '
+        + 'Beitrag nicht; deshalb stehen sie oben im Zufluss und gehen hier wieder ab.',
+    });
+  }
+  if (agZuschuss > 0) {
+    zeilen.push({
+      text: '− Arbeitgeberzuschuss',
+      betrag: agZuschuss,
+      art: 'abzug',
+      erklaerung: 'Was Ihr Arbeitgeber zum Vertrag beisteuert. Bei Entgeltumwandlung sind '
+        + 'mindestens 15 % Pflicht (§ 1a Abs. 1a BetrAVG), weil er Sozialabgaben spart; '
+        + 'viele zahlen mehr.',
+    });
+  }
 
   /*
     Erst ab einem halben Euro: Bei privat Versicherten bleiben nach dem
@@ -545,9 +605,22 @@ export function belastungsTreppe(r: TuevErgebnis): {
   */
   const sv = r.svErsparnisMonat >= 0.5 ? r.svErsparnisMonat : 0;
   const eigeneAbzuege: TreppenZeile[] = [];
-  if (sv > 0) eigeneAbzuege.push({ text: '− SV-Ersparnis', betrag: sv, art: 'abzug' });
+  if (sv > 0) {
+    eigeneAbzuege.push({
+      text: '− SV-Ersparnis',
+      betrag: sv,
+      art: 'abzug',
+      erklaerung: fuerErklaerung && svErklaerung(sv, fuerErklaerung),
+    });
+  }
   if (r.steuerersparnisMonat > 0) {
-    eigeneAbzuege.push({ text: '− Steuerersparnis', betrag: r.steuerersparnisMonat, art: 'abzug' });
+    eigeneAbzuege.push({
+      text: '− Steuerersparnis',
+      betrag: r.steuerersparnisMonat,
+      art: 'abzug',
+      erklaerung: fuerErklaerung
+        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat, fuerErklaerung),
+    });
   }
 
   /*
@@ -568,6 +641,37 @@ export function belastungsTreppe(r: TuevErgebnis): {
   zeilen.push(...eigeneAbzuege);
 
   return { zufluss, zeilen, aufwand: r.echterAufwandMonat };
+}
+
+/** Woher die SV-Ersparnis kommt — mit der Grenze, an der sie endet. */
+function svErklaerung(
+  svMonat: number,
+  k: { p: LegalParameters; beamter: boolean; selbststaendig: boolean; privatVersichert: boolean },
+): string {
+  const frei = SV_FREI_QUOTE * k.p.bbgRvJahr / 12;
+  const teil = k.privatVersichert
+    ? 'Renten- und Arbeitslosenversicherung — Ihre private Krankenversicherung richtet sich '
+      + 'nach dem Vertrag, nicht nach dem Gehalt, und spart deshalb nichts'
+    : 'Renten-, Arbeitslosen-, Kranken- und Pflegeversicherung';
+  return `Umgewandeltes Entgelt ist bis ${euroText(frei)} im Monat beitragsfrei — 4 % der `
+    + `Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV). Gespart wird Ihr ARBEITNEHMERanteil `
+    + `zur ${teil}: ${euroText(svMonat)} im Monat. Was über die 4 % hinausgeht, trägt volle `
+    + 'Sozialabgaben.';
+}
+
+/** Woher die Steuerersparnis kommt — am zvE und am Grenzsteuersatz. */
+function steuerErklaerung(
+  steuerMonat: number,
+  beitragMonat: number,
+  k: { zve: number; p: LegalParameters },
+): string {
+  const grenz = grenzsteuersatz(k.zve, false, k.p);
+  return `Der Beitrag mindert Ihr zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
+    + 'wird die DIFFERENZ Ihrer Jahressteuer mit und ohne Beitrag — nicht ein '
+    + `Durchschnittssatz: Der letzte Euro Ihres Einkommens kostet rund `
+    + `${(grenz * 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} % Steuer, und `
+    + `genau dort setzt der Beitrag an. Von ${euroText(beitragMonat)} bleiben so `
+    + `${euroText(steuerMonat)} im Monat beim Finanzamt liegen.`;
 }
 
 /**

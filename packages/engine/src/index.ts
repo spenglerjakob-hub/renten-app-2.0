@@ -114,6 +114,14 @@ export {
   type Datum,
 } from './util/datum.js';
 
+/*
+  Das Betragsformat der Hinweistexte. Exportiert, weil auch die Oberflaeche
+  Saetze baut, die eine Zahl im Text tragen (die Erklaerungen am Vertrags-TUEV)
+  — mit einem zweiten Formatierer stuenden dort andere Betraege als in den
+  Hinweisen, die derselbe Bildschirm daneben zeigt.
+*/
+export { euroText } from './util/text.js';
+
 // Modell
 export type {
   Szenario, Person, Vertrag, Haushalt, Annahmen, EinkommenHeute, Entnahmeplaner,

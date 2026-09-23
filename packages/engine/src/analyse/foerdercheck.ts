@@ -126,6 +126,22 @@ export interface FoerderKontext extends SvKontext {
 export interface FoerderBefund {
   id: 'bav' | 'basis' | 'avd';
   titel: string;
+  /**
+   * WORAUS die Foerderung besteht.
+   *
+   * `zulage` ist GELD VOM STAAT: Es wird dem Vertrag gutgeschrieben, ob man
+   * Steuern zahlt oder nicht. `steuer` ist eine ERSPARNIS: Sie entsteht nur,
+   * weil der Beitrag das zu versteuernde Einkommen mindert, und faellt mit
+   * dem persoenlichen Steuersatz aus.
+   *
+   * Beide stecken in `ersparnisJahr`, weil beide dasselbe bewirken — den
+   * Eigenaufwand senken. Fuer die ANZEIGE sind sie trotzdem nicht dasselbe:
+   * Eine Zulage ist eine Zahl, die man jemandem nennen kann („840 EUR im
+   * Jahr"), eine Steuerersparnis haengt an Einkommen und Familienstand. Ohne
+   * dieses Feld muesste die Oberflaeche an der `id` herumraten, welche von
+   * beiden sie vor sich hat.
+   */
+  foerderArt: 'zulage' | 'steuer';
   /** Freier Foerderrahmen im Monat */
   rahmenMonat: number;
   /** Beitrag im Monat, an dem die Wirkung gerechnet ist */
@@ -246,6 +262,7 @@ function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null 
     if (summe <= 0) return null;
     return {
       id: 'avd',
+      foerderArt: 'zulage',
       titel: `Altersvorsorgedepot: ab ${p.avd.abJahr} verfügbar`,
       rahmenMonat: hoechst / 12,
       probeMonat: hoechst / 12,
@@ -288,6 +305,7 @@ function avdBefund(k: FoerderKontext, p: LegalParameters): FoerderBefund | null 
 
   return {
     id: 'avd',
+    foerderArt: 'zulage',
     titel: k.avdEigenbeitragJahr > 0
       ? 'Altersvorsorgedepot: Zulagen nicht ausgeschöpft'
       : 'Altersvorsorgedepot: Zulagen bleiben ganz liegen',
@@ -380,6 +398,7 @@ function bavBefund(
 
   return {
     id: 'bav',
+    foerderArt: 'steuer',
     titel: 'Entgeltumwandlung: 4 % nicht ausgeschöpft',
     rahmenMonat,
     probeMonat: probeJahr / 12,
@@ -446,6 +465,7 @@ function basisBefund(
 
   return {
     id: 'basis',
+    foerderArt: 'steuer',
     titel: 'Basisrente: Höchstbetrag ungenutzt',
     rahmenMonat,
     probeMonat: probeJahr / 12,

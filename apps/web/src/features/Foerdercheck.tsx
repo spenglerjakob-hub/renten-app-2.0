@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Gift } from 'lucide-react';
 import { foerdercheck, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { euro } from '../components/Feld';
+import { euro, InfoPunkt } from '../components/Feld';
 import { foerderBasis } from './tuev-berechnung';
 
 /**
@@ -69,14 +69,47 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
               langer Titel den Betrag in die naechste Zeile, und zwei Karten
               nebeneinander haben verschieden hohe Koepfe.
             */}
+            {/*
+              DER KOPF ZEIGT, WORAUF ES BEI DIESEM BEFUND ANKOMMT.
+
+              Bei einer ZULAGE ist das die Jahressumme: Sie ist Geld vom
+              Staat, eine feste Zahl, die man jemandem nennen kann — und sie
+              stand bisher mitten im Fliesstext, waehrend oben der Rahmen
+              prangte. Bei einer Steuerersparnis bleibt es beim Rahmen: Was
+              sie wert ist, haengt an Einkommen und Familienstand und laesst
+              sich nicht in eine Schlagzahl fassen.
+            */}
             <header className="flex items-baseline justify-between gap-3 border-b border-slate-100 bg-emerald-50/70 px-3 py-2.5 sm:px-4 sm:py-3">
               <h4 className="min-w-0 text-xs font-bold text-slate-800 sm:text-sm">{b.titel}</h4>
-              <span className="shrink-0 text-xs font-black tabular-nums text-emerald-700 sm:text-sm">
-                {euro(b.rahmenMonat)} / Monat frei
-              </span>
+              {b.foerderArt === 'zulage' ? (
+                <span className="shrink-0 text-right">
+                  <span className="block text-lg font-black leading-none tabular-nums text-emerald-700 sm:text-2xl">
+                    {euro(b.ersparnisJahr)}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                    Zulage im Jahr
+                  </span>
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs font-black tabular-nums text-emerald-700 sm:text-sm">
+                  {euro(b.rahmenMonat)} / Monat frei
+                </span>
+              )}
             </header>
 
             <div className="p-3 sm:p-4">
+              {/*
+                Bei der Zulage rueckt der Rahmen hierher — er ist die
+                Voraussetzung („so viel muessten Sie einzahlen"), nicht das
+                Ergebnis.
+              */}
+              {b.foerderArt === 'zulage' && (
+                <p className="mb-2 text-[11px] font-semibold text-emerald-800 sm:text-xs">
+                  {euro(b.rahmenMonat)} im Monat einzahlen — {euro(b.ersparnisJahr / 12)} davon
+                  trägt der Staat.
+                </p>
+              )}
+
               <p className="text-[11px] leading-relaxed text-slate-600 sm:text-xs">{b.text}</p>
 
               {/* Die Einschraenkung steht kleiner darunter — im Ausdruck
@@ -96,6 +129,26 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 <strong>{euro(b.probeMonat)}</strong> im Monat kosten Sie nach Förderung nur{' '}
                 <strong>{euro(b.nettoAufwandMonat)}</strong> — der Staat trägt{' '}
                 {Math.round(b.foerderquote * 100)} % ({euro(b.ersparnisJahr / 12)} im Monat).
+                <InfoPunkt titel="Wie die Förderquote entsteht">
+                  {b.foerderArt === 'zulage' ? (
+                    <>
+                      Auf {euro(b.probeMonat)} im Monat ({euro(b.probeMonat * 12)} im Jahr) gibt
+                      es {euro(b.ersparnisJahr)} Zulage. Das ist <strong>Geld vom Staat</strong>,
+                      keine Steuerersparnis — es fließt unabhängig von Ihrem Steuersatz und wird
+                      dem Vertrag gutgeschrieben. {Math.round(b.foerderquote * 100)} % bezogen
+                      auf Ihren Eigenbeitrag.
+                    </>
+                  ) : (
+                    <>
+                      Der Beitrag von {euro(b.probeMonat * 12)} im Jahr mindert Ihr zu
+                      versteuerndes Einkommen. Gerechnet wird die <strong>Differenz</strong> Ihrer
+                      Jahressteuer mit und ohne Beitrag — nicht ein Durchschnittssatz. Das ergibt{' '}
+                      {euro(b.ersparnisJahr)} im Jahr, also{' '}
+                      {Math.round(b.foerderquote * 100)} % des Einsatzes. Ihr persönlicher
+                      Steuersatz bestimmt diese Quote; sie ist keine feste Zusage.
+                    </>
+                  )}
+                </InfoPunkt>
               </p>
 
               <p className="mt-1.5 text-[10px] text-slate-400">{b.paragraf}</p>

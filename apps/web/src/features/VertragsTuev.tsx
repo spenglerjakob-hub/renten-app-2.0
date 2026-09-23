@@ -3,10 +3,12 @@ import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react'
 import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
 import { tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr } from './tuev-berechnung';
 import { kenntKapitalwahl } from './vertragsarten';
+import { EinkommenFelder } from './EinkommenFelder';
+import { personNameAus } from './personen';
 import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
-  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, euro, prozent, TON,
+  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, Abschnitt, euro, prozent, TON,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 
@@ -46,6 +48,12 @@ export function VertragsTuev({
   const tuevKindEntfernen = useSzenario((x) => x.tuevKindEntfernen);
   const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
   const setzeKind = useSzenario((x) => x.setzeKind);
+  /*
+    Dieselben Setzer wie die Basisdaten — deshalb zieht die eine Stelle mit,
+    wenn man die andere aendert, ohne dass hier etwas dafuer getan wird.
+  */
+  const setzeEinkommen = useSzenario((x) => x.setzeEinkommen);
+  const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
 
   // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
   const jetzt = new Date().getFullYear();
@@ -77,8 +85,8 @@ export function VertragsTuev({
           </h2>
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:mt-2 sm:text-sm">
             Stellen Sie Ihre Verträge nebeneinander. Gerechnet wird mit Ihrem tatsächlichen
-            Bruttogehalt von <strong>{euro(basis.monatsbrutto)}</strong> im Monat und der
-            Steuer, die genau dieser Vertrag auslöst — nicht mit einem Durchschnittssatz.
+            Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
+            Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
           </p>
         </div>
 
@@ -107,6 +115,94 @@ export function VertragsTuev({
         </div>
       </div>
 
+      {/*
+        DAS EINKOMMEN, AN DEM ALLES HAENGT — hier unten noch einmal.
+
+        Es steht in den Basisdaten ganz oben; wer hier unten einen Vertrag
+        prueft, hat es zwei Bildschirmlaengen hinter sich. Genau hier will man
+        aber ausprobieren, was eine Gehaltserhoehung an der Foerderung aendert.
+
+        BEIDE STELLEN SIND DASSELBE FELD: `EinkommenFelder` schreibt ueber
+        `setzeEinkommen` in denselben Speicher wie die Basisdaten. Die
+        Uebernahme in beide Richtungen ist damit keine Verdrahtung, die man
+        vergessen koennte, sondern ergibt sich von selbst.
+
+        `print:hidden`, weil das Gutachten die Angaben auf seinem eigenen
+        Blatt fuehrt.
+      */}
+      <div className="mb-4 px-2 print:hidden sm:mb-6">
+        <Abschnitt
+          titel={szenario.einkommenGetrennt
+            ? `Ihr Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
+            : 'Ihr Einkommen (Ausgangsbasis)'}
+          einklappbar
+        >
+          <EinkommenFelder wert={szenario.einkommenHeute} onChange={setzeEinkommen} />
+
+          {szenario.haushalt.verheiratet && szenario.einkommenGetrennt && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {personNameAus(szenario.personen, 'B')}
+              </p>
+              <EinkommenFelder wert={szenario.einkommenPartner} onChange={setzeEinkommenPartner} />
+            </div>
+          )}
+
+          {/*
+            Die Herleitung offen hingelegt: Wer Brutto eintraegt, sieht sein
+            Netto; wer Netto eintraegt, das Brutto dahinter. Beides ist
+            dieselbe Rechnung, einmal vorwaerts und einmal rueckwaerts
+            (`erwerbsBasisHeute` kehrt ein eingegebenes Netto mit
+            `nettoZuBrutto` um) — die drei Zahlen koennen deshalb nicht
+            auseinanderlaufen.
+          */}
+          <div className="mt-4 grid grid-cols-3 gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <Kennzahl
+              titel="Ø Brutto im Monat"
+              wert={euro(basis.monatsbrutto)}
+              info={(
+                <>
+                  Das Jahresbrutto durch zwölf. Bei 13 oder 14 Gehältern ist das <strong>mehr
+                  als Ihr Monatsgehalt</strong> — Sonderzahlungen sind darin verteilt. Beiträge
+                  und Steuer hängen am Jahresbetrag, deshalb wird so gerechnet.
+                </>
+              )}
+            />
+            <Kennzahl
+              titel="Jahresbrutto"
+              wert={euro(basis.jahresbrutto)}
+              farbe="text-slate-900"
+              info={(
+                <>
+                  {szenario.einkommenHeute.modus === 'netto'
+                    ? 'Aus Ihrem eingegebenen Netto zurückgerechnet: Gesucht wird das Brutto, '
+                      + 'das nach Sozialabgaben und Steuer genau dieses Netto ergibt.'
+                    : szenario.einkommenHeute.modus === 'besoldung'
+                      ? 'Aus der Besoldungstabelle Ihres Dienstherrn — Gruppe und Erfahrungsstufe '
+                        + 'bestimmen den Betrag.'
+                      : 'Betrag × Auszahlungen pro Jahr.'}
+                  {' '}Hierauf rechnen Beitragsbemessungsgrenzen, Höchstbeträge und Steuertarif.
+                  {szenario.einkommenGetrennt && ' Beide Einkommen zusammen.'}
+                </>
+              )}
+            />
+            <Kennzahl
+              titel="Ø Netto im Monat"
+              wert={euro(basis.jahresnetto / 12)}
+              farbe="text-indigo-700"
+              info={(
+                <>
+                  Brutto abzüglich Sozialabgaben, Einkommensteuer, Soli und — falls
+                  angegeben — Kirchensteuer, nach dem Rechtsstand {basis.p.jahr}. Ihr zu
+                  versteuerndes Einkommen beträgt dabei {euro(basis.zve)} im Jahr; daran hängt
+                  die Steuerersparnis jedes geförderten Beitrags.
+                </>
+              )}
+            />
+          </div>
+        </Abschnitt>
+      </div>
+
       {tuev.length === 0 ? (
         <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 px-4 py-8 text-center text-sm text-amber-900">
           Noch kein Vertrag zur Prüfung ausgewählt. Wählen Sie oben einen aus, um zu sehen,
@@ -128,7 +224,21 @@ export function VertragsTuev({
             const { ergebnis: r, vergleich, istKapital, wege } = pos;
 
             const gut = r.nettoHebel >= 1;
-            const treppe = belastungsTreppe(r);
+            /*
+              Die Erklaerungen brauchen das zvE und die Erwerbsart DIESES
+              Inhabers — das zvE ist eine Haushaltsgroesse, die Erwerbsart
+              nicht. Beides liegt in `basis`; der Ausdruck laesst das zweite
+              Argument weg und bekommt die Treppe ohne Erklaerungen.
+            */
+            const erwerb = basis.jePerson.find((x) => x.id === v.inhaber) ?? basis.jePerson[0];
+            const treppe = belastungsTreppe(r, {
+              zve: basis.zve,
+              p: basis.p,
+              beamter: erwerb?.beamter ?? false,
+              selbststaendig: erwerb?.selbststaendig ?? false,
+              privatVersichert: szenario.haushalt.kvErwerb === 'pkv'
+                || szenario.haushalt.kvStatus === 'pkv',
+            });
 
             return (
               <article key={t.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich">
@@ -331,6 +441,7 @@ export function VertragsTuev({
                               text={z.text}
                               wert={euro(z.betrag)}
                               farbe="text-emerald-600"
+                              info={z.erklaerung}
                             />
                           )
                         ))}
@@ -496,12 +607,34 @@ export function VertragsTuev({
                           wert={`${r.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ×`}
                           farbe={gut ? 'text-emerald-700' : 'text-rose-700'}
                           fussnote="Auszahlung je Euro Einzahlung"
+                          info={(
+                            <>
+                              {euro(r.summeAuszahlung)} Auszahlung geteilt durch{' '}
+                              {euro(r.summeEinzahlung)} eigenen Aufwand über{' '}
+                              {r.jahreEinzahlung} Jahre. <strong>Beide Seiten netto</strong>: oben
+                              nach Steuer und KV/PV im Alter, unten nach Förderung. Ohne
+                              Verzinsung gerechnet — ein Euro von heute zählt hier so viel wie
+                              einer in {r.jahreEinzahlung} Jahren. Was das Geld dann wert ist,
+                              sagt erst die Rendite daneben.
+                            </>
+                          )}
                         />
                         <Kennzahl
                           titel="Nettorendite"
                           wert={prozent(r.rendite, 2)}
                           farbe={r.rendite > 0 ? 'text-emerald-700' : 'text-rose-700'}
                           fussnote="p. a. nach allen Abzügen"
+                          info={(
+                            <>
+                              Der interne Zinsfuß Ihrer Zahlungsreihe: der Zinssatz, bei dem
+                              {' '}{r.jahreEinzahlung} Jahre Einzahlung und{' '}
+                              {istKapital ? 'die Kapitalauszahlung' : `${r.jahreAuszahlung} Jahre Rente`}
+                              {' '}genau aufgehen. Anders als der Hebel <strong>berücksichtigt
+                              er, wann</strong> jeder Euro fließt. Gerechnet nach Steuer, KV/PV
+                              und Förderung — mit einem Depot zum selben Satz wäre es ein
+                              fairer Vergleich.
+                            </>
+                          )}
                         />
                         <Kennzahl
                           titel="Netto-Gewinn"

@@ -279,3 +279,32 @@ describe('Altersvorsorgedepot im Foerdercheck', () => {
     expect(b.text).toContain('Ab 2027');
   });
 });
+
+describe('Fördercheck — Zulage oder Steuerersparnis', () => {
+  /*
+    WOFUER DAS FELD DA IST: Beide Betraege stehen in `ersparnisJahr` und
+    senken den Eigenaufwand — fuer die Anzeige sind sie trotzdem nicht
+    dasselbe. Eine Zulage ist Geld vom Staat und eine Zahl, die man nennen
+    kann; eine Steuerersparnis haengt an Einkommen und Familienstand. Ohne
+    dieses Feld muesste die Oberflaeche an der `id` herumraten.
+  */
+  it('weist die Zulagen des Altersvorsorgedepots als ZULAGE aus', () => {
+    const p2027 = parameterFuer(2027, { indexRate: 0 });
+    const b = foerdercheck({ ...angestellt, jahr: 2027 }, steuerOpt, p2027)
+      .find((x) => x.id === 'avd')!;
+    expect(b.foerderArt).toBe('zulage');
+    // Auch der Befund vor dem Startjahr — es bleibt eine Zulage.
+    const vorher = foerdercheck({ ...angestellt, jahr: 2026 }, steuerOpt, p)
+      .find((x) => x.id === 'avd')!;
+    expect(vorher.foerderArt).toBe('zulage');
+  });
+
+  it('weist bAV und Basisrente als STEUERersparnis aus', () => {
+    expect(bav(angestellt)!.foerderArt).toBe('steuer');
+    const selbst: FoerderKontext = {
+      ...angestellt, selbststaendig: true, grvBeitragJahr: 0,
+      jahresbrutto: 90_000, zveHeute: 80_000,
+    };
+    expect(basis(selbst)!.foerderArt).toBe('steuer');
+  });
+});
