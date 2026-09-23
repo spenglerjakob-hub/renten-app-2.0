@@ -308,6 +308,7 @@ export function VertragsTuev({
                         min={60}
                         max={120}
                         einheit="J."
+                        stufen
                       />
                     </div>
 

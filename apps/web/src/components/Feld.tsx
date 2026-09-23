@@ -2,7 +2,7 @@ import {
   useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
 
 /**
@@ -25,8 +25,20 @@ export function ZahlFeld(props: {
   id?: string;
   /** Groesseres Feld fuer die eine Zahl, an der alles Weitere haengt. */
   gross?: boolean;
+  /**
+   * Zwei Knoepfe zum Hoch- und Runterzaehlen um `schritt` — fuer Werte, die
+   * man eher ausprobiert als eintippt (Lebenserwartung).
+   *
+   * WARUM NICHT `type="number"`: Das verschluckt das deutsche Komma (Befund
+   * D3 oben), und seine Pfeile zeigt Chrome erst beim Darueberfahren — auf dem
+   * Handy gar nicht. Diese Knoepfe sind immer da und lassen sich tippen.
+   */
+  stufen?: boolean;
 }) {
-  const { label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross } = props;
+  const {
+    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen,
+  } = props;
+  const schritt = props.schritt ?? 1;
   /*
     Die Kennung kam frueher aus der BESCHRIFTUNG. Steht dieselbe Beschriftung
     zweimal auf der Seite — zwei Vertragskarten, Person A und Person B —,
@@ -52,6 +64,22 @@ export function ZahlFeld(props: {
     onChange(n);
   };
 
+  /*
+    Ein Schritt rauf oder runter — ueber denselben `onChange` wie eine
+    Tastatureingabe, also kein zweiter Weg in den Speicher. Auf die Grenzen
+    geklemmt statt mit Fehlermeldung: Wer an der Grenze weiterklickt, hat
+    nichts falsch gemacht. Gerundet auf die Nachkommastellen des Schritts,
+    damit 0,1 + 0,2 nicht als 0,30000000000000004 im Feld steht.
+  */
+  const stelle = (String(schritt).split('.')[1] ?? '').length;
+  const stufe = (richtung: 1 | -1) => {
+    const roh = Math.min(max, Math.max(min, wert + richtung * schritt));
+    const n = Number(roh.toFixed(stelle));
+    setFehler(null);
+    setText(String(n).replace('.', ','));
+    onChange(n);
+  };
+
   return (
     <div>
       <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
@@ -62,19 +90,57 @@ export function ZahlFeld(props: {
           inputMode="decimal"
           value={text}
           onChange={(e) => uebernehmen(e.target.value)}
+          // Pfeiltasten wie beim nativen Zahlenfeld — nur mit Stufenknoepfen,
+          // sonst bleibt das Feld, wie es war.
+          onKeyDown={stufen ? (e) => {
+            if (e.key === 'ArrowUp') { e.preventDefault(); stufe(1); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
+          } : undefined}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : undefined}
           className={`w-full rounded-md border font-medium tabular-nums ${
             gross ? 'p-3 text-xl font-bold' : 'p-2 text-sm'
           } ${
             fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
-          } ${einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
+          } ${stufen
+            ? (einheit ? 'pr-14' : 'pr-8')
+            : einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
         />
         {einheit && (
           <span className={`pointer-events-none absolute text-slate-400 ${
-            gross ? 'right-4 top-3.5 text-lg' : 'right-3 top-2 text-sm'
-          }`}>
+            gross ? 'right-4 top-3.5 text-lg' : stufen ? 'right-7 top-2 text-sm' : 'right-3 top-2 text-sm'
+          } ${stufen ? 'print:right-3' : ''}`}>
             {einheit}
+          </span>
+        )}
+        {stufen && (
+          /*
+            Zwei Knoepfe uebereinander am rechten Rand, wie die Pfeile eines
+            Zahlenfelds — nur immer sichtbar. `tabIndex={-1}`: Die Tastatur hat
+            dafuer die Pfeiltasten im Feld; zwei zusaetzliche Tab-Stopps pro
+            Feld waeren nur Weg.
+          */
+          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-md border-l border-slate-200 print:hidden">
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={`${label} um ${String(schritt).replace('.', ',')} erhöhen`}
+              disabled={wert >= max}
+              onClick={() => stufe(1)}
+              className="flex flex-1 items-center justify-center bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronUp className="h-3 w-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={`${label} um ${String(schritt).replace('.', ',')} verringern`}
+              disabled={wert <= min}
+              onClick={() => stufe(-1)}
+              className="flex flex-1 items-center justify-center border-t border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronDown className="h-3 w-3" aria-hidden />
+            </button>
           </span>
         )}
       </div>
