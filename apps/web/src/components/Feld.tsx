@@ -225,8 +225,14 @@ export function DatumFeld(props: {
   onChange: (s: string) => void;
   hilfe?: ReactNode;
   zusatz?: ReactNode;
+  /**
+   * Knoepfe wie am `ZahlFeld`, hier um ein JAHR: Tag und Monat bleiben
+   * stehen, nur ein 29.02. wird im Gemeinjahr zum 28.02.
+   */
+  stufen?: boolean;
 }) {
   const id = `d${useId()}`;
+  const { stufen } = props;
 
   const anzeige = (roh: string) => {
     const d = parseDatum(roh);
@@ -272,23 +278,65 @@ export function DatumFeld(props: {
     props.onChange(toDe(d));
   };
 
+  // Vom gespeicherten Wert aus, nicht vom halb getippten Text.
+  const basis = parseDatum(props.wert);
+  const stufe = (richtung: 1 | -1) => {
+    if (!basis) return;
+    const jahr = Math.min(2200, Math.max(1900, basis.jahr + richtung));
+    const tageImMonat = new Date(Date.UTC(jahr, basis.monat, 0)).getUTCDate();
+    const neu = toDe({ jahr, monat: basis.monat, tag: Math.min(basis.tag, tageImMonat) });
+    setFehler(null);
+    setText(neu);
+    props.onChange(neu);
+  };
+
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-600">{props.label}</label>
-      <input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="TT.MM.JJJJ"
-        value={text}
-        onChange={(e) => uebernehmen(e.target.value)}
-        aria-invalid={fehler ? true : undefined}
-        aria-describedby={fehler ? `${id}-fehler` : undefined}
-        className={`w-full rounded-md border p-2 text-sm tabular-nums ${
-          fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
-        }`}
-      />
+      <div className="relative">
+        <input
+          id={id}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="TT.MM.JJJJ"
+          value={text}
+          onChange={(e) => uebernehmen(e.target.value)}
+          onKeyDown={stufen ? (e) => {
+            if (e.key === 'ArrowUp') { e.preventDefault(); stufe(1); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
+          } : undefined}
+          aria-invalid={fehler ? true : undefined}
+          aria-describedby={fehler ? `${id}-fehler` : undefined}
+          className={`w-full rounded-md border p-2 text-sm tabular-nums ${
+            fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
+          } ${stufen ? 'pr-8' : ''}`}
+        />
+        {stufen && (
+          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-md border-l border-slate-200 print:hidden">
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={`${props.label} um ein Jahr später`}
+              disabled={!basis || basis.jahr >= 2200}
+              onClick={() => stufe(1)}
+              className="flex flex-1 items-center justify-center bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronUp className="h-3 w-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={`${props.label} um ein Jahr früher`}
+              disabled={!basis || basis.jahr <= 1900}
+              onClick={() => stufe(-1)}
+              className="flex flex-1 items-center justify-center border-t border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronDown className="h-3 w-3" aria-hidden />
+            </button>
+          </span>
+        )}
+      </div>
       {fehler
         ? <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>
         : props.hilfe && <p className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
@@ -525,6 +573,19 @@ export const euro = (n: number) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(
     Number.isFinite(n) ? n : 0,
   );
+
+/**
+ * Euro mit Cent, wenn es Cent gibt. Fuer eingegebene Beitraege: „86,96 €"
+ * auf „87 €" gerundet stimmte mit dem eigenen Gehaltszettel nicht mehr ueberein.
+ */
+export const euroGenau = (n: number) => {
+  const w = Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+  const cent = !Number.isInteger(w);
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: cent ? 2 : 0, maximumFractionDigits: cent ? 2 : 0,
+  }).format(w);
+};
 
 export const prozent = (n: number, stellen = 1) =>
   `${(Number.isFinite(n) ? n * 100 : 0).toLocaleString('de-DE', { maximumFractionDigits: stellen, minimumFractionDigits: stellen })} %`;

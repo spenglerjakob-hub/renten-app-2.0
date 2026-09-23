@@ -51,8 +51,29 @@ export interface TuevAnnahmen {
   kinder: { geburtsjahr: number }[];
   /** Jahr, ab dem eingezahlt wird */
   beginnJahr: number;
+  /**
+   * Monat (1–12) im `beginnJahr`, ab dem eingezahlt wird. Vorgabe 1 — dann
+   * rechnet der TUEV wie vor der Einfuehrung dieses Felds.
+   */
+  beginnMonat?: number;
+  /**
+   * Fruehere Beitragsstufen, etwa vor einem Arbeitgeberwechsel. Jede gilt
+   * bis EINSCHLIESSLICH ihres Monats; danach die naechste, zuletzt der
+   * laufende Beitrag oben. Feste historische Betraege, ohne Dynamik.
+   */
+  fruehereBeitraege?: TuevBeitragsstufe[];
   /** Angenommene Lebenserwartung — bestimmt die Dauer der Auszahlphase */
   lebenserwartung: number;
+}
+
+export interface TuevBeitragsstufe {
+  /** Letztes Jahr und letzter Monat (1–12), in dem dieser Beitrag floss */
+  bisJahr: number;
+  bisMonat: number;
+  /** Gesamtbeitrag im Monat — bei der bAV Arbeitnehmer- UND Arbeitgeberanteil */
+  beitragMonat: number;
+  /** bAV: der Arbeitgeberanteil darin */
+  agZuschussMonat: number;
 }
 
 /**
@@ -151,12 +172,19 @@ export interface TuevKontext {
 
 export interface TuevErgebnis {
   vertragId: string;
-  /** Jahre bis Rentenbeginn */
+  /** Jahre bis Rentenbeginn — Kalenderjahre, ein angefangenes zaehlt mit */
   jahreEinzahlung: number;
+  /** Monate mit Beitrag — genau, fuer die Anzeige der Laufzeit */
+  monateEinzahlung: number;
   /** Jahre der Auszahlphase */
   jahreAuszahlung: number;
 
-  /** --- Momentaufnahme des ERSTEN Jahres, monatlich --- */
+  /**
+   * --- Momentaufnahme, monatlich ---
+   * Aus dem ersten VOLLEN Kalenderjahr des laufenden Beitrags: Ein Rumpfjahr
+   * oder eine fruehere Beitragsstufe zeigte sonst einen Monat, den es so
+   * heute nicht gibt.
+   */
   beitragMonat: number;
   agZuschussMonat: number;
   zulageMonat: number;
@@ -483,17 +511,69 @@ export function vertragsTuev(
   // zurueckgerechnet, damit der Berufseinsteigerbonus im richtigen Jahr faellt.
   const alterImJahr = (jahr: number) => k.alterBeiRentenbeginn - (k.rentenbeginnJahr - jahr);
 
-  // Momentaufnahme des ersten Jahres
+  /*
+    MONATSGENAUE BEITRAEGE. Gerechnet wird weiter je Kalenderjahr — Deckel,
+    Zulagen und Steuer sind Jahresgroessen —, aber der Jahresbeitrag ist die
+    Summe seiner zwoelf Monate: vor dem Beginnmonat keiner, in einer
+    frueheren Stufe deren fester Betrag, danach der laufende.
+
+    Monate werden als fortlaufende Zahl `jahr * 12 + (monat - 1)` gefuehrt,
+    dann ist „bis einschliesslich" ein einfacher Vergleich.
+  */
+  const beginnMonat = Math.min(12, Math.max(1, Math.round(a.beginnMonat ?? 1)));
+  const beginnIndex = a.beginnJahr * 12 + beginnMonat - 1;
+  const stufen = (a.fruehereBeitraege ?? [])
+    .map((st) => ({
+      ende: st.bisJahr * 12 + Math.min(12, Math.max(1, Math.round(st.bisMonat))) - 1,
+      beitrag: Math.max(0, st.beitragMonat),
+      ag: Math.max(0, st.agZuschussMonat),
+    }))
+    .sort((x, y) => x.ende - y.ende);
+  // Der laufende Beitrag gilt ab dem Monat nach der letzten frueheren Stufe.
+  const laufendAb = Math.max(beginnIndex, stufen.length > 0 ? stufen[stufen.length - 1]!.ende + 1 : -Infinity);
+  /*
+    DIE DYNAMIK beginnt mit dem ersten vollen Kalenderjahr des laufenden
+    Beitrags: Der eingetragene Betrag ist der, der dann fliesst. Ohne Stufen
+    und mit Beginn im Januar ist das `beginnJahr` — wie vor der Einfuehrung
+    der Monate, bestehende Szenarien rechnen unveraendert.
+  */
+  const ankerJahr = Math.ceil(laufendAb / 12);
+  const laufendMonat = Math.max(0, a.beitragMonat);
+  const laufendAg = Math.max(0, a.agZuschussMonat);
+
+  // Die Momentaufnahme kommt aus dem Ankerjahr; liegt es hinter dem
+  // Rentenbeginn, aus dem letzten Beitragsjahr.
+  const ankerT = ankerJahr - a.beginnJahr;
+  const momentT = ankerT >= 0 && ankerT < jahreEinzahlung ? ankerT : jahreEinzahlung - 1;
+
   let beitragMonat = 0, agZuschussMonat = 0, zulageMonat = 0;
   let zulageDetail: TuevZulageDetail | undefined;
   let steuerersparnisMonat = 0, svErsparnisMonat = 0, echterAufwandMonat = 0;
+  let bonusGezahlt = 0;
+  let monateEinzahlung = 0;
 
-  let beitragJahr = Math.max(0, a.beitragMonat) * 12;
+  let dynamikFaktor = 1;
 
   for (let t = 0; t < jahreEinzahlung; t++) {
     const jahr = a.beginnJahr + t;
     let aufwandJahr: number;
-    let zulageJahr = 0, steuerJahr = 0, svJahr = 0, agJahr = 0;
+    let zulageJahr = 0, steuerJahr = 0, svJahr = 0;
+
+    // Die zwoelf Monate dieses Jahres, nach Stufe gezaehlt.
+    let monate = 0, monateLaufend = 0, beitragStufen = 0, agStufen = 0;
+    for (let m = 0; m < 12; m++) {
+      const index = jahr * 12 + m;
+      if (index < beginnIndex) continue;
+      monate++;
+      const st = stufen.find((x) => index <= x.ende);
+      if (st) { beitragStufen += st.beitrag; agStufen += st.ag; } else monateLaufend++;
+    }
+    monateEinzahlung += monate;
+    const beitragJahr = beitragStufen + laufendMonat * monateLaufend * dynamikFaktor;
+    const agSumme = agStufen + laufendAg * monateLaufend * dynamikFaktor;
+    // Mehr als der Beitrag kann der Arbeitgeber nicht tragen.
+    const agJahr = v.typ.startsWith('bav') ? Math.min(beitragJahr, agSumme) : 0;
+    const moment = t === momentT;
 
     if (v.typ === 'riester') {
       // Zulagen zuerst, dann der Steuervorteil ueber den Hoechstbetrag § 10a
@@ -537,14 +617,16 @@ export function vertragsTuev(
       );
       // Der Berufseinsteigerbonus faellt nur einmal an.
       const bonus = bonusVerbraucht ? 0 : z.bonus;
-      if (bonus > 0) bonusVerbraucht = true;
+      if (bonus > 0) { bonusVerbraucht = true; bonusGezahlt = bonus; }
       zulageJahr = z.grundzulage + z.kinderzulage + bonus;
-      if (t === 0) {
+      if (moment) {
+        // Der Bonus kann im Rumpfjahr davor geflossen sein — genannt wird er
+        // trotzdem, nur nicht in der Monatszahl dieses Jahres.
         zulageDetail = {
           grundzulageMonat: z.grundzulage / 12,
           kinderzulageMonat: z.kinderzulage / 12,
           bonusMonat: bonus / 12,
-          bonusEinmalig: bonus,
+          bonusEinmalig: bonusGezahlt,
           kinderMitAnspruch: z.kinderMitAnspruch,
           foerderquoteDauerhaft: z.foerderquoteDauerhaft,
         };
@@ -563,9 +645,7 @@ export function vertragsTuev(
       aufwandJahr = vorteil.eigenaufwandNetto;
     } else if (v.typ.startsWith('bav')) {
       // Der Arbeitgeberzuschuss mindert den eigenen Aufwand; er waechst mit
-      // dem Beitrag mit.
-      const skala = a.beitragMonat > 0 ? beitragJahr / (a.beitragMonat * 12) : 1;
-      agJahr = Math.min(beitragJahr, Math.max(0, a.agZuschussMonat) * 12 * skala);
+      // dem Beitrag mit (`agJahr` oben, aus denselben Monaten).
       const eigenanteil = Math.max(0, beitragJahr - agJahr);
 
       // GRENZEN DES § 3 Nr. 63 EStG. Entgeltumwandlung ist nur bis 8 % der
@@ -597,7 +677,7 @@ export function vertragsTuev(
       steuerJahr = zusatzsteuer(k.zveHeute - zveMinderung, zveMinderung, steuerOpt, p);
       aufwandJahr = Math.max(0, eigenanteil - steuerJahr - svJahr);
 
-      if (t === 0) {
+      if (moment) {
         if (eigenanteil > svFrei + 0.5) {
           hinweise.push(
             `Nur ${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat sind beitragsfrei `
@@ -637,7 +717,7 @@ export function vertragsTuev(
         p.hoechstbetragAltersvorsorge * (steuerOpt.verheiratet ? 2 : 1) - verbraucht);
       const abziehbar = Math.min(beitragJahr, rahmen);
 
-      if (t === 0 && k.selbststaendig && verbraucht <= 0.5) {
+      if (moment && k.selbststaendig && verbraucht <= 0.5) {
         hinweise.push(
           `Als Selbstständiger ohne Rentenversicherungspflicht steht Ihnen der Höchstbetrag `
           + `nach § 10 Abs. 3 EStG in voller Höhe zur Verfügung: `
@@ -649,7 +729,7 @@ export function vertragsTuev(
       steuerJahr = zusatzsteuer(k.zveHeute - abziehbar, abziehbar, steuerOpt, p);
       aufwandJahr = Math.max(0, beitragJahr - steuerJahr);
 
-      if (t === 0 && beitragJahr > abziehbar + 0.5) {
+      if (moment && beitragJahr > abziehbar + 0.5) {
         hinweise.push(
           `Absetzbar sind hier nur ${euroText(rahmen / 12)} im Monat: der Höchstbetrag von `
           + `${euroText(p.hoechstbetragAltersvorsorge * (steuerOpt.verheiratet ? 2 : 1))} im Jahr `
@@ -664,18 +744,21 @@ export function vertragsTuev(
       aufwandJahr = beitragJahr;
     }
 
-    if (t === 0) {
-      beitragMonat = beitragJahr / 12;
-      agZuschussMonat = agJahr / 12;
-      zulageMonat = zulageJahr / 12;
-      steuerersparnisMonat = steuerJahr / 12;
-      svErsparnisMonat = svJahr / 12;
-      echterAufwandMonat = aufwandJahr / 12;
+    if (moment) {
+      // Im Ankerjahr sind es zwoelf Monate; nur im Rueckfall auf ein
+      // Rumpfjahr wird durch dessen Monate geteilt.
+      const teiler = monate > 0 ? monate : 12;
+      beitragMonat = beitragJahr / teiler;
+      agZuschussMonat = agJahr / teiler;
+      zulageMonat = zulageJahr / teiler;
+      steuerersparnisMonat = steuerJahr / teiler;
+      svErsparnisMonat = svJahr / teiler;
+      echterAufwandMonat = aufwandJahr / teiler;
     }
 
     einzahlungenJeJahr.push(aufwandJahr);
     summeEinzahlung += aufwandJahr;
-    beitragJahr *= 1 + a.dynamik;
+    if (jahr >= ankerJahr) dynamikFaktor *= 1 + a.dynamik;
   }
 
   const istKapital = k.nettoKapital > 0;
@@ -705,6 +788,7 @@ export function vertragsTuev(
   return {
     vertragId: v.id,
     jahreEinzahlung,
+    monateEinzahlung,
     jahreAuszahlung,
 
     bruttoRenteMonat: k.bruttoRenteMonat,

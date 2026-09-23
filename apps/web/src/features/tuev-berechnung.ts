@@ -281,7 +281,15 @@ export function tuevPositionen(
         dynamik: t.dynamik,
         agZuschussMonat: t.agZuschussMonat,
         kinder: t.kinder,
-        beginnJahr: t.beginnJahr,
+        beginnJahr: parseDatum(t.beginnDatum)?.jahr ?? t.beginnJahr,
+        // Der Monat aus dem genauen Datum; ohne Datum (aeltere Szenarien) Januar.
+        beginnMonat: parseDatum(t.beginnDatum)?.monat ?? 1,
+        fruehereBeitraege: t.fruehereBeitraege.flatMap((st) => {
+          const bis = parseDatum(st.bis);
+          return bis
+            ? [{ bisJahr: bis.jahr, bisMonat: bis.monat, beitragMonat: st.beitragMonat, agZuschussMonat: st.agZuschussMonat }]
+            : [];
+        }),
         lebenserwartung: t.lebenserwartung,
       },
       {
@@ -687,4 +695,17 @@ function steuerErklaerung(
 export function laufendeZulageJahr(r: TuevErgebnis): number {
   if (!r.zulageDetail) return r.zulageMonat * 12;
   return (r.zulageDetail.grundzulageMonat + r.zulageDetail.kinderzulageMonat) * 12;
+}
+
+/**
+ * Eine Laufzeit in Monaten als „29 Jahre, 3 Monate". Seit der Beginn
+ * monatsgenau ist, stimmte eine glatte Jahreszahl nicht mehr.
+ */
+export function laufzeitText(monate: number): string {
+  const j = Math.floor(monate / 12);
+  const m = monate % 12;
+  const jahre = j === 1 ? '1 Jahr' : `${j} Jahre`;
+  if (m === 0) return jahre;
+  const mon = m === 1 ? '1 Monat' : `${m} Monate`;
+  return j === 0 ? mon : `${jahre}, ${mon}`;
 }

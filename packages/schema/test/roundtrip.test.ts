@@ -93,6 +93,27 @@ describe('Abwaertskompatibilitaet', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.szenario.tuev).toEqual(mitTuev.tuev);
+    // Ohne die neuen Felder laedt die Position weiter — mit leerer Historie.
+    expect(r.szenario.tuev[0]!.beginnDatum).toBeUndefined();
+    expect(r.szenario.tuev[0]!.fruehereBeitraege).toEqual([]);
+  });
+
+  it('erhaelt Beginndatum und fruehere Beitragsstufen', () => {
+    const mitStufe = szenarioSchema.parse({
+      ...vollstaendig,
+      tuev: [{
+        id: 't1', vertragId: 'v1', beitragMonat: 100, agZuschussMonat: 13.04,
+        beginnJahr: 2020, beginnDatum: '01.10.2020',
+        fruehereBeitraege: [{ bis: '30.09.2025', beitragMonat: 100, agZuschussMonat: 50 }],
+      }],
+    });
+    const r = importiere(exportiere(mitStufe));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.tuev[0]!.beginnDatum).toBe('01.10.2020');
+    expect(r.szenario.tuev[0]!.fruehereBeitraege).toEqual([
+      { bis: '30.09.2025', beitragMonat: 100, agZuschussMonat: 50 },
+    ]);
   });
 });
 

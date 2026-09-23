@@ -255,6 +255,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
           ?? (v?.typ === 'avd'
             ? Math.max(new Date().getFullYear(), AVD_AB_JAHR)
             : new Date().getFullYear()),
+        fruehereBeitraege: [],
         lebenserwartung: 85,
         vergleichen: false,
         vergleichKapitalNetto: 0,

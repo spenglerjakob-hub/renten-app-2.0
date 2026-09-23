@@ -854,3 +854,83 @@ describe('Selbstständige im Vertrags-TÜV', () => {
     }
   });
 });
+
+describe('Beginnmonat und fruehere Beitragsstufen', () => {
+  /*
+    Der Fall, der das Feld ausgeloest hat: bAV seit 01.10.2020 mit 50 € vom
+    Arbeitnehmer und 50 € vom Arbeitgeber; nach fuenf Jahren zu einem neuen
+    Arbeitgeber, seitdem 86,96 € + 13,04 €.
+  */
+  const stufe = { bisJahr: 2025, bisMonat: 9, beitragMonat: 100, agZuschussMonat: 50 };
+
+  it('zaehlt ab dem Beginnmonat, nicht ab Januar', () => {
+    const r = vertragsTuev(vertrag(), annahmen({ beitragMonat: 100, beginnJahr: 2020, beginnMonat: 10 }),
+      kontext(), szenario, p);
+    // Oktober bis Dezember 2020, dann 2021 bis 2041 voll.
+    expect(r.monateEinzahlung).toBe(3 + 21 * 12);
+    expect(r.summeEinzahlung).toBeCloseTo(100 * (3 + 21 * 12), 6);
+    expect(r.jahreEinzahlung).toBe(22);
+    // Der Monat der Treppe ist ein ganzer, kein Rumpfjahr-Zwoelftel.
+    expect(r.beitragMonat).toBeCloseTo(100, 6);
+  });
+
+  it('rechnet eine fruehere Stufe bis einschliesslich ihres Monats', () => {
+    const r = vertragsTuev(vertrag(),
+      annahmen({ beitragMonat: 100, beginnJahr: 2020, beginnMonat: 10,
+        fruehereBeitraege: [{ ...stufe, beitragMonat: 60 }] }),
+      kontext(), szenario, p);
+    // 10/2020 – 09/2025 sind 60 Monate zu 60 €, danach 10/2025 – 12/2041.
+    expect(r.summeEinzahlung).toBeCloseTo(60 * 60 + 100 * (3 + 16 * 12), 6);
+    expect(r.beitragMonat).toBeCloseTo(100, 6);
+  });
+
+  it('laesst die Dynamik erst mit dem ersten vollen Jahr des laufenden Beitrags beginnen', () => {
+    const mit = vertragsTuev(vertrag(),
+      annahmen({ beitragMonat: 100, dynamik: 0.1, beginnJahr: 2020, beginnMonat: 10,
+        fruehereBeitraege: [{ ...stufe, beitragMonat: 60 }], }),
+      kontext({ rentenbeginnJahr: 2028 }), szenario, p);
+    // 2020–2025 fest, 10–12/2025 zu 100, 2026 zu 100, 2027 zu 110.
+    expect(mit.summeEinzahlung).toBeCloseTo(60 * 60 + 300 + 1200 + 1320, 6);
+    expect(mit.beitragMonat).toBeCloseTo(100, 6);
+  });
+
+  it('zeigt im bAV-Fall die heutigen Betraege und rechnet die alten Jahre mit dem alten AG-Anteil', () => {
+    const vt = vertrag({ typ: 'bav', schicht: 2 });
+    const nutzerfall = annahmen({
+      beitragMonat: 100, agZuschussMonat: 13.04, beginnJahr: 2020, beginnMonat: 10,
+      fruehereBeitraege: [stufe],
+    });
+    const r = vertragsTuev(vt, nutzerfall, kontext(), szenario, p);
+    expect(r.beitragMonat).toBeCloseTo(100, 6);
+    expect(r.agZuschussMonat).toBeCloseTo(13.04, 6);
+
+    // Dieselbe Momentaufnahme wie ein Vertrag, der erst heute beginnt.
+    const heute = vertragsTuev(vt, annahmen({ beitragMonat: 100, agZuschussMonat: 13.04 }),
+      kontext(), szenario, p);
+    expect(r.echterAufwandMonat).toBeCloseTo(heute.echterAufwandMonat, 6);
+
+    // Hätte der Arbeitgeber immer nur 13,04 € gezahlt, wäre der eigene
+    // Aufwand über die Laufzeit höher — die fünf Jahre mit 50 € zählen.
+    const ohneStufe = vertragsTuev(vt,
+      annahmen({ beitragMonat: 100, agZuschussMonat: 13.04, beginnJahr: 2020, beginnMonat: 10 }),
+      kontext(), szenario, p);
+    expect(r.summeEinzahlung).toBeLessThan(ohneStufe.summeEinzahlung - 100);
+  });
+
+  it('teilt im Rueckfall auf ein Rumpfjahr durch dessen Monate', () => {
+    const r = vertragsTuev(vertrag(), annahmen({ beitragMonat: 100, beginnJahr: 2041, beginnMonat: 10 }),
+      kontext(), szenario, p);
+    expect(r.monateEinzahlung).toBe(3);
+    expect(r.beitragMonat).toBeCloseTo(100, 6);
+  });
+
+  it('rechnet ohne Monat und Stufen wie bisher', () => {
+    const a = annahmen({ beitragMonat: 150, dynamik: 0.03, beginnJahr: 2026 });
+    const alt = vertragsTuev(vertrag(), a, kontext(), szenario, p);
+    const neu = vertragsTuev(vertrag(), { ...a, beginnMonat: 1, fruehereBeitraege: [] }, kontext(), szenario, p);
+    expect(neu.summeEinzahlung).toBe(alt.summeEinzahlung);
+    let erwartet = 0, b = 150 * 12;
+    for (let t = 0; t < 16; t++) { erwartet += b; b *= 1.03; }
+    expect(alt.summeEinzahlung).toBeCloseTo(erwartet, 6);
+  });
+});

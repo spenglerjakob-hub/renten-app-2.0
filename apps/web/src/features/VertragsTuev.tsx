@@ -1,16 +1,137 @@
 import { useMemo } from 'react';
 import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
-import { parameterFuer, type ProjektionsErgebnis } from '@renten/engine';
-import { tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr } from './tuev-berechnung';
+import { parameterFuer, parseDatum, toDe, type ProjektionsErgebnis } from '@renten/engine';
+import {
+  tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText,
+} from './tuev-berechnung';
 import { kenntKapitalwahl } from './vertragsarten';
 import { EinkommenFelder } from './EinkommenFelder';
 import { personNameAus } from './personen';
 import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
-  ZahlFeld, ProzentFeld, Schalter, Kennzahl, GegenueberZeile, Abschnitt, euro, prozent, TON,
+  ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, Abschnitt, euro, euroGenau,
+  prozent, TON,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+
+type TuevEintrag = SzenarioParsed['tuev'][number];
+
+const auf2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * „Hat sich der Beitrag zwischenzeitlich geaendert?" — fruehere Beitraege
+ * einer bAV, etwa vor einem Arbeitgeberwechsel.
+ *
+ * EINGABE ALS ARBEITNEHMER + ARBEITGEBER, so wie es auf dem Gehaltszettel
+ * steht. Gespeichert wird wie oben (Gesamtbeitrag und AG-Anteil darin),
+ * damit Rechenkern und Anzeige eine Logik haben; die Summe steht darunter.
+ *
+ * „Gezahlt bis" ist der LETZTE Monat mit diesem Beitrag — ab dem Folgemonat
+ * gilt die naechste Stufe bzw. der Beitrag oben.
+ */
+function FruehereBeitraege({ t, aendern }: {
+  t: TuevEintrag;
+  aendern: (p: Partial<TuevEintrag>) => void;
+}) {
+  const stufen = t.fruehereBeitraege;
+  const beginn = parseDatum(t.beginnDatum ?? `01.01.${t.beginnJahr}`);
+  const jetzt = new Date();
+  const heuteIndex = jetzt.getFullYear() * 12 + jetzt.getMonth();
+  const monatsIndex = (s: string) => {
+    const d = parseDatum(s);
+    return d ? d.jahr * 12 + d.monat - 1 : null;
+  };
+
+  const setzeStufe = (i: number, p: Partial<TuevEintrag['fruehereBeitraege'][number]>) =>
+    aendern({ fruehereBeitraege: stufen.map((st, j) => (j === i ? { ...st, ...p } : st)) });
+
+  const neueStufe = () => {
+    // Vorbelegt mit dem heutigen Beitrag; das Datum eine Stufe weiter zurueck.
+    const aeltestes = stufen.map((st) => parseDatum(st.bis)).filter((d) => d !== null)
+      .sort((x, y) => (x.jahr * 12 + x.monat) - (y.jahr * 12 + y.monat))[0];
+    const bisJahr = aeltestes ? aeltestes.jahr - 1 : jetzt.getFullYear() - 1;
+    // Ein Monatsende, denn gemeint ist ein ganzer letzter Monat.
+    const monat = aeltestes?.monat ?? 12;
+    const tag = new Date(Date.UTC(bisJahr, monat, 0)).getUTCDate();
+    return {
+      bis: toDe({ jahr: bisJahr, monat, tag }),
+      beitragMonat: t.beitragMonat,
+      agZuschussMonat: t.agZuschussMonat,
+    };
+  };
+
+  return (
+    <div className="space-y-2">
+      <Schalter
+        label="Hat sich der Beitrag zwischenzeitlich geändert?"
+        wert={stufen.length > 0}
+        onChange={(b) => aendern({ fruehereBeitraege: b ? [neueStufe()] : [] })}
+      />
+      {stufen.map((st, i) => {
+        const an = auf2(Math.max(0, st.beitragMonat - st.agZuschussMonat));
+        const bis = monatsIndex(st.bis);
+        const vorBeginn = bis !== null && beginn !== null && bis < beginn.jahr * 12 + beginn.monat - 1;
+        const zukunft = bis !== null && bis >= heuteIndex;
+        return (
+          <div key={i} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {stufen.length > 1 ? `Früherer Beitrag ${i + 1}` : 'Früherer Beitrag'}
+              </span>
+              {stufen.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => aendern({ fruehereBeitraege: stufen.filter((_, j) => j !== i) })}
+                  aria-label={`Früheren Beitrag ${i + 1} entfernen`}
+                  className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <ZahlFeld
+                label="Arbeitnehmer"
+                wert={an}
+                onChange={(n) => setzeStufe(i, { beitragMonat: auf2(n + st.agZuschussMonat) })}
+                einheit="€"
+              />
+              <ZahlFeld
+                label="Arbeitgeber"
+                wert={st.agZuschussMonat}
+                onChange={(n) => setzeStufe(i, { agZuschussMonat: n, beitragMonat: auf2(an + n) })}
+                einheit="€"
+              />
+            </div>
+            <DatumFeld
+              label="Gezahlt bis"
+              wert={st.bis}
+              onChange={(s) => setzeStufe(i, { bis: s })}
+              hilfe={`Letzter Monat mit diesem Beitrag — zusammen ${euroGenau(st.beitragMonat)}. Danach gilt der Beitrag oben.`}
+            />
+            {(vorBeginn || zukunft) && (
+              <p className="text-[11px] leading-relaxed text-amber-700">
+                {vorBeginn
+                  ? 'Dieses Datum liegt vor dem Beginn des Vertrags — die Stufe wirkt dann nicht.'
+                  : 'Dieses Datum liegt in der Zukunft — bis dahin rechnet der TÜV mit diesem Beitrag statt mit dem oben.'}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      {stufen.length > 0 && stufen.length < 5 && (
+        <button
+          type="button"
+          onClick={() => aendern({ fruehereBeitraege: [...stufen, neueStufe()] })}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+        >
+          <Plus className="h-3 w-3" aria-hidden /> Noch eine frühere Änderung
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** Eine Zeile im Vergleich der beiden Auszahlungswege. */
 function WegZeile({ text, rente, kapital, hervor }: {
@@ -277,6 +398,9 @@ export function VertragsTuev({
                       wert={t.beitragMonat}
                       onChange={(n) => tuevAendern(t.id, { beitragMonat: n })}
                       einheit="€"
+                      hilfe={v.typ.startsWith('bav')
+                        ? 'Gesamtbeitrag: Ihr Anteil und der des Arbeitgebers zusammen.'
+                        : undefined}
                     />
                     <ProzentFeld
                       label="Beitragsdynamik p. a."
@@ -285,21 +409,37 @@ export function VertragsTuev({
                       max={10}
                     />
                     {v.typ.startsWith('bav') && (
-                      <ZahlFeld
-                        label="AG-Zuschuss monatlich"
-                        wert={t.agZuschussMonat}
-                        onChange={(n) => tuevAendern(t.id, { agZuschussMonat: n })}
-                        einheit="€"
-                        hilfe="Mindert Ihren eigenen Aufwand."
-                      />
+                      <>
+                        <ZahlFeld
+                          label="AG-Zuschuss monatlich"
+                          wert={t.agZuschussMonat}
+                          onChange={(n) => tuevAendern(t.id, { agZuschussMonat: n })}
+                          einheit="€"
+                          hilfe={`Mindert Ihren eigenen Aufwand. Ihr Anteil: ${
+                            euroGenau(Math.max(0, t.beitragMonat - t.agZuschussMonat))}.`}
+                        />
+                        <FruehereBeitraege
+                          t={t}
+                          aendern={(p) => tuevAendern(t.id, p)}
+                        />
+                      </>
                     )}
+                    {/*
+                      Das genaue Datum, weil Beitraege monatlich fliessen: Ein
+                      Vertrag ab 01.10.2020 hat im ersten Jahr drei Beitraege,
+                      nicht zwoelf. Die Knoepfe verstellen das Jahr — so wie
+                      das Feld frueher nur das Jahr kannte.
+                    */}
                     <div className="grid grid-cols-2 gap-2">
-                      <ZahlFeld
+                      <DatumFeld
                         label="Beginn"
-                        wert={t.beginnJahr}
-                        onChange={(n) => tuevAendern(t.id, { beginnJahr: n })}
-                        min={1900}
-                        max={2200}
+                        wert={t.beginnDatum ?? `01.01.${t.beginnJahr}`}
+                        onChange={(s) => {
+                          const d = parseDatum(s);
+                          if (d) tuevAendern(t.id, { beginnDatum: s, beginnJahr: d.jahr });
+                        }}
+                        hilfe="Gerechnet ab diesem Monat."
+                        stufen
                       />
                       <ZahlFeld
                         label="Lebenserwartung"
@@ -582,7 +722,7 @@ export function VertragsTuev({
                       </div>
                       <div className="space-y-1.5">
                         <GegenueberZeile
-                          text={`Eingezahlt (${r.jahreEinzahlung} Jahre)`}
+                          text={`Eingezahlt (${laufzeitText(r.monateEinzahlung)})`}
                           wert={euro(r.summeEinzahlung)}
                           farbe="text-rose-600"
                         />
@@ -612,7 +752,7 @@ export function VertragsTuev({
                             <>
                               {euro(r.summeAuszahlung)} Auszahlung geteilt durch{' '}
                               {euro(r.summeEinzahlung)} eigenen Aufwand über{' '}
-                              {r.jahreEinzahlung} Jahre. <strong>Beide Seiten netto</strong>: oben
+                              {laufzeitText(r.monateEinzahlung)}. <strong>Beide Seiten netto</strong>: oben
                               nach Steuer und KV/PV im Alter, unten nach Förderung. Ohne
                               Verzinsung gerechnet — ein Euro von heute zählt hier so viel wie
                               einer in {r.jahreEinzahlung} Jahren. Was das Geld dann wert ist,
@@ -628,7 +768,7 @@ export function VertragsTuev({
                           info={(
                             <>
                               Der interne Zinsfuß Ihrer Zahlungsreihe: der Zinssatz, bei dem
-                              {' '}{r.jahreEinzahlung} Jahre Einzahlung und{' '}
+                              {' '}{laufzeitText(r.monateEinzahlung)} Einzahlung und{' '}
                               {istKapital ? 'die Kapitalauszahlung' : `${r.jahreAuszahlung} Jahre Rente`}
                               {' '}genau aufgehen. Anders als der Hebel <strong>berücksichtigt
                               er, wann</strong> jeder Euro fließt. Gerechnet nach Steuer, KV/PV

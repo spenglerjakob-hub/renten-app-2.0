@@ -433,6 +433,26 @@ export const tuevPositionSchema = z.object({
     geburtsjahr: z.number().int().min(1900).max(2200),
   })).max(10).default([]),
   beginnJahr: z.number().int().min(1900).max(2200).default(new Date().getFullYear()),
+  /**
+   * Genaues Beginndatum (TT.MM.JJJJ). Gerechnet wird ab dessen MONAT —
+   * Beitraege fliessen monatlich, der Tag aendert nichts.
+   *
+   * Optional, damit frueher gespeicherte Szenarien weiter laden: Fehlt es,
+   * gilt der 01.01. von `beginnJahr`. `beginnJahr` wird bei jeder Aenderung
+   * mitgefuehrt und bleibt damit die Jahreszahl fuer alles, was nur sie braucht.
+   */
+  beginnDatum: z.string().regex(/^\d{2}\.\d{2}\.\d{4}$/).optional(),
+  /**
+   * Fruehere Beitragsstufen, aeltere zuerst — etwa vor einem
+   * Arbeitgeberwechsel. `bis` ist der LETZTE Monat, in dem dieser Beitrag
+   * floss; danach gilt die naechste Stufe bzw. der laufende Beitrag oben.
+   * Beitrag wie oben als GESAMTbeitrag, der AG-Anteil darin.
+   */
+  fruehereBeitraege: z.array(z.object({
+    bis: z.string().regex(/^\d{2}\.\d{2}\.\d{4}$/),
+    beitragMonat: z.number().min(0).max(100_000),
+    agZuschussMonat: z.number().min(0).max(100_000).default(0),
+  })).max(5).default([]),
   lebenserwartung: z.number().int().min(60).max(120).default(85),
   /** Zusaetzlich Rente gegen Kapital gegenueberstellen */
   vergleichen: z.boolean().default(false),

@@ -1,5 +1,7 @@
-import { belastungsTreppe, laufendeZulageJahr, type TuevPosition } from '../features/tuev-berechnung';
-import { euro, prozent } from '../components/Feld';
+import {
+  belastungsTreppe, laufendeZulageJahr, laufzeitText, type TuevPosition,
+} from '../features/tuev-berechnung';
+import { euro, euroGenau, prozent } from '../components/Feld';
 import { typText, vertragsBezeichnung } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
@@ -40,7 +42,7 @@ export function TuevBogen({
         <GrosseZahl
           titel={istKapital ? 'Auszahlung netto' : 'Netto-Rente im Monat'}
           wert={istKapital ? euro(r.nettoKapital) : euro(r.nettoRenteMonat)}
-          hinweis={`ab ${r.jahreEinzahlung} Jahren Einzahlung`}
+          hinweis={`Einzahlung: ${laufzeitText(r.monateEinzahlung)}`}
         />
         <GrosseZahl
           titel="Aus einem Euro Aufwand werden"
@@ -53,15 +55,26 @@ export function TuevBogen({
       <Untertitel>Zugrunde gelegt</Untertitel>
       <Zweispaltig>
         <Angabe feld="Inhaber" wert={personNameAus(szenario.personen, v.inhaber)} />
-        <Angabe feld="Beitrag im Monat" wert={euro(r.beitragMonat)} />
+        <Angabe feld="Beitrag im Monat" wert={euroGenau(r.beitragMonat)} />
         {t && t.dynamik !== 0 && (
           <Angabe feld="Beitragsdynamik" wert={`${prozent(t.dynamik)} pro Jahr`} />
         )}
         {r.agZuschussMonat > 0 && (
-          <Angabe feld="Arbeitgeberzuschuss" wert={`${euro(r.agZuschussMonat)} im Monat`} />
+          <Angabe feld="Arbeitgeberzuschuss" wert={`${euroGenau(r.agZuschussMonat)} im Monat`} />
         )}
-        {t && <Angabe feld="Einzahlung ab" wert={String(t.beginnJahr)} />}
-        <Angabe feld="Einzahlungsdauer" wert={`${r.jahreEinzahlung} Jahre`} />
+        {t && <Angabe feld="Einzahlung ab" wert={t.beginnDatum ?? `01.01.${t.beginnJahr}`} />}
+        {/* Fruehere Beitraege stehen hier, weil sie die Summe der
+            Einzahlungen tragen, die Treppe unten aber nur den heutigen Monat. */}
+        {t?.fruehereBeitraege.map((st, i) => (
+          <Angabe
+            key={i}
+            feld={`Früherer Beitrag bis ${st.bis.slice(3).replace('.', '/')}`}
+            wert={st.agZuschussMonat > 0
+              ? `${euroGenau(st.beitragMonat)} (davon AG ${euroGenau(st.agZuschussMonat)})`
+              : euroGenau(st.beitragMonat)}
+          />
+        ))}
+        <Angabe feld="Einzahlungsdauer" wert={laufzeitText(r.monateEinzahlung)} />
         {t && <Angabe feld="Angenommene Lebenserwartung" wert={`${t.lebenserwartung} Jahre`} />}
         <Angabe feld="Auszahlungsdauer" wert={`${r.jahreAuszahlung} Jahre`} />
       </Zweispaltig>
@@ -69,7 +82,7 @@ export function TuevBogen({
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Was Sie einzahlen (1. Jahr, monatlich)
+            Was Sie einzahlen (laufender Beitrag, monatlich)
           </div>
           {/* Dieselbe Treppe wie am Bildschirm, aus derselben Funktion: oben
               was der Vertrag bekommt, unten was es kostet. */}
