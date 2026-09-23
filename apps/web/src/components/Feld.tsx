@@ -1,4 +1,7 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import {
+  useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
 
@@ -488,6 +491,9 @@ export function InfoPunkt(props: {
   const [offen, setOffen] = useState(false);
   const eigen = useId();
   const id = `info${eigen}`;
+  const knopfRef = useRef<HTMLButtonElement>(null);
+  const blaseRef = useRef<HTMLSpanElement>(null);
+  const [lage, setLage] = useState<{ top: number; left: number } | null>(null);
 
   /*
     Ein offener Hinweis schliesst bei Escape und bei einem Klick irgendwo
@@ -507,9 +513,69 @@ export function InfoPunkt(props: {
     };
   }, [offen]);
 
+  /*
+    DIE LAGE WIRD GERECHNET, NICHT GESETZT.
+
+    BEFUND: Die Blase war `absolute` und sass damit im Kasten ihrer Karte.
+    Drei dieser Kaesten tragen `overflow-hidden` (damit der farbige Kopf die
+    runden Ecken nicht ueberlaeuft) — und schnitten sie ab. Gemessen waren
+    vom Hinweis an der Nettorendite noch 36 % zu sehen, von dem am
+    Netto-Hebel 51 %; am Handy blieben bei der Foerderquote 64 %, weil die
+    Blase seitlich ueber die Kartenkante lief.
+
+    `useLayoutEffect` und nicht `useEffect`: Gerechnet werden muss, BEVOR der
+    Browser zeichnet — sonst blitzt die Blase eine Bildfolge lang links oben
+    auf und springt dann an ihren Platz.
+  */
+  useLayoutEffect(() => {
+    if (!offen) return;
+
+    const rechne = () => {
+      const k = knopfRef.current?.getBoundingClientRect();
+      const b = blaseRef.current?.getBoundingClientRect();
+      if (!k || !b) return;
+
+      const RAND = 8;   // Mindestabstand zum Bildschirmrand
+      const LUFT = 6;   // Abstand zwischen Knopf und Blase
+
+      // Waagerecht ueber dem Knopf gemittet, dann ins Sichtfenster geklemmt.
+      const mitte = k.left + k.width / 2 - b.width / 2;
+      const left = Math.min(Math.max(mitte, RAND), window.innerWidth - b.width - RAND);
+
+      /*
+        Senkrecht ueber den Knopf — und darunter, wenn oben nicht genug Platz
+        ist. Ohne das Umklappen steht die Blase am oberen Bildschirmrand
+        angeschlagen und verdeckt sich selbst.
+      */
+      const obenPasst = k.top - b.height - LUFT >= RAND;
+      const top = obenPasst ? k.top - b.height - LUFT : k.bottom + LUFT;
+
+      setLage({ top, left });
+    };
+
+    rechne();
+    /*
+      Beim Scrollen und bei Groessenaenderung neu rechnen: Eine `fixed`
+      positionierte Blase bliebe sonst stehen, waehrend der Knopf unter ihr
+      wegwandert. `capture: true`, damit auch Bildlaeufe INNERHALB eines
+      Bereichs zaehlen — die steigen nicht bis zum Fenster auf.
+    */
+    window.addEventListener('scroll', rechne, true);
+    window.addEventListener('resize', rechne);
+    return () => {
+      window.removeEventListener('scroll', rechne, true);
+      window.removeEventListener('resize', rechne);
+    };
+  }, [offen]);
+
+  // Beim Schliessen die Lage vergessen, damit die naechste Blase nicht kurz
+  // an der Stelle der vorherigen erscheint.
+  useEffect(() => { if (!offen) setLage(null); }, [offen]);
+
   return (
-    <span className="relative inline-flex print:hidden">
+    <span className="inline-flex print:hidden">
       <button
+        ref={knopfRef}
         type="button"
         aria-label={`Erklärung: ${props.titel}`}
         aria-expanded={offen}
@@ -535,23 +601,31 @@ export function InfoPunkt(props: {
       >
         ?
       </button>
-      {offen && (
+      {offen && createPortal(
         /*
-          `left-1/2 -translate-x-1/2` mittet die Blase ueber dem Knopf; die
-          feste Breite verhindert, dass ein langer Text sie ueber den
-          Bildschirmrand zieht. `pointer-events-none`, damit die Blase den
-          Mauszeiger nicht abfaengt und `onMouseLeave` zuverlaessig feuert.
+          AM SEITENKOERPER, nicht in der Karte: Dort kann kein `overflow` sie
+          mehr beschneiden. `fixed` allein reichte nicht — ein Vorfahre mit
+          `transform`, `filter` oder `will-change` macht sich zum Bezugsrahmen,
+          und dann klemmt es doch. Im Portal kann das nicht passieren.
+
+          `pointer-events-none`, damit die Blase den Mauszeiger nicht abfaengt
+          und `onMouseLeave` am Knopf zuverlaessig feuert. Bis die Lage
+          gerechnet ist, bleibt sie unsichtbar — sie wird aber gerendert, denn
+          ihre Hoehe ist es ja, die gemessen werden muss.
         */
         <span
+          ref={blaseRef}
           id={id}
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-60 -translate-x-1/2 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-[11px] font-normal leading-relaxed text-slate-700 shadow-lg sm:w-72"
+          style={{ top: lage?.top ?? 0, left: lage?.left ?? 0, visibility: lage ? 'visible' : 'hidden' }}
+          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-[11px] font-normal leading-relaxed text-slate-700 shadow-lg print:hidden sm:w-72"
         >
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {props.titel}
           </span>
           {props.children}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );
