@@ -20,6 +20,14 @@ const oeffentlicherSchluessel =
 
 export const supabaseKonfiguriert = Boolean(url && oeffentlicherSchluessel);
 
+/**
+ * Die Adresse, mit der die Seite geoeffnet wurde — festgehalten, BEVOR der
+ * Client entsteht. Der wertet Bestaetigungs-Links im alten Format
+ * (`#access_token=…`) selbst aus und raeumt die Adresse dabei auf; danach
+ * liesse sich nicht mehr erkennen, dass jemand gerade ueber einen Link kam.
+ */
+export const adresseBeimStart = typeof window === 'undefined' ? '' : window.location.href;
+
 export const supabase: SupabaseClient | null = supabaseKonfiguriert
   ? createClient(url!, oeffentlicherSchluessel!, {
       auth: {
