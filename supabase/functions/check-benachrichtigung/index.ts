@@ -47,6 +47,9 @@ function adminSchluessel(): string {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
+/** Fuer Protokolle: `spe…@yahoo.de` statt der vollen Adresse. */
+const maskiert = (adresse: string) => adresse.replace(/^(.{0,3}).*(@.*)$/, '$1…$2');
+
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -140,7 +143,7 @@ Deno.serve(async (req) => {
       secure: port === 465,
       auth: { user: smtpUser, pass: smtpPass },
     });
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from: Deno.env.get('MAIL_ABSENDER') ?? `JS-Rentenplaner <${smtpUser}>`,
       to: empfaenger,
       subject: `Neuer Vorsorge-Check eingegangen: ${kunde}`,
@@ -148,7 +151,18 @@ Deno.serve(async (req) => {
       html,
     });
 
-    return antwort(200, { status: 'verschickt' });
+    /*
+      NACHVOLLZIEHBARKEIT. Ohne Fehler heisst nur: Der SMTP-Server hat die
+      Mail angenommen — nicht, dass sie ankommt. Seine Antwort („250 OK
+      queued as …") und die Message-ID stehen deshalb im Protokoll und in der
+      Antwort an pg_net (net._http_response). Damit laesst sich eine
+      verschwundene Mail beim Postfach-Anbieter wiederfinden.
+    */
+    const abgelehnt = (info.rejected ?? []).length > 0 || (info.accepted ?? []).length === 0;
+    if (abgelehnt) throw new Error(`Empfaenger abgelehnt: ${info.response ?? 'ohne Antwort'}`);
+    console.log('Verschickt', { an: maskiert(empfaenger), id: info.messageId, smtp: info.response });
+
+    return antwort(200, { status: 'verschickt', id: info.messageId, smtp: info.response });
   } catch (e) {
     // Freigeben, damit ein erneuter Aufruf es noch einmal versuchen kann.
     await freigeben();
