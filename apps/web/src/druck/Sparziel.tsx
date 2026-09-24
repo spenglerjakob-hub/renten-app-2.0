@@ -118,15 +118,38 @@ export function Sparziel({
             ))}
           </Tabelle>
 
-          <Text>
-            <strong>Jedes Jahr, das Sie warten, kostet Sie{' '}
-            {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat</strong> — und über die dann
-            kürzere Sparzeit {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt. Das wirkt
-            zunächst widersprüchlich: Wer später beginnt, zahlt über <em>weniger</em> Jahre und
-            am Ende trotzdem <em>mehr</em>. Der Grund ist der Zinseszins — die Jahre am Anfang
-            sind die wertvollsten, weil ihre Erträge am längsten mitarbeiten. Wer sie verstreichen
-            lässt, muss den fehlenden Ertrag aus eigener Tasche nachlegen.
-          </Text>
+          {/*
+            DIE KERNAUSSAGE DER SEITE, deshalb als Kasten und nicht als
+            Fliesstext: zwei Zahlen, die man sich merkt, und darunter der
+            Grund. Als Absatz ging sie unter der Tabelle unter.
+          */}
+          <div className="mt-3 break-inside-avoid rounded-lg border-2 border-amber-400 bg-amber-50 p-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+              Was Warten kostet — je Jahr Aufschub
+            </div>
+            <div className="mt-1.5 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-2xl font-black tabular-nums text-amber-900">
+                  + {euro(r.proJahrWarten.mehrProMonat)}
+                </div>
+                <div className="text-[11px] text-amber-900">mehr Beitrag im Monat</div>
+              </div>
+              <div>
+                <div className="text-2xl font-black tabular-nums text-amber-900">
+                  + {euro(r.proJahrWarten.mehrGesamt)}
+                </div>
+                <div className="text-[11px] text-amber-900">mehr insgesamt — trotz kürzerer Sparzeit</div>
+              </div>
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-slate-800">
+              {/* Die beiden Betraege stehen gross darueber; der Satz erklaert
+                  nur noch, warum. */}
+              Das wirkt zunächst widersprüchlich: Wer später beginnt, zahlt über <em>weniger</em> Jahre und
+              am Ende trotzdem <em>mehr</em>. Der Grund ist der Zinseszins — die Jahre am Anfang
+              sind die wertvollsten, weil ihre Erträge am längsten mitarbeiten. Wer sie
+              verstreichen lässt, muss den fehlenden Ertrag aus eigener Tasche nachlegen.
+            </p>
+          </div>
 
           <Text>
             Die Summen sind nominal addiert. Wer später beginnt, zahlt seine Beiträge in
