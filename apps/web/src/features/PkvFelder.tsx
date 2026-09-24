@@ -31,10 +31,17 @@ import { ZahlFeld, ProzentFeld, Schalter } from '../components/Feld';
  * griff die Komponente selbst auf `haushalt.pkv` zu und liess sich deshalb
  * nur an einer Stelle einsetzen.
  */
-export function PkvFelder({ wert, onChange, titel }: {
+export function PkvFelder({ wert, onChange, titel, einfach = false }: {
   wert?: PkvFelderWert;
   onChange?: (p: PkvFelderWert) => void;
   titel?: string;
+  /**
+   * Ohne die beiden Steigerungssaetze — fuer den Vorsorge-Check. Ein
+   * Endkunde soll dort nicht ueber Beitragsentwicklungen nachdenken muessen;
+   * es gelten die Vorgaben des Rechners, und der Berater passt sie nach der
+   * Uebernahme bei Bedarf an.
+   */
+  einfach?: boolean;
 }) {
   const haushaltsPkv = useSzenario((x) => x.szenario.haushalt.pkv);
   const setzeHaushalt = useSzenario((x) => x.setzeHaushalt);
@@ -68,20 +75,24 @@ export function PkvFelder({ wert, onChange, titel }: {
             ? 'Alles zusammen, wie auf Ihrer Rechnung — Kranken-, Pflege- und Entlastungstarif.'
             : 'Kranken- und Pflegeversicherung zusammen, wie Sie ihn heute zahlen.'}
         />
-        <ProzentFeld
-          label="Steigerung p. a."
-          wert={pkv.steigerung}
-          onChange={(n) => setze({ steigerung: n })}
-          max={15}
-          hilfe="Bis 64. Historisch lagen PKV-Beiträge über der allgemeinen Inflation."
-        />
-        <ProzentFeld
-          label={`Steigerung ab ${DAEMPFUNG_AB_ALTER}`}
-          wert={pkv.steigerungAb65}
-          onChange={(n) => setze({ steigerungAb65: n })}
-          max={15}
-          hilfe={`Gedämpft: ab ${DAEMPFUNG_AB_ALTER} finanzieren die angesparten Mittel die Erhöhungen mit (§ 150 Abs. 3 VAG).`}
-        />
+        {!einfach && (
+          <>
+            <ProzentFeld
+              label="Steigerung p. a."
+              wert={pkv.steigerung}
+              onChange={(n) => setze({ steigerung: n })}
+              max={15}
+              hilfe="Bis 64. Historisch lagen PKV-Beiträge über der allgemeinen Inflation."
+            />
+            <ProzentFeld
+              label={`Steigerung ab ${DAEMPFUNG_AB_ALTER}`}
+              wert={pkv.steigerungAb65}
+              onChange={(n) => setze({ steigerungAb65: n })}
+              max={15}
+              hilfe={`Gedämpft: ab ${DAEMPFUNG_AB_ALTER} finanzieren die angesparten Mittel die Erhöhungen mit (§ 150 Abs. 3 VAG).`}
+            />
+          </>
+        )}
       </div>
 
       <div className="mt-3">

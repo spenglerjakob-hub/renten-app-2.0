@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ClipboardList, ExternalLink, FileText,
-  Plus, Printer, Send, SkipForward, Trash2,
+  ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ExternalLink, FileText,
+  Plus, Send, SkipForward, Trash2,
 } from 'lucide-react';
 import {
   BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, parseDatum, alterExakt, heute,
@@ -42,21 +42,6 @@ const DRV_ESERVICE = 'https://www.eservice-drv.de/SelfServiceWeb/';
 const SPEICHER_SZENARIO = 'rentenplaner.szenario.v1';
 const JETZT = new Date().getFullYear();
 
-/** Die Unterlagen, die man vorher bereitlegt — die Checkliste oben. */
-const UNTERLAGEN: { id: string; titel: string; text: string; link?: { href: string; text: string } }[] = [
-  { id: 'ausweis', titel: 'Personalausweis', text: 'Ihr Geburtsdatum, bei Kindern die Geburtsjahre.' },
-  { id: 'gehalt', titel: 'Letzte Gehaltsabrechnung', text: 'Beamte: Bezügemitteilung. Selbstständige: letzter Steuerbescheid.' },
-  { id: 'kv', titel: 'Krankenversicherung', text: 'Name Ihrer Krankenkasse — oder die Beitragsrechnung Ihrer privaten Versicherung.' },
-  {
-    id: 'rente', titel: 'Renteninformation',
-    text: 'Von der Deutschen Rentenversicherung, kommt jährlich per Post. Beamte: Versorgungsauskunft. Nicht zur Hand? Online anfordern:',
-    // Die Adresse steht als Linktext, damit sie auch auf der gedruckten Liste lesbar ist.
-    link: { href: DRV_ESERVICE, text: 'www.eservice-drv.de/SelfServiceWeb' },
-  },
-  { id: 'vertraege', titel: 'Standmitteilungen', text: 'Jährliches Schreiben jedes Vorsorgevertrags: Betriebsrente, Riester, Rürup, private Rente.' },
-  { id: 'depot', titel: 'Depotauszug', text: 'Aktueller Wert und Sparrate Ihrer Wertpapierdepots.' },
-];
-
 const SCHRITTE = [
   'Sie & Ihr Haushalt',
   'Einkommen',
@@ -82,7 +67,6 @@ const VERTRAGSARTEN: { wert: VertragsTyp; text: string }[] = [
 interface Stand {
   antworten: Antworten;
   schritt: number;
-  abgehakt: string[];
 }
 
 /**
@@ -110,11 +94,12 @@ function ladeStand(): Stand {
     const roh = speicher()?.getItem(SPEICHER_STAND);
     if (roh) {
       const s = JSON.parse(roh) as Stand;
-      // Neue Felder spaeterer Fassungen mit Vorgaben auffuellen.
-      return { ...s, antworten: { ...leereAntworten(), ...s.antworten } };
+      // Neue Felder spaeterer Fassungen mit Vorgaben auffuellen; Felder
+      // frueherer Fassungen (etwa die Haekchen der Checkliste) fallen weg.
+      return { schritt: s.schritt ?? 0, antworten: { ...leereAntworten(), ...s.antworten } };
     }
   } catch { /* Speicher gesperrt oder kaputt — neu beginnen */ }
-  return { antworten: leereAntworten(), schritt: 0, abgehakt: [] };
+  return { antworten: leereAntworten(), schritt: 0 };
 }
 
 /** Ist ein Schritt vollstaendig? Die Uebersicht nennt, was noch offen ist. */
@@ -178,10 +163,6 @@ export function Seite() {
     setStand((s) => ({ ...s, schritt: Math.max(0, Math.min(SCHRITTE.length - 1, i)) }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const abhaken = (id: string) => setStand((s) => ({
-    ...s,
-    abgehakt: s.abgehakt.includes(id) ? s.abgehakt.filter((a) => a !== id) : [...s.abgehakt, id],
-  }));
 
   /** Ins Szenario des Rechners schreiben und dorthin wechseln. */
   const uebernehmen = () => {
@@ -258,60 +239,6 @@ export function Seite() {
             </p>
           </section>
         ) : (<>
-
-        {/* --- Checkliste --- */}
-        <section className="mt-5 rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow-sm sm:p-5 print:border-slate-300 print:shadow-none">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-              <ClipboardList className="h-4 w-4 text-emerald-600" aria-hidden />
-              Das sollten Sie bereitlegen
-            </h2>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <Printer className="h-3.5 w-3.5" aria-hidden /> Checkliste drucken
-            </button>
-          </div>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {UNTERLAGEN.map((u) => {
-              const erledigt = stand.abgehakt.includes(u.id);
-              return (
-                <li key={u.id}>
-                  <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      checked={erledigt}
-                      onChange={() => abhaken(u.id)}
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600"
-                    />
-                    <span>
-                      <span className={`block text-sm font-semibold ${erledigt ? 'text-emerald-700' : 'text-slate-800'}`}>
-                        {u.titel}
-                      </span>
-                      <span className="block text-xs leading-relaxed text-slate-500">
-                        {u.text}
-                        {u.link && (
-                          <>
-                            {' '}
-                            <a href={u.link.href} target="_blank" rel="noopener noreferrer"
-                              className="font-semibold text-indigo-700 underline hover:text-indigo-900">
-                              {u.link.text}
-                            </a>
-                          </>
-                        )}
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-2 text-[11px] text-slate-500">
-            {stand.abgehakt.length} von {UNTERLAGEN.length} bereit.
-          </p>
-        </section>
 
         {/* --- Fortschritt --- */}
         <nav aria-label="Schritte" className="mt-6 print:hidden">
@@ -507,7 +434,7 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
 
       <Block>
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextFeld label="Ihr Vorname" wert={x.a.name} onChange={(s) => setzePerson('a', { name: s })} />
+          <TextFeld label="Ihr Vor- und Nachname" wert={x.a.name} onChange={(s) => setzePerson('a', { name: s })} />
           <DatumFeld label="Ihr Geburtsdatum" wert={x.a.geburtsdatum}
             onChange={(s) => setzePerson('a', { geburtsdatum: s })} />
         </div>
@@ -517,7 +444,7 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
         </div>
         {x.verheiratet && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <TextFeld label="Vorname Partner/in" wert={x.b.name} onChange={(s) => setzePerson('b', { name: s })} />
+            <TextFeld label="Vor- und Nachname Partner/in" wert={x.b.name} onChange={(s) => setzePerson('b', { name: s })} />
             <DatumFeld label="Geburtsdatum Partner/in" wert={x.b.geburtsdatum}
               onChange={(s) => setzePerson('b', { geburtsdatum: s })} />
           </div>
@@ -659,7 +586,7 @@ function SchrittKv({ x, setze, personen }: {
         {x.kv === 'gesetzlich' ? (
           <GesetzlichFelder kasse={x.krankenkasse} satz={x.zusatzbeitrag} setze={setze} />
         ) : (
-          <PkvFelder wert={x.pkv} onChange={(p) => setze({ pkv: p })} />
+          <PkvFelder wert={x.pkv} onChange={(p) => setze({ pkv: p })} einfach />
         )}
       </Block>
 
@@ -680,7 +607,7 @@ function SchrittKv({ x, setze, personen }: {
             <GesetzlichFelder kasse={kB.krankenkasse} satz={kB.zusatzbeitrag} setze={setzeB} />
           )}
           {kB.art === 'privat' && (
-            <PkvFelder wert={kB.pkv} onChange={(p) => setzeB({ pkv: p })} titel="Private Krankenversicherung Partner/in" />
+            <PkvFelder wert={kB.pkv} onChange={(p) => setzeB({ pkv: p })} titel="Private Krankenversicherung Partner/in" einfach />
           )}
         </Block>
       )}
