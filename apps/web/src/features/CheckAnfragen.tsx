@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Copy, Check, Mail, Download, Trash2, RefreshCw, Link2 } from 'lucide-react';
 import { useCheckAnfragen } from '../store/check-anfragen';
 import { useSzenario } from '../store/szenario';
+import { useAuth } from '../store/auth';
 import { checkLink } from '../lib/check';
 import type { CheckAnfrage } from '../lib/check';
 
@@ -17,6 +18,7 @@ const datum = (iso: string) => new Date(iso).toLocaleDateString('de-DE');
 export function CheckAnfragen() {
   const { liste, laedt, meldung, laden, anlegen, uebernehmen, loeschen, meldungLoeschen } = useCheckAnfragen();
   const setze = useSzenario((s) => s.setze);
+  const email = useAuth((s) => s.email);
   const [kunde, setKunde] = useState('');
   const [neu, setNeu] = useState<CheckAnfrage | null>(null);
   const [kopiert, setKopiert] = useState<string | null>(null);
@@ -53,6 +55,9 @@ export function CheckAnfragen() {
       <p className="text-xs leading-relaxed text-slate-600">
         Schicken Sie Ihrem Kunden einen persönlichen Link. Er erfasst seine Angaben zu Hause,
         Schritt für Schritt und ohne Konto — und sie landen nur bei Ihnen.
+        {email && (
+          <> Sobald ein Kunde absendet, bekommen Sie eine E-Mail an <strong>{email}</strong>.</>
+        )}
       </p>
 
       {meldung && (
