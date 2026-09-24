@@ -69,6 +69,19 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
 
   return (
     <div className="space-y-4">
+      {/* Wer lieber gefuehrt wird: derselbe Datensatz, Schritt fuer Schritt
+          und mit Hinweis auf die jeweilige Unterlage. */}
+      <a
+        href="/vorsorge-check"
+        className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
+      >
+        <span>
+          <strong>Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
+          einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
+        </span>
+        <span className="shrink-0 font-bold">Zum Check →</span>
+      </a>
+
       {/*
         Das Zielnetto steht VOR dem Haushaltsraster und in einem eigenen
         Kasten. Es war bisher eines von fuenf gleichrangigen Feldern —
@@ -374,7 +387,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
               <>
                 <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
                   onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
-                  hilfe="Wert aus der Renteninformation: bisher erreichter Anspruch." />
+                  hilfe="Wert aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“." />
                 <Rentenschaetzer personId={p.id} />
               </>
             ) : (

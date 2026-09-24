@@ -178,6 +178,14 @@ export function Anmeldung() {
           </span>
         </p>
 
+        <a
+          href="/vorsorge-check"
+          className="mt-4 block rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-xs text-emerald-900 hover:bg-emerald-100"
+        >
+          <strong>Neu hier?</strong> Mit dem Vorsorge-Check erfassen Sie Ihre Angaben Schritt für
+          Schritt — ohne Anmeldung. Das Konto brauchen Sie erst für das Ergebnis.
+        </a>
+
         <p className="mt-3 px-2 text-center text-xs text-slate-500">
           Informationen zum{' '}
           <a href="/altersvorsorgedepot" className="font-medium text-indigo-700 hover:underline">

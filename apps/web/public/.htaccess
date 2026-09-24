@@ -30,6 +30,12 @@ DirectoryIndex index.html
   # egal (NC): Verlinkungen und Suchmaschinen schreiben es unterschiedlich.
   RewriteRule ^altersvorsorgedepot/?$ /altersvorsorgedepot.html [NC,L]
 
+  # --- Vorsorge-Check -----------------------------------------------------
+  # Dieselbe Lage wie oben: eigene Seite, eigenes Bundle, ohne Anmeldung.
+  # Sie schreibt ihr Ergebnis in den Speicher des Browsers und schickt dann
+  # zum Rechner. Auch diese Regel MUSS vor dem Auffangmuster stehen.
+  RewriteRule ^vorsorge-check/?$ /vorsorge-check.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
