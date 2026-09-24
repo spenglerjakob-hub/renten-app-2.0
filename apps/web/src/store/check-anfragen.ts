@@ -27,7 +27,20 @@ export interface CheckStore {
 function fehlertext(e: unknown): string {
   if (typeof e === 'object' && e && 'message' in e) {
     const m = String((e as { message: unknown }).message);
+    const code = 'code' in e ? String((e as { code: unknown }).code) : '';
     if (m.includes('hoechstens 500')) return 'Es sind höchstens 500 offene Anfragen je Konto möglich.';
+    /*
+      Fehlen die Tabellen (Migration nicht eingespielt), meldet PostgREST
+      PGRST205 „Could not find the table … in the schema cache". Genau so
+      ging es beim ersten Einsatz: Die Oberflaeche war online, die Datenbank
+      noch nicht — und die Karte zeigte den rohen englischen Text.
+    */
+    if (code === 'PGRST205' || code === '42P01' || m.includes('schema cache')) {
+      return 'Der Vorsorge-Check ist in der Datenbank noch nicht eingerichtet. '
+        + 'Bitte wenden Sie sich an den Betreiber des Rentenplaners.';
+    }
+    if (code === '42501' || m.includes('row-level security')) return 'Keine Berechtigung für diese Anfrage.';
+    if (m.includes('Failed to fetch')) return 'Keine Verbindung zum Server — bitte später erneut versuchen.';
     return m;
   }
   return 'Unbekannter Fehler';
