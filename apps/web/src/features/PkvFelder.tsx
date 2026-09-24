@@ -36,10 +36,11 @@ export function PkvFelder({ wert, onChange, titel, einfach = false }: {
   onChange?: (p: PkvFelderWert) => void;
   titel?: string;
   /**
-   * Ohne die beiden Steigerungssaetze — fuer den Vorsorge-Check. Ein
-   * Endkunde soll dort nicht ueber Beitragsentwicklungen nachdenken muessen;
-   * es gelten die Vorgaben des Rechners, und der Berater passt sie nach der
-   * Uebernahme bei Bedarf an.
+   * Ohne die beiden Steigerungssaetze und ohne den Schalter zum
+   * gesetzlichen Zuschlag — fuer den Vorsorge-Check. Ein Endkunde soll dort
+   * nicht ueber Beitragsentwicklungen nachdenken muessen; es gelten die
+   * Vorgaben des Rechners, und der Berater passt sie nach der Uebernahme bei
+   * Bedarf an.
    */
   einfach?: boolean;
 }) {
@@ -95,6 +96,13 @@ export function PkvFelder({ wert, onChange, titel, einfach = false }: {
         )}
       </div>
 
+      {/*
+        Im einfachen Modus ohne diesen Schalter: Es gilt „ja". Das ist fuer
+        Endkunden die richtige Annahme — der Rechenkern zieht den Zuschlag
+        ohnehin nur ab, wenn jemand heute hoechstens 60 ist; fuer Aeltere
+        wirkt die Vorgabe gar nicht.
+      */}
+      {!einfach && (
       <div className="mt-3">
         <Schalter
           label={`Der gesetzliche Zuschlag von ${Math.round(ZUSCHLAG_QUOTE * 100)} % steckt im Beitrag`}
@@ -107,6 +115,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false }: {
           überschritten hat, lässt den Haken weg.
         </p>
       </div>
+      )}
 
       {/*
         Der Entlastungstarif steht bewusst HIER und nicht in Schicht 3: er
