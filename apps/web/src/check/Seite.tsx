@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ClipboardList, ExternalLink, FileText,
-  Plus, Printer, SkipForward, Trash2,
+  Plus, Printer, Send, SkipForward, Trash2,
 } from 'lucide-react';
 import {
   BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, parseDatum, alterExakt, heute,
   schaetzeEntgeltpunkte, erwerbsBasisHeute, type VertragsTyp,
 } from '@renten/engine';
 import { exportiere } from '@renten/schema';
+import { CHECK_CODE, codePruefen, einreichen, type CodeStatus } from '../lib/check';
 import { Logo } from '../components/Logo';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, TextFeld, AuswahlFeld, Schalter, euro,
@@ -84,9 +85,29 @@ interface Stand {
   abgehakt: string[];
 }
 
+/**
+ * Der Code aus dem Link des Beraters — oder null, wenn die Seite ohne Link
+ * aufgerufen wurde (dann fuehrt sie wie bisher in den eigenen Rechner).
+ */
+const ANFRAGE: string | null = (() => {
+  const a = new URLSearchParams(window.location.search).get('a');
+  return a && CHECK_CODE.test(a) ? a.toLowerCase() : null;
+})();
+
+/*
+  WO DER ZWISCHENSTAND LIEGT. Mit Link des Beraters im localStorage, je Code:
+  Der Kunde fuellt zu Hause aus, holt vielleicht erst morgen die
+  Renteninformation — und soll dann nicht von vorn beginnen. Nach dem
+  Absenden wird der Stand geloescht. Ohne Link bleibt es beim sessionStorage.
+*/
+function speicher(): Storage | null {
+  try { return ANFRAGE ? localStorage : sessionStorage; } catch { return null; }
+}
+const SPEICHER_STAND = ANFRAGE ? `${SPEICHER_CHECK}.${ANFRAGE}` : SPEICHER_CHECK;
+
 function ladeStand(): Stand {
   try {
-    const roh = sessionStorage.getItem(SPEICHER_CHECK);
+    const roh = speicher()?.getItem(SPEICHER_STAND);
     if (roh) {
       const s = JSON.parse(roh) as Stand;
       // Neue Felder spaeterer Fassungen mit Vorgaben auffuellen.
@@ -119,9 +140,35 @@ export function Seite() {
   const [ersetzenOffen, setErsetzenOffen] = useState(false);
   const { antworten: x, schritt } = stand;
 
+  /* --- Anfrage des Beraters --- */
+  const [codeStatus, setCodeStatus] = useState<CodeStatus | 'pruefe'>(ANFRAGE ? 'pruefe' : 'gueltig');
+  const [einwilligung, setEinwilligung] = useState(false);
+  const [senden, setSenden] = useState<'bereit' | 'laeuft' | 'fertig' | 'fehler'>('bereit');
   useEffect(() => {
-    try { sessionStorage.setItem(SPEICHER_CHECK, JSON.stringify(stand)); } catch { /* egal */ }
-  }, [stand]);
+    if (ANFRAGE) void codePruefen(ANFRAGE).then(setCodeStatus);
+  }, []);
+
+  useEffect(() => {
+    if (senden === 'fertig') return;
+    try { speicher()?.setItem(SPEICHER_STAND, JSON.stringify(stand)); } catch { /* egal */ }
+  }, [stand, senden]);
+
+  /** An den Berater, der den Link geschickt hat. */
+  const absenden = async () => {
+    if (!ANFRAGE) return;
+    setSenden('laeuft');
+    const r = await einreichen(ANFRAGE, JSON.parse(exportiere(szenarioAusCheck(x))) as unknown);
+    if (r === 'ok') {
+      try { speicher()?.removeItem(SPEICHER_STAND); } catch { /* egal */ }
+      setSenden('fertig');
+      window.scrollTo({ top: 0 });
+    } else if (r === 'ungueltig') {
+      setCodeStatus('ungueltig');
+      setSenden('bereit');
+    } else {
+      setSenden('fehler');
+    }
+  };
 
   const setze = (p: Partial<Antworten>) =>
     setStand((s) => ({ ...s, antworten: { ...s.antworten, ...p } }));
@@ -140,7 +187,7 @@ export function Seite() {
   const uebernehmen = () => {
     try {
       localStorage.setItem(SPEICHER_SZENARIO, exportiere(szenarioAusCheck(x)));
-      sessionStorage.removeItem(SPEICHER_CHECK);
+      speicher()?.removeItem(SPEICHER_STAND);
     } catch { /* ohne Speicher gibt es keinen Weg in den Rechner */ }
     window.location.href = '/';
   };
@@ -176,6 +223,41 @@ export function Seite() {
           welche Unterlage Sie dafür brauchen. Was Sie gerade nicht zur Hand haben, überspringen
           Sie einfach; es lässt sich später ergänzen.
         </p>
+
+        {/*
+          MIT LINK DES BERATERS. Der Name des Beraters steht hier bewusst
+          NICHT: Konten kann jeder anlegen, ein angezeigter Name bewiese also
+          nichts. Wahr ist allein, dass die Angaben dorthin gehen, woher der
+          Link kam — und genau das steht da.
+        */}
+        {ANFRAGE && senden !== 'fertig' && (
+          <div role="status" className={`mt-4 rounded-lg border px-3 py-2.5 text-sm leading-relaxed ${
+            codeStatus === 'ungueltig' ? 'border-rose-200 bg-rose-50 text-rose-900'
+              : codeStatus === 'fehler' ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-indigo-200 bg-indigo-50 text-indigo-900'
+          }`}>
+            {codeStatus === 'ungueltig'
+              ? <><strong>Dieser Link ist abgelaufen oder wurde schon genutzt.</strong> Bitte fragen Sie
+                  Ihren Berater nach einem neuen Link. Ihre Eingaben bleiben auf diesem Gerät erhalten.</>
+              : codeStatus === 'fehler'
+                ? <>Die Verbindung zum Server ließ sich gerade nicht prüfen. Sie können trotzdem
+                    ausfüllen — beim Absenden wird es erneut versucht.</>
+                : <><strong>Ihr Berater hat Sie um diese Angaben gebeten.</strong> Wenn Sie fertig sind,
+                    senden Sie sie mit einem Klick an ihn — ein Konto brauchen Sie nicht. Ihr
+                    Zwischenstand bleibt auf diesem Gerät gespeichert, bis Sie absenden.</>}
+          </div>
+        )}
+
+        {senden === 'fertig' ? (
+          <section className="mt-6 rounded-2xl border-2 border-emerald-300 bg-white p-6 text-center shadow-sm">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" aria-hidden />
+            <h2 className="mt-3 text-xl font-black text-slate-900">Vielen Dank!</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+              Ihre Angaben sind bei Ihrem Berater angekommen. Er rechnet Ihre Vorsorge damit durch
+              und bespricht das Ergebnis mit Ihnen. Auf diesem Gerät ist nichts mehr gespeichert.
+            </p>
+          </section>
+        ) : (<>
 
         {/* --- Checkliste --- */}
         <section className="mt-5 rounded-2xl border-2 border-emerald-200 bg-white p-4 shadow-sm sm:p-5 print:border-slate-300 print:shadow-none">
@@ -276,7 +358,21 @@ export function Seite() {
           {schritt === 3 && <SchrittRente x={x} personen={personen} setzePerson={setzePerson} />}
           {schritt === 4 && <SchrittVertraege x={x} setze={setze} />}
           {schritt === 5 && <SchrittZiel x={x} setze={setze} />}
-          {schritt === 6 && <SchrittUebersicht x={x} geheZu={geheZu} />}
+          {schritt === 6 && (
+            <SchrittUebersicht
+              x={x}
+              geheZu={geheZu}
+              anfrage={ANFRAGE !== null}
+              einwilligung={einwilligung}
+              setEinwilligung={setEinwilligung}
+            />
+          )}
+          {schritt === 6 && senden === 'fehler' && (
+            <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+              Das Senden hat nicht geklappt — bitte prüfen Sie Ihre Internetverbindung und versuchen
+              Sie es noch einmal. Ihre Angaben sind nicht verloren.
+            </p>
+          )}
 
           {/* Navigation */}
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-indigo-100 pt-4">
@@ -309,6 +405,16 @@ export function Seite() {
                   Weiter <ArrowRight className="h-4 w-4" aria-hidden />
                 </button>
               </>
+            ) : ANFRAGE ? (
+              <button
+                type="button"
+                onClick={() => void absenden()}
+                disabled={!einwilligung || codeStatus === 'ungueltig' || senden === 'laeuft'}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Send className="h-4 w-4" aria-hidden />
+                {senden === 'laeuft' ? 'Wird gesendet …' : 'An meinen Berater senden'}
+              </button>
             ) : (
               <button
                 type="button"
@@ -321,9 +427,13 @@ export function Seite() {
           </div>
         </section>
 
+        </>)}
+
         <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
-          Ihre Angaben bleiben in Ihrem Browser, bis Sie „Ergebnis berechnen“ wählen. Modellrechnung
-          ohne Gewähr; keine Steuer-, Renten- oder Anlageberatung.
+          {ANFRAGE
+            ? 'Ihre Angaben bleiben in Ihrem Browser, bis Sie sie absenden. Übermittelt werden sie verschlüsselt und nur an Ihren Berater.'
+            : 'Ihre Angaben bleiben in Ihrem Browser, bis Sie „Ergebnis berechnen“ wählen.'}{' '}
+          Modellrechnung ohne Gewähr; keine Steuer-, Renten- oder Anlageberatung.
         </p>
       </main>
 
@@ -840,7 +950,14 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
 
 /* --- 7. Uebersicht ---------------------------------------------------------- */
 
-function SchrittUebersicht({ x, geheZu }: { x: Antworten; geheZu: (i: number) => void }) {
+function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }: {
+  x: Antworten;
+  geheZu: (i: number) => void;
+  /** Mit Link des Beraters: senden statt selbst berechnen */
+  anfrage: boolean;
+  einwilligung: boolean;
+  setEinwilligung: (b: boolean) => void;
+}) {
   const namen = x.verheiratet ? `${x.a.name || 'Sie'} und ${x.b.name || 'Partner/in'}` : (x.a.name || 'Sie');
   const zusammenfassung = [
     `${namen}${x.kinder.length > 0 ? `, ${x.kinder.length} Kind${x.kinder.length > 1 ? 'er' : ''}` : ''} · ${x.bundesland}`,
@@ -884,6 +1001,34 @@ function SchrittUebersicht({ x, geheZu }: { x: Antworten; geheZu: (i: number) =>
         })}
       </ul>
 
+      {anfrage ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
+          <strong>So geht es weiter:</strong> Mit „An meinen Berater senden“ gehen Ihre Angaben an
+          den Berater, der Ihnen den Link geschickt hat. Er rechnet damit Ihre Versorgung im
+          Ruhestand durch und bespricht das Ergebnis mit Ihnen.
+          {offen > 0 && (
+            <> {offen === 1 ? 'Ein Schritt ist' : `${offen} Schritte sind`} noch offen — das ist in
+            Ordnung, Ihr Berater ergänzt es mit Ihnen im Gespräch.</>
+          )}
+          {/*
+            EINWILLIGUNG. Die Angaben liegen bis zur Uebernahme auf dem Server.
+            Ohne Haken bleibt der Knopf gesperrt.
+          */}
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md bg-white p-2.5 text-xs leading-relaxed text-slate-700">
+            <input
+              type="checkbox"
+              checked={einwilligung}
+              onChange={(e) => setEinwilligung(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600"
+            />
+            <span>
+              Ich bin einverstanden, dass meine Angaben an meinen Berater übermittelt und für die
+              Beratung gespeichert werden, bis er sie übernommen oder gelöscht hat. Die
+              Einwilligung kann ich jederzeit bei meinem Berater widerrufen.
+            </span>
+          </label>
+        </div>
+      ) : (
       <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
         <strong>So geht es weiter:</strong> Mit „Ergebnis berechnen“ übernimmt der Rentenplaner Ihre
         Angaben und rechnet Ihre Versorgung im Ruhestand durch — Einkünfte, Versorgungslücke,
@@ -894,6 +1039,7 @@ function SchrittUebersicht({ x, geheZu }: { x: Antworten; geheZu: (i: number) =>
           wird dadurch ungenauer, lässt sich im Rechner aber jederzeit ergänzen.</>
         )}
       </div>
+      )}
     </>
   );
 }

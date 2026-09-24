@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
-  List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet,
+  List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -19,6 +19,10 @@ import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
 import { Konto } from './features/Konto';
+import { CheckAnfragen } from './features/CheckAnfragen';
+import { useCheckAnfragen } from './store/check-anfragen';
+import { useAuth } from './store/auth';
+import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
@@ -98,6 +102,20 @@ export default function App() {
   const [menueOffen, setMenueOffen] = useState(false);
   const [basisOffen, setBasisOffen] = useState(true);
   const [kontoOffen, setKontoOffen] = useState(false);
+  const [checkOffen, setCheckOffen] = useState(false);
+
+  /*
+    Angeforderte Vorsorge-Checks laden, sobald jemand angemeldet ist — auch
+    bei geschlossener Karte, damit ihr Kopf zeigen kann, dass ein Kunde
+    geantwortet hat.
+  */
+  const angemeldet = useAuth((s) => s.email);
+  const checkListe = useCheckAnfragen((s) => s.liste);
+  const checkLaden = useCheckAnfragen((s) => s.laden);
+  useEffect(() => {
+    if (supabaseKonfiguriert && angemeldet) void checkLaden();
+  }, [angemeldet, checkLaden]);
+  const neueEingaenge = checkListe.filter((a) => a.eingang).length;
   const [ehepartnerDialog, setEhepartnerDialog] = useState(false);
   const dateiRef = useRef<HTMLInputElement>(null);
 
@@ -454,6 +472,24 @@ export default function App() {
           >
             <Konto />
           </AkkordeonKarte>
+
+          {supabaseKonfiguriert && angemeldet && (
+            <AkkordeonKarte
+              titel="Vorsorge-Check anfordern"
+              offen={checkOffen}
+              onUmschalten={() => setCheckOffen((v) => !v)}
+              symbol={<Inbox className="h-4 w-4 text-indigo-400" aria-hidden />}
+              kopfzeile={neueEingaenge > 0 ? (
+                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  {neueEingaenge} eingegangen
+                </span>
+              ) : undefined}
+              ton="eingabe"
+              klasse="print:hidden"
+            >
+              <CheckAnfragen />
+            </AkkordeonKarte>
+          )}
         </div>
 
         {/* RECHTE SPALTE: ERGEBNIS */}
