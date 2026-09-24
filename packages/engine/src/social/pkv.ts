@@ -271,13 +271,24 @@ export interface BetVergleich {
   jahreEinzahlung: number;
   /** Summe der Beitraege bis zum Beginn der Entlastung, nominal */
   eingezahlt: number;
+  /** Jahre, in denen die Entlastung laeuft — bis zur Lebenserwartung */
+  jahreEntlastung: number;
   /** Summe der Entlastung bis zur Lebenserwartung, nominal */
   erspart: number;
+  /**
+   * Was im selben Zeitraum als RESTBEITRAG weiterlaeuft, nominal.
+   *
+   * Er mindert die Ersparnis: Ohne Entlastungstarif fiele er nicht an.
+   * Vorher stand die Entlastung ungekuerzt gegen die Beitraege — der Tarif
+   * wirkte besser, als er ist.
+   */
+  restbeitrag: number;
   /** Davon als Sonderausgabe abziehbar (Basisanteil) */
   abzugsfaehig: number;
   /**
-   * Alter, in dem die aufgelaufene Entlastung die Beitraege eingeholt hat.
-   * `null`, wenn das nie geschieht — etwa bei einer Entlastung von null.
+   * Alter, in dem die aufgelaufene Entlastung — abzueglich Restbeitrag — die
+   * Beitraege eingeholt hat. `null`, wenn das nie geschieht, etwa bei einer
+   * Entlastung, die den Restbeitrag nicht uebersteigt.
    */
   breakEvenAlter: number | null;
 }
@@ -314,17 +325,109 @@ export function betVergleich(
 
   const eingezahlt = Math.max(0, bet.beitragMonat) * 12 * jahreEinzahlung;
   const erspart = Math.max(0, bet.entlastungMonat) * 12 * jahreEntlastung;
+  const restMonat = Math.max(0, bet.beitragMonat) * Math.max(0, bet.beitragImRuhestand);
+  const restbeitrag = restMonat * 12 * jahreEntlastung;
 
-  const entlastungJahr = Math.max(0, bet.entlastungMonat) * 12;
-  const breakEvenAlter = entlastungJahr > 0
-    ? bet.abAlter + eingezahlt / entlastungJahr
+  const vorteilJahr = (Math.max(0, bet.entlastungMonat) - restMonat) * 12;
+  const breakEvenAlter = vorteilJahr > 0
+    ? bet.abAlter + eingezahlt / vorteilJahr
     : null;
 
   return {
     jahreEinzahlung,
     eingezahlt,
+    jahreEntlastung,
     erspart,
+    restbeitrag,
     abzugsfaehig: eingezahlt * PKV_BASISANTEIL,
     breakEvenAlter,
+  };
+}
+
+/**
+ * Was auf den Entlastungstarif wirkt, ausser ihm selbst.
+ *
+ * Die Saetze kommen vom Aufrufer, weil sie an Dingen haengen, die dieses
+ * Modul nicht kennt: Gehalt, zvE, Familienstand, Erwerbsart.
+ */
+export interface BetNettoSaetze {
+  /**
+   * Anteil des BET-Beitrags, den der Arbeitgeber traegt — 0 bis 0,5.
+   * Der Zuschuss nach § 257 SGB V gilt fuer den Gesamtbeitrag, also auch fuer
+   * den Entlastungstarif, solange der Hoechstzuschuss nicht ausgeschoepft
+   * ist. Selbststaendige und Beamte: 0.
+   */
+  agAnteil: number;
+  /** Steuer je Euro Sonderausgabe HEUTE (Grenzbelastung inkl. Soli, KiSt) */
+  steuersatzHeute: number;
+  /** Dasselbe im Ruhestand */
+  steuersatzRuhestand: number;
+}
+
+/** Der Entlastungstarif nach Arbeitgeberzuschuss und Steuer. */
+export interface BetNetto {
+  /** --- heute, je Monat --- */
+  beitragMonat: number;
+  agMonat: number;
+  /** Steuerersparnis, weil der eigene Anteil als Sonderausgabe zaehlt */
+  steuerMonat: number;
+  /** Was der Tarif heute wirklich kostet */
+  aufwandMonat: number;
+
+  /** --- im Ruhestand, je Monat --- */
+  entlastungMonat: number;
+  restbeitragMonat: number;
+  /**
+   * Steuer, die man MEHR zahlt: Die niedrigere Praemie mindert auch den
+   * Sonderausgabenabzug. Der Restbeitrag bleibt abziehbar — deshalb auf
+   * den Saldo gerechnet.
+   */
+  steuerRuhestandMonat: number;
+  /** Was im Ruhestand wirklich bleibt */
+  ersparnisMonat: number;
+
+  /** --- ueber die Laufzeit, nominal --- */
+  eingezahlt: number;
+  erspart: number;
+  breakEvenAlter: number | null;
+}
+
+/**
+ * Dieselbe Rechnung wie `betVergleich`, aber netto.
+ *
+ * DIE STEUER WIRKT UNGLEICH: Der Beitrag mindert die Steuer zum Grenzsatz
+ * des Berufslebens, die Entlastung kostet Abzug zum meist niedrigeren Satz im
+ * Ruhestand. Dazu traegt bei Angestellten der Arbeitgeber einen Teil des
+ * Beitrags, im Ruhestand gibt es keinen Arbeitgeber mehr. Brutto gerechnet
+ * sah der Tarif deshalb schlechter aus, als er ist.
+ */
+export function betNetto(
+  bet: BetAnnahmen,
+  v: BetVergleich,
+  s: BetNettoSaetze,
+  basisanteil = PKV_BASISANTEIL,
+): BetNetto {
+  const beitragMonat = Math.max(0, bet.beitragMonat);
+  const agMonat = beitragMonat * Math.min(0.5, Math.max(0, s.agAnteil));
+  const eigen = beitragMonat - agMonat;
+  const steuerMonat = eigen * basisanteil * Math.max(0, s.steuersatzHeute);
+  const aufwandMonat = eigen - steuerMonat;
+
+  const entlastungMonat = Math.max(0, bet.entlastungMonat);
+  const restbeitragMonat = beitragMonat * Math.max(0, bet.beitragImRuhestand);
+  const saldo = entlastungMonat - restbeitragMonat;
+  const steuerRuhestandMonat = saldo * basisanteil * Math.max(0, s.steuersatzRuhestand);
+  const ersparnisMonat = saldo - steuerRuhestandMonat;
+
+  const eingezahlt = aufwandMonat * 12 * v.jahreEinzahlung;
+  const erspart = ersparnisMonat * 12 * v.jahreEntlastung;
+  const breakEvenAlter = ersparnisMonat > 0
+    ? bet.abAlter + eingezahlt / (ersparnisMonat * 12)
+    : null;
+
+  return {
+    beitragMonat, agMonat, steuerMonat, aufwandMonat,
+    entlastungMonat, restbeitragMonat, steuerRuhestandMonat, ersparnisMonat,
+    eingezahlt, erspart, breakEvenAlter,
   };
 }

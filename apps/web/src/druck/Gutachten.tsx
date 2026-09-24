@@ -100,8 +100,8 @@ export function Gutachten({
   // Nur bei privat Versicherten mit einem eingetragenen Beitrag; sonst null,
   // und die Seite entfaellt samt Eintrag im Inhaltsverzeichnis.
   const pkv = useMemo(
-    () => pkvRechnen(szenario, zeile.zielNettoMonat),
-    [szenario, zeile.zielNettoMonat],
+    () => pkvRechnen(szenario, zeile),
+    [szenario, zeile],
   );
 
   const gedeckt = zeile.zielNettoMonat > 0

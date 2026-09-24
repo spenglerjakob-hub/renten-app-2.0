@@ -118,32 +118,38 @@ export function Krankenversicherung({
         Schritte.
       </Text>
 
-      {r.bet && (
-        <>
-          <Untertitel>Ihr Beitragsentlastungstarif</Untertitel>
-          <Tabelle kopf={['', 'Betrag']} spalten={[60, 40]}>
-            <Zeile zellen={[`Eingezahlt über ${r.bet.jahreEinzahlung} Jahre`, euro(r.bet.eingezahlt)]} />
-            <Zeile zellen={[`Erspart bis Alter ${LEBENSERWARTUNG}`, euro(r.bet.erspart)]} />
-            <Zeile
-              fett
-              zellen={[
-                'Getragen hat er sich mit',
-                r.bet.breakEvenAlter !== null
-                  ? `${r.bet.breakEvenAlter.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren`
-                  : '—',
-              ]}
-            />
-          </Tabelle>
-          <Text>
-            Nominal addiert, ohne Abzinsung — spätere Euro sind weniger wert, der Vorteil fällt
-            also eine Spur kleiner aus als die rohe Differenz. Die Entlastung ist ein fester
-            Betrag; sie wächst nicht mit, verliert über die Jahre also an Kaufkraft. Als
-            Sonderausgabe abziehbar sind rund {euro(r.bet.abzugsfaehig)} der eingezahlten Beiträge
-            (§ 10 Abs. 1 Nr. 3 EStG) — anders als sonstige Vorsorgeaufwendungen sind sie nicht
-            durch einen Höchstbetrag gedeckelt.
-          </Text>
-        </>
-      )}
+      {r.bet && r.betNetto && (() => {
+        const bet = r.bet;
+        const n = r.betNetto;
+        const alter = (x: number | null) =>
+          x !== null ? `${x.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren` : 'nie';
+        return (
+          <>
+            <Untertitel>Ihr Beitragsentlastungstarif</Untertitel>
+            {/* Brutto aus dem Vertrag, netto nach Arbeitgeberzuschuss und
+                Steuer — dieselbe Rechnung wie am Bildschirm. */}
+            <Tabelle kopf={['', 'Brutto', 'Netto']} spalten={[52, 24, 24]}>
+              <Zeile zellen={['Beitrag heute im Monat', euro(n.beitragMonat), euro(n.aufwandMonat)]} />
+              <Zeile zellen={[
+                `Ab ${r.betAbAlter} im Monat gespart`,
+                euro(n.entlastungMonat - n.restbeitragMonat), euro(n.ersparnisMonat),
+              ]} />
+              <Zeile zellen={[`Eingezahlt über ${bet.jahreEinzahlung} Jahre`, euro(bet.eingezahlt), euro(n.eingezahlt)]} />
+              <Zeile zellen={[
+                `Erspart bis Alter ${LEBENSERWARTUNG}`, euro(bet.erspart - bet.restbeitrag), euro(n.erspart),
+              ]} />
+              <Zeile fett zellen={['Getragen hat er sich mit', alter(bet.breakEvenAlter), alter(n.breakEvenAlter)]} />
+            </Tabelle>
+            {/* Knapp: Die Seite ist ohne diesen Block schon fast voll, und
+                die Herleitung steht ausfuehrlich am Bildschirm. */}
+            <Text>
+              <strong>Netto</strong> nach{n.agMonat >= 0.5 ? ` ${euro(n.agMonat)} AG-Zuschuss,` : ''} Steuer
+              ({prozent(n.steuersatzHeute, 0)} heute, {prozent(n.steuersatzRuhestand, 0)} im Ruhestand)
+              und {euro(n.restbeitragMonat)} Restbeitrag ab {r.betAbAlter}; nominal addiert.
+            </Text>
+          </>
+        );
+      })()}
 
       <Text>
         In der privaten Krankenversicherung fallen auf <strong>keine</strong> Ihrer übrigen

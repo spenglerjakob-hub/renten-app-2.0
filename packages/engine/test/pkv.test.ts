@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  pkvImJahr, pkvVerlauf, arbeitgeberzuschuss, betVergleich,
-  PKV_VORGABE, ZUSCHLAG_QUOTE,
+  pkvImJahr, pkvVerlauf, arbeitgeberzuschuss, betVergleich, betNetto,
+  PKV_VORGABE, PKV_BASISANTEIL, ZUSCHLAG_QUOTE,
   type PkvAnnahmen, type BetAnnahmen,
 } from '../src/social/pkv.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -187,13 +187,19 @@ describe('Beitragsentlastungstarif', () => {
     expect(betVergleich(bet, 40, 85, 2026)).toEqual(betVergleich(bet, 40, 85));
   });
 
-  it('nennt das Alter, ab dem sich der Tarif getragen hat', () => {
-    // 27 Jahre a 1 200 EUR = 32 400 EUR eingezahlt, 3 000 EUR Entlastung im
-    // Jahr — nach 10,8 Jahren ist er drin.
+  it('nennt das Alter, ab dem sich der Tarif getragen hat — nach Restbeitrag', () => {
+    // 27 Jahre a 1 200 EUR = 32 400 EUR eingezahlt. Im Ruhestand 250 EUR
+    // Entlastung, aber 25 EUR Restbeitrag laufen weiter: 2 700 EUR Vorteil im
+    // Jahr — nach 12 Jahren ist er drin, nicht nach 10,8.
     const v = betVergleich(bet, 40, 85);
     expect(v.eingezahlt).toBeCloseTo(100 * 12 * 27, 6);
     expect(v.erspart).toBeCloseTo(250 * 12 * 18, 6);
-    expect(v.breakEvenAlter).toBeCloseTo(67 + 32_400 / 3_000, 6);
+    expect(v.restbeitrag).toBeCloseTo(25 * 12 * 18, 6);
+    expect(v.breakEvenAlter).toBeCloseTo(67 + 32_400 / 2_700, 6);
+  });
+
+  it('traegt sich nie, wenn der Restbeitrag die Entlastung aufzehrt', () => {
+    expect(betVergleich({ ...bet, entlastungMonat: 25 }, 40, 85).breakEvenAlter).toBeNull();
   });
 
   it('kennt kein Break-even ohne Entlastung', () => {
@@ -202,6 +208,44 @@ describe('Beitragsentlastungstarif', () => {
 
   it('ist sofort drin, wenn er nichts kostet', () => {
     expect(betVergleich({ ...bet, beitragMonat: 0 }, 40, 85).breakEvenAlter).toBe(67);
+  });
+});
+
+describe('Entlastungstarif netto', () => {
+  const bet: BetAnnahmen = {
+    aktiv: true, beitragMonat: 100, entlastungMonat: 300, abAlter: 67, beitragImRuhestand: 0.25,
+  };
+  const v = betVergleich(bet, 40, 85);
+
+  it('zieht heute Arbeitgeberanteil und Steuer ab', () => {
+    const n = betNetto(bet, v, { agAnteil: 0.5, steuersatzHeute: 0.42, steuersatzRuhestand: 0.25 });
+    expect(n.agMonat).toBeCloseTo(50, 6);
+    // Abziehbar ist nur der EIGENE Anteil, davon der Basisanteil.
+    expect(n.steuerMonat).toBeCloseTo(50 * PKV_BASISANTEIL * 0.42, 6);
+    expect(n.aufwandMonat).toBeCloseTo(50 - 50 * PKV_BASISANTEIL * 0.42, 6);
+  });
+
+  it('kuerzt die Entlastung um Restbeitrag und verlorenen Abzug', () => {
+    const n = betNetto(bet, v, { agAnteil: 0.5, steuersatzHeute: 0.42, steuersatzRuhestand: 0.25 });
+    expect(n.restbeitragMonat).toBeCloseTo(25, 6);
+    expect(n.steuerRuhestandMonat).toBeCloseTo(275 * PKV_BASISANTEIL * 0.25, 6);
+    expect(n.ersparnisMonat).toBeCloseTo(275 - 275 * PKV_BASISANTEIL * 0.25, 6);
+    expect(n.eingezahlt).toBeCloseTo(n.aufwandMonat * 12 * 27, 6);
+    expect(n.erspart).toBeCloseTo(n.ersparnisMonat * 12 * 18, 6);
+  });
+
+  it('traegt sich netto frueher als brutto, wenn heute hoeher besteuert wird', () => {
+    const angestellt = betNetto(bet, v, { agAnteil: 0.5, steuersatzHeute: 0.42, steuersatzRuhestand: 0.25 });
+    const selbst = betNetto(bet, v, { agAnteil: 0, steuersatzHeute: 0.42, steuersatzRuhestand: 0.25 });
+    expect(angestellt.breakEvenAlter!).toBeLessThan(selbst.breakEvenAlter!);
+    expect(selbst.breakEvenAlter!).toBeLessThan(v.breakEvenAlter!);
+  });
+
+  it('ohne Steuer und Zuschuss gleich der Bruttorechnung', () => {
+    const n = betNetto(bet, v, { agAnteil: 0, steuersatzHeute: 0, steuersatzRuhestand: 0 });
+    expect(n.eingezahlt).toBeCloseTo(v.eingezahlt, 6);
+    expect(n.erspart).toBeCloseTo(v.erspart - v.restbeitrag, 6);
+    expect(n.breakEvenAlter).toBeCloseTo(v.breakEvenAlter!, 6);
   });
 });
 

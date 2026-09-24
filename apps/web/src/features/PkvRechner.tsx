@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, HeartPulse, Mail } from 'lucide-react';
-import { ZUSCHLAG_BIS_ALTER, type Jahreszeile } from '@renten/engine';
+import { ZUSCHLAG_BIS_ALTER, PKV_BASISANTEIL, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { euro, prozent } from '../components/Feld';
+import { euro, prozent, InfoPunkt } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
-import { pkvRechnen, LEBENSERWARTUNG, SCHWELLE_ANTEIL } from './pkv-berechnung';
+import { pkvRechnen, LEBENSERWARTUNG, SCHWELLE_ANTEIL, type PkvErgebnis } from './pkv-berechnung';
 
 /**
  * Was die private Krankenversicherung im Ruhestand kostet.
@@ -19,8 +19,8 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
   const [offen, setOffen] = useState(false);
 
   const r = useMemo(
-    () => pkvRechnen(szenario, zeile.zielNettoMonat),
-    [szenario, zeile.zielNettoMonat],
+    () => pkvRechnen(szenario, zeile),
+    [szenario, zeile],
   );
 
   if (r === null) return null;
@@ -30,9 +30,8 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
   /*
     Beide Angaben stehen nebeneinander, weil sie verschiedene Dinge sind: der
     Entlastungstarif erhoeht, was heute abfliesst, der Arbeitgeberzuschuss
-    senkt es. Und er haengt an der PRAEMIE, nicht am Entlastungstarif — ihn
-    ohne diesen Zusatz neben einer Summe zu nennen, die beides enthaelt,
-    liesse ihn groesser wirken, als er ist.
+    senkt es. Der Zuschuss gilt fuer den GESAMTbeitrag, den Entlastungstarif
+    eingeschlossen — bis zum Hoechstzuschuss. Selbststaendige bekommen keinen.
   */
   const teile: string[] = [];
   if (r.heute.betBeitragMonat > 0) {
@@ -102,31 +101,8 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           hier <strong>nicht</strong> gerechnet, die Kurve fällt insoweit eher zu hoch aus.
         </p>
 
-        {r.bet && (
-          <div className="mt-5">
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Ihr Beitragsentlastungstarif
-            </div>
-            <dl className="grid gap-2 sm:grid-cols-3">
-              <Wert titel="Eingezahlt bis dahin" wert={euro(r.bet.eingezahlt)}
-                hinweis={`${r.bet.jahreEinzahlung} Jahre`} />
-              <Wert titel={`Erspart bis ${LEBENSERWARTUNG}`} wert={euro(r.bet.erspart)} />
-              <Wert
-                titel="Getragen hat er sich mit"
-                wert={r.bet.breakEvenAlter !== null
-                  ? `${r.bet.breakEvenAlter.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren`
-                  : '—'}
-                hinweis={r.bet.breakEvenAlter !== null ? '' : 'ohne Entlastung nie'}
-              />
-            </dl>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-              Nominal addiert, ohne Abzinsung — spätere Euro sind weniger wert, der Vorteil fällt
-              also eine Spur kleiner aus als die rohe Differenz. Als Sonderausgabe abziehbar sind
-              nach § 10 Abs. 1 Nr. 3 EStG rund {euro(r.bet.abzugsfaehig)} der eingezahlten Beiträge;
-              anders als sonstige Vorsorgeaufwendungen sind sie nicht durch einen Höchstbetrag
-              gedeckelt.
-            </p>
-          </div>
+        {r.bet && r.betNetto && (
+          <BetKarte bet={r.bet} n={r.betNetto} abAlter={r.betAbAlter} />
         )}
 
         {/*
@@ -219,6 +195,82 @@ function Verlaufskurve({ punkte, schmal }: {
   );
 }
 
+/**
+ * Der Entlastungstarif brutto UND netto.
+ *
+ * Brutto steht weiter da, weil es die Zahlen des Versicherers sind und man
+ * sie im Vertrag wiederfindet. Netto ist, was entscheidet: Heute tragen
+ * Arbeitgeber und Finanzamt einen Teil des Beitrags, im Ruhestand kostet die
+ * niedrigere Praemie Sonderausgabenabzug — zu einem meist niedrigeren Satz.
+ */
+function BetKarte({ bet, n, abAlter }: {
+  bet: NonNullable<PkvErgebnis['bet']>;
+  n: NonNullable<PkvErgebnis['betNetto']>;
+  abAlter: number;
+}) {
+  const alter = (x: number | null) =>
+    x !== null ? `${x.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren` : 'nie';
+  const zeilen: [string, string, string][] = [
+    ['Beitrag heute im Monat', euro(n.beitragMonat), euro(n.aufwandMonat)],
+    [`Ab ${abAlter} im Monat gespart`, euro(n.entlastungMonat - n.restbeitragMonat), euro(n.ersparnisMonat)],
+    [`Eingezahlt über ${bet.jahreEinzahlung} Jahre`, euro(bet.eingezahlt), euro(n.eingezahlt)],
+    [`Erspart bis ${LEBENSERWARTUNG}`, euro(bet.erspart - bet.restbeitrag), euro(n.erspart)],
+    ['Getragen hat er sich mit', alter(bet.breakEvenAlter), alter(n.breakEvenAlter)],
+  ];
+  return (
+    <div className="mt-5">
+      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        Ihr Beitragsentlastungstarif
+      </div>
+      <table className="w-full overflow-hidden rounded-lg border border-slate-200 text-xs tabular-nums">
+        <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
+          <tr>
+            <th className="px-2.5 py-1.5 text-left font-bold" />
+            <th className="px-2.5 py-1.5 text-right font-bold">Brutto</th>
+            <th className="px-2.5 py-1.5 text-right font-bold text-emerald-700">
+              Netto
+              <InfoPunkt titel="Wie aus brutto netto wird">
+                <strong>Heute:</strong>{' '}
+                {n.agMonat >= 0.5
+                  ? <>Von {euro(n.beitragMonat)} Beitrag trägt Ihr Arbeitgeber {euro(n.agMonat)}.</>
+                  : <>Einen Arbeitgeberzuschuss auf die {euro(n.beitragMonat)} gibt es nicht —
+                      Selbstständige und Beamte bekommen keinen, Angestellte nicht mehr, wenn die
+                      Prämie den Höchstzuschuss schon ausschöpft.</>}{' '}
+                Ihr eigener Anteil zählt zu {prozent(PKV_BASISANTEIL, 0)} als Sonderausgabe und spart
+                bei Ihrem heutigen Steuersatz {euro(n.steuerMonat)} — so kostet der Tarif Sie{' '}
+                {euro(n.aufwandMonat)}.{' '}
+                <strong>Ab {abAlter}:</strong> {euro(n.entlastungMonat)} Entlastung, abzüglich{' '}
+                {euro(n.restbeitragMonat)} Restbeitrag, der weiterläuft. Die niedrigere Prämie
+                mindert aber auch Ihren Sonderausgabenabzug; das kostet zum Steuersatz im Ruhestand{' '}
+                {euro(n.steuerRuhestandMonat)}. Es bleiben {euro(n.ersparnisMonat)}. Gerechnet mit{' '}
+                {prozent(n.steuersatzHeute, 0)} heute und {prozent(n.steuersatzRuhestand, 0)} im
+                Ruhestand, jeweils je Euro Sonderausgabe samt Soli und Kirchensteuer.
+              </InfoPunkt>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {zeilen.map(([text, brutto, netto], i) => (
+            <tr key={text} className={`border-t border-slate-100 ${i === zeilen.length - 1 ? 'font-bold' : ''}`}>
+              <td className="px-2.5 py-1.5 text-slate-600">{text}</td>
+              <td className="px-2.5 py-1.5 text-right text-slate-500">{brutto}</td>
+              <td className="px-2.5 py-1.5 text-right font-semibold text-slate-900">{netto}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        Brutto sind die Beträge aus dem Vertrag, die Ersparnis schon nach dem Restbeitrag.{' '}
+        <strong>Netto</strong> nach Arbeitgeberzuschuss und Steuer — darauf kommt es an: Den
+        Beitrag mindert heute Ihr höherer Steuersatz, die Entlastung kostet im Ruhestand Abzug zu
+        einem meist niedrigeren. Nominal addiert, ohne Abzinsung; die Entlastung ist ein fester
+        Betrag und verliert über die Jahre an Kaufkraft. Den genauen abziehbaren Anteil nennt die
+        Beitragsbescheinigung Ihres Versicherers.
+      </p>
+    </div>
+  );
+}
+
 function Kachel({ titel, wert, hinweis, akzent }: {
   titel: string; wert: string; hinweis: string; akzent?: boolean;
 }) {
@@ -229,16 +281,6 @@ function Kachel({ titel, wert, hinweis, akzent }: {
         {wert}
       </div>
       <div className="mt-0.5 text-[10px] leading-tight text-slate-500">{hinweis}</div>
-    </div>
-  );
-}
-
-function Wert({ titel, wert, hinweis }: { titel: string; wert: string; hinweis?: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</dt>
-      <dd className="mt-0.5 text-sm font-black tabular-nums text-slate-900">{wert}</dd>
-      {hinweis && <dd className="text-[10px] text-slate-500">{hinweis}</dd>}
     </div>
   );
 }
