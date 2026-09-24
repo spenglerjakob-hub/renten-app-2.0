@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ClipboardList, FileText,
+  ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ClipboardList, ExternalLink, FileText,
   Plus, Printer, SkipForward, Trash2,
 } from 'lucide-react';
 import {
@@ -36,15 +36,22 @@ import {
  */
 
 const SPEICHER_CHECK = 'rentenplaner.check.v1';
+/** Online-Dienste der Deutschen Rentenversicherung — dort laesst sich die Rentenauskunft anfordern. */
+const DRV_ESERVICE = 'https://www.eservice-drv.de/SelfServiceWeb/';
 const SPEICHER_SZENARIO = 'rentenplaner.szenario.v1';
 const JETZT = new Date().getFullYear();
 
 /** Die Unterlagen, die man vorher bereitlegt — die Checkliste oben. */
-const UNTERLAGEN: { id: string; titel: string; text: string }[] = [
+const UNTERLAGEN: { id: string; titel: string; text: string; link?: { href: string; text: string } }[] = [
   { id: 'ausweis', titel: 'Personalausweis', text: 'Ihr Geburtsdatum, bei Kindern die Geburtsjahre.' },
   { id: 'gehalt', titel: 'Letzte Gehaltsabrechnung', text: 'Beamte: Bezügemitteilung. Selbstständige: letzter Steuerbescheid.' },
   { id: 'kv', titel: 'Krankenversicherung', text: 'Name Ihrer Krankenkasse — oder die Beitragsrechnung Ihrer privaten Versicherung.' },
-  { id: 'rente', titel: 'Renteninformation', text: 'Von der Deutschen Rentenversicherung, kommt jährlich per Post. Beamte: Versorgungsauskunft.' },
+  {
+    id: 'rente', titel: 'Renteninformation',
+    text: 'Von der Deutschen Rentenversicherung, kommt jährlich per Post. Beamte: Versorgungsauskunft. Nicht zur Hand? Online anfordern:',
+    // Die Adresse steht als Linktext, damit sie auch auf der gedruckten Liste lesbar ist.
+    link: { href: DRV_ESERVICE, text: 'www.eservice-drv.de/SelfServiceWeb' },
+  },
   { id: 'vertraege', titel: 'Standmitteilungen', text: 'Jährliches Schreiben jedes Vorsorgevertrags: Betriebsrente, Riester, Rürup, private Rente.' },
   { id: 'depot', titel: 'Depotauszug', text: 'Aktueller Wert und Sparrate Ihrer Wertpapierdepots.' },
 ];
@@ -201,7 +208,18 @@ export function Seite() {
                       <span className={`block text-sm font-semibold ${erledigt ? 'text-emerald-700' : 'text-slate-800'}`}>
                         {u.titel}
                       </span>
-                      <span className="block text-xs leading-relaxed text-slate-500">{u.text}</span>
+                      <span className="block text-xs leading-relaxed text-slate-500">
+                        {u.text}
+                        {u.link && (
+                          <>
+                            {' '}
+                            <a href={u.link.href} target="_blank" rel="noopener noreferrer"
+                              className="font-semibold text-indigo-700 underline hover:text-indigo-900">
+                              {u.link.text}
+                            </a>
+                          </>
+                        )}
+                      </span>
                     </span>
                   </label>
                 </li>
@@ -571,7 +589,21 @@ function SchrittRente({ x, personen, setzePerson }: {
         Die <strong>Renteninformation</strong> der Deutschen Rentenversicherung (kommt jährlich ab
         27): der Betrag unter <em>„Höhe Ihrer künftigen Regelaltersrente“</em>. Beamte: die{' '}
         <strong>Versorgungsauskunft</strong> Ihres Dienstherrn mit dem Ruhegehaltssatz. Keine
-        Renteninformation zur Hand? Dann schätzen wir aus Ihrem Einkommen.
+        Renteninformation zur Hand? Dann schätzen wir aus Ihrem Einkommen — oder Sie fordern sie an.
+        {/*
+          Der Weg zur genauen Zahl. Die Schaetzung ist eine Notloesung; wer die
+          Renteninformation nicht findet, soll sie mit einem Klick anfordern
+          koennen, statt sie im Keller zu suchen.
+        */}
+        <a
+          href={DRV_ESERVICE}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+        >
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          Renteninformation / Rentenauskunft online anfordern (Deutsche Rentenversicherung)
+        </a>
       </Unterlage>
       {personen.map(([id, name]) => (
         <RenteJePerson key={id} p={x[id]} name={personen.length > 1 ? name : undefined}
