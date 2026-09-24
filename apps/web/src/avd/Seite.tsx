@@ -1,10 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
-  CalendarClock, Calculator, Eraser, Gift, Info, LineChart, Mail, TrendingUp,
+  CalendarClock, Calculator, Eraser, Gift, Info, LineChart, Mail, Printer, TrendingUp,
 } from 'lucide-react';
 import {
   avdZulagen, avdAnsparphase, avdSteuervorteil, avdProfitabilitaet,
-  parameterFuer, regelaltersrentenbeginn, parseDatum, bruttoZuNetto,
+  parameterFuer, regelaltersrentenbeginn, parseDatum, toDe, bruttoZuNetto,
   type AvdKind,
 } from '@renten/engine';
 import { Logo } from '../components/Logo';
@@ -189,7 +189,7 @@ export function Seite() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800">
+    <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
       <header className="bg-slate-900 text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
           <Logo klasse="h-9 w-9" />
@@ -207,7 +207,9 @@ export function Seite() {
         {/* Drei kurze Punkte statt eines Absatzes: Wer die Seite ueber einen
             QR-Code auf dem Telefon oeffnet, ueberspringt einen Textblock — drei
             Zeilen mit Symbol liest er. */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {/* Im Druck entfallen die drei Werbepunkte: Das Blatt ist ein
+            Ergebnis, keine Landingpage. */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3 print:hidden">
           <Punkt
             symbol={<CalendarClock className="h-5 w-5 text-indigo-600" aria-hidden />}
             titel={`Ab ${a.abJahr}`}
@@ -225,21 +227,57 @@ export function Seite() {
           />
         </div>
 
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600">
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600 print:hidden">
           Rechnen Sie hier aus, was das in Ihrem Fall bedeutet.
         </p>
+
+        {/*
+          DIE ANGABEN FUER DAS PAPIER. Die Eingabespalte besteht aus
+          Formularfeldern, Schnellwahlknoepfen und Hilfetexten — gedruckt
+          ergaebe das Kaesten und Knoepfe ohne Sinn. Stattdessen stehen die
+          Werte hier als Text, und die Eingabespalte entfaellt im Druck.
+        */}
+        <section className="mt-4 hidden break-inside-avoid rounded-lg border border-slate-300 p-3 print:block">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
+            <span className="text-[10px] text-slate-500">
+              {istBeispiel ? 'Beispielwerte · ' : ''}Erstellt am {new Date().toLocaleDateString('de-DE')}
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-8 gap-y-1 text-xs">
+            <DruckAngabe feld="Beitrag monatlich" wert={euro(beitragMonat)} />
+            <DruckAngabe
+              feld="Geburtsdatum"
+              wert={geburt ? `${toDe(geburt)}${rentenbeginn ? ` · Rente ab ${String(rentenbeginn.monat).padStart(2, '0')}/${rentenbeginn.jahr}` : ''}` : '—'}
+            />
+            <DruckAngabe
+              feld="Kinder mit Kindergeldanspruch"
+              wert={kinder > 0
+                ? `${kinder} (geboren ${kinderListe.map((k) => k.geburtsjahr).join(', ')})`
+                : 'keine'}
+            />
+            <DruckAngabe feld="Bruttoeinkommen im Jahr" wert={bruttoJahr > 0 ? euro(bruttoJahr) : '—'} />
+            <DruckAngabe feld="Familienstand" wert={verheiratet ? 'verheiratet (Splittingtarif)' : 'ledig'} />
+            <DruckAngabe
+              feld="Rendite / Effektivkosten p. a."
+              wert={`${prozent(rendite)} / ${prozent(KOSTEN)}`}
+            />
+          </dl>
+        </section>
 
         {/* Angaben links, Wirkung rechts: so sieht man beim Tippen sofort, was
             sich aendert. Die linke Spalte bleibt beim Scrollen stehen; auf
             schmalen Geraeten stapelt das Raster wie bisher. */}
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
-        <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-4 lg:self-start">
+        {/* Im Druck kein Raster: Chrome bricht Rasterzellen nur ungern um
+            und schob jeden Abschnitt auf ein eigenes Blatt. */}
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-4 print:block">
+        <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-4 lg:self-start print:hidden">
 
         {/* --- Rechner ---
             Eingabe und Ergebnis sollen sich auf den ersten Blick unterscheiden:
             die Eingabespalte steht auf getoentem Grund mit kraeftigem Rand, die
             Ergebnisse rechts auf weissen Karten. */}
-        <section className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6">
+        <section className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6 print:hidden">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
             {istBeispiel && (
@@ -369,6 +407,16 @@ export function Seite() {
             >
               <Mail className="h-4 w-4" aria-hidden /> Beratung gewünscht
             </button>
+            {/* Der Browser-Druck genuegt: Die Eingabespalte ist im Druck
+                durch eine Textfassung ersetzt, Knoepfe und Dialoge
+                entfallen, der Rest steht untereinander. */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <Printer className="h-3.5 w-3.5" aria-hidden /> Ergebnis drucken
+            </button>
             <button
               type="button"
               onClick={leeren}
@@ -383,7 +431,7 @@ export function Seite() {
         <div className="space-y-4 lg:col-span-7">
 
         {/* --- Profitabilitaet --- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:p-3 print:shadow-none">
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
             <Calculator className="h-4 w-4" aria-hidden /> Was es kostet, was es bringt
           </h2>
@@ -467,7 +515,7 @@ export function Seite() {
         </section>
 
         {/* --- Zulagen --- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:p-3 print:shadow-none">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Ihre Förderung je Jahr
           </h2>
@@ -576,7 +624,7 @@ export function Seite() {
         </section>
 
         {/* --- Hochrechnung --- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 print:p-3 print:shadow-none">
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
             <TrendingUp className="h-4 w-4" aria-hidden /> Bis zu Ihrem Rentenbeginn
           </h2>
@@ -723,6 +771,15 @@ export function Seite() {
         empfaenger={BERATER_MAIL}
         eckdaten={eckdaten}
       />
+    </div>
+  );
+}
+
+function DruckAngabe({ feld, wert }: { feld: string; wert: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-dotted border-slate-200 py-0.5">
+      <dt className="text-slate-600">{feld}</dt>
+      <dd className="text-right font-semibold tabular-nums text-slate-900">{wert}</dd>
     </div>
   );
 }

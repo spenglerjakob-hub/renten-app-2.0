@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Gift } from 'lucide-react';
 import { foerdercheck, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { euro, InfoPunkt } from '../components/Feld';
+import { euro, euroGenau, InfoPunkt } from '../components/Feld';
 import { foerderBasis } from './tuev-berechnung';
 
 /**
@@ -156,6 +156,18 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                     <strong>{euro(b.probeMonat)}</strong> im Monat kosten Sie nach Förderung nur{' '}
                     <strong>{euro(b.nettoAufwandMonat)}</strong> — der Staat trägt{' '}
                     {Math.round(b.foerderquote * 100)} % ({euro(b.ersparnisJahr / 12)} im Monat).
+                    {/*
+                      Der Pflichtzuschuss des Arbeitgebers kommt OBENDRAUF wie
+                      eine Zulage — er gehoert in den Vertrag, nicht in den
+                      Aufwand.
+                    */}
+                    {(b.agZuschussMonat ?? 0) >= 0.5 && (
+                      <>
+                        {' '}Dazu legt Ihr Arbeitgeber <strong>{euroGenau(b.agZuschussMonat!)}</strong>{' '}
+                        obendrauf (§ 1a Abs. 1a BetrAVG) — im Vertrag landen{' '}
+                        <strong>{euroGenau(b.zuflussMonat ?? b.probeMonat)}</strong>.
+                      </>
+                    )}
                   </>
                 )}
                 <InfoPunkt titel="Wie die Förderquote entsteht">
@@ -176,6 +188,13 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                       {euro(b.ersparnisJahr)} im Jahr, also{' '}
                       {Math.round(b.foerderquote * 100)} % des Einsatzes. Ihr persönlicher
                       Steuersatz bestimmt diese Quote; sie ist keine feste Zusage.
+                      {(b.agZuschussMonat ?? 0) >= 0.5 && (
+                        <>
+                          {' '}Der Arbeitgeberzuschuss ist Pflicht: 15 % des umgewandelten Betrags,
+                          soweit er selbst Sozialabgaben spart — gilt für Direktversicherung,
+                          Pensionskasse und Pensionsfonds; ein Tarifvertrag kann abweichen.
+                        </>
+                      )}
                     </>
                   )}
                 </InfoPunkt>

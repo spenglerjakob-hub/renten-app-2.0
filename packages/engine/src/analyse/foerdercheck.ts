@@ -56,6 +56,16 @@ const PROBE_HOECHSTENS = 250;
  */
 const GRENZWIRKUNG_SCHWELLE = 0.35;
 
+/**
+ * Pflichtzuschuss des Arbeitgebers zur Entgeltumwandlung (§ 1a Abs. 1a
+ * BetrAVG, eingefuehrt mit dem Betriebsrentenstaerkungsgesetz): 15 % des
+ * umgewandelten Betrags, soweit der Arbeitgeber dadurch Sozialversicherungs-
+ * beitraege spart. Seit 2022 fuer ALLE Entgeltumwandlungen in Direkt-
+ * versicherung, Pensionskasse und Pensionsfonds. Ein Tarifvertrag kann
+ * abweichen.
+ */
+export const BAV_AG_PFLICHTZUSCHUSS = 0.15;
+
 /** Unter dieser Deckung gilt die gesetzliche Rente als schwache Grundlage. */
 const DECKUNG_SCHWACH = 0.5;
 
@@ -162,6 +172,12 @@ export interface FoerderBefund {
    * Gutachten nicht zwei Summen bilden.
    */
   zuflussMonat?: number;
+  /**
+   * Nur bei der bAV: der Pflichtzuschuss des Arbeitgebers auf den
+   * Beispielbeitrag, im Monat (§ 1a Abs. 1a BetrAVG). Er kommt OBENDRAUF wie
+   * eine Zulage und mindert den eigenen Aufwand nicht.
+   */
+  agZuschussMonat?: number;
   /**
    * Foerderquote: Foerderung je eingesetztem Euro.
    *
@@ -423,8 +439,22 @@ function bavBefund(
   const rahmenMonat = svRahmen / 12;
   if (rahmenMonat < BAGATELLE_BAV) return null;
 
-  const probeJahr = Math.min(svRahmen, PROBE_HOECHSTENS * 12);
+  /*
+    Der Pflichtzuschuss des Arbeitgebers verbraucht den Rahmen mit — die
+    Grenzen gelten fuer die Summe aller Beitraege. Der Beispielbeitrag ist
+    deshalb so gewaehlt, dass Beitrag UND Zuschuss in den freien Rahmen passen.
+  */
+  const probeJahr = Math.min(svRahmen / (1 + BAV_AG_PFLICHTZUSCHUSS), PROBE_HOECHSTENS * 12);
   const wirkung = svWirkung(probeJahr, k, p);
+  /*
+    15 %, aber nur „soweit" der Arbeitgeber Beitraege spart. Seine Ersparnis
+    entspricht im Wesentlichen der des Arbeitnehmers; bei privat Versicherten
+    kommt der Zuschuss zur Krankenversicherung dazu, den er nicht mehr zahlt.
+    Oberhalb der Beitragsbemessungsgrenzen spart er nichts mehr — dann
+    schuldet er auch keinen Zuschuss.
+  */
+  const agErsparnis = Math.max(0, wirkung.ersparnis + wirkung.verlorenerZuschuss);
+  const agZuschussJahr = Math.min(BAV_AG_PFLICHTZUSCHUSS * probeJahr, agErsparnis);
   /*
     Wie im TUEV: die Umwandlung mindert das zvE nicht um den vollen Betrag,
     weil mit dem Bruttolohn auch die abziehbaren Vorsorgeaufwendungen sinken.
@@ -465,6 +495,8 @@ function bavBefund(
     probeMonat: probeJahr / 12,
     ersparnisJahr,
     nettoAufwandMonat: Math.max(0, probeJahr - ersparnisJahr) / 12,
+    zuflussMonat: (probeJahr + agZuschussJahr) / 12,
+    agZuschussMonat: agZuschussJahr / 12,
     foerderquote: probeJahr > 0 ? ersparnisJahr / probeJahr : 0,
     text,
     hinweis,

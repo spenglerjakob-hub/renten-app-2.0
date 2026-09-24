@@ -98,7 +98,7 @@ export {
   type SvKontext, type SvWirkung,
 } from './analyse/vertrags-tuev.js';
 export {
-  foerdercheck, basisrahmenJahr,
+  foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,
   type FoerderKontext, type FoerderBefund,
 } from './analyse/foerdercheck.js';
 

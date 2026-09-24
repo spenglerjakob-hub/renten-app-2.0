@@ -14,8 +14,7 @@ import type { SzenarioParsed } from '../store/szenario';
  *
  * Deshalb wird die Alternative WIRKLICH GERECHNET und nicht beschrieben:
  * `projiziere` ist eine reine Funktion eines einfachen Objekts und laesst
- * sich auf einem Klon ein zweites Mal aufrufen — dasselbe Vorgehen wie auf
- * der Stellschrauben-Seite des Gutachtens.
+ * sich auf einem Klon ein zweites Mal aufrufen.
  */
 export function KvdrHinweis({ szenario }: { szenario: SzenarioParsed }) {
   const unterschied = useMemo(() => {

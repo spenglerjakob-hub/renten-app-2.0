@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  foerdercheck, basisrahmenJahr, type FoerderKontext,
+  foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS, type FoerderKontext,
 } from '../src/analyse/foerdercheck.js';
 import { SV_FREI_QUOTE, STEUER_FREI_QUOTE } from '../src/analyse/vertrags-tuev.js';
 import { avdSteuervorteil } from '../src/products/altersvorsorgedepot.js';
@@ -126,6 +126,39 @@ describe('Fördercheck — betriebliche Altersvorsorge', () => {
     expect(b.ersparnisJahr).toBeGreaterThan(0);
     expect(b.nettoAufwandMonat).toBeLessThan(b.probeMonat);
     expect(b.nettoAufwandMonat).toBeGreaterThan(0);
+  });
+
+  it('legt den Pflichtzuschuss des Arbeitgebers obendrauf — 15 % nach § 1a Abs. 1a BetrAVG', () => {
+    // Unter den Beitragsbemessungsgrenzen spart der Arbeitgeber rund 20 % —
+    // der Zuschuss betraegt dann die vollen 15 %.
+    const b = bav({ ...angestellt, jahresbrutto: 45_000, zveHeute: 35_000 })!;
+    expect(b.probeMonat).toBeCloseTo(250, 6);
+    expect(b.agZuschussMonat).toBeCloseTo(250 * BAV_AG_PFLICHTZUSCHUSS, 6);
+    expect(b.zuflussMonat).toBeCloseTo(287.5, 6);
+    // Er mindert den eigenen Aufwand nicht — er vergroessert den Vertrag.
+    expect(b.nettoAufwandMonat).toBeCloseTo(250 - b.ersparnisJahr / 12, 6);
+  });
+
+  it('deckelt den Zuschuss auf das, was der Arbeitgeber tatsaechlich spart', () => {
+    // 72.000 EUR liegen an der Grenze der Krankenversicherung: Dort spart
+    // der Arbeitgeber weniger als 15 % — und schuldet nur das.
+    const b = bav(angestellt)!;
+    expect(b.agZuschussMonat!).toBeGreaterThan(0);
+    expect(b.agZuschussMonat!).toBeLessThan(250 * BAV_AG_PFLICHTZUSCHUSS);
+  });
+
+  it('laesst Beitrag und Zuschuss zusammen in den freien Rahmen passen', () => {
+    // Fast ausgeschoepft: 300 EUR vom Rahmen sind belegt.
+    const eng = bav({ ...angestellt, bavEigenanteilJahr: 300 * 12 });
+    if (!eng) return; // Rest unter der Bagatellgrenze
+    expect(eng.probeMonat + eng.agZuschussMonat!).toBeLessThanOrEqual(eng.rahmenMonat + 1e-9);
+  });
+
+  it('schuldet keinen Zuschuss, wo der Arbeitgeber nichts spart', () => {
+    // Ueber beiden Beitragsbemessungsgrenzen spart niemand Sozialabgaben.
+    const reich = bav({ ...angestellt, jahresbrutto: 200_000, zveHeute: 180_000 });
+    if (!reich) return;
+    expect(reich.agZuschussMonat).toBeCloseTo(0, 6);
   });
 });
 

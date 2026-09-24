@@ -1,13 +1,13 @@
 import { Fragment, useMemo, type ReactNode } from 'react';
 import {
-  ruhestandsfenster, parameterFuer, versorgungsluecke,
+  parameterFuer, versorgungsluecke, foerdercheck,
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
-import { tuevPositionen } from '../features/tuev-berechnung';
+import { tuevPositionen, foerderBasis } from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -16,12 +16,10 @@ import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
-import { RuhestandVerlauf } from './RuhestandVerlauf';
 import { JePersonSeite } from './JePerson';
-import { Kaufkraft } from './Kaufkraft';
 import { Krankenversicherung } from './Krankenversicherung';
 import { Sparziel } from './Sparziel';
-import { Stellschrauben } from './Stellschrauben';
+import { Foerderung } from './Foerderung';
 import { Merkblatt } from './Merkblatt';
 import { TuevBogen } from './TuevBogen';
 
@@ -74,11 +72,6 @@ export function Gutachten({
     [jetzt, szenario.annahmen.tarifIndex],
   );
 
-  const fenster = useMemo(
-    () => (ergebnis ? ruhestandsfenster(ergebnis) : []),
-    [ergebnis],
-  );
-
   const positionen = useMemo(
     () => tuevPositionen(szenario, ergebnis ? zeile : null, ergebnis?.kapitalauszahlungen ?? []),
     [szenario, ergebnis, zeile],
@@ -103,6 +96,15 @@ export function Gutachten({
     () => pkvRechnen(szenario, zeile),
     [szenario, zeile],
   );
+
+  /*
+    Der Foerdercheck — dieselbe Rechnung wie am Bildschirm. Ohne Befund
+    entfaellt die Seite samt Eintrag im Inhaltsverzeichnis.
+  */
+  const foerderung = useMemo(() => {
+    const b = foerderBasis(szenario, ergebnis ? zeile : null);
+    return { ...b, befunde: foerdercheck(b.kontext, b.steuerOpt, b.p) };
+  }, [szenario, ergebnis, zeile]);
 
   const gedeckt = zeile.zielNettoMonat > 0
     ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
@@ -139,11 +141,10 @@ export function Gutachten({
    * Aus einer Liste kann das nicht mehr passieren: Was keinen Eintrag hat,
    * wird nicht gedruckt, und was gedruckt wird, steht im Verzeichnis.
    *
-   * `titel` ist ein ARRAY, weil zwei Eintraege mehr als eine Seite rendern
-   * (Sparziel und Stellschrauben haengen an derselben Bedingung). Zwei Titel
-   * an einem Eintrag sind ehrlicher als zwei Eintraege, die dieselbe
-   * Bedingung doppelt tragen muessten — genau so fing das Auseinanderlaufen
-   * an.
+   * `titel` ist ein ARRAY, damit ein Eintrag, der mehr als eine Seite
+   * rendert, alle seine Titel ins Verzeichnis bringt. Zwei Titel an einem
+   * Eintrag sind ehrlicher als zwei Eintraege, die dieselbe Bedingung doppelt
+   * tragen muessten — genau so fing das Auseinanderlaufen an.
    *
    * DER TITEL TAUGT NICHT ALS REACT-KEY. Er war es, und bei mehreren
    * namenlosen Vertraegen hiessen alle Pruefungen gleich. Gezaehlt wird
@@ -221,15 +222,13 @@ export function Gutachten({
       knoten: <JePersonSeite zeile={zeile} szenario={szenario} />,
     }] : []),
 
+    /*
+      „Ihre Einkünfte im Ruhestand" und „Was Ihr Geld dann noch wert ist"
+      sind entfallen: Beide zeigten die Jahre nach Rentenbeginn als Tabelle,
+      und was davon zaehlt — Bedarf, Netto, Luecke, heute und im Rentenjahr —
+      steht schon auf dem Deckblatt und bei den Renteneinkuenften.
+    */
     ...(lang ? [
-      {
-        titel: ['Ihre Einkünfte im Ruhestand'],
-        knoten: <RuhestandVerlauf zeilen={fenster} />,
-      },
-      {
-        titel: ['Was Ihr Geld dann noch wert ist'],
-        knoten: <Kaufkraft zeilen={fenster} inflation={szenario.annahmen.inflation} />,
-      },
       ...(pkv ? [{
         titel: [`Die Krankenversicherung von ${pkv.person} im Alter`],
         knoten: (
@@ -242,17 +241,32 @@ export function Gutachten({
         ),
       }] : []),
       ...(sparziel ? [{
-        titel: ['Was Sie jetzt tun können', 'Ihre drei Stellschrauben'],
+        titel: ['Was Sie jetzt tun können'],
         knoten: (
-          <>
-            <Sparziel
-              ergebnis={sparziel}
-              eingaben={SPARZIEL_VORGABE}
-              rentenjahr={zeile.jahr}
-              inflation={szenario.annahmen.inflation}
-            />
-            <Stellschrauben szenario={szenario} zeile={zeile} eingaben={SPARZIEL_VORGABE} />
-          </>
+          <Sparziel
+            ergebnis={sparziel}
+            eingaben={SPARZIEL_VORGABE}
+            rentenjahr={zeile.jahr}
+            inflation={szenario.annahmen.inflation}
+          />
+        ),
+      }] : []),
+      /*
+        AN DER STELLE DER STELLSCHRAUBEN. Die drei Hebel dort waren
+        Lehrbuch — hier steht, welche Foerderung konkret liegen bleibt, mit
+        Rechenbeispiel und Hochrechnung bis zur Rente.
+      */
+      ...(foerderung.befunde.length > 0 ? [{
+        titel: ['Förderung, die Sie nicht nutzen'],
+        knoten: (
+          <Foerderung
+            befunde={foerderung.befunde}
+            kontext={foerderung.kontext}
+            p={foerderung.p}
+            zeile={zeile}
+            rendite={SPARZIEL_VORGABE.rendite}
+            ohneBeitrag={foerderung.ohneBeitrag}
+          />
         ),
       }] : []),
       ...positionen.map((p) => ({
@@ -344,8 +358,8 @@ export function Gutachten({
           Bis zu Ihrem Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}
           <strong>{prozent(szenario.annahmen.inflation)}</strong> Inflation im Jahr. Deshalb stehen
           in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
-          Rentenjahres statt im Geld von heute. Wie sich beide Maßstäbe über den ganzen Ruhestand
-          entwickeln, zeigt die Seite „Was Ihr Geld dann noch wert ist“.
+          Rentenjahres statt im Geld von heute. Die Seite „Ihre Renteneinkünfte“ nennt beide
+          Maßstäbe nebeneinander.
         </Text>
 
         <Untertitel>Im Jahr {zeile.jahr} — mit Inflation gerechnet</Untertitel>
