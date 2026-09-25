@@ -99,7 +99,9 @@ export {
 } from './analyse/vertrags-tuev.js';
 export {
   matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis,
+  zuschussModell, zuschussVollAusschoepfen, zuschussStaffel,
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
+  type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
 } from './analyse/matching-modell.js';
 export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,

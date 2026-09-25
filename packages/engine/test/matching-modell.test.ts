@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis, type MatchingEingaben,
+  zuschussModell, zuschussVollAusschoepfen, zuschussStaffel, type ZuschussEingaben,
 } from '../src/analyse/matching-modell.js';
 import { vertragsTuev, type TuevKontext } from '../src/analyse/vertrags-tuev.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -148,5 +149,93 @@ describe('Matching-Modell: Sonderlagen', () => {
     const mit = matchingModell(eingaben({ umlagenSatz: 0.02 }), steuer, p);
     expect(mit.arbeitgeber.umlagenErsparnisMonat).toBeCloseTo(293.91 * 0.02, 1);
     expect(mit.arbeitgeber.nettoKostenMonat).toBeLessThan(ohne.arbeitgeber.nettoKostenMonat);
+  });
+});
+
+describe('Zuschussmodell: 50 % der Umwandlung, hoechstens 100 EUR', () => {
+  const zuschuss = (over: Partial<ZuschussEingaben> = {}): ZuschussEingaben => ({
+    jahresbrutto: 54_000,
+    umwandlungMonat: 200,
+    quote: 0.5,
+    deckelMonat: 100,
+    unternehmensSteuersatz: 0.3,
+    umlagenSatz: 0,
+    privatVersichert: false,
+    pkvPraemieMonat: 0,
+    kinder: { hatKinder: false, kinderUnter25: 0 },
+    ...over,
+  });
+
+  it('200 EUR Umwandlung: 100 EUR Zuschuss, rund 58 EUR vor und 40 EUR nach Steuern', () => {
+    const r = zuschussModell(zuschuss(), steuer, p);
+    expect(r.arbeitgeber.zuschussMonat).toBeCloseTo(100, 6);
+    expect(r.arbeitgeber.davonPflichtzuschussMonat).toBeCloseTo(30, 6);
+    expect(r.arbeitgeber.freiwilligMonat).toBeCloseTo(70, 6);
+    expect(r.arbeitgeber.svErsparnisMonat).toBeCloseTo(200 * 0.2115, 1);
+    expect(r.arbeitgeber.kostenVorSteuerMonat).toBeCloseTo(57.7, 1);
+    expect(r.arbeitgeber.nettoKostenMonat).toBeCloseTo(40.39, 1);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeCloseTo(0, 6);
+    expect(r.vertragMonat).toBeCloseTo(300, 6);
+    expect(r.gedeckelt).toBe(false);
+  });
+
+  it('300 EUR: Deckel greift, 38 EUR der Umwandlung werden beitragspflichtig', () => {
+    const r = zuschussModell(zuschuss({ umwandlungMonat: 300 }), steuer, p);
+    expect(r.gedeckelt).toBe(true);
+    expect(r.arbeitgeber.zuschussMonat).toBeCloseTo(100, 6);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeCloseTo(300 + 100 - svGrenze, 1);
+    expect(r.hinweise.join(' ')).toContain('gedeckelt');
+  });
+
+  it('voll ausgeschoepft bei 238 EUR', () => {
+    const voll = zuschussVollAusschoepfen(zuschuss(), steuer.bundesland, p);
+    expect(voll).toBeCloseTo(svGrenze - 100, 1);
+    const r = zuschussModell(zuschuss({ umwandlungMonat: voll }), steuer, p);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeLessThan(0.05);
+  });
+
+  it('ohne Deckelwirkung: 4 % / 1,5', () => {
+    const voll = zuschussVollAusschoepfen(zuschuss({ deckelMonat: 500 }), steuer.bundesland, p);
+    expect(voll).toBeCloseTo(svGrenze / 1.5, 0);
+  });
+
+  it('Quote unter 15 %: mindestens der Pflichtzuschuss', () => {
+    const r = zuschussModell(zuschuss({ quote: 0.1 }), steuer, p);
+    expect(r.arbeitgeber.zuschussMonat).toBeCloseTo(30, 1);
+    expect(r.hinweise.join(' ')).toContain('Pflichtzuschuss');
+  });
+
+  it('Mitarbeiterseite stimmt mit dem Vertrags-TUEV ueberein', () => {
+    const r = zuschussModell(zuschuss({ umwandlungMonat: 300 }), steuer, p);
+    const zve = bruttoZuNetto(54_000, { ...steuer, kinder: { hatKinder: false, kinderUnter25: 0 } }, p).zve;
+    const k = {
+      jahresbrutto: 54_000, zveHeute: zve, beamter: false, privatVersichert: false, pkvPraemieMonat: 0,
+      selbststaendig: false, grvBeitragJahr: 0, rentenbeginnJahr: 2042, alterBeiRentenbeginn: 67,
+      bruttoRenteMonat: 0, kvPvMonat: 0, steuerMonat: 0, nettoRenteMonat: 0,
+      bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
+    } satisfies TuevKontext;
+    const sz = {
+      haushalt: { verheiratet: false, bundesland: steuer.bundesland, kirchensteuer: false, kinder: [], pkv: PKV_VORGABE },
+    } as unknown as Szenario;
+    const t = vertragsTuev(
+      { id: 'v', inhaber: 'A', schicht: 2, typ: 'bav', name: 'DV', brutto: 0, strategie: 'rente', altvertrag: false },
+      { beitragMonat: r.vertragMonat, agZuschussMonat: r.arbeitgeber.zuschussMonat, dynamik: 0, kinder: [], beginnJahr: 2026, lebenserwartung: 85 },
+      k, sz, p,
+    );
+    expect(r.mitarbeiter.nettoAufwandMonat).toBeCloseTo(t.echterAufwandMonat, 2);
+  });
+
+  it('Staffel: steigt bis zum Deckel, enthaelt die volle Stufe', () => {
+    const st = zuschussStaffel(zuschuss(), steuer, p);
+    expect(st.map((x) => Math.round(x.umwandlungMonat))).toEqual([50, 100, 150, 200, 238]);
+    expect(st[0]!.zuschussMonat).toBeCloseTo(25, 6);
+    expect(st.at(-1)!.voll).toBe(true);
+    expect(st.at(-1)!.zuschussMonat).toBeCloseTo(100, 6);
+    // Bis zum Deckel steigen die Kosten mit der Umwandlung …
+    for (let i = 1; i < 4; i++) {
+      expect(st[i]!.arbeitgeberNettoMonat).toBeGreaterThan(st[i - 1]!.arbeitgeberNettoMonat);
+    }
+    // … darueber sinken sie: Der Zuschuss steht, die gesparten Abgaben wachsen.
+    expect(st[4]!.arbeitgeberNettoMonat).toBeLessThan(st[3]!.arbeitgeberNettoMonat);
   });
 });

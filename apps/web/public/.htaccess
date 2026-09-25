@@ -39,6 +39,8 @@ DirectoryIndex index.html
   # --- Arbeitgeber-Seite (Matching-Modell) --------------------------------
   # Ebenso: eigene Seite ohne Anmeldung, VOR dem Auffangmuster.
   RewriteRule ^arbeitgeber/?$ /arbeitgeber.html [NC,L]
+  # Und das einfachere Zuschussmodell.
+  RewriteRule ^zuschussmodell/?$ /zuschussmodell.html [NC,L]
 
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]

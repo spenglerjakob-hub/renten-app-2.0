@@ -877,12 +877,20 @@ export function VertragsTuev({
 
                     {/* Fuer das Gespraech mit dem Arbeitgeber: eigene Seite, ohne Anmeldung. */}
                     {v.typ.startsWith('bav') && (
-                      <a
-                        href="/arbeitgeber" target="_blank" rel="noopener"
-                        className="block rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 print:hidden"
-                      >
-                        Matching-Modell für den Arbeitgeber zeigen →
-                      </a>
+                      <div className="flex flex-wrap gap-2 print:hidden">
+                        <a
+                          href="/zuschussmodell" target="_blank" rel="noopener"
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100"
+                        >
+                          Zuschussmodell für den Arbeitgeber →
+                        </a>
+                        <a
+                          href="/arbeitgeber" target="_blank" rel="noopener"
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100"
+                        >
+                          Matching-Modell mit Unterstützungskasse →
+                        </a>
+                      </div>
                     )}
 
                     {!wege && kenntKapitalwahl(v.typ) && (

@@ -12,8 +12,9 @@ export default defineConfig({
     // Statisches Bundle, ausgeliefert ueber ein CDN. Die Berechnung laeuft im
     // Browser — die Serverlast ist damit unabhaengig von der Nutzerzahl.
     rollupOptions: {
-      // Vier Einstiegspunkte: der Rechner, die Landingpage zum
-      // Altersvorsorgedepot, der Vorsorge-Check und die Arbeitgeber-Seite. Die Landingpages sollen
+      // Fuenf Einstiegspunkte: der Rechner, die Landingpage zum
+      // Altersvorsorgedepot, der Vorsorge-Check und die beiden
+      // Arbeitgeber-Seiten (Matching-Modell, Zuschussmodell). Die Landingpages sollen
       // schnell laden und nicht das ganze Bundle des Rechners mitziehen;
       // Rollup trennt sie deshalb und teilt nur, was wirklich gemeinsam
       // gebraucht wird.
@@ -22,6 +23,7 @@ export default defineConfig({
         altersvorsorgedepot: resolve(hier, 'altersvorsorgedepot.html'),
         check: resolve(hier, 'vorsorge-check.html'),
         arbeitgeber: resolve(hier, 'arbeitgeber.html'),
+        zuschuss: resolve(hier, 'zuschussmodell.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },

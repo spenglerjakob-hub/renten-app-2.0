@@ -72,6 +72,26 @@ export interface MatchingSteuer {
   kirchensteuerpflichtig: boolean;
 }
 
+/**
+ * Dieselben Kosten vor Steuern als Gehaltserhoehung — mit allen
+ * Zwischenschritten, damit die Seite die Rechnung Zeile fuer Zeile neben
+ * das Modell stellen kann.
+ */
+export interface GehaltsVergleich {
+  bruttoMonat: number;
+  /** Arbeitgeberanteil Sozialversicherung plus Umlagen auf die Erhoehung */
+  agAbgabenMonat: number;
+  /** = Brutto + AG-Abgaben; gleich den Kosten vor Steuern des Modells */
+  kostenVorSteuerMonat: number;
+  steuerersparnisMonat: number;
+  nettoKostenMonat: number;
+  /** Sozialabgaben des Mitarbeiters auf die Erhoehung */
+  svMonat: number;
+  /** Lohnsteuer, Soli und ggf. Kirchensteuer auf die Erhoehung */
+  steuerMonat: number;
+  nettoMonat: number;
+}
+
 export interface MatchingErgebnis {
   mitarbeiter: {
     umwandlungMonat: number;
@@ -97,25 +117,8 @@ export interface MatchingErgebnis {
     ukasseMonat: number;
     gesamtMonat: number;
   };
-  /**
-   * Dieselben Kosten vor Steuern als Gehaltserhoehung — mit allen
-   * Zwischenschritten, damit die Seite die Rechnung Zeile fuer Zeile neben
-   * das Modell stellen kann.
-   */
-  gehalt: {
-    bruttoMonat: number;
-    /** Arbeitgeberanteil Sozialversicherung plus Umlagen auf die Erhoehung */
-    agAbgabenMonat: number;
-    /** = Brutto + AG-Abgaben; gleich `arbeitgeber.kostenVorSteuerMonat` */
-    kostenVorSteuerMonat: number;
-    steuerersparnisMonat: number;
-    nettoKostenMonat: number;
-    /** Sozialabgaben des Mitarbeiters auf die Erhoehung */
-    svMonat: number;
-    /** Lohnsteuer, Soli und ggf. Kirchensteuer auf die Erhoehung */
-    steuerMonat: number;
-    nettoMonat: number;
-  } | null;
+  /** Dieselben Kosten vor Steuern als Gehaltserhoehung */
+  gehalt: GehaltsVergleich | null;
   /** Im Vertrag je Euro Nettoaufwand des Mitarbeiters */
   hebelMitarbeiter: number;
   /** Im Vertrag je Euro Nettokosten des Arbeitgebers */
@@ -232,6 +235,49 @@ export function optimaleUmwandlung(
   return Math.floor(lo / 12 * 100) / 100;
 }
 
+/**
+ * Welche Gehaltserhoehung dieselben Personalkosten vor Steuern verursacht —
+ * und was davon beim Mitarbeiter netto ankommt. `null`, wenn das Modell den
+ * Arbeitgeber nichts kostet.
+ */
+function gehaltsVergleich(
+  kostenVorSteuer: number,
+  e: Pick<MatchingEingaben, 'jahresbrutto'>,
+  sk: SvKontext,
+  erwerbOpt: Parameters<typeof bruttoZuNetto>[1],
+  heute: ReturnType<typeof bruttoZuNetto>,
+  satz: number,
+  umlagenSatz: number,
+  bundesland: string,
+  p: LegalParameters,
+): GehaltsVergleich | null {
+  if (kostenVorSteuer <= 1) return null;
+  const kostenGehalt = (b: number) => {
+    const k2 = { ...sk, jahresbrutto: e.jahresbrutto + b };
+    return b + arbeitgeberSvErsparnis(b, k2, bundesland, p)
+      + unterGrenze(e.jahresbrutto + b, b, p.bbgRvJahr) * umlagenSatz;
+  };
+  let lo = 0, hi = kostenVorSteuer;
+  for (let i = 0; i < 60; i++) {
+    const mitte = (lo + hi) / 2;
+    if (kostenGehalt(mitte) > kostenVorSteuer) hi = mitte; else lo = mitte;
+  }
+  const nachher = bruttoZuNetto(e.jahresbrutto + lo, erwerbOpt, p);
+  const kosten = kostenGehalt(lo);
+  const sv = nachher.sv - heute.sv;
+  const steuer = (nachher.est + nachher.soli + nachher.kirchensteuer) - (heute.est + heute.soli + heute.kirchensteuer);
+  return {
+    bruttoMonat: lo / 12,
+    agAbgabenMonat: (kosten - lo) / 12,
+    kostenVorSteuerMonat: kosten / 12,
+    steuerersparnisMonat: kosten * satz / 12,
+    nettoKostenMonat: kosten * (1 - satz) / 12,
+    svMonat: sv / 12,
+    steuerMonat: steuer / 12,
+    nettoMonat: (nachher.jahresnetto - heute.jahresnetto) / 12,
+  };
+}
+
 export function matchingModell(
   e: MatchingEingaben,
   steuerOpt: MatchingSteuer,
@@ -272,33 +318,7 @@ export function matchingModell(
   const uk = ukasseAg + (e.weg === 'ukasse' ? a.e : 0);
 
   // --- Vergleich: dieselben Kosten vor Steuern als Gehaltserhoehung ---------
-  let gehalt: MatchingErgebnis['gehalt'] = null;
-  if (kostenVorSteuer > 1) {
-    const kostenGehalt = (b: number) => {
-      const k2 = { ...sk, jahresbrutto: e.jahresbrutto + b };
-      return b + arbeitgeberSvErsparnis(b, k2, steuerOpt.bundesland, p)
-        + unterGrenze(e.jahresbrutto + b, b, p.bbgRvJahr) * umlagenSatz;
-    };
-    let lo = 0, hi = kostenVorSteuer;
-    for (let i = 0; i < 60; i++) {
-      const mitte = (lo + hi) / 2;
-      if (kostenGehalt(mitte) > kostenVorSteuer) hi = mitte; else lo = mitte;
-    }
-    const nachher = bruttoZuNetto(e.jahresbrutto + lo, erwerbOpt, p);
-    const kosten = kostenGehalt(lo);
-    const sv = nachher.sv - heute.sv;
-    const steuer = (nachher.est + nachher.soli + nachher.kirchensteuer) - (heute.est + heute.soli + heute.kirchensteuer);
-    gehalt = {
-      bruttoMonat: lo / 12,
-      agAbgabenMonat: (kosten - lo) / 12,
-      kostenVorSteuerMonat: kosten / 12,
-      steuerersparnisMonat: kosten * satz / 12,
-      nettoKostenMonat: kosten * (1 - satz) / 12,
-      svMonat: sv / 12,
-      steuerMonat: steuer / 12,
-      nettoMonat: (nachher.jahresnetto - heute.jahresnetto) / 12,
-    };
-  }
+  const gehalt = gehaltsVergleich(kostenVorSteuer, e, sk, erwerbOpt, heute, satz, umlagenSatz, steuerOpt.bundesland, p);
 
   // --- Hinweise ------------------------------------------------------------
   if (e.weg === 'dv' && a.e + a.z > svGrenze + 6) {
@@ -364,4 +384,245 @@ export function matchingModell(
     hebelArbeitgeber: nettoAg > 0 ? (dv + uk) / nettoAg : 0,
     hinweise,
   };
+}
+
+/* ==========================================================================
+ * ZUSCHUSSMODELL: der Arbeitgeber gibt einen festen Anteil der
+ * Entgeltumwandlung dazu, gedeckelt — alles in EINE Direktversicherung.
+ *
+ * Die einfache Schwester des Matching-Modells: keine Unterstuetzungskasse,
+ * kein PSV, ein Vertrag, den der Mitarbeiter beim Wechsel mitnimmt. Der
+ * gesetzliche Pflichtzuschuss (§ 1a Abs. 1a BetrAVG) ist im Zuschuss
+ * enthalten; liegt die Quote darunter, zahlt der Arbeitgeber mindestens ihn.
+ *
+ * Weil alles in derselben Direktversicherung liegt, belegt der Zuschuss die
+ * Freigrenzen zuerst — wie im TUEV. Voll ausgeschoepft ist der beitragsfreie
+ * Rahmen, wenn Umwandlung und Zuschuss zusammen 4 % ergeben.
+ * ======================================================================== */
+
+export interface ZuschussEingaben
+  extends Omit<MatchingEingaben, 'weg' | 'matchingMonat' | 'zuschussImMatching'> {
+  /** Anteil der Umwandlung, den der Arbeitgeber dazugibt, z. B. 0,5 */
+  quote: number;
+  /** Hoechstbetrag des Zuschusses, Monat */
+  deckelMonat: number;
+}
+
+export interface ZuschussErgebnis {
+  mitarbeiter: MatchingErgebnis['mitarbeiter'];
+  arbeitgeber: {
+    /** Gesamter Zuschuss in die Direktversicherung */
+    zuschussMonat: number;
+    /** davon gesetzlicher Pflichtzuschuss */
+    davonPflichtzuschussMonat: number;
+    /** davon freiwillig ueber die Pflicht hinaus */
+    freiwilligMonat: number;
+    svErsparnisMonat: number;
+    umlagenErsparnisMonat: number;
+    kostenVorSteuerMonat: number;
+    steuerersparnisMonat: number;
+    nettoKostenMonat: number;
+  };
+  /** Was insgesamt in die Direktversicherung fliesst */
+  vertragMonat: number;
+  /** Der Deckel begrenzt den Zuschuss */
+  gedeckelt: boolean;
+  gehalt: GehaltsVergleich | null;
+  hebelMitarbeiter: number;
+  hebelArbeitgeber: number;
+  hinweise: string[];
+}
+
+interface ZuschussAufteilung {
+  e: number;
+  ag: number;
+  pflicht: number;
+  svFrei: number;
+  agSv: number;
+}
+
+/** Zuschuss, Pflichtzuschuss und beitragsfreier Teil fuer eine Umwandlung (Jahr). */
+function zuschussAufteilen(
+  e: number, quote: number, deckelJahr: number, sk: SvKontext, bundesland: string, p: LegalParameters,
+): ZuschussAufteilung {
+  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const regel = Math.min(Math.max(0, quote) * e, Math.max(0, deckelJahr));
+  let ag = regel, pflicht = 0, svFrei = 0, agSv = 0;
+  // Nur wenn die Regel unter dem Pflichtzuschuss liegt, haengen beide
+  // voneinander ab — gedaempft wie in `aufteilen`.
+  for (let i = 0; i < 60; i++) {
+    svFrei = Math.min(e, Math.max(0, svGrenze - ag));
+    agSv = arbeitgeberSvErsparnis(svFrei, sk, bundesland, p);
+    pflicht = Math.min(BAV_PFLICHTZUSCHUSS_QUOTE * e, agSv);
+    const neu = Math.max(regel, pflicht);
+    if (Math.abs(neu - ag) < 0.001) { ag = neu; break; }
+    ag = (ag + neu) / 2;
+  }
+  svFrei = Math.min(e, Math.max(0, svGrenze - ag));
+  agSv = arbeitgeberSvErsparnis(svFrei, sk, bundesland, p);
+  return { e, ag, pflicht: Math.min(pflicht, ag), svFrei, agSv };
+}
+
+/**
+ * Die Umwandlung, bei der Umwandlung und Zuschuss den beitragsfreien Rahmen
+ * genau fuellen — Monat, auf Cent abgerundet. Mit 50 % und 100 EUR Deckel
+ * 2026: 238 EUR.
+ */
+export function zuschussVollAusschoepfen(
+  e: Pick<ZuschussEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'quote' | 'deckelMonat'>,
+  bundesland: string,
+  p: LegalParameters,
+): number {
+  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const sk = svKontext(e);
+  let lo = 0, hi = svGrenze;
+  for (let i = 0; i < 60; i++) {
+    const mitte = (lo + hi) / 2;
+    const a = zuschussAufteilen(mitte, e.quote, e.deckelMonat * 12, sk, bundesland, p);
+    if (a.e + a.ag > svGrenze) hi = mitte; else lo = mitte;
+  }
+  return Math.floor(lo / 12 * 100) / 100;
+}
+
+export function zuschussModell(
+  e: ZuschussEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+): ZuschussErgebnis {
+  const hinweise: string[] = [];
+  const sk = svKontext(e);
+  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const steuerGrenze = STEUER_FREI_QUOTE * p.bbgRvJahr;
+  const satz = Math.min(0.6, Math.max(0, e.unternehmensSteuersatz));
+  const umlagenSatz = Math.max(0, e.umlagenSatz);
+  const erwerbOpt = {
+    ...steuerOpt,
+    kinder: e.kinder,
+    privatVersichert: e.privatVersichert,
+    pkvPraemieMonat: e.privatVersichert ? e.pkvPraemieMonat : 0,
+  };
+  const heute = bruttoZuNetto(Math.max(0, e.jahresbrutto), erwerbOpt, p);
+
+  const a = zuschussAufteilen(
+    Math.max(0, e.umwandlungMonat) * 12, e.quote, e.deckelMonat * 12, sk, steuerOpt.bundesland, p,
+  );
+
+  // --- Mitarbeiter ---------------------------------------------------------
+  const steuerFrei = Math.min(a.e, Math.max(0, steuerGrenze - a.ag));
+  const wirkung = svWirkung(a.svFrei, sk, p);
+  const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
+  const steuerAn = zusatzsteuer(heute.zve - zveMinderung, zveMinderung, steuerOpt, p);
+  const aufwandAn = Math.max(0, a.e - wirkung.ersparnis - steuerAn);
+
+  // --- Arbeitgeber ---------------------------------------------------------
+  const umlagen = unterGrenze(e.jahresbrutto, a.svFrei, p.bbgRvJahr) * umlagenSatz;
+  const kostenVorSteuer = a.ag - a.agSv - umlagen;
+  const steuerAg = kostenVorSteuer * satz;
+  const nettoAg = kostenVorSteuer - steuerAg;
+  const vertrag = a.e + a.ag;
+  const gedeckelt = Math.max(0, e.quote) * a.e > e.deckelMonat * 12 + 0.5;
+
+  const gehalt = gehaltsVergleich(kostenVorSteuer, e, sk, erwerbOpt, heute, satz, umlagenSatz, steuerOpt.bundesland, p);
+
+  // --- Hinweise ------------------------------------------------------------
+  if (a.e > 0 && vertrag > svGrenze + 6) {
+    const voll = zuschussVollAusschoepfen(e, steuerOpt.bundesland, p);
+    hinweise.push(
+      `Umwandlung und Zuschuss liegen zusammen um ${euro((vertrag - svGrenze) / 12)} im Monat über dem `
+      + `beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Zuschuss wird zuerst angerechnet, auf `
+      + `${euro((a.e - a.svFrei) / 12)} der Umwandlung fallen deshalb Sozialabgaben an. Voll ausgeschöpft `
+      + `ist der Rahmen mit ${euro(voll)} Umwandlung.`,
+    );
+  }
+  if (gedeckelt) {
+    hinweise.push(
+      `Der Zuschuss ist bei ${euro(e.deckelMonat)} im Monat gedeckelt — jeder weitere Euro Umwandlung `
+      + 'wird nicht mehr bezuschusst. Solange er beitragsfrei bleibt, senkt er die Kosten des Arbeitgebers '
+      + 'sogar: Der Zuschuss steht fest, die gesparten Sozialabgaben wachsen mit.',
+    );
+  }
+  if (a.e > 0 && Math.max(0, e.quote) * a.e < a.pflicht - 0.5) {
+    hinweise.push(
+      'Die Zuschussquote liegt unter dem gesetzlichen Pflichtzuschuss. Gezahlt werden mindestens 15 % '
+      + 'der Umwandlung, soweit der Arbeitgeber Sozialabgaben spart (§ 1a Abs. 1a BetrAVG).',
+    );
+  }
+  if (a.ag > svGrenze + 0.5) {
+    hinweise.push(
+      `Der Zuschuss allein liegt über dem beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Rest ist für `
+      + 'den Mitarbeiter Arbeitsentgelt; in der Rechnung ist das nicht enthalten.',
+    );
+  }
+  if (e.privatVersichert) {
+    hinweise.push(
+      'Privat versichert: Der Arbeitgeber spart nur Renten- und Arbeitslosenversicherung, keine Kranken- '
+      + 'und Pflegebeiträge. Die Ersparnis fällt entsprechend kleiner aus.',
+    );
+  } else if (e.jahresbrutto > p.bbgKvJahr) {
+    hinweise.push(
+      'Das Gehalt liegt über der Beitragsbemessungsgrenze der Krankenversicherung: Dort spart die Umwandlung '
+      + 'keine Beiträge, nur noch bei Renten- und Arbeitslosenversicherung.',
+    );
+  }
+
+  return {
+    mitarbeiter: {
+      umwandlungMonat: a.e / 12,
+      svErsparnisMonat: wirkung.ersparnis / 12,
+      steuerersparnisMonat: steuerAn / 12,
+      nettoAufwandMonat: aufwandAn / 12,
+      svPflichtigMonat: (a.e - a.svFrei) / 12,
+    },
+    arbeitgeber: {
+      zuschussMonat: a.ag / 12,
+      davonPflichtzuschussMonat: a.pflicht / 12,
+      freiwilligMonat: Math.max(0, a.ag - a.pflicht) / 12,
+      svErsparnisMonat: a.agSv / 12,
+      umlagenErsparnisMonat: umlagen / 12,
+      kostenVorSteuerMonat: kostenVorSteuer / 12,
+      steuerersparnisMonat: steuerAg / 12,
+      nettoKostenMonat: nettoAg / 12,
+    },
+    vertragMonat: vertrag / 12,
+    gedeckelt,
+    gehalt,
+    hebelMitarbeiter: aufwandAn > 0 ? vertrag / aufwandAn : 0,
+    hebelArbeitgeber: nettoAg > 0 ? vertrag / nettoAg : 0,
+    hinweise,
+  };
+}
+
+export interface ZuschussStufe {
+  umwandlungMonat: number;
+  zuschussMonat: number;
+  arbeitgeberNettoMonat: number;
+  mitarbeiterNettoMonat: number;
+  vertragMonat: number;
+  /** Die Stufe, die den beitragsfreien Rahmen voll ausschoepft */
+  voll: boolean;
+}
+
+/**
+ * Die Staffel fuer den Arbeitgeber: was kostet ein Mitarbeiter bei 50, 100,
+ * 150, 200 EUR Umwandlung — und beim voll ausgeschoepften Rahmen.
+ */
+export function zuschussStaffel(
+  e: ZuschussEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+  stufen: readonly number[] = [50, 100, 150, 200],
+): ZuschussStufe[] {
+  const voll = zuschussVollAusschoepfen(e, steuerOpt.bundesland, p);
+  const alle = [...new Set([...stufen, voll])].filter((x) => x > 0).sort((x, y) => x - y);
+  return alle.map((u) => {
+    const r = zuschussModell({ ...e, umwandlungMonat: u }, steuerOpt, p);
+    return {
+      umwandlungMonat: u,
+      zuschussMonat: r.arbeitgeber.zuschussMonat,
+      arbeitgeberNettoMonat: r.arbeitgeber.nettoKostenMonat,
+      mitarbeiterNettoMonat: r.mitarbeiter.nettoAufwandMonat,
+      vertragMonat: r.vertragMonat,
+      voll: u === voll,
+    };
+  });
 }
