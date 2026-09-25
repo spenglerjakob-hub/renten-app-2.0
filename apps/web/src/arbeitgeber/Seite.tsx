@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Building2, HandCoins, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
+import { ArrowRightLeft, Building2, HandCoins, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
 import {
   matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg,
 } from '@renten/engine';
@@ -289,17 +289,6 @@ export function Seite() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
-              </h2>
-              <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
-                <li>• Matching-Regel für alle Beschäftigten gleich (Gleichbehandlung)</li>
-                <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
-                <li>• Pflichtzuschuss fließt in die Direktversicherung (§ 1a Abs. 1a BetrAVG)</li>
-                <li>• Rückgedeckte Unterstützungskasse, Meldung an den PSVaG</li>
-              </ul>
-            </section>
 
             {r.hinweise.length > 0 && (
               <section className="space-y-1.5">
@@ -316,6 +305,74 @@ export function Seite() {
               Pensions-Sicherungs-Verein und Verwaltungskosten der Unterstützungskasse sowie die Besteuerung und
               Verbeitragung der späteren Leistungen.
             </p>
+
+
+            {/*
+              ZWEITE DRUCKSEITE: Umsetzung. Seite 1 ist die Rechnung, Seite 2
+              beantwortet die Frage, die jeder Arbeitgeber als naechstes
+              stellt — was passiert, wenn jemand geht. Bewusst getrennt statt
+              auf eine Seite gepresst.
+            */}
+            <div className="space-y-4 print:break-before-page print:space-y-2">
+              <p className="hidden text-lg font-black text-slate-900 print:block">
+                Umsetzung und Arbeitgeberwechsel
+              </p>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-3 print:shadow-none">
+                <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
+                  <ArrowRightLeft className="h-4 w-4 text-indigo-600" aria-hidden /> Wenn ein Mitarbeiter wechselt
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Das Modell trennt die beiden Töpfe: Das Geld des Mitarbeiters liegt in der Direktversicherung und
+                  geht mit ihm, das Matching liegt in der Unterstützungskasse und bleibt hier.
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
+                  <WechselSpalte titel="Direktversicherung — nimmt er mit" farbe="border-sky-200 bg-sky-50">
+                    <li>Umwandlung und Pflichtzuschuss sind <strong>sofort unverfallbar</strong> (§ 1b Abs. 5 BetrAVG).</li>
+                    <li>Mitnahme zum neuen Arbeitgeber: Anspruch <strong>innerhalb eines Jahres</strong> nach dem Ausscheiden
+                      (§ 4 Abs. 3 BetrAVG), steuerfrei (§ 3 Nr. 55 EStG). Meist wird einfach der Versicherungsnehmer
+                      gewechselt.</li>
+                    <li>Alternativ beitragsfrei stellen oder privat weiterführen — dann ohne Steuer- und SV-Vorteil.</li>
+                    <li>Kündigen und auszahlen lassen geht nicht (§ 2 Abs. 2 BetrAVG).</li>
+                  </WechselSpalte>
+                  <WechselSpalte titel="Unterstützungskasse — bleibt hier" farbe="border-emerald-200 bg-emerald-50">
+                    <li>Wer <strong>vor drei Jahren</strong> Zusagedauer geht, verliert den Arbeitgeberanteil. Der Wert der
+                      Rückdeckung bleibt in der Unterstützungskasse (je nach Satzung).</li>
+                    <li>Danach bleibt die Anwartschaft <strong>beitragsfrei stehen</strong>; die Rente zahlt später die
+                      Unterstützungskasse.</li>
+                    <li>Einen Anspruch auf Mitnahme gibt es nicht. Übertragen lässt sie sich nur, wenn alter und neuer
+                      Arbeitgeber und der Mitarbeiter zustimmen (§ 4 Abs. 2 BetrAVG) — in der Praxis selten.</li>
+                  </WechselSpalte>
+                  <WechselSpalte titel="Für den Arbeitgeber" farbe="border-amber-200 bg-amber-50">
+                    <li>Für unverfallbare Anwartschaften bleiben Verwaltung, Auskunft (§ 4a BetrAVG) und
+                      <strong> PSV-Beiträge</strong> bis zum Rentenbeginn.</li>
+                    <li><strong>Kongruent rückgedeckte</strong> Unterstützungskasse wählen — sonst haftet der Arbeitgeber
+                      für eine Lücke (§ 1 Abs. 1 S. 3 BetrAVG).</li>
+                    <li>Einseitig abfinden lassen sich nur Kleinstanwartschaften (§ 3 BetrAVG).</li>
+                    <li>Ausscheidende auf die Jahresfrist für die Mitnahme der Direktversicherung hinweisen.</li>
+                  </WechselSpalte>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
+                <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
+                </h2>
+                <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
+                  <li>• Matching-Regel für alle Beschäftigten gleich (Gleichbehandlung)</li>
+                  <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
+                  <li>• Pflichtzuschuss fließt in die Direktversicherung (§ 1a Abs. 1a BetrAVG)</li>
+                  <li>• Rückgedeckte Unterstützungskasse, Meldung an den PSVaG</li>
+                  <li>• Unverfallbarkeit des Matchings: gesetzlich 3 Jahre, kürzer möglich, länger nicht (§ 17 Abs. 3 BetrAVG)</li>
+                  <li>• Was mit verfallenen Anteilen geschieht (Satzung der Unterstützungskasse)</li>
+                </ul>
+              </section>
+
+              <p className="text-[10px] leading-relaxed text-slate-500 print:text-[8px]">
+                Überblick zum Rechtsstand {p.jahr}, keine Rechtsberatung. Die Einzelheiten regeln die Versorgungsordnung
+                und die Satzung der Unterstützungskasse — die Ausgestaltung sollte ein bAV-Spezialist prüfen.
+              </p>
+            </div>
 
             <button
               type="button" onClick={() => window.print()}
@@ -336,6 +393,17 @@ function Kasten({ titel, children }: { titel: string; children: ReactNode }) {
       <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">{titel}</h2>
       {children}
     </section>
+  );
+}
+
+function WechselSpalte({ titel, farbe, children }: { titel: string; farbe: string; children: ReactNode }) {
+  return (
+    <div className={`rounded-xl border p-3 print:p-2 ${farbe}`}>
+      <h3 className="text-xs font-black text-slate-900">{titel}</h3>
+      <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+        {children}
+      </ul>
+    </div>
   );
 }
 
