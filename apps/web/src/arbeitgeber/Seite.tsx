@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowRightLeft, Building2, HandCoins, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
+import { ArrowRightLeft, Building2, HandCoins, Info, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
 import {
   matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg,
 } from '@renten/engine';
@@ -147,6 +147,7 @@ export function Seite() {
                 label="Umlagen U1, U2, Insolvenzgeld" wert={umlagen} onChange={setUmlagen} min={0} max={10} stellen={2}
                 hilfe="Sparen Sie auf den beitragsfreien Teil zusätzlich. Ohne Angabe nicht eingerechnet."
               />
+              <UmlagenErklaerung onWaehlen={setUmlagen} />
               <ZahlFeld label="Mitarbeiter im Modell" wert={anzahl} onChange={setAnzahl} min={1} schritt={1} stufen />
             </Kasten>
           </div>
@@ -393,6 +394,65 @@ function Kasten({ titel, children }: { titel: string; children: ReactNode }) {
       <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">{titel}</h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * Was hinter den Umlagen steckt — aufklappbar unter dem Feld, damit die
+ * Eingabe nicht zum Ratespiel wird. Die Saetze fuer U1 und U2 legt jede
+ * Krankenkasse selbst fest; genannt sind deshalb Spannen, und die beiden
+ * Knoepfe setzen typische Summen, keine Werte einer bestimmten Kasse.
+ */
+function UmlagenErklaerung({ onWaehlen }: { onWaehlen: (satz: number) => void }) {
+  return (
+    <details className="group rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-bold text-indigo-800">
+        <Info className="h-3.5 w-3.5" aria-hidden /> Was sind die Umlagen?
+      </summary>
+      <p className="mt-2 leading-relaxed">
+        Drei Beiträge, die <strong>allein der Arbeitgeber</strong> trägt — berechnet auf das
+        rentenversicherungspflichtige Entgelt. Entgeltumwandlung, die beitragsfrei ist, senkt auch diese
+        Grundlage; deshalb spart der Arbeitgeber sie mit.
+      </p>
+      <dl className="mt-2 space-y-2">
+        <div>
+          <dt className="font-bold">U1 — Entgeltfortzahlung bei Krankheit</dt>
+          <dd className="leading-relaxed">
+            Nur Betriebe mit bis zu 30 Beschäftigten. Dafür erstattet die Krankenkasse einen Teil des Lohns, den
+            der Arbeitgeber im Krankheitsfall weiterzahlt. Der Satz hängt von Kasse und gewähltem
+            Erstattungssatz ab, meist etwa <strong>1 bis 3,5 %</strong>.
+          </dd>
+        </div>
+        <div>
+          <dt className="font-bold">U2 — Mutterschaft</dt>
+          <dd className="leading-relaxed">
+            Alle Arbeitgeber, unabhängig von der Größe. Erstattet werden die Aufwendungen während Mutterschutz und
+            Beschäftigungsverbot vollständig. Meist etwa <strong>0,2 bis 0,8 %</strong>, je nach Kasse.
+          </dd>
+        </div>
+        <div>
+          <dt className="font-bold">Insolvenzgeldumlage</dt>
+          <dd className="leading-relaxed">
+            Alle privaten Arbeitgeber. Sie finanziert das Insolvenzgeld der Bundesagentur für Arbeit, das
+            Beschäftigte bei einer Pleite ihres Arbeitgebers bis zu drei Monate lang erhalten. Einheitlicher Satz,
+            derzeit <strong>0,15 %</strong>.
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2 leading-relaxed">
+        Die genauen Sätze stehen in der Lohnabrechnung bzw. bei der Krankenkasse des Mitarbeiters. Typische Summen:
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onWaehlen(0.025)}
+          className="rounded-md border border-indigo-200 bg-white px-2 py-1 font-bold text-indigo-800 hover:bg-indigo-50">
+          bis 30 Beschäftigte ≈ 2,5 %
+        </button>
+        <button type="button" onClick={() => onWaehlen(0.006)}
+          className="rounded-md border border-indigo-200 bg-white px-2 py-1 font-bold text-indigo-800 hover:bg-indigo-50">
+          über 30 Beschäftigte ≈ 0,6 %
+        </button>
+      </div>
+    </details>
   );
 }
 
