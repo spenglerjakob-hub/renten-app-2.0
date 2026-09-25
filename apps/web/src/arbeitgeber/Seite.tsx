@@ -190,6 +190,9 @@ export function Seite() {
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
+                <p className="pl-3 text-[11px] leading-snug text-slate-500 print:text-[9px]">
+                  Zuwendungen an eine rückgedeckte Unterstützungskasse sind Betriebsausgabe (§ 4d EStG), der Pflichtzuschuss in die Direktversicherung ebenso (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand.
+                </p>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
               </Bon>
             </section>
