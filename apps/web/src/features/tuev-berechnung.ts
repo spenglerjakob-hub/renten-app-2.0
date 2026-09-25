@@ -3,7 +3,7 @@ import {
   versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, SV_FREI_QUOTE, euroText,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario,
-  type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute,
+  type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -151,6 +151,38 @@ function jahrAus(datum: string, ersatz: number): number {
  * dieselben Regeln, kein Auseinanderlaufen. Das kostet wenige Millisekunden
  * und nur dann, wenn beide Betraege ueberhaupt erfasst sind.
  */
+/** Durchfuehrungswege des § 3 Nr. 63 EStG: Direktversicherung, Pensionskasse, Pensionsfonds. */
+const bav63 = (v: Vertrag) => v.typ.startsWith('bav') && v.typ !== 'bavUkasse';
+
+/**
+ * Was die UEBRIGEN bAV-Vertraege derselben Person von den Freigrenzen
+ * belegen — heutige Beitraege, als Jahreswerte.
+ *
+ * Die Grenzen gelten je Person, nicht je Vertrag. Angerechnet werden zuerst
+ * alle Arbeitgeberbeitraege, danach die Entgeltumwandlungen in der
+ * Reihenfolge, in der die Vertraege erfasst sind.
+ */
+export function bavVorbelegung(szenario: SzenarioParsed, v: Vertrag): BavVorbelegung {
+  const b: BavVorbelegung = { agAndereJahr: 0, agFruehereJahr: 0, eigenFruehereJahr: 0, eigenUkasseFruehereJahr: 0 };
+  const eigene = szenario.vertraege.filter((x) => x.typ.startsWith('bav') && x.inhaber === v.inhaber);
+  const position = eigene.findIndex((x) => x.id === v.id);
+  eigene.forEach((x, i) => {
+    if (x.id === v.id) return;
+    const t = szenario.tuev.find((y) => y.vertragId === x.id);
+    if (!t || t.beitragMonat <= 0) return;
+    const ag = Math.min(Math.max(0, t.agZuschussMonat), t.beitragMonat) * 12;
+    const eigen = t.beitragMonat * 12 - ag;
+    const davor = i < position;
+    if (bav63(x)) {
+      b.agAndereJahr += ag;
+      if (davor) { b.agFruehereJahr += ag; b.eigenFruehereJahr += eigen; }
+    } else if (davor) {
+      b.eigenUkasseFruehereJahr += eigen;
+    }
+  });
+  return b;
+}
+
 function andererWeg(
   szenario: SzenarioParsed,
   v: Vertrag,
@@ -291,6 +323,7 @@ export function tuevPositionen(
             : [];
         }),
         lebenserwartung: t.lebenserwartung,
+        bavVorbelegung: v.typ.startsWith('bav') ? bavVorbelegung(szenario, v) : undefined,
       },
       {
         /*
@@ -437,8 +470,13 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
     if (!t || t.beitragMonat <= 0) { ohneBeitrag += 1; continue; }
     if (v.typ === 'basis') {
       basisBeitragJahr += t.beitragMonat * 12;
-    } else {
+    } else if (bav63(v) && v.inhaber === (szenario.personen[0]?.id ?? v.inhaber)) {
       /*
+        Nur Direktversicherung, Pensionskasse und Pensionsfonds, und nur die
+        von Person A — der Befund gilt ihrem Rahmen. Arbeitgeberbeitraege in
+        eine Unterstuetzungskasse belegen ihn nicht, eine Entgeltumwandlung
+        dorthin hat einen eigenen.
+
         BEIDE Teile werden gebraucht, und zwar getrennt: Die Grenzen des
         § 3 Nr. 63 EStG und des § 1 Abs. 1 Nr. 9 SvEV gelten fuer die Summe
         aller Beitraege aus dem Dienstverhaeltnis — der Arbeitgeberanteil
@@ -662,7 +700,8 @@ function svErklaerung(
       + 'nach dem Vertrag, nicht nach dem Gehalt, und spart deshalb nichts'
     : 'Renten-, Arbeitslosen-, Kranken- und Pflegeversicherung';
   return `Umgewandeltes Entgelt ist bis ${euroText(frei)} im Monat beitragsfrei — 4 % der `
-    + `Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV). Gespart wird Ihr ARBEITNEHMERanteil `
+    + 'Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV), für Arbeitgeber- und Arbeitnehmeranteil '
+    + 'zusammen; der Arbeitgeberanteil wird zuerst angerechnet. Gespart wird Ihr ARBEITNEHMERanteil '
     + `zur ${teil}: ${euroText(svMonat)} im Monat. Was über die 4 % hinausgeht, trägt volle `
     + 'Sozialabgaben.';
 }

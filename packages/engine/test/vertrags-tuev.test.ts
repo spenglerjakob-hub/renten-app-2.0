@@ -934,3 +934,93 @@ describe('Beginnmonat und fruehere Beitragsstufen', () => {
     expect(alt.summeEinzahlung).toBeCloseTo(erwartet, 6);
   });
 });
+
+describe('bAV: Arbeitgeberanteil geht bei den Freigrenzen vor', () => {
+  /*
+    BEFUND: Die Grenzen des § 3 Nr. 63 EStG (8 %) und des § 1 Abs. 1 Nr. 9
+    SvEV (4 %) gelten fuer Arbeitgeber- und Arbeitnehmeranteil ZUSAMMEN, und
+    der Arbeitgeberanteil wird zuerst angerechnet. Der TUEV legte die vollen
+    4 % an den Eigenanteil und wies bei 676 EUR, halb und halb geteilt, eine
+    SV-Ersparnis von rund 70 EUR im Monat aus, die es nicht gibt.
+  */
+  const svGrenze = Math.round((0.04 * p.bbgRvJahr) / 12);   // 338 EUR
+  const stGrenze = Math.round((0.08 * p.bbgRvJahr) / 12);   // 676 EUR
+  const bav = (beitragMonat: number, agZuschussMonat: number, over: Partial<TuevAnnahmen> = {}, typ: 'bav' | 'bavUkasse' = 'bav') =>
+    vertragsTuev(vertrag({ typ, schicht: 2 }), annahmen({ beitragMonat, agZuschussMonat, ...over }), kontext(), szenario, p);
+
+  it('676 EUR halb und halb: keine SV-Ersparnis, aber volle Steuerfreiheit', () => {
+    const r = bav(stGrenze, svGrenze);
+    expect(r.svErsparnisMonat).toBeCloseTo(0, 6);
+    // Steuerlich passt der Eigenanteil noch ganz in die 8 %. Die Ersparnis
+    // ist sogar etwas hoeher als ohne Arbeitgeber: Wer Sozialabgaben weiter
+    // zahlt, behaelt auch deren Abzug als Vorsorgeaufwand.
+    const allein = bav(svGrenze, 0);
+    expect(r.steuerersparnisMonat).toBeGreaterThanOrEqual(allein.steuerersparnisMonat);
+    // Unterm Strich teurer — um die entgangene SV-Ersparnis, abzueglich
+    // dieses Steuereffekts.
+    expect(allein.svErsparnisMonat).toBeGreaterThan(60);
+    expect(r.echterAufwandMonat - allein.echterAufwandMonat).toBeCloseTo(
+      allein.svErsparnisMonat - (r.steuerersparnisMonat - allein.steuerersparnisMonat), 6,
+    );
+    expect(r.echterAufwandMonat).toBeCloseTo(svGrenze - r.steuerersparnisMonat, 6);
+    expect(r.hinweise.join(' ')).toContain('Arbeitgeberanteil wird zuerst angerechnet');
+  });
+
+  it('Arbeitgeber unter 4 %: nur der Rest ist beitragsfrei', () => {
+    const r = bav(300, 100);             // 100 AG, 200 eigen
+    const ohneAg = bav(200, 0);
+    expect(r.svErsparnisMonat).toBeCloseTo(ohneAg.svErsparnisMonat, 6);   // 200 passen noch ganz
+    const knapp = bav(400, 200);         // 200 AG, 200 eigen → nur 138 frei
+    const frei138 = bav(svGrenze - 200, 0);
+    expect(knapp.svErsparnisMonat).toBeCloseTo(frei138.svErsparnisMonat, 6);
+  });
+
+  it('Summe ueber 676 EUR: steuerfrei ist nur der Rest nach dem Arbeitgeberanteil', () => {
+    const r = bav(900, 400);             // 400 AG, 500 eigen → steuerfrei nur 276
+    const rest = bav(stGrenze - 400, 0);
+    expect(r.steuerersparnisMonat).toBeLessThan(bav(500, 0).steuerersparnisMonat);
+    expect(r.hinweise.join(' ')).toContain('Steuerfrei sind höchstens');
+    // Der Arbeitgeberanteil selbst liegt ueber 338 EUR — das ist Lohn.
+    expect(r.hinweise.join(' ')).toContain('über dem beitragsfreien Rahmen');
+    expect(rest.steuerersparnisMonat).toBeGreaterThan(0);
+  });
+
+  it('andere Vertraege derselben Person belegen den Rahmen mit', () => {
+    const allein = bav(200, 0);
+    const mitAnderem = bav(200, 0, {
+      bavVorbelegung: { agAndereJahr: 338 * 12, agFruehereJahr: 338 * 12, eigenFruehereJahr: 0, eigenUkasseFruehereJahr: 0 },
+    });
+    expect(allein.svErsparnisMonat).toBeGreaterThan(30);
+    expect(mitAnderem.svErsparnisMonat).toBeCloseTo(0, 6);
+  });
+
+  it('Unterstuetzungskasse: Arbeitgeberbeitraege belegen nichts, eigener 4-%-Rahmen', () => {
+    // Arbeitgeberbeitraege in der Direktversicherung belegen den Rahmen der
+    // U-Kasse nicht, und umgekehrt.
+    const uk = bav(400, 0, {
+      bavVorbelegung: { agAndereJahr: 338 * 12, agFruehereJahr: 338 * 12, eigenFruehereJahr: 338 * 12, eigenUkasseFruehereJahr: 0 },
+    }, 'bavUkasse');
+    const ukAllein = bav(400, 0, {}, 'bavUkasse');
+    expect(uk.svErsparnisMonat).toBeCloseTo(ukAllein.svErsparnisMonat, 6);
+    expect(ukAllein.svErsparnisMonat).toBeGreaterThan(60);
+  });
+
+  it('Tipp Unterstuetzungskasse, wenn freiwillige Arbeitgeberbeitraege den Rahmen belegen', () => {
+    const r = bav(stGrenze, svGrenze);
+    const tipp = r.hinweise.find((h) => h.startsWith('Tipp'));
+    expect(tipp).toBeDefined();
+    expect(tipp).toContain('Unterstützungskasse');
+    expect(tipp).toContain('Pflichtzuschuss');
+  });
+
+  it('kein Tipp beim reinen 15-%-Pflichtzuschuss', () => {
+    const r = bav(230, 30);              // 200 eigen + 30 AG (15 %)
+    expect(r.hinweise.some((h) => h.startsWith('Tipp'))).toBe(false);
+  });
+
+  it('kein Tipp bei der Unterstuetzungskasse selbst', () => {
+    const r = bav(stGrenze, svGrenze, {}, 'bavUkasse');
+    expect(r.hinweise.some((h) => h.startsWith('Tipp'))).toBe(false);
+    expect(r.svErsparnisMonat).toBeGreaterThan(60);   // AG-Anteil belegt dort nichts
+  });
+});

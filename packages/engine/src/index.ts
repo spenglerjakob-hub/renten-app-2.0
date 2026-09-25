@@ -94,7 +94,7 @@ export {
 } from './social/kv-profil.js';
 export {
   vertragsTuev, renteOderKapital, svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE,
-  type TuevAnnahmen, type TuevBeitragsstufe, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
+  type TuevAnnahmen, type TuevBeitragsstufe, type BavVorbelegung, type TuevKontext, type TuevErgebnis, type RenteOderKapital,
   type SvKontext, type SvWirkung,
 } from './analyse/vertrags-tuev.js';
 export {

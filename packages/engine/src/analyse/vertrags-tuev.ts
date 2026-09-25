@@ -64,6 +64,30 @@ export interface TuevAnnahmen {
   fruehereBeitraege?: TuevBeitragsstufe[];
   /** Angenommene Lebenserwartung — bestimmt die Dauer der Auszahlphase */
   lebenserwartung: number;
+  /**
+   * bAV: was ANDERE bAV-Vertraege derselben Person von den Freigrenzen schon
+   * belegen. Fehlt es, hat der Vertrag die Grenzen fuer sich allein.
+   */
+  bavVorbelegung?: BavVorbelegung;
+}
+
+/**
+ * Belegung der Freigrenzen durch die uebrigen bAV-Vertraege einer Person,
+ * je Jahr.
+ *
+ * Die Grenzen gelten je Person und Dienstverhaeltnis, nicht je Vertrag. Die
+ * Reihenfolge der Anrechnung: zuerst ALLE Arbeitgeberbeitraege, danach die
+ * Entgeltumwandlungen in der Reihenfolge der Vertraege.
+ */
+export interface BavVorbelegung {
+  /** Arbeitgeberbeitraege aller anderen Vertraege in DV, Pensionskasse, Pensionsfonds */
+  agAndereJahr: number;
+  /** davon die der Vertraege, die vor diesem stehen — fuer den Anteil des Arbeitgebers selbst */
+  agFruehereJahr: number;
+  /** Entgeltumwandlung der Vertraege davor in DV, Pensionskasse, Pensionsfonds */
+  eigenFruehereJahr: number;
+  /** Entgeltumwandlung der Vertraege davor in Unterstuetzungskasse/Direktzusage */
+  eigenUkasseFruehereJahr: number;
 }
 
 export interface TuevBeitragsstufe {
@@ -233,6 +257,16 @@ export interface TuevErgebnis {
  */
 export const STEUER_FREI_QUOTE = 0.08;
 export const SV_FREI_QUOTE = 0.04;
+
+/**
+ * Pflichtzuschuss auf umgewandeltes Entgelt, § 1a Abs. 1a BetrAVG — derselbe
+ * Satz wie `BAV_AG_PFLICHTZUSCHUSS` im Foerdercheck, der von hier importiert.
+ */
+const BAV_PFLICHTZUSCHUSS_QUOTE = 0.15;
+
+const LEERE_VORBELEGUNG: BavVorbelegung = {
+  agAndereJahr: 0, agFruehereJahr: 0, eigenFruehereJahr: 0, eigenUkasseFruehereJahr: 0,
+};
 
 /** Vorgabe der Auszahldauer, wenn am Vertrag nichts eingetragen ist. */
 const AUSZAHLDAUER_VORGABE = 25;
@@ -648,18 +682,42 @@ export function vertragsTuev(
       // dem Beitrag mit (`agJahr` oben, aus denselben Monaten).
       const eigenanteil = Math.max(0, beitragJahr - agJahr);
 
-      // GRENZEN DES § 3 Nr. 63 EStG. Entgeltumwandlung ist nur bis 8 % der
-      // Beitragsbemessungsgrenze steuerfrei und nur bis 4 % beitragsfrei.
-      // Was darueber liegt, ist normales Gehalt — der Vertrag kostet dann
-      // fast den vollen Beitrag. Ohne diese Deckelung wies der TUEV bei
-      // 1.000 EUR im Monat einen um 280 EUR zu niedrigen Aufwand aus.
-      const svFrei = Math.min(eigenanteil, SV_FREI_QUOTE * p.bbgRvJahr);
-      // Unterstuetzungskasse und Direktzusage fallen NICHT unter § 3 Nr. 63:
-      // sie sind ohne Grenze lohnsteuerfrei (Zuflussprinzip), aber
-      // beitragsfrei ebenfalls nur bis 4 %.
-      const steuerFrei = v.typ === 'bavUkasse'
+      /*
+        GRENZEN DES § 3 Nr. 63 EStG UND DES § 1 Abs. 1 Nr. 9 SvEV. In
+        Direktversicherung, Pensionskasse und Pensionsfonds ist nur bis 8 %
+        der Beitragsbemessungsgrenze steuerfrei und nur bis 4 % beitragsfrei.
+        Was darueber liegt, ist normales Gehalt — der Vertrag kostet dann
+        fast den vollen Beitrag. Ohne diese Deckelung wies der TUEV bei
+        1.000 EUR im Monat einen um 280 EUR zu niedrigen Aufwand aus.
+
+        DIE GRENZEN GELTEN FUER DIE SUMME, UND DER ARBEITGEBER GEHT VOR.
+        Arbeitgeber- und Arbeitnehmeranteil, auch aus anderen Vertraegen,
+        teilen sich denselben Rahmen, und die arbeitgeberfinanzierten
+        Beitraege werden zuerst angerechnet. Zahlt der Arbeitgeber 338 EUR
+        in die Direktversicherung, ist der beitragsfreie Rahmen 2026 voll —
+        eine Entgeltumwandlung daneben spart nur noch Steuern. Vorher lagen
+        die vollen 4 % am Eigenanteil, und der TUEV wies eine SV-Ersparnis
+        aus, die es nicht gibt.
+
+        UNTERSTUETZUNGSKASSE UND DIREKTZUSAGE fallen nicht unter § 3 Nr. 63:
+        Arbeitgeberbeitraege sind dort weder Lohn noch Entgelt und belegen
+        nichts. Eine Entgeltumwandlung ist ohne Grenze lohnsteuerfrei
+        (Zuflussprinzip) und bis 4 % beitragsfrei (§ 14 Abs. 1 S. 2 SGB IV) —
+        ein eigener Rahmen neben dem der Direktversicherung.
+      */
+      const vb = a.bavVorbelegung ?? LEERE_VORBELEGUNG;
+      const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+      const steuerGrenze = STEUER_FREI_QUOTE * p.bbgRvJahr;
+      const ukasse = v.typ === 'bavUkasse';
+      const agVorEigen = ukasse ? 0 : vb.agAndereJahr + agJahr;
+      const svRahmen = ukasse
+        ? Math.max(0, svGrenze - vb.eigenUkasseFruehereJahr)
+        : Math.max(0, svGrenze - agVorEigen - vb.eigenFruehereJahr);
+      const steuerRahmen = ukasse
         ? eigenanteil
-        : Math.min(eigenanteil, STEUER_FREI_QUOTE * p.bbgRvJahr);
+        : Math.max(0, steuerGrenze - agVorEigen - vb.eigenFruehereJahr);
+      const svFrei = Math.min(eigenanteil, svRahmen);
+      const steuerFrei = Math.min(eigenanteil, steuerRahmen);
 
       /*
         Beitragsfrei ist nur, was unter 4 % der Beitragsbemessungsgrenze
@@ -678,20 +736,79 @@ export function vertragsTuev(
       aufwandJahr = Math.max(0, eigenanteil - steuerJahr - svJahr);
 
       if (moment) {
+        const monat = (x: number) => euroText(x / 12);
+        const agBelegt = Math.min(agVorEigen, svGrenze);
         if (eigenanteil > svFrei + 0.5) {
           hinweise.push(
-            `Nur ${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat sind beitragsfrei `
-            + `(4 % der Beitragsbemessungsgrenze). Auf die darüber liegenden `
-            + `${euroText((eigenanteil - svFrei) / 12)} zahlen Sie volle Sozialabgaben.`,
+            !ukasse && agBelegt > 0.5
+              ? `Beitragsfrei sind höchstens ${monat(svGrenze)} im Monat (4 % der `
+                + 'Beitragsbemessungsgrenze) — für Arbeitgeber- und Arbeitnehmeranteil zusammen, und '
+                + `der Arbeitgeberanteil wird zuerst angerechnet. Er belegt davon ${monat(agBelegt)}. `
+                + `Auf ${monat(eigenanteil - svFrei)} Ihrer Entgeltumwandlung zahlen Sie deshalb `
+                + 'volle Sozialabgaben; gespart wird dort nur Steuer.'
+              : `Nur ${monat(svGrenze)} im Monat sind beitragsfrei `
+                + `(4 % der Beitragsbemessungsgrenze${svRahmen < svGrenze - 0.5 ? ', zum Teil schon durch Ihre anderen Verträge belegt' : ''}). `
+                + `Auf die darüber liegenden ${monat(eigenanteil - svFrei)} zahlen Sie volle Sozialabgaben.`,
           );
         }
         if (eigenanteil > steuerFrei + 0.5) {
           hinweise.push(
-            `Steuerfrei sind nur ${euroText(STEUER_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat `
-            + `(8 % der Beitragsbemessungsgrenze). Die darüber liegenden `
-            + `${euroText((eigenanteil - steuerFrei) / 12)} zahlen Sie aus versteuertem `
+            `Steuerfrei sind höchstens ${monat(steuerGrenze)} im Monat (8 % der `
+            + 'Beitragsbemessungsgrenze) — Arbeitgeberanteil und andere Verträge eingerechnet. Die '
+            + `darüber liegenden ${monat(eigenanteil - steuerFrei)} zahlen Sie aus versteuertem `
             + 'Gehalt — der Vertrag lohnt sich insoweit nur noch wegen der Rendite.',
           );
+        }
+
+        /*
+          Der Arbeitgeberanteil selbst kann ueber die Grenzen gehen. Dann ist
+          der Rest fuer den Arbeitnehmer Lohn: Er zahlt darauf Steuer und
+          Sozialabgaben. Das steht nur als Hinweis da, nicht in der Rechnung —
+          der Kassenbon rechnet vom Eigenanteil aus, und dieser Betrag faellt
+          daneben an.
+        */
+        if (!ukasse) {
+          const agUeberSv = Math.max(0, agJahr - Math.max(0, svGrenze - vb.agFruehereJahr));
+          const agUeberSteuer = Math.max(0, agJahr - Math.max(0, steuerGrenze - vb.agFruehereJahr));
+          if (agUeberSv > 0.5) {
+            hinweise.push(
+              `Der Arbeitgeberanteil liegt selbst um ${monat(agUeberSv)} im Monat über dem beitragsfreien `
+              + `Rahmen${agUeberSteuer > 0.5 ? ` (um ${monat(agUeberSteuer)} auch über dem steuerfreien)` : ''}. `
+              + 'Dieser Teil ist für Sie Arbeitslohn: Sie zahlen darauf Sozialabgaben'
+              + `${agUeberSteuer > 0.5 ? ' und Steuer' : ''}. In der Rechnung oben ist das nicht enthalten.`,
+            );
+          }
+
+          /*
+            UNTERSTUETZUNGSKASSE FUER DEN ARBEITGEBERANTEIL. Freiwillige
+            Arbeitgeberbeitraege in eine Unterstuetzungskasse sind unbegrenzt
+            steuer- und beitragsfrei und belegen den Rahmen der
+            Direktversicherung nicht. Der 15-%-Pflichtzuschuss bleibt aussen
+            vor: Er muss in den Vertrag der Entgeltumwandlung fliessen
+            (§ 1a Abs. 1a BetrAVG).
+          */
+          const pflicht = Math.min(agJahr, BAV_PFLICHTZUSCHUSS_QUOTE * eigenanteil);
+          const freiwillig = agJahr + vb.agAndereJahr - pflicht;
+          if (freiwillig > 0.5 && eigenanteil > 0.5) {
+            const agAlt = pflicht;
+            const svFreiAlt = Math.min(eigenanteil, Math.max(0, svGrenze - agAlt - vb.eigenFruehereJahr));
+            const steuerFreiAlt = Math.min(eigenanteil, Math.max(0, steuerGrenze - agAlt - vb.eigenFruehereJahr));
+            const wirkungAlt = svWirkung(svFreiAlt, k, p);
+            const minderungAlt = Math.max(0, steuerFreiAlt - wirkungAlt.wegfallenderAbzug);
+            const steuerAlt = zusatzsteuer(k.zveHeute - minderungAlt, minderungAlt, steuerOpt, p);
+            const gewinn = (wirkungAlt.ersparnis + steuerAlt) - (svJahr + steuerJahr);
+            if (gewinn / 12 >= 5) {
+              hinweise.push(
+                `Tipp: Ihr Arbeitgeber zahlt ${monat(freiwillig)} im Monat freiwillig in die `
+                + 'Direktversicherung und belegt damit den Freirahmen, den Ihre Entgeltumwandlung '
+                + 'bräuchte. Zahlt er diesen Anteil stattdessen in eine Unterstützungskasse, bleibt '
+                + 'er für beide Seiten unbegrenzt steuer- und sozialabgabenfrei, und Ihnen stünde '
+                + 'der Rahmen der Direktversicherung zur Verfügung. Das brächte Ihnen rund '
+                + `${monat(gewinn)} im Monat mehr Ersparnis. Der 15-%-Pflichtzuschuss bleibt in der `
+                + 'Direktversicherung (§ 1a Abs. 1a BetrAVG).',
+              );
+            }
+          }
         }
       }
     } else if (v.typ === 'basis') {
