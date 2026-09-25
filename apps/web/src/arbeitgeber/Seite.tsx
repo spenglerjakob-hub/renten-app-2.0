@@ -60,7 +60,8 @@ export function Seite() {
   const ma = r.mitarbeiter;
   const ag = r.arbeitgeber;
   const n = Math.max(1, Math.round(anzahl));
-  const maxBalken = Math.max(r.vertrag.gesamtMonat, r.gehalt?.bruttoMonat ?? 0, 1);
+  const g = r.gehalt;
+  const maxBalken = Math.max(r.vertrag.gesamtMonat, g?.nettoMonat ?? 0, 1);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
@@ -78,7 +79,7 @@ export function Seite() {
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
           Betriebsrente im Matching-Modell
         </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-xs">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
           Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie als Arbeitgeber legen einen eigenen
           Beitrag in eine Unterstützungskasse dazu. Beide zahlen deutlich weniger, als in der
           Altersvorsorge ankommt — und der Mitarbeiter hat einen guten Grund zu bleiben.
@@ -197,25 +198,80 @@ export function Seite() {
               </Bon>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="text-sm font-black text-slate-900">Dasselbe Geld als Gehaltserhöhung?</h2>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                Mit {euro(ag.kostenVorSteuerMonat)} Personalkosten vor Steuern — genauso viel wie das Modell — ginge
-                eine Gehaltserhöhung von {euro(r.gehalt?.bruttoMonat ?? 0)} brutto. Nach Abgaben und Steuer bliebe dem
-                Mitarbeiter davon:
-              </p>
-              <div className="mt-3 space-y-2">
-                <Balken text="Gehaltserhöhung, netto beim Mitarbeiter" betrag={r.gehalt?.nettoMonat ?? 0} max={maxBalken} farbe="bg-slate-400" />
-                <Balken text="Matching-Modell, in seiner Altersvorsorge" betrag={r.vertrag.gesamtMonat} max={maxBalken} farbe="bg-emerald-500" />
-              </div>
-            </section>
+            {/*
+              HERLEITUNG STATT NUR ERGEBNIS. Die Karten oben nennen die
+              Nettokosten, der Vergleich rechnet mit den Personalkosten VOR
+              Steuern — ohne die Zwischenschritte stehen zwei Zahlen da, deren
+              Zusammenhang niemand sieht. Beide Wege Zeile fuer Zeile
+              nebeneinander: Sie treffen sich bei denselben Kosten.
+            */}
+            {g && (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
+                <h2 className="text-sm font-black text-slate-900">Dasselbe Geld als Gehaltserhöhung?</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
+                  Beide Wege kosten den Arbeitgeber gleich viel. So entsteht die Zahl, Monat für Monat:
+                </p>
+                <table className="mt-2 w-full text-xs print:mt-1 print:text-[10px]">
+                  <thead>
+                    <tr className="text-left text-[11px] text-slate-500">
+                      <th className="py-0.5 font-medium" />
+                      <th className="py-0.5 text-right font-bold text-emerald-700">
+                        <span className="sm:hidden">Modell</span><span className="hidden sm:inline">Matching-Modell</span>
+                      </th>
+                      <th className="py-0.5 pl-3 text-right font-bold text-slate-600">
+                        <span className="sm:hidden">Gehalt</span><span className="hidden sm:inline">Gehaltserhöhung</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-700">
+                    <VergleichZeile
+                      text="Zahlung des Arbeitgebers"
+                      links={euro(ag.pflichtzuschussMonat + ag.ukasseMonat)} rechts={<>{euro(g.bruttoMonat)}<Zusatz> brutto</Zusatz></>}
+                    />
+                    <VergleichZeile
+                      text={`Arbeitgeberanteil Sozialversicherung${umlagen > 0 ? ' + Umlagen' : ''}`}
+                      links={<>− {euro(ag.svErsparnisMonat + ag.umlagenErsparnisMonat)}<Zusatz> gespart</Zusatz></>}
+                      rechts={<>+ {euro(g.agAbgabenMonat)}<Zusatz> fällig</Zusatz></>}
+                    />
+                    <VergleichZeile
+                      text="= Personalkosten vor Steuern" summe
+                      links={euro(ag.kostenVorSteuerMonat)} rechts={euro(g.kostenVorSteuerMonat)}
+                    />
+                    <VergleichZeile
+                      text={`− Steuerersparnis (${prozent(steuersatz, 0)} Betriebsausgabe)`}
+                      links={`− ${euro(ag.steuerersparnisMonat)}`} rechts={`− ${euro(g.steuerersparnisMonat)}`}
+                    />
+                    <VergleichZeile
+                      text="= kostet den Arbeitgeber netto" summe hervor
+                      links={euro(ag.nettoKostenMonat)} rechts={euro(g.nettoKostenMonat)}
+                    />
+                    <VergleichZeile
+                      text="Beim Mitarbeiter kommt an" summe
+                      links={<>{euro(ag.pflichtzuschussMonat + ag.ukasseMonat)}<Zusatz> Vorsorge</Zusatz></>}
+                      rechts={<>{euro(g.nettoMonat)}<Zusatz> netto</Zusatz></>}
+                    />
+                  </tbody>
+                </table>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+                  Von {euro(g.bruttoMonat)} Gehaltserhöhung gehen beim Mitarbeiter {euro(g.svMonat)} Sozialabgaben
+                  und {euro(g.steuerMonat)} Steuer ab. Im Modell kommt der Arbeitgeberbeitrag ungekürzt in der
+                  Altersvorsorge an — zusammen mit der eigenen Umwandlung {euro(r.vertrag.gesamtMonat)}.
+                </p>
+                {/* Im Druck traegt die Tabelle die Zahlen; die Balken kosten nur Hoehe. */}
+                <div className="mt-3 space-y-2 print:hidden">
+                  <Balken text="Gehaltserhöhung, netto beim Mitarbeiter" betrag={g.nettoMonat} max={maxBalken} farbe="bg-slate-400" />
+                  <Balken text="Arbeitgeberbeitrag in der Altersvorsorge" betrag={ag.pflichtzuschussMonat + ag.ukasseMonat} max={maxBalken} farbe="bg-emerald-400" />
+                  <Balken text="mit eigener Umwandlung insgesamt" betrag={r.vertrag.gesamtMonat} max={maxBalken} farbe="bg-emerald-600" />
+                </div>
+              </section>
+            )}
 
             <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
                 <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                   <Link2 className="h-4 w-4 text-indigo-600" aria-hidden /> Bindung
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
                   Der Arbeitgeberanteil wird erst nach <strong>drei Jahren</strong> Zusagedauer unverfallbar
                   (§ 1b BetrAVG). Wer früher geht, verliert ihn — wer später geht, verliert den laufenden
                   Matching-Beitrag. Die eigene Umwandlung gehört dem Mitarbeiter sofort.
@@ -237,7 +293,7 @@ export function Seite() {
               <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
               </h2>
-              <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2">
+              <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
                 <li>• Matching-Regel für alle Beschäftigten gleich (Gleichbehandlung)</li>
                 <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
                 <li>• Pflichtzuschuss fließt in die Direktversicherung (§ 1a Abs. 1a BetrAVG)</li>
@@ -310,6 +366,21 @@ function Zeile({ text, betrag, summe }: { text: string; betrag: number; summe?: 
       <dt>{text}</dt>
       <dd className="tabular-nums">{euro(betrag)}</dd>
     </div>
+  );
+}
+
+/** Erlaeuterndes Wort hinter dem Betrag — auf schmalen Bildschirmen weggelassen. */
+function Zusatz({ children }: { children: ReactNode }) {
+  return <span className="hidden font-normal text-slate-500 sm:inline">{children}</span>;
+}
+
+function VergleichZeile(props: { text: string; links: ReactNode; rechts: ReactNode; summe?: boolean; hervor?: boolean }) {
+  return (
+    <tr className={`${props.summe ? 'border-t border-slate-200 font-bold text-slate-900' : ''} ${props.hervor ? 'bg-amber-50' : ''}`}>
+      <td className="py-0.5 pr-2">{props.text}</td>
+      <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{props.links}</td>
+      <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{props.rechts}</td>
+    </tr>
   );
 }
 

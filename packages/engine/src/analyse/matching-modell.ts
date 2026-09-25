@@ -97,9 +97,23 @@ export interface MatchingErgebnis {
     ukasseMonat: number;
     gesamtMonat: number;
   };
-  /** Dieselben Kosten vor Steuern als Gehaltserhoehung */
+  /**
+   * Dieselben Kosten vor Steuern als Gehaltserhoehung — mit allen
+   * Zwischenschritten, damit die Seite die Rechnung Zeile fuer Zeile neben
+   * das Modell stellen kann.
+   */
   gehalt: {
     bruttoMonat: number;
+    /** Arbeitgeberanteil Sozialversicherung plus Umlagen auf die Erhoehung */
+    agAbgabenMonat: number;
+    /** = Brutto + AG-Abgaben; gleich `arbeitgeber.kostenVorSteuerMonat` */
+    kostenVorSteuerMonat: number;
+    steuerersparnisMonat: number;
+    nettoKostenMonat: number;
+    /** Sozialabgaben des Mitarbeiters auf die Erhoehung */
+    svMonat: number;
+    /** Lohnsteuer, Soli und ggf. Kirchensteuer auf die Erhoehung */
+    steuerMonat: number;
     nettoMonat: number;
   } | null;
   /** Im Vertrag je Euro Nettoaufwand des Mitarbeiters */
@@ -271,7 +285,19 @@ export function matchingModell(
       if (kostenGehalt(mitte) > kostenVorSteuer) hi = mitte; else lo = mitte;
     }
     const nachher = bruttoZuNetto(e.jahresbrutto + lo, erwerbOpt, p);
-    gehalt = { bruttoMonat: lo / 12, nettoMonat: (nachher.jahresnetto - heute.jahresnetto) / 12 };
+    const kosten = kostenGehalt(lo);
+    const sv = nachher.sv - heute.sv;
+    const steuer = (nachher.est + nachher.soli + nachher.kirchensteuer) - (heute.est + heute.soli + heute.kirchensteuer);
+    gehalt = {
+      bruttoMonat: lo / 12,
+      agAbgabenMonat: (kosten - lo) / 12,
+      kostenVorSteuerMonat: kosten / 12,
+      steuerersparnisMonat: kosten * satz / 12,
+      nettoKostenMonat: kosten * (1 - satz) / 12,
+      svMonat: sv / 12,
+      steuerMonat: steuer / 12,
+      nettoMonat: (nachher.jahresnetto - heute.jahresnetto) / 12,
+    };
   }
 
   // --- Hinweise ------------------------------------------------------------

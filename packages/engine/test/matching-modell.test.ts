@@ -136,6 +136,11 @@ describe('Matching-Modell: Sonderlagen', () => {
     expect(g.bruttoMonat * (1 + 0.2115)).toBeCloseTo(r.arbeitgeber.kostenVorSteuerMonat, 0);
     expect(g.nettoMonat).toBeLessThan(g.bruttoMonat * 0.65);
     expect(g.nettoMonat).toBeLessThan(r.vertrag.gesamtMonat / 3);
+    // Die Zwischenschritte gehen auf
+    expect(g.bruttoMonat + g.agAbgabenMonat).toBeCloseTo(g.kostenVorSteuerMonat, 6);
+    expect(g.kostenVorSteuerMonat).toBeCloseTo(r.arbeitgeber.kostenVorSteuerMonat, 1);
+    expect(g.nettoKostenMonat).toBeCloseTo(r.arbeitgeber.nettoKostenMonat, 1);
+    expect(g.bruttoMonat - g.svMonat - g.steuerMonat).toBeCloseTo(g.nettoMonat, 6);
   });
 
   it('Umlagen erhoehen die Ersparnis des Arbeitgebers', () => {
