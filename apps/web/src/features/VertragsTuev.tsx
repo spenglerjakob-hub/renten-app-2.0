@@ -875,6 +875,16 @@ export function VertragsTuev({
                       </p>
                     ))}
 
+                    {/* Fuer das Gespraech mit dem Arbeitgeber: eigene Seite, ohne Anmeldung. */}
+                    {v.typ.startsWith('bav') && (
+                      <a
+                        href="/arbeitgeber" target="_blank" rel="noopener"
+                        className="block rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 print:hidden"
+                      >
+                        Matching-Modell für den Arbeitgeber zeigen →
+                      </a>
+                    )}
+
                     {!wege && kenntKapitalwahl(v.typ) && (
                       <p className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
                         Für den Vergleich fehlt {v.brutto > 0 ? 'die Kapitalauszahlung' : 'die monatliche Rente'}.

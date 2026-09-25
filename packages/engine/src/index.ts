@@ -98,6 +98,10 @@ export {
   type SvKontext, type SvWirkung,
 } from './analyse/vertrags-tuev.js';
 export {
+  matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis,
+  type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
+} from './analyse/matching-modell.js';
+export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,
   type FoerderKontext, type FoerderBefund,
 } from './analyse/foerdercheck.js';

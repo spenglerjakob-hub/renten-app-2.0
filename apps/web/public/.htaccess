@@ -36,6 +36,10 @@ DirectoryIndex index.html
   # zum Rechner. Auch diese Regel MUSS vor dem Auffangmuster stehen.
   RewriteRule ^vorsorge-check/?$ /vorsorge-check.html [NC,L]
 
+  # --- Arbeitgeber-Seite (Matching-Modell) --------------------------------
+  # Ebenso: eigene Seite ohne Anmeldung, VOR dem Auffangmuster.
+  RewriteRule ^arbeitgeber/?$ /arbeitgeber.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
