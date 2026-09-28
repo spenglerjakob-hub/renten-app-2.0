@@ -198,7 +198,7 @@ export function VertragsTuev({
   );
 
   return (
-    <section className="mx-auto mb-24 max-w-6xl p-2 sm:p-6 print:break-before-page">
+    <section id="vertrags-tuev" className="mx-auto mb-24 max-w-6xl scroll-mt-28 p-2 sm:p-6 print:break-before-page">
       <div className="mb-4 flex flex-col items-start justify-between gap-4 border-b-2 border-amber-200 px-2 pb-3 sm:mb-6 sm:pb-4 md:flex-row md:items-center">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-amber-800 sm:gap-3 sm:text-2xl">

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
+  PanelLeft, Layers, BarChart3, SearchCheck,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -28,6 +29,7 @@ import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
+import { Seitenleiste, type Abschnitt } from './components/Seitenleiste';
 import { personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro, TON } from './components/Feld';
 
@@ -103,6 +105,7 @@ export default function App() {
   const [basisOffen, setBasisOffen] = useState(true);
   const [kontoOffen, setKontoOffen] = useState(false);
   const [checkOffen, setCheckOffen] = useState(false);
+  const [leisteOffen, setLeisteOffen] = useState(false);
 
   /*
     Angeforderte Vorsorge-Checks laden, sobald jemand angemeldet ist — auch
@@ -228,6 +231,17 @@ export default function App() {
 
   const verheiratet = szenario.haushalt.verheiratet;
 
+  const schliesseLeiste = useCallback(() => setLeisteOffen(false), []);
+  const abschnitte: Abschnitt[] = [
+    { id: 'eingaben', text: 'Allgemeine Daten & Ziel', symbol: <User className="h-4 w-4" aria-hidden />, beiSprung: () => setBasisOffen(true) },
+    { id: 'vertraege', text: 'Versorgungsschichten', symbol: <Layers className="h-4 w-4" aria-hidden /> },
+    { id: 'ergebnis', text: 'Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden /> },
+    { id: 'vertrags-tuev', text: 'Vertrags-TÜV', symbol: <SearchCheck className="h-4 w-4" aria-hidden /> },
+    ...(supabaseKonfiguriert && angemeldet
+      ? [{ id: 'check-anfragen', text: 'Vorsorge-Check anfordern', symbol: <Inbox className="h-4 w-4" aria-hidden />, beiSprung: () => setCheckOffen(true) }]
+      : []),
+  ];
+
   return (
     /*
       Grauer Seitengrund wie auf der Landingpage (`avd/Seite.tsx`), nicht
@@ -256,6 +270,16 @@ export default function App() {
           */}
           <div className={`flex items-center md:shrink-0 ${kopfEingeklappt ? 'w-full justify-center' : 'w-full justify-between md:w-auto md:gap-3'}`}>
             <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+              {/* Uebersicht ueber alle Seiten — auch bei eingeklappter Kopfleiste da. */}
+              <button
+                type="button"
+                onClick={() => setLeisteOffen(true)}
+                aria-expanded={leisteOffen}
+                aria-label="Übersicht aller Seiten öffnen"
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
+              >
+                <PanelLeft className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Seiten</span>
+              </button>
               <Logo klasse={kopfEingeklappt ? 'h-8 w-8 sm:h-10 sm:w-10' : 'h-10 w-10 sm:h-14 sm:w-14'} />
               <div className="text-left">
                 <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
@@ -433,6 +457,7 @@ export default function App() {
           aus, und man muss erst lesen, um zu wissen, wo man etwas eintraegt.
         */}
         <div className="space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-5 print:hidden">
+          <div id="eingaben" className="scroll-mt-28">
           <AkkordeonKarte
             titel="Allgemeine Daten & Ziel"
             offen={basisOffen}
@@ -445,8 +470,9 @@ export default function App() {
               onEhepartnerDialog={() => setEhepartnerDialog(true)}
             />
           </AkkordeonKarte>
+          </div>
 
-          <section className={`overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
+          <section id="vertraege" className={`scroll-mt-28 overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
             <Reiterleiste
               reiter={REITER}
               aktiv={reiter}
@@ -474,6 +500,7 @@ export default function App() {
           </AkkordeonKarte>
 
           {supabaseKonfiguriert && angemeldet && (
+            <div id="check-anfragen" className="scroll-mt-28">
             <AkkordeonKarte
               titel="Vorsorge-Check anfordern"
               offen={checkOffen}
@@ -489,11 +516,12 @@ export default function App() {
             >
               <CheckAnfragen />
             </AkkordeonKarte>
+            </div>
           )}
         </div>
 
         {/* RECHTE SPALTE: ERGEBNIS */}
-        <div className="space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-7 print:col-span-12">
+        <div id="ergebnis" className="scroll-mt-28 space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-7 print:col-span-12">
           {fehler && (
             <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
               Die Berechnung ist fehlgeschlagen: {fehler}
@@ -702,6 +730,8 @@ export default function App() {
       </main>
 
       <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
+
+      <Seitenleiste offen={leisteOffen} onSchliessen={schliesseLeiste} abschnitte={abschnitte} />
 
       <div className="print:hidden">
         <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
