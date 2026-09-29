@@ -8,6 +8,7 @@ import {
   type AvdKind,
 } from '@renten/engine';
 import { Logo } from '../components/Logo';
+import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile,
   euro, prozent,
@@ -750,6 +751,7 @@ export function Seite() {
           am 8. Mai 2026 verabschiedeten Gesetzes, Anwendung ab 1. Januar 2027. Die Berechnung läuft
           vollständig in Ihrem Browser — Ihre Eingaben verlassen dieses Gerät nicht.
         </p>
+        <RechtsLinks klasse="mt-4" />
       </main>
 
       {/*

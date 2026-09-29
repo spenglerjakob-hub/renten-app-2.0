@@ -10,6 +10,7 @@ import {
 import { exportiere } from '@renten/schema';
 import { CHECK_CODE, codePruefen, einreichen, type CodeStatus } from '../lib/check';
 import { Logo } from '../components/Logo';
+import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, TextFeld, AuswahlFeld, Schalter, euro,
 } from '../components/Feld';
@@ -362,6 +363,7 @@ export function Seite() {
             : 'Ihre Angaben bleiben in Ihrem Browser, bis Sie „Ergebnis berechnen“ wählen.'}{' '}
           Modellrechnung ohne Gewähr; keine Steuer-, Renten- oder Anlageberatung.
         </p>
+        <RechtsLinks klasse="mt-4" />
       </main>
 
       <Dialog
@@ -940,6 +942,12 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
           {/*
             EINWILLIGUNG. Die Angaben liegen bis zur Uebernahme auf dem Server.
             Ohne Haken bleibt der Knopf gesperrt.
+
+            AUSDRUECKLICH nach Art. 9 Abs. 2 lit. a DSGVO: Kirchensteuer
+            (Religion) und ein PKV-Zuschlag (Gesundheit) sind besondere
+            Kategorien. Eine pauschale Einwilligung deckt sie nicht — sie
+            muessen beim Namen genannt sein. Die Loeschfrist steht hier, weil
+            der Kunde sonst nicht weiss, wie lange er einwilligt.
           */}
           <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md bg-white p-2.5 text-xs leading-relaxed text-slate-700">
             <input
@@ -949,9 +957,15 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
               className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600"
             />
             <span>
-              Ich bin einverstanden, dass meine Angaben an meinen Berater übermittelt und für die
-              Beratung gespeichert werden, bis er sie übernommen oder gelöscht hat. Die
-              Einwilligung kann ich jederzeit bei meinem Berater widerrufen.
+              Ich willige ein, dass meine Angaben an meinen Berater übermittelt und für die Beratung
+              gespeichert werden — bis er sie gelöscht hat, <strong>höchstens 90 Tage</strong>. Das
+              schließt ausdrücklich Angaben ein, die Rückschlüsse auf meine Religionszugehörigkeit
+              (Kirchensteuer) oder meine Gesundheit (Zuschlag der privaten Krankenversicherung) zulassen
+              (Art. 9 Abs. 2 lit. a DSGVO). Die Einwilligung ist freiwillig und kann jederzeit mit Wirkung
+              für die Zukunft bei meinem Berater widerrufen werden. Mehr in der{' '}
+              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-emerald-800 underline">
+                Datenschutzerklärung
+              </a>.
             </span>
           </label>
         </div>

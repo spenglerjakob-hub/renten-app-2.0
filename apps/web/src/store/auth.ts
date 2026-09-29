@@ -51,6 +51,11 @@ export interface AuthStore {
   /** Loest den Link aus der Mail ein — erst auf Knopfdruck, siehe `linkAusAdresse`. */
   linkBestaetigen: () => Promise<void>;
   bestaetigungErneutSenden: () => Promise<void>;
+  /**
+   * Loescht das eigene Konto samt allem, was daran haengt (Art. 17 DSGVO).
+   * Liefert true bei Erfolg; die Anmeldemaske zeigt danach die Bestaetigung.
+   */
+  kontoLoeschen: () => Promise<boolean>;
   abmelden: () => Promise<void>;
   meldungLoeschen: () => void;
 }
@@ -422,6 +427,26 @@ export const useAuth = create<AuthStore>((set, get) => ({
     }
     stempeln();
     set({ laedt: false, status: 'angemeldet', meldung: { art: 'ok', text: 'Neues Passwort gespeichert.' } });
+  },
+
+  kontoLoeschen: async () => {
+    if (!supabase) return false;
+    set({ laedt: true });
+    // `invoke` schickt das Zugriffstoken der Sitzung mit; die Funktion loescht
+    // genau den Nutzer, dem es gehoert.
+    const { error } = await supabase.functions.invoke('konto-loeschen', { method: 'POST' });
+    if (error) {
+      set({ laedt: false, meldung: { art: 'fehler', text: 'Das Konto konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.' } });
+      return false;
+    }
+    // Die Sitzung gibt es serverseitig nicht mehr — nur noch lokal aufraeumen.
+    await supabase.auth.signOut({ scope: 'local' });
+    stempelLoeschen();
+    set({
+      laedt: false, status: 'abgemeldet', email: null,
+      meldung: { art: 'ok', text: 'Ihr Konto und alle darin gespeicherten Daten wurden gelöscht.' },
+    });
+    return true;
   },
 
   abmelden: async () => {

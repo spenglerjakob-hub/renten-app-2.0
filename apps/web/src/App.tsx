@@ -30,6 +30,7 @@ import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
 import { Seitenleiste, type Abschnitt } from './components/Seitenleiste';
+import { RechtsLinks } from './components/RechtsLinks';
 import { personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro, TON } from './components/Feld';
 
@@ -742,6 +743,7 @@ export default function App() {
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Berechnung läuft
           vollständig in Ihrem Browser — ohne Anmeldung verlassen Ihre Eingaben dieses Gerät nicht.
         </p>
+        <RechtsLinks klasse="mt-2" />
       </footer>
 
       {/* FESTE FUSSLEISTE */}

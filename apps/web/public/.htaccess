@@ -42,6 +42,11 @@ DirectoryIndex index.html
   # Und das einfachere Zuschussmodell.
   RewriteRule ^zuschussmodell/?$ /zuschussmodell.html [NC,L]
 
+  # --- Impressum und Datenschutz ------------------------------------------
+  # Pflichtseiten, von jeder Seite aus verlinkt. Ebenfalls VOR dem Auffangmuster.
+  RewriteRule ^impressum/?$ /impressum.html [NC,L]
+  RewriteRule ^datenschutz/?$ /datenschutz.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>

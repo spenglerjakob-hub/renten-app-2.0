@@ -58,6 +58,7 @@ export function CheckAnfragen() {
         {email && (
           <> Sobald ein Kunde absendet, bekommen Sie eine E-Mail an <strong>{email}</strong>.</>
         )}
+        {' '}Eingegangene Angaben werden nach <strong>90 Tagen</strong> automatisch gelöscht.
       </p>
 
       {meldung && (

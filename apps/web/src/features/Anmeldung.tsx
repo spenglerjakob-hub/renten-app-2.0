@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send } from 'lucide-react';
 import { Logo } from '../components/Logo';
+import { RechtsLinks } from '../components/RechtsLinks';
 import { useAuth, type MailLink } from '../store/auth';
 
 type Maske = 'anmelden' | 'registrieren' | 'vergessen';
@@ -212,6 +213,7 @@ export function Anmeldung() {
         </a>{' '}
         gibt es ohne Anmeldung.
       </p>
+      <RechtsLinks klasse="mt-4 justify-center" />
     </Rahmen>
   );
 }

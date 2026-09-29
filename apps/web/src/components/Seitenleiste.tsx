@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, LineChart, X,
 } from 'lucide-react';
+import { RechtsLinks } from './RechtsLinks';
 
 /**
  * Seitenleiste des Rechners: Sprungmarken auf der langen Rechnerseite und
@@ -134,10 +135,11 @@ export function Seitenleiste(props: {
           {ARBEITGEBER.map((s) => <SeitenLink key={s.href} seite={s} fokussierbar={offen} />)}
         </Gruppe>
 
-        <p className="mt-auto px-4 pb-4 pt-6 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-auto px-4 pb-2 pt-6 text-[11px] leading-relaxed text-slate-500">
           Diese Seiten brauchen keine Anmeldung und öffnen in einem neuen Tab — der Rechner bleibt mit
           allen Eingaben offen.
         </p>
+        <RechtsLinks hell klasse="px-4 pb-4" />
       </nav>
     </div>
   );

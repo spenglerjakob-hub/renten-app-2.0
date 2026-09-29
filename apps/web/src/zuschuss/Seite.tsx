@@ -4,6 +4,7 @@ import {
   zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
+import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, ModellWechsel,
 } from '../arbeitgeber/bausteine';
@@ -313,6 +314,7 @@ export function Seite() {
             >
               <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
             </button>
+            <RechtsLinks />
           </div>
         </div>
       </main>

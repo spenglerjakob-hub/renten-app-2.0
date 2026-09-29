@@ -4,6 +4,7 @@ import {
   matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
+import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, ModellWechsel,
 } from './bausteine';
@@ -330,6 +331,7 @@ export function Seite() {
             >
               <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
             </button>
+            <RechtsLinks />
           </div>
         </div>
       </main>
