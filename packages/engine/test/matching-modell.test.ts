@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis, type MatchingEingaben,
   zuschussModell, zuschussVollAusschoepfen, zuschussStaffel, type ZuschussEingaben,
+  festbetragModell, festbetragGehaltsStaffel, type FestbetragEingaben,
 } from '../src/analyse/matching-modell.js';
 import { vertragsTuev, type TuevKontext } from '../src/analyse/vertrags-tuev.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -237,5 +238,79 @@ describe('Zuschussmodell: 50 % der Umwandlung, hoechstens 100 EUR', () => {
     }
     // … darueber sinken sie: Der Zuschuss steht, die gesparten Abgaben wachsen.
     expect(st[4]!.arbeitgeberNettoMonat).toBeLessThan(st[3]!.arbeitgeberNettoMonat);
+  });
+});
+
+describe('Festbetragsmodell: 50 EUR fuer jeden, der mindestens 50 EUR einzahlt', () => {
+  const fest = (over: Partial<FestbetragEingaben> = {}): FestbetragEingaben => ({
+    jahresbrutto: 54_000,
+    umwandlungMonat: 50,
+    festbetragMonat: 50,
+    mindestUmwandlungMonat: 50,
+    unternehmensSteuersatz: 0.3,
+    umlagenSatz: 0,
+    privatVersichert: false,
+    pkvPraemieMonat: 0,
+    kinder: { hatKinder: false, kinderUnter25: 0 },
+    ...over,
+  });
+
+  it('50 EUR Umwandlung: 50 EUR Zuschuss, rund 39 EUR vor und 28 EUR nach Steuern', () => {
+    const r = festbetragModell(fest(), steuer, p);
+    expect(r.schwelleErreicht).toBe(true);
+    expect(r.arbeitgeber.zuschussMonat).toBeCloseTo(50, 6);
+    expect(r.arbeitgeber.davonPflichtzuschussMonat).toBeCloseTo(7.5, 6);
+    expect(r.arbeitgeber.svErsparnisMonat).toBeCloseTo(50 * 0.2115, 1);
+    expect(r.arbeitgeber.kostenVorSteuerMonat).toBeCloseTo(50 - 50 * 0.2115, 1);
+    expect(r.arbeitgeber.nettoKostenMonat).toBeCloseTo((50 - 50 * 0.2115) * 0.7, 1);
+    expect(r.vertragMonat).toBeCloseTo(100, 6);
+  });
+
+  it('unter der Schwelle nur der Pflichtzuschuss', () => {
+    const r = festbetragModell(fest({ umwandlungMonat: 40 }), steuer, p);
+    expect(r.schwelleErreicht).toBe(false);
+    expect(r.arbeitgeber.zuschussMonat).toBeCloseTo(6, 1);
+    expect(r.hinweise.join(' ')).toContain('Darunter zahlt der Arbeitgeber nur');
+  });
+
+  it('mehr Umwandlung: Zuschuss bleibt, Kosten des Arbeitgebers sinken', () => {
+    const r50 = festbetragModell(fest(), steuer, p);
+    const r200 = festbetragModell(fest({ umwandlungMonat: 200 }), steuer, p);
+    expect(r200.arbeitgeber.zuschussMonat).toBeCloseTo(50, 6);
+    expect(r200.arbeitgeber.nettoKostenMonat).toBeLessThan(r50.arbeitgeber.nettoKostenMonat);
+  });
+
+  it('ab rund 333 EUR liegt der Pflichtzuschuss ueber dem Festbetrag', () => {
+    const r = festbetragModell(fest({ umwandlungMonat: 400 }), steuer, p);
+    expect(r.arbeitgeber.zuschussMonat).toBeGreaterThan(50);
+    expect(r.hinweise.join(' ')).toContain('über dem Festbetrag');
+  });
+
+  it('Gehaltsstaffel: gleicher Zuschuss fuer alle, ueber der KV-Grenze teurer', () => {
+    const st = festbetragGehaltsStaffel(fest(), steuer, p);
+    expect(st.map((x) => x.zuschussMonat)).toEqual([50, 50, 50, 50]);
+    const bei45 = st.find((x) => x.jahresbrutto === 45_000)!;
+    const bei80 = st.find((x) => x.jahresbrutto === 80_000)!;
+    expect(bei80.arbeitgeberNettoMonat).toBeGreaterThan(bei45.arbeitgeberNettoMonat);
+  });
+
+  it('Mitarbeiterseite stimmt mit dem Vertrags-TUEV ueberein', () => {
+    const r = festbetragModell(fest({ umwandlungMonat: 120 }), steuer, p);
+    const zve = bruttoZuNetto(54_000, { ...steuer, kinder: { hatKinder: false, kinderUnter25: 0 } }, p).zve;
+    const k = {
+      jahresbrutto: 54_000, zveHeute: zve, beamter: false, privatVersichert: false, pkvPraemieMonat: 0,
+      selbststaendig: false, grvBeitragJahr: 0, rentenbeginnJahr: 2042, alterBeiRentenbeginn: 67,
+      bruttoRenteMonat: 0, kvPvMonat: 0, steuerMonat: 0, nettoRenteMonat: 0,
+      bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
+    } satisfies TuevKontext;
+    const sz = {
+      haushalt: { verheiratet: false, bundesland: steuer.bundesland, kirchensteuer: false, kinder: [], pkv: PKV_VORGABE },
+    } as unknown as Szenario;
+    const t = vertragsTuev(
+      { id: 'v', inhaber: 'A', schicht: 2, typ: 'bav', name: 'DV', brutto: 0, strategie: 'rente', altvertrag: false },
+      { beitragMonat: r.vertragMonat, agZuschussMonat: r.arbeitgeber.zuschussMonat, dynamik: 0, kinder: [], beginnJahr: 2026, lebenserwartung: 85 },
+      k, sz, p,
+    );
+    expect(r.mitarbeiter.nettoAufwandMonat).toBeCloseTo(t.echterAufwandMonat, 2);
   });
 });

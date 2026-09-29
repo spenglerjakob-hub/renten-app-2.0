@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, HandCoins, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
+import { Building2, HandCoins, PiggyBank, Printer, Scale, ShieldCheck } from 'lucide-react';
 import {
-  zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER,
+  festbetragModell, festbetragGehaltsStaffel, parameterFuer, BUNDESLAENDER,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
@@ -10,12 +10,13 @@ import {
 } from '../arbeitgeber/bausteine';
 
 /**
- * Arbeitgeber-Seite „Zuschussmodell".
+ * Arbeitgeber-Seite „Festbetrag".
  *
- * Die einfache Schwester des Matching-Modells: Der Arbeitgeber gibt einen
- * festen Anteil der Entgeltumwandlung dazu (Vorgabe 50 %, hoechstens 100 EUR),
- * alles fliesst in EINE Direktversicherung. Keine Unterstuetzungskasse, kein
- * PSV, der Mitarbeiter nimmt den Vertrag beim Wechsel mit.
+ * Der Arbeitgeber zahlt einen festen Betrag (Vorgabe 50 EUR), sobald der
+ * Mitarbeiter mindestens einen festen Betrag umwandelt (Vorgabe 50 EUR). Alle
+ * bekommen dasselbe — unabhaengig vom Gehalt und davon, wie viel sie
+ * darueber hinaus selbst einzahlen koennen. Das ist die Botschaft der Seite,
+ * deshalb steht die Gehaltsstaffel „gleich fuer alle" im Mittelpunkt.
  *
  * Eigenes Bundle, ohne Anmeldung, nichts wird gespeichert.
  */
@@ -28,9 +29,9 @@ export function Seite() {
   const [praemie, setPraemie] = useState(600);
   const [bundesland, setBundesland] = useState<string>('Nordrhein-Westfalen');
   const [verheiratet, setVerheiratet] = useState(false);
-  const [umwandlung, setUmwandlung] = useState(200);
-  const [quote, setQuote] = useState(0.5);
-  const [deckel, setDeckel] = useState(100);
+  const [umwandlung, setUmwandlung] = useState(50);
+  const [festbetrag, setFestbetrag] = useState(50);
+  const [mindest, setMindest] = useState(50);
   const [steuersatz, setSteuersatz] = useState(0.3);
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
@@ -38,21 +39,25 @@ export function Seite() {
   const eingaben = useMemo(() => ({
     jahresbrutto: brutto,
     umwandlungMonat: umwandlung,
-    quote,
-    deckelMonat: deckel,
+    festbetragMonat: festbetrag,
+    mindestUmwandlungMonat: mindest,
     unternehmensSteuersatz: steuersatz,
     umlagenSatz: umlagen,
     privatVersichert: privat,
     pkvPraemieMonat: privat ? praemie : 0,
     kinder: { hatKinder: false, kinderUnter25: 0 },
-  }), [brutto, umwandlung, quote, deckel, steuersatz, umlagen, privat, praemie]);
+  }), [brutto, umwandlung, festbetrag, mindest, steuersatz, umlagen, privat, praemie]);
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: false }), [verheiratet, bundesland],
   );
 
-  const r = useMemo(() => zuschussModell(eingaben, steuerOpt, p), [eingaben, steuerOpt]);
-  const staffel = useMemo(() => zuschussStaffel(eingaben, steuerOpt, p), [eingaben, steuerOpt]);
-  const voll = () => setUmwandlung(zuschussVollAusschoepfen(eingaben, bundesland, p));
+  const r = useMemo(() => festbetragModell(eingaben, steuerOpt, p), [eingaben, steuerOpt]);
+  // Die Staffel rechnet mit der Mindestumwandlung: der Fall, den jeder
+  // Mitarbeiter erreichen kann — und der zeigt, dass alle dasselbe bekommen.
+  const staffel = useMemo(
+    () => festbetragGehaltsStaffel({ ...eingaben, umwandlungMonat: Math.max(mindest, 1) }, steuerOpt, p),
+    [eingaben, mindest, steuerOpt],
+  );
 
   const ma = r.mitarbeiter;
   const ag = r.arbeitgeber;
@@ -64,19 +69,20 @@ export function Seite() {
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
-          Betriebsrente mit Arbeitgeberzuschuss: {prozent(quote, 0)} obendrauf
+          Betriebsrente mit festem Arbeitgeberbeitrag: {euro(festbetrag)} für jeden
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
-          Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie legen {prozent(quote, 0)} davon dazu — höchstens
-          {' '}{euro(deckel)} im Monat. Alles fließt in eine Direktversicherung. Weil Sie auf die Umwandlung
-          Sozialabgaben sparen, kostet Sie der Zuschuss nur einen Bruchteil.
+          Jeder Mitarbeiter, der mindestens {euro(mindest)} im Monat für seine Betriebsrente umwandelt, bekommt
+          {' '}{euro(festbetrag)} von Ihnen dazu — gleich viel für alle, unabhängig vom Gehalt und davon, wie viel
+          sich jemand leisten kann. Weil Sie auf die Umwandlung Sozialabgaben sparen, kostet Sie das nur einen
+          Bruchteil.
         </p>
-        <AndereModelle aktuell="/zuschussmodell" />
+        <AndereModelle aktuell="/festbetrag" />
 
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
-          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}. Umwandlung {euro(ma.umwandlungMonat)}, Zuschuss
-          {' '}{prozent(quote, 0)} bis {euro(deckel)}. Unternehmenssteuer {prozent(steuersatz, 0)}
+          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}. Umwandlung {euro(ma.umwandlungMonat)}, Festbetrag
+          {' '}{euro(festbetrag)} ab {euro(mindest)} Umwandlung. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
         </p>
 
@@ -103,22 +109,21 @@ export function Seite() {
             <Kasten titel="Modell">
               <ZahlFeld label="Entgeltumwandlung im Monat" wert={umwandlung} onChange={setUmwandlung} einheit="€" schritt={10} />
               <div className="flex flex-wrap gap-1.5">
-                {[100, 200].map((b) => (
+                {[50, 100, 200].map((b) => (
                   <button key={b} type="button" onClick={() => setUmwandlung(b)}
                     className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
                     {euro(b)}
                   </button>
                 ))}
-                <button type="button" onClick={voll}
-                  className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100">
-                  <Wand2 className="h-3.5 w-3.5" aria-hidden /> Rahmen voll ausschöpfen
-                </button>
               </div>
-              <ProzentFeld
-                label="Zuschuss des Arbeitgebers" wert={quote} onChange={setQuote} min={0} max={100}
-                hilfe="Anteil der Umwandlung. Der gesetzliche Pflichtzuschuss von 15 % ist darin enthalten."
+              <ZahlFeld
+                label="Festbetrag des Arbeitgebers im Monat" wert={festbetrag} onChange={setFestbetrag} einheit="€" schritt={10}
+                hilfe="Der gesetzliche Pflichtzuschuss von 15 % ist darin enthalten."
               />
-              <ZahlFeld label="Höchstens im Monat" wert={deckel} onChange={setDeckel} einheit="€" schritt={10} />
+              <ZahlFeld
+                label="Ab einer Umwandlung von" wert={mindest} onChange={setMindest} einheit="€" schritt={10}
+                hilfe="Darunter gibt es nur den gesetzlichen Pflichtzuschuss."
+              />
             </Kasten>
 
             <Kasten titel="Unternehmen">
@@ -146,7 +151,7 @@ export function Seite() {
               <Kachel
                 symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Arbeitgeber zahlt netto" betrag={ag.nettoKostenMonat}
-                unten={`für ${euro(ag.zuschussMonat)} Zuschuss`}
+                unten={`für ${euro(ag.zuschussMonat)} Beitrag`}
               />
               <Kachel
                 symbol={<PiggyBank className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
@@ -171,39 +176,50 @@ export function Seite() {
                 )}
               </Bon>
               <Bon titel="Arbeitgeber">
-                <Zeile text={`Zuschuss ${prozent(quote, 0)}${r.gedeckelt ? ' (gedeckelt)' : ''}`} betrag={ag.zuschussMonat} />
-                <p className="pl-3 text-[11px] text-slate-500">
-                  davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
-                </p>
+                <Zeile text={r.schwelleErreicht ? 'Festbetrag' : 'Pflichtzuschuss (Schwelle nicht erreicht)'} betrag={ag.zuschussMonat} />
+                {r.schwelleErreicht && (
+                  <p className="pl-3 text-[11px] text-slate-500">
+                    davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
+                  </p>
+                )}
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="= Kosten vor Steuern" betrag={ag.kostenVorSteuerMonat} summe />
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
                 <p className="pl-3 text-[11px] leading-snug text-slate-500 print:text-[9px]">
-                  Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht aktiviert (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand — steuerlich zählt nur, was zusätzlich anfällt: Zuschuss minus gesparte Abgaben.
+                  Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht
+                  aktiviert (§ 4b EStG).
                 </p>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
               </Bon>
             </section>
 
             {/*
-              DIE STAFFEL: die Frage des Arbeitgebers ist nicht „was kostet
-              dieser eine Fall", sondern „was kostet mich das je Mitarbeiter,
-              je nachdem, wie viel er umwandelt". Oberhalb des Deckels sinken
-              die Kosten sogar — der Zuschuss steht, die Ersparnis waechst.
+              GLEICH FUER ALLE — das Argument des Modells. Derselbe Beitrag bei
+              jedem Gehalt; die Kosten unterscheiden sich nur dort, wo das Gehalt
+              ueber einer Beitragsbemessungsgrenze liegt.
             */}
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="text-sm font-black text-slate-900">Was kostet mich jeder Mitarbeiter?</h2>
+              <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
+                <Scale className="h-4 w-4 text-indigo-600" aria-hidden /> Gleich für alle — was es Sie je Mitarbeiter kostet
+              </h2>
               <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
-                Je nachdem, wie viel er umwandelt — im Monat, nach Steuern und gesparten Abgaben:
+                Bei {euro(mindest)} Umwandlung, im Monat, nach Steuern und gesparten Abgaben:
               </p>
               <table className="mt-2 w-full text-xs print:mt-1 print:text-[10px]">
                 <thead>
                   <tr className="text-[11px] text-slate-500">
-                    <th className="py-0.5 text-left font-medium">Umwandlung</th>
-                    <th className="py-0.5 text-right font-medium">Zuschuss</th>
+                    <th className="py-0.5 text-left font-medium">
+                      <span className="sm:hidden">Brutto</span><span className="hidden sm:inline">Bruttogehalt im Jahr</span>
+                    </th>
+                    <th className="py-0.5 text-right font-medium">
+                      <span className="sm:hidden">Beitrag</span><span className="hidden sm:inline">Ihr Beitrag</span>
+                    </th>
                     <th className="py-0.5 text-right font-bold text-amber-800">
-                      <span className="sm:hidden">AG netto</span><span className="hidden sm:inline">Arbeitgeber netto</span>
+                      <span className="sm:hidden">AG netto</span><span className="hidden sm:inline">Sie netto</span>
+                    </th>
+                    <th className="py-0.5 text-right font-medium text-sky-800">
+                      <span className="sm:hidden">MA netto</span><span className="hidden sm:inline">Mitarbeiter netto</span>
                     </th>
                     <th className="py-0.5 text-right font-bold text-emerald-700">
                       <span className="sm:hidden">Vertrag</span><span className="hidden sm:inline">im Vertrag</span>
@@ -211,34 +227,27 @@ export function Seite() {
                   </tr>
                 </thead>
                 <tbody className="text-slate-700">
-                  {staffel.map((st) => {
-                    const aktiv = Math.abs(st.umwandlungMonat - ma.umwandlungMonat) < 0.5;
-                    return (
-                      <tr key={st.umwandlungMonat}
-                        className={`border-t border-slate-100 ${aktiv ? 'bg-amber-50 font-bold' : ''} cursor-pointer hover:bg-slate-50 print:cursor-auto`}
-                        onClick={() => setUmwandlung(st.umwandlungMonat)}>
-                        <td className="py-0.5">
-                          {euro(st.umwandlungMonat)}
-                          {st.voll && <span className="ml-1 text-[10px] font-normal text-indigo-700">Rahmen voll</span>}
-                        </td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.zuschussMonat)}</td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.arbeitgeberNettoMonat)}</td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.vertragMonat)}</td>
-                      </tr>
-                    );
-                  })}
+                  {staffel.map((st) => (
+                    <tr key={st.jahresbrutto} className="border-t border-slate-100">
+                      <td className="py-0.5">{euro(st.jahresbrutto)}</td>
+                      <td className="py-0.5 text-right tabular-nums">{euro(st.zuschussMonat)}</td>
+                      <td className="py-0.5 text-right tabular-nums">{euro(st.arbeitgeberNettoMonat)}</td>
+                      <td className="py-0.5 text-right tabular-nums">{euro(st.mitarbeiterNettoMonat)}</td>
+                      <td className="py-0.5 text-right tabular-nums">{euro(st.vertragMonat)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
               <p className="mt-1 text-[11px] leading-relaxed text-slate-500 print:text-[9px]">
-                Oberhalb des Deckels sinken Ihre Kosten sogar: Der Zuschuss bleibt bei {euro(deckel)}, die gesparten
-                Sozialabgaben wachsen mit jeder weiteren beitragsfreien Umwandlung.
-                <span className="print:hidden"> Zeile antippen übernimmt den Betrag.</span>
+                Jeder bekommt denselben Beitrag. Im Verhältnis zum Gehalt ist er für Geringverdiener am größten — für
+                sie ist das Modell der stärkste Anreiz, überhaupt vorzusorgen. Über der Beitragsbemessungsgrenze der
+                Krankenversicherung sparen Sie auf die Umwandlung weniger Abgaben; deshalb kostet es dort etwas mehr.
               </p>
             </section>
 
             {r.gehalt && (
               <GehaltVergleich
-                modell="Zuschussmodell" g={r.gehalt} steuersatz={steuersatz} mitUmlagen={umlagen > 0}
+                modell="Festbetrag" g={r.gehalt} steuersatz={steuersatz} mitUmlagen={umlagen > 0}
                 agZahlung={ag.zuschussMonat}
                 agAbgabenGespart={ag.svErsparnisMonat + ag.umlagenErsparnisMonat}
                 agKostenVorSteuer={ag.kostenVorSteuerMonat}
@@ -264,16 +273,18 @@ export function Seite() {
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 print:p-2">
                   <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Einfach umzusetzen
+                    <Scale className="h-4 w-4 text-emerald-600" aria-hidden /> Einfach und fair
                   </h2>
                   <ul className="mt-1 list-disc space-y-1 pl-4 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
-                    <li><strong>Ein Vertrag</strong> je Mitarbeiter, eine Direktversicherung — keine Unterstützungskasse,
-                      kein Pensions-Sicherungs-Verein.</li>
-                    <li>Der gesetzliche <strong>Pflichtzuschuss ist enthalten</strong> — nichts kommt obendrauf.</li>
-                    <li>Beim Wechsel <strong>nimmt der Mitarbeiter den Vertrag mit</strong> (Anspruch innerhalb eines
-                      Jahres, § 4 Abs. 3 BetrAVG); für Sie ist er danach erledigt.</li>
-                    <li>Umwandlung und Pflichtzuschuss sind sofort unverfallbar. Der <strong>freiwillige Teil</strong> darüber
-                      hinaus erst nach drei Jahren (§ 1b BetrAVG) — das Bezugsrecht dafür mit dem Versicherer gestalten.</li>
+                    <li><strong>Ein fester Betrag für alle</strong> — leicht zu erklären, niemand fühlt sich benachteiligt.</li>
+                    <li>Der gesetzliche <strong>Pflichtzuschuss ist enthalten</strong>; ab rund {euro(festbetrag / 0.15)} Umwandlung
+                      wäre er höher als der Festbetrag, dann gilt er.</li>
+                    <li><strong>Eine Direktversicherung</strong> je Mitarbeiter, kein Pensions-Sicherungs-Verein; beim Wechsel
+                      nimmt der Mitarbeiter sie mit (§ 4 Abs. 3 BetrAVG).</li>
+                    <li>Umwandlung und Pflichtzuschuss sind sofort unverfallbar, der <strong>freiwillige Teil</strong> erst nach
+                      drei Jahren (§ 1b BetrAVG) — das Bezugsrecht dafür mit dem Versicherer gestalten.</li>
+                    <li>Für <strong>Geringverdiener</strong> kann zusätzlich der BAV-Förderbetrag nach § 100 EStG greifen —
+                      die Voraussetzungen mit dem Steuerberater prüfen.</li>
                   </ul>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
@@ -282,7 +293,7 @@ export function Seite() {
                   </h2>
                   <dl className="mt-1 space-y-0.5 text-xs text-slate-700">
                     <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
-                    <div className="flex justify-between gap-2"><dt>Zuschüsse in die Altersvorsorge</dt><dd className="tabular-nums">{euro(ag.zuschussMonat * 12 * n)}</dd></div>
+                    <div className="flex justify-between gap-2"><dt>Beiträge in die Altersvorsorge</dt><dd className="tabular-nums">{euro(ag.zuschussMonat * 12 * n)}</dd></div>
                     <div className="flex justify-between gap-2"><dt>Altersvorsorge insgesamt</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertragMonat * 12 * n)}</dd></div>
                   </dl>
                 </div>
@@ -293,7 +304,7 @@ export function Seite() {
                   <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
                 </h2>
                 <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
-                  <li>• Zuschuss {prozent(quote, 0)} der Umwandlung, höchstens {euro(deckel)} im Monat</li>
+                  <li>• {euro(festbetrag)} im Monat für jeden, der mindestens {euro(mindest)} umwandelt</li>
                   <li>• Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
                   <li>• Für alle Beschäftigten gleich (Gleichbehandlung)</li>
                   <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>

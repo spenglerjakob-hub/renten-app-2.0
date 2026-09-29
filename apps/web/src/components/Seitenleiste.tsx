@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, LineChart, X,
+  Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, LineChart, Scale, X,
 } from 'lucide-react';
 import { RechtsLinks } from './RechtsLinks';
 
@@ -48,6 +48,10 @@ const ARBEITGEBER: Seite[] = [
   {
     href: '/zuschussmodell', titel: 'Zuschussmodell', text: '50 % Zuschuss, ein Vertrag',
     symbol: <HandCoins className="h-4 w-4" aria-hidden />,
+  },
+  {
+    href: '/festbetrag', titel: 'Festbetrag-Modell', text: '50 € für jeden, der 50 € einzahlt',
+    symbol: <Scale className="h-4 w-4" aria-hidden />,
   },
   {
     href: '/arbeitgeber', titel: 'Matching-Modell', text: 'Entgeltumwandlung + Unterstützungskasse',

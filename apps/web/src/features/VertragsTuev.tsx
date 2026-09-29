@@ -885,6 +885,12 @@ export function VertragsTuev({
                           Zuschussmodell für den Arbeitgeber →
                         </a>
                         <a
+                          href="/festbetrag" target="_blank" rel="noopener"
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100"
+                        >
+                          Festbetrag: 50 € für jeden →
+                        </a>
+                        <a
                           href="/arbeitgeber" target="_blank" rel="noopener"
                           className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100"
                         >

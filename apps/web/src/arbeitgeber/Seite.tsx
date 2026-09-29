@@ -6,7 +6,7 @@ import {
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, ModellWechsel,
+  Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
 } from './bausteine';
 
 /**
@@ -79,7 +79,7 @@ export function Seite() {
           Altersvorsorge ankommt — und der Mitarbeiter hat einen guten Grund zu bleiben.
         </p>
 
-        <ModellWechsel href="/zuschussmodell" text="Lieber einfacher? Zum Zuschussmodell: 50 % obendrauf, alles in einem Vertrag" />
+        <AndereModelle aktuell="/arbeitgeber" />
 
         {/* Die Annahmen fuer das Papier — die Eingabespalte entfaellt im Druck. */}
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">

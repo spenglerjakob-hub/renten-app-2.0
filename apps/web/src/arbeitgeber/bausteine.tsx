@@ -246,11 +246,24 @@ export function Kopf() {
   );
 }
 
-/** Querverweis auf das jeweils andere Arbeitgeber-Modell. */
-export function ModellWechsel({ href, text }: { href: string; text: string }) {
+/** Die drei Arbeitgebermodelle — fuer die Querverweise zwischen den Seiten. */
+const MODELLE = [
+  { href: '/zuschussmodell', text: 'Zuschussmodell: 50 % obendrauf' },
+  { href: '/festbetrag', text: 'Festbetrag: 50 € für jeden' },
+  { href: '/arbeitgeber', text: 'Matching-Modell mit Unterstützungskasse' },
+] as const;
+
+/** Querverweis auf die jeweils anderen Arbeitgebermodelle. */
+export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] }) {
   return (
-    <a href={href} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-indigo-700 hover:underline print:hidden">
-      {text} →
-    </a>
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs print:hidden">
+      <span className="text-slate-500">Andere Modelle:</span>
+      {MODELLE.filter((m) => m.href !== aktuell).map((m, i) => (
+        <span key={m.href} className="flex items-center gap-2">
+          {i > 0 && <span aria-hidden className="text-slate-300">·</span>}
+          <a href={m.href} className="font-bold text-indigo-700 hover:underline">{m.text} →</a>
+        </span>
+      ))}
+    </p>
   );
 }

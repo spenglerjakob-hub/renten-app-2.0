@@ -441,12 +441,22 @@ interface ZuschussAufteilung {
   agSv: number;
 }
 
+/**
+ * Die Zuschussregel eines Modells: Arbeitgeberbeitrag im Jahr fuer eine
+ * Umwandlung im Jahr — VOR der Untergrenze Pflichtzuschuss, die
+ * `zuschussAufteilen` selbst setzt.
+ */
+type ZuschussRegel = (umwandlungJahr: number) => number;
+
+const quotenRegel = (quote: number, deckelMonat: number): ZuschussRegel =>
+  (e) => Math.min(Math.max(0, quote) * e, Math.max(0, deckelMonat) * 12);
+
 /** Zuschuss, Pflichtzuschuss und beitragsfreier Teil fuer eine Umwandlung (Jahr). */
 function zuschussAufteilen(
-  e: number, quote: number, deckelJahr: number, sk: SvKontext, bundesland: string, p: LegalParameters,
+  e: number, regelFn: ZuschussRegel, sk: SvKontext, bundesland: string, p: LegalParameters,
 ): ZuschussAufteilung {
   const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
-  const regel = Math.min(Math.max(0, quote) * e, Math.max(0, deckelJahr));
+  const regel = Math.max(0, regelFn(e));
   let ag = regel, pflicht = 0, svFrei = 0, agSv = 0;
   // Nur wenn die Regel unter dem Pflichtzuschuss liegt, haengen beide
   // voneinander ab — gedaempft wie in `aufteilen`.
@@ -473,21 +483,47 @@ export function zuschussVollAusschoepfen(
   bundesland: string,
   p: LegalParameters,
 ): number {
+  return rahmenVoll(e, quotenRegel(e.quote, e.deckelMonat), bundesland, p);
+}
+
+/**
+ * Groesste Umwandlung, bei der Umwandlung und Zuschuss noch in den
+ * beitragsfreien Rahmen passen. Die Summe steigt mit der Umwandlung (der
+ * Zuschuss faellt nie schneller, als die Umwandlung waechst) — deshalb
+ * genuegt eine Bisektion.
+ */
+function rahmenVoll(
+  e: Pick<ZuschussEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat'>,
+  regel: ZuschussRegel,
+  bundesland: string,
+  p: LegalParameters,
+): number {
   const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
   const sk = svKontext(e);
   let lo = 0, hi = svGrenze;
   for (let i = 0; i < 60; i++) {
     const mitte = (lo + hi) / 2;
-    const a = zuschussAufteilen(mitte, e.quote, e.deckelMonat * 12, sk, bundesland, p);
+    const a = zuschussAufteilen(mitte, regel, sk, bundesland, p);
     if (a.e + a.ag > svGrenze) hi = mitte; else lo = mitte;
   }
   return Math.floor(lo / 12 * 100) / 100;
 }
 
-export function zuschussModell(
-  e: ZuschussEingaben,
+/** Was beide Zuschussmodelle gemeinsam brauchen — ohne Quote, Deckel oder Festbetrag. */
+type KernEingaben = Omit<ZuschussEingaben, 'quote' | 'deckelMonat'>;
+
+/**
+ * Die gemeinsame Rechnung von Zuschuss- und Festbetragsmodell: alles in einer
+ * Direktversicherung, der Zuschuss nach `regel`, mindestens der
+ * Pflichtzuschuss. Modellspezifische Hinweise liefert `eigeneHinweise`; sie
+ * stehen nach dem Hinweis zum Rahmen und vor denen zur Krankenversicherung.
+ */
+function zuschussKern(
+  e: KernEingaben,
+  regel: ZuschussRegel,
   steuerOpt: MatchingSteuer,
   p: LegalParameters,
+  eigeneHinweise: (a: ZuschussAufteilung) => string[],
 ): ZuschussErgebnis {
   const hinweise: string[] = [];
   const sk = svKontext(e);
@@ -503,9 +539,7 @@ export function zuschussModell(
   };
   const heute = bruttoZuNetto(Math.max(0, e.jahresbrutto), erwerbOpt, p);
 
-  const a = zuschussAufteilen(
-    Math.max(0, e.umwandlungMonat) * 12, e.quote, e.deckelMonat * 12, sk, steuerOpt.bundesland, p,
-  );
+  const a = zuschussAufteilen(Math.max(0, e.umwandlungMonat) * 12, regel, sk, steuerOpt.bundesland, p);
 
   // --- Mitarbeiter ---------------------------------------------------------
   const steuerFrei = Math.min(a.e, Math.max(0, steuerGrenze - a.ag));
@@ -520,13 +554,12 @@ export function zuschussModell(
   const steuerAg = kostenVorSteuer * satz;
   const nettoAg = kostenVorSteuer - steuerAg;
   const vertrag = a.e + a.ag;
-  const gedeckelt = Math.max(0, e.quote) * a.e > e.deckelMonat * 12 + 0.5;
 
   const gehalt = gehaltsVergleich(kostenVorSteuer, e, sk, erwerbOpt, heute, satz, umlagenSatz, steuerOpt.bundesland, p);
 
   // --- Hinweise ------------------------------------------------------------
   if (a.e > 0 && vertrag > svGrenze + 6) {
-    const voll = zuschussVollAusschoepfen(e, steuerOpt.bundesland, p);
+    const voll = rahmenVoll(e, regel, steuerOpt.bundesland, p);
     hinweise.push(
       `Umwandlung und Zuschuss liegen zusammen um ${euro((vertrag - svGrenze) / 12)} im Monat über dem `
       + `beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Zuschuss wird zuerst angerechnet, auf `
@@ -534,19 +567,7 @@ export function zuschussModell(
       + `ist der Rahmen mit ${euro(voll)} Umwandlung.`,
     );
   }
-  if (gedeckelt) {
-    hinweise.push(
-      `Der Zuschuss ist bei ${euro(e.deckelMonat)} im Monat gedeckelt — jeder weitere Euro Umwandlung `
-      + 'wird nicht mehr bezuschusst. Solange er beitragsfrei bleibt, senkt er die Kosten des Arbeitgebers '
-      + 'sogar: Der Zuschuss steht fest, die gesparten Sozialabgaben wachsen mit.',
-    );
-  }
-  if (a.e > 0 && Math.max(0, e.quote) * a.e < a.pflicht - 0.5) {
-    hinweise.push(
-      'Die Zuschussquote liegt unter dem gesetzlichen Pflichtzuschuss. Gezahlt werden mindestens 15 % '
-      + 'der Umwandlung, soweit der Arbeitgeber Sozialabgaben spart (§ 1a Abs. 1a BetrAVG).',
-    );
-  }
+  hinweise.push(...eigeneHinweise(a));
   if (a.ag > svGrenze + 0.5) {
     hinweise.push(
       `Der Zuschuss allein liegt über dem beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Rest ist für `
@@ -584,12 +605,39 @@ export function zuschussModell(
       nettoKostenMonat: nettoAg / 12,
     },
     vertragMonat: vertrag / 12,
-    gedeckelt,
+    gedeckelt: false,
     gehalt,
     hebelMitarbeiter: aufwandAn > 0 ? vertrag / aufwandAn : 0,
     hebelArbeitgeber: nettoAg > 0 ? vertrag / nettoAg : 0,
     hinweise,
   };
+}
+
+export function zuschussModell(
+  e: ZuschussEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+): ZuschussErgebnis {
+  const quote = Math.max(0, e.quote);
+  const gedeckeltBei = (u: number) => quote * u > e.deckelMonat * 12 + 0.5;
+  const r = zuschussKern(e, quotenRegel(e.quote, e.deckelMonat), steuerOpt, p, (a) => {
+    const h: string[] = [];
+    if (gedeckeltBei(a.e)) {
+      h.push(
+        `Der Zuschuss ist bei ${euro(e.deckelMonat)} im Monat gedeckelt — jeder weitere Euro Umwandlung `
+        + 'wird nicht mehr bezuschusst. Solange er beitragsfrei bleibt, senkt er die Kosten des Arbeitgebers '
+        + 'sogar: Der Zuschuss steht fest, die gesparten Sozialabgaben wachsen mit.',
+      );
+    }
+    if (a.e > 0 && quote * a.e < a.pflicht - 0.5) {
+      h.push(
+        'Die Zuschussquote liegt unter dem gesetzlichen Pflichtzuschuss. Gezahlt werden mindestens 15 % '
+        + 'der Umwandlung, soweit der Arbeitgeber Sozialabgaben spart (§ 1a Abs. 1a BetrAVG).',
+      );
+    }
+    return h;
+  });
+  return { ...r, gedeckelt: gedeckeltBei(r.mitarbeiter.umwandlungMonat * 12) };
 }
 
 export interface ZuschussStufe {
@@ -623,6 +671,93 @@ export function zuschussStaffel(
       mitarbeiterNettoMonat: r.mitarbeiter.nettoAufwandMonat,
       vertragMonat: r.vertragMonat,
       voll: u === voll,
+    };
+  });
+}
+
+/* ==========================================================================
+ * FESTBETRAGSMODELL: „50 EUR fuer jeden, der mindestens 50 EUR einzahlt".
+ *
+ * Der Arbeitgeber zahlt einen festen Betrag, sobald der Mitarbeiter eine
+ * Mindestumwandlung erreicht — unabhaengig davon, wie viel er darueber hinaus
+ * einzahlt und wie viel er verdient. Das ist die Gleichbehandlung, um die es
+ * geht: Wer wenig verdient, bekommt denselben Zuschuss wie der Gutverdiener.
+ *
+ * Darunter gibt es nur den gesetzlichen Pflichtzuschuss. Darueber bleibt der
+ * Festbetrag stehen — bis 15 % der Umwandlung mehr ausmachen (bei 50 EUR ab
+ * rund 333 EUR Umwandlung); dann gilt die Pflicht.
+ * ======================================================================== */
+
+export interface FestbetragEingaben extends KernEingaben {
+  /** Fester Arbeitgeberbeitrag, Monat */
+  festbetragMonat: number;
+  /** Ab dieser Umwandlung (Monat) gibt es den Festbetrag */
+  mindestUmwandlungMonat: number;
+}
+
+export interface FestbetragErgebnis extends ZuschussErgebnis {
+  /** Die Umwandlung erreicht die Mindestumwandlung */
+  schwelleErreicht: boolean;
+}
+
+const festbetragRegel = (festMonat: number, mindestMonat: number): ZuschussRegel =>
+  (e) => (e > 0 && e + 0.005 >= Math.max(0, mindestMonat) * 12 ? Math.max(0, festMonat) * 12 : 0);
+
+export function festbetragModell(
+  e: FestbetragEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+): FestbetragErgebnis {
+  const regel = festbetragRegel(e.festbetragMonat, e.mindestUmwandlungMonat);
+  const r = zuschussKern(e, regel, steuerOpt, p, (a) => {
+    const h: string[] = [];
+    if (a.e > 0 && regel(a.e) === 0) {
+      h.push(
+        `Der Festbetrag von ${euro(e.festbetragMonat)} gilt ab ${euro(e.mindestUmwandlungMonat)} Umwandlung im `
+        + 'Monat. Darunter zahlt der Arbeitgeber nur den gesetzlichen Pflichtzuschuss von 15 %, soweit er '
+        + 'Sozialabgaben spart (§ 1a Abs. 1a BetrAVG).',
+      );
+    }
+    if (a.e > 0 && regel(a.e) > 0 && a.pflicht > regel(a.e) + 0.5) {
+      h.push(
+        `Bei dieser Umwandlung liegt der gesetzliche Pflichtzuschuss (15 %) mit ${euro(a.pflicht / 12)} über dem `
+        + `Festbetrag — gezahlt wird der höhere Betrag.`,
+      );
+    }
+    return h;
+  });
+  const u = r.mitarbeiter.umwandlungMonat * 12;
+  return { ...r, schwelleErreicht: u > 0 && regel(u) > 0 };
+}
+
+export interface FestbetragStufe {
+  jahresbrutto: number;
+  zuschussMonat: number;
+  arbeitgeberNettoMonat: number;
+  mitarbeiterNettoMonat: number;
+  vertragMonat: number;
+}
+
+/**
+ * „Gleich fuer alle": derselbe Festbetrag bei verschiedenen Gehaeltern. Der
+ * Beitrag ist ueberall gleich; die Kosten des Arbeitgebers unterscheiden sich
+ * nur dort, wo das Gehalt ueber einer Beitragsbemessungsgrenze liegt und die
+ * Umwandlung dort keine Abgaben mehr spart.
+ */
+export function festbetragGehaltsStaffel(
+  e: FestbetragEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+  gehaelter: readonly number[] = [30_000, 45_000, 60_000, 80_000],
+): FestbetragStufe[] {
+  return gehaelter.map((b) => {
+    const r = festbetragModell({ ...e, jahresbrutto: b }, steuerOpt, p);
+    return {
+      jahresbrutto: b,
+      zuschussMonat: r.arbeitgeber.zuschussMonat,
+      arbeitgeberNettoMonat: r.arbeitgeber.nettoKostenMonat,
+      mitarbeiterNettoMonat: r.mitarbeiter.nettoAufwandMonat,
+      vertragMonat: r.vertragMonat,
     };
   });
 }

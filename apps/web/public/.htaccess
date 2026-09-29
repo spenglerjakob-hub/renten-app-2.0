@@ -41,6 +41,8 @@ DirectoryIndex index.html
   RewriteRule ^arbeitgeber/?$ /arbeitgeber.html [NC,L]
   # Und das einfachere Zuschussmodell.
   RewriteRule ^zuschussmodell/?$ /zuschussmodell.html [NC,L]
+  # Und das Festbetragsmodell.
+  RewriteRule ^festbetrag/?$ /festbetrag.html [NC,L]
 
   # --- Impressum und Datenschutz ------------------------------------------
   # Pflichtseiten, von jeder Seite aus verlinkt. Ebenfalls VOR dem Auffangmuster.

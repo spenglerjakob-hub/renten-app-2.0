@@ -13,8 +13,8 @@ export default defineConfig({
     // Browser — die Serverlast ist damit unabhaengig von der Nutzerzahl.
     rollupOptions: {
       // Einstiegspunkte: der Rechner, die Landingpage zum
-      // Altersvorsorgedepot, der Vorsorge-Check, die beiden
-      // Arbeitgeber-Seiten (Matching-Modell, Zuschussmodell) sowie
+      // Altersvorsorgedepot, der Vorsorge-Check, die drei
+      // Arbeitgeber-Seiten (Matching-Modell, Zuschussmodell, Festbetrag) sowie
       // Impressum und Datenschutz (ein Bundle, zwei Seiten). Die Landingpages sollen
       // schnell laden und nicht das ganze Bundle des Rechners mitziehen;
       // Rollup trennt sie deshalb und teilt nur, was wirklich gemeinsam
@@ -25,6 +25,7 @@ export default defineConfig({
         check: resolve(hier, 'vorsorge-check.html'),
         arbeitgeber: resolve(hier, 'arbeitgeber.html'),
         zuschuss: resolve(hier, 'zuschussmodell.html'),
+        festbetrag: resolve(hier, 'festbetrag.html'),
         impressum: resolve(hier, 'impressum.html'),
         datenschutz: resolve(hier, 'datenschutz.html'),
       },
