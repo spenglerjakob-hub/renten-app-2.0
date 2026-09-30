@@ -30,6 +30,7 @@ export function Seite() {
   const [praemie, setPraemie] = useState(600);
   const [bundesland, setBundesland] = useState<string>('Nordrhein-Westfalen');
   const [verheiratet, setVerheiratet] = useState(false);
+  const [kirchensteuer, setKirchensteuer] = useState(false);
   const [weg, setWeg] = useState<UmwandlungsWeg>('dv');
   const [umwandlung, setUmwandlung] = useState(() =>
     optimaleUmwandlung('dv', { jahresbrutto: 54_000, privatVersichert: false, pkvPraemieMonat: 0 }, 'Nordrhein-Westfalen', p));
@@ -56,9 +57,9 @@ export function Seite() {
       pkvPraemieMonat: privat ? praemie : 0,
       kinder: { hatKinder: false, kinderUnter25: 0 },
     },
-    { verheiratet, bundesland, kirchensteuerpflichtig: false },
+    { verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer },
     p,
-  ), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie, verheiratet, bundesland]);
+  ), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie, verheiratet, bundesland, kirchensteuer]);
 
   const ma = r.mitarbeiter;
   const ag = r.arbeitgeber;
@@ -84,7 +85,7 @@ export function Seite() {
         {/* Die Annahmen fuer das Papier — die Eingabespalte entfaellt im Druck. */}
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
-          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}. Umwandlung {euro(ma.umwandlungMonat)} in die
+          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)} in die
           {' '}{weg === 'dv' ? 'Direktversicherung' : 'Unterstützungskasse'}, Matching {euro(matching)}
           {weg === 'dv' && inklusive ? ' einschließlich Pflichtzuschuss' : ''}. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
@@ -108,6 +109,7 @@ export function Seite() {
                 optionen={BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }))}
               />
               <Schalter label="verheiratet" wert={verheiratet} onChange={setVerheiratet} />
+              <Schalter label="kirchensteuerpflichtig" wert={kirchensteuer} onChange={setKirchensteuer} />
             </Kasten>
 
             <Kasten titel="Modell">

@@ -29,6 +29,7 @@ export function Seite() {
   const [praemie, setPraemie] = useState(600);
   const [bundesland, setBundesland] = useState<string>('Nordrhein-Westfalen');
   const [verheiratet, setVerheiratet] = useState(false);
+  const [kirchensteuer, setKirchensteuer] = useState(false);
   const [umwandlung, setUmwandlung] = useState(50);
   const [festbetrag, setFestbetrag] = useState(50);
   const [mindest, setMindest] = useState(50);
@@ -48,7 +49,7 @@ export function Seite() {
     kinder: { hatKinder: false, kinderUnter25: 0 },
   }), [brutto, umwandlung, festbetrag, mindest, steuersatz, umlagen, privat, praemie]);
   const steuerOpt = useMemo(
-    () => ({ verheiratet, bundesland, kirchensteuerpflichtig: false }), [verheiratet, bundesland],
+    () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
   );
 
   const r = useMemo(() => festbetragModell(eingaben, steuerOpt, p), [eingaben, steuerOpt]);
@@ -81,7 +82,7 @@ export function Seite() {
 
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
-          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}. Umwandlung {euro(ma.umwandlungMonat)}, Festbetrag
+          {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)}, Festbetrag
           {' '}{euro(festbetrag)} ab {euro(mindest)} Umwandlung. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
         </p>
@@ -104,6 +105,7 @@ export function Seite() {
                 optionen={BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }))}
               />
               <Schalter label="verheiratet" wert={verheiratet} onChange={setVerheiratet} />
+              <Schalter label="kirchensteuerpflichtig" wert={kirchensteuer} onChange={setKirchensteuer} />
             </Kasten>
 
             <Kasten titel="Modell">
