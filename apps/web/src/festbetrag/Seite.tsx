@@ -18,7 +18,7 @@ import {
  * darueber hinaus selbst einzahlen koennen. Das ist die Botschaft der Seite,
  * deshalb steht die Gehaltsstaffel „gleich fuer alle" im Mittelpunkt.
  *
- * Eigenes Bundle, ohne Anmeldung, nichts wird gespeichert.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird gespeichert.
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });

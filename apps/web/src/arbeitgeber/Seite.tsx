@@ -17,8 +17,8 @@ import {
  * dazu. Die Seite zeigt, was das beide wirklich kostet, was es gegenueber
  * einer Gehaltserhoehung bringt und was in die Versorgungsordnung gehoert.
  *
- * Wie die Landingpage zum Altersvorsorgedepot: eigenes Bundle, ohne
- * Anmeldung, nichts wird gespeichert, und gedruckt ergibt sie EINE A4-Seite.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird
+ * gespeichert.
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });

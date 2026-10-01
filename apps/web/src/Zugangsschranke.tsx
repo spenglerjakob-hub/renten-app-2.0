@@ -13,9 +13,12 @@ import { Anmeldung } from './features/Anmeldung';
  * Konto ausfuehren. Wirklich geschuetzt sind die gespeicherten Szenarien:
  * dort greifen die Row-Level-Security-Regeln der Datenbank.
  *
- * Die Seite /altersvorsorgedepot ist bewusst NICHT betroffen. Sie hat einen
- * eigenen Einstiegspunkt (src/avd/main.tsx) und ist das Ziel des QR-Codes aus
- * dem Kundenbrief — wer ihn scannt, hat naturgemaess noch kein Konto.
+ * Sie steht vor dem Rechner und vor allen eigenen Seiten (Arbeitgeber-Seiten,
+ * bKV, Vorsorge-Check ohne Link). Ohne Konto erreichbar sind nur:
+ *   - /altersvorsorgedepot — Ziel des QR-Codes aus dem Kundenbrief; wer ihn
+ *     scannt, hat naturgemaess noch kein Konto,
+ *   - /vorsorge-check?a=<Code> — der persoenliche Link des Beraters,
+ *   - Impressum und Datenschutz, die jederzeit erreichbar sein muessen.
  */
 export function Zugangsschranke({ children }: { children: ReactNode }) {
   const status = useAuth((s) => s.status);

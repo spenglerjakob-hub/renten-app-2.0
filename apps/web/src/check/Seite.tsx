@@ -32,7 +32,8 @@ import {
  * Felder, die der Rechner tatsaechlich verwendet. Gerechnet wird hier nicht —
  * am Ende wandert alles als Szenario in den Rentenplaner.
  *
- * Wie die Seite zum Altersvorsorgedepot ein eigener Einstieg ohne Anmeldung.
+ * Eigener Einstieg. Ohne Konto nur mit dem persoenlichen Link des Beraters
+ * (?a=<Code>, siehe main.tsx); ohne Link gilt die Zugangsschranke.
  * Die Antworten liegen bis zum Schluss nur in `sessionStorage`: Ein Neuladen
  * verliert nichts, und nach dem Schliessen des Tabs bleibt nichts zurueck.
  */

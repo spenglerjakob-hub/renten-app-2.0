@@ -17,7 +17,7 @@ import {
  * alles fliesst in EINE Direktversicherung. Keine Unterstuetzungskasse, kein
  * PSV, der Mitarbeiter nimmt den Vertrag beim Wechsel mit.
  *
- * Eigenes Bundle, ohne Anmeldung, nichts wird gespeichert.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird gespeichert.
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });

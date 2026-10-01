@@ -14,8 +14,9 @@ import { RechtsLinks } from './RechtsLinks';
  * Gespraech arbeiten.
  *
  * Die anderen Seiten oeffnen in einem neuen Tab, damit der Rechner mit allen
- * Eingaben offen bleibt. „Link kopieren" daneben, weil der Berater sie in
- * der Regel an Kunden oder Arbeitgeber weiterschickt.
+ * Eingaben offen bleibt. „Link kopieren" nur bei Seiten, die ohne Konto
+ * erreichbar sind — ein weitergeschickter Link auf eine geschuetzte Seite
+ * fuehrte beim Empfaenger nur zur Anmeldemaske.
  */
 
 export interface Abschnitt {
@@ -31,6 +32,8 @@ interface Seite {
   titel: string;
   text: string;
   symbol: ReactNode;
+  /** Ohne Konto erreichbar — nur dann lohnt das Weiterschicken des Links */
+  oeffentlich?: boolean;
 }
 
 const KUNDEN: Seite[] = [
@@ -39,7 +42,7 @@ const KUNDEN: Seite[] = [
     symbol: <ClipboardList className="h-4 w-4" aria-hidden />,
   },
   {
-    href: '/altersvorsorgedepot', titel: 'Altersvorsorgedepot', text: 'Zulagen und Kapital ab 2027',
+    href: '/altersvorsorgedepot', titel: 'Altersvorsorgedepot', text: 'Zulagen und Kapital ab 2027', oeffentlich: true,
     symbol: <LineChart className="h-4 w-4" aria-hidden />,
   },
 ];
@@ -144,8 +147,8 @@ export function Seitenleiste(props: {
         </Gruppe>
 
         <p className="mt-auto px-4 pb-2 pt-6 text-[11px] leading-relaxed text-slate-500">
-          Diese Seiten brauchen keine Anmeldung und öffnen in einem neuen Tab — der Rechner bleibt mit
-          allen Eingaben offen.
+          Die Seiten öffnen in einem neuen Tab — der Rechner bleibt mit allen Eingaben offen. Ohne Konto
+          erreichbar sind nur das Altersvorsorgedepot und der persönliche Link aus den Check-Anfragen.
         </p>
         <RechtsLinks hell klasse="px-4 pb-4" />
       </nav>
@@ -188,7 +191,7 @@ function SeitenLink({ seite, fokussierbar }: { seite: Seite; fokussierbar: boole
           <span className="block text-[11px] leading-snug text-slate-400">{seite.text}</span>
         </span>
       </a>
-      <button
+      {seite.oeffentlich && <button
         type="button"
         onClick={() => void kopieren()}
         tabIndex={fokussierbar ? 0 : -1}
@@ -197,7 +200,7 @@ function SeitenLink({ seite, fokussierbar }: { seite: Seite; fokussierbar: boole
         className="shrink-0 rounded-lg px-2 text-slate-500 hover:bg-slate-800 hover:text-white"
       >
         {kopiert ? <Check className="h-4 w-4 text-emerald-400" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
-      </button>
+      </button>}
     </li>
   );
 }
