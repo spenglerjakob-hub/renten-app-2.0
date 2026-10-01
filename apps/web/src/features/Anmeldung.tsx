@@ -26,6 +26,7 @@ export function Anmeldung() {
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [passwort2, setPasswort2] = useState('');
+  const [zustimmung, setZustimmung] = useState(false);
 
   // Beim Wechsel der Maske stehen gebliebene Meldungen loeschen — sonst
   // erscheint "E-Mail oder Passwort stimmen nicht" ueber dem Registrierformular.
@@ -50,7 +51,7 @@ export function Anmeldung() {
     }
     if (maske === 'anmelden') void anmelden(email.trim(), passwort);
     else if (maske === 'registrieren') {
-      if (passwort.length >= 8 && passwort === passwort2) void registrieren(email.trim(), passwort);
+      if (passwort.length >= 8 && passwort === passwort2 && zustimmung) void registrieren(email.trim(), passwort);
     } else void passwortVergessen(email.trim());
   };
 
@@ -155,6 +156,26 @@ export function Anmeldung() {
             </Feld>
           )}
 
+          {maske === 'registrieren' && !passwortNeu && (
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
+              <input
+                type="checkbox" required checked={zustimmung} onChange={(e) => setZustimmung(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+              />
+              <span>
+                Ich akzeptiere die{' '}
+                <a href="/nutzungsbedingungen" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+                  Nutzungsbedingungen
+                </a>
+                . Die{' '}
+                <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+                  Datenschutzerklärung
+                </a>{' '}
+                habe ich zur Kenntnis genommen.
+              </span>
+            </label>
+          )}
+
           <button
             type="submit"
             disabled={laedt}
@@ -220,7 +241,7 @@ function Feld({ label, id, children }: { label: string; id: string; children: Re
 }
 
 /** Kopf und Rahmen der Maske — gemeinsam fuer Anmeldung und Link-Seite. */
-function Rahmen({ children }: { children: ReactNode }) {
+export function Rahmen({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-slate-100">
       <header className="bg-slate-900 text-white">

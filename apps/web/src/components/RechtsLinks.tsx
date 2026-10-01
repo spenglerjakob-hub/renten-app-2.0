@@ -1,5 +1,6 @@
 /**
- * Impressum und Datenschutz — im Fuss JEDER Seite.
+ * Impressum, Datenschutz und Nutzungsbedingungen — im Fuss JEDER Seite,
+ * dazu der Urheberhinweis.
  *
  * Pflicht, nicht Zierde: § 5 DDG verlangt, dass das Impressum von jeder
  * Seite aus leicht erreichbar ist, Art. 13 DSGVO dasselbe fuer die
@@ -13,6 +14,10 @@ export function RechtsLinks({ hell = false, klasse = '' }: { hell?: boolean; kla
       <a href="/impressum" className={`underline-offset-2 hover:underline ${farbe}`}>Impressum</a>
       <span aria-hidden className={hell ? 'text-slate-600' : 'text-slate-300'}>·</span>
       <a href="/datenschutz" className={`underline-offset-2 hover:underline ${farbe}`}>Datenschutz</a>
+      <span aria-hidden className={hell ? 'text-slate-600' : 'text-slate-300'}>·</span>
+      <a href="/nutzungsbedingungen" className={`underline-offset-2 hover:underline ${farbe}`}>Nutzungsbedingungen</a>
+      {/* Ohne Trennpunkt davor: Bricht die Zeile hier um, stuende er allein am Ende. */}
+      <span className={hell ? 'text-slate-500' : 'text-slate-400'}>© {new Date().getFullYear()} JS-Rentenplaner</span>
     </nav>
   );
 }

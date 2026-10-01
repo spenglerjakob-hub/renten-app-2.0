@@ -1,8 +1,10 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useAuth } from './store/auth';
-import { supabaseKonfiguriert } from './lib/supabase';
+import { supabase, supabaseKonfiguriert } from './lib/supabase';
+import { NUTZUNGSBEDINGUNGEN_FASSUNG } from './lib/nutzungsbedingungen';
 import { Anmeldung } from './features/Anmeldung';
+import { Zustimmung } from './features/Zustimmung';
 
 /**
  * Laesst den Rechner nur angemeldeten Nutzern durch.
@@ -25,6 +27,19 @@ export function Zugangsschranke({ children }: { children: ReactNode }) {
   const initialisieren = useAuth((s) => s.initialisieren);
 
   useEffect(() => { void initialisieren(); }, [initialisieren]);
+
+  // Hat das Konto der aktuellen Fassung der Nutzungsbedingungen zugestimmt?
+  // null: noch nicht geprueft. Die Sitzung liegt lokal vor, das kostet keine
+  // Anfrage an den Server.
+  const [zugestimmt, setZugestimmt] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (status !== 'angemeldet' || !supabase) { setZugestimmt(null); return; }
+    let aktiv = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (aktiv) setZugestimmt(data.session?.user.user_metadata?.nutzungsbedingungen === NUTZUNGSBEDINGUNGEN_FASSUNG);
+    });
+    return () => { aktiv = false; };
+  }, [status]);
 
   // Ohne Supabase-Konfiguration wird durchgelassen — mit deutlichem Band.
   // Andernfalls legte eine vergessene Umgebungsvariable die ganze Seite lahm,
@@ -58,6 +73,15 @@ export function Zugangsschranke({ children }: { children: ReactNode }) {
   }
 
   if (status !== 'angemeldet') return <Anmeldung />;
+
+  if (zugestimmt === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100">
+        <p className="text-sm text-slate-500">Einen Moment …</p>
+      </div>
+    );
+  }
+  if (!zugestimmt) return <Zustimmung onFertig={() => setZugestimmt(true)} />;
 
   return <>{children}</>;
 }

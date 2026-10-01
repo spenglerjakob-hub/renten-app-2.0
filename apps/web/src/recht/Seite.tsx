@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 
 /**
- * Impressum und Datenschutzerklaerung.
+ * Impressum, Datenschutzerklaerung und Nutzungsbedingungen.
  *
  * ENTWURF. Die Texte bilden ab, was die Anwendung TATSAECHLICH tut — welche
  * Daten wohin gehen, wer sie sieht, wie lange sie bleiben. Rechtlich
@@ -19,7 +19,9 @@ import { RechtsLinks } from '../components/RechtsLinks';
 const ENTWURF = true;
 const STAND = '[Datum eintragen]';
 
-export function Seite({ seite }: { seite: 'impressum' | 'datenschutz' }) {
+export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
+
+export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
       <header className="bg-slate-900 text-white">
@@ -40,7 +42,7 @@ export function Seite({ seite }: { seite: 'impressum' | 'datenschutz' }) {
           </div>
         )}
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-          {seite === 'impressum' ? <Impressum /> : <Datenschutz />}
+          {seite === 'impressum' ? <Impressum /> : seite === 'datenschutz' ? <Datenschutz /> : <Nutzungsbedingungen />}
         </article>
         <RechtsLinks klasse="mt-6 justify-center" />
       </main>
@@ -158,7 +160,8 @@ function Datenschutz() {
       <P>
         Für ein Konto verarbeiten wir Ihre E-Mail-Adresse, Ihr Passwort (nur als Prüfwert, nie im Klartext),
         Zeitpunkte der Registrierung und Anmeldung sowie die dabei verwendete IP-Adresse. Bestätigungs- und
-        Passwort-E-Mails versenden wir über unser Postfach info@js-rentenplaner.de. Rechtsgrundlage ist der
+        Passwort-E-Mails versenden wir über unser Postfach info@js-rentenplaner.de. Mit dem Konto speichern wir,
+        welcher Fassung der Nutzungsbedingungen Sie wann zugestimmt haben. Rechtsgrundlage ist der
         Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Daten bleiben gespeichert, bis Sie Ihr Konto löschen —
         das können Sie jederzeit selbst unter „Konto“ im Rechner.
       </P>
@@ -252,3 +255,108 @@ function Datenschutz() {
     </>
   );
 }
+
+/**
+ * Nutzungsbedingungen. Sie sollen vor allem das Programm schuetzen: Die
+ * Rechenlogik laeuft im Browser und ist damit technisch zugaenglich — wer sie
+ * kopiert oder nachbaut, verstoesst gegen das Urheberrecht (§§ 69a ff. UrhG)
+ * und gegen diese Bedingungen. Was das Gesetz unabdingbar erlaubt
+ * (§§ 69d, 69e UrhG), kann ein Vertrag nicht verbieten (§ 69g Abs. 2 UrhG);
+ * die Formulierung nimmt es deshalb ausdruecklich aus.
+ */
+function Nutzungsbedingungen() {
+  return (
+    <>
+      <H1>Nutzungsbedingungen</H1>
+      <p className="mt-1 text-xs text-slate-500">Fassung vom 1. Oktober 2026</p>
+
+      <H2>1. Geltungsbereich</H2>
+      <P>
+        Diese Bedingungen gelten für die Nutzung des JS-Rentenplaners unter js-rentenplaner.de — des Rechners,
+        der Arbeitgeber-Seiten, des Vorsorge-Checks und aller weiteren Inhalte. Anbieter ist [Vor- und Nachname
+        bzw. Firma, Anschrift] (im Folgenden „Anbieter“), siehe{' '}
+        <a href="/impressum" className="text-indigo-700 underline">Impressum</a>. Mit der Registrierung bzw. der
+        Zustimmung im Konto akzeptieren Sie diese Bedingungen.
+      </P>
+
+      <H2>2. Leistungen</H2>
+      <P>
+        Der JS-Rentenplaner erstellt Modellrechnungen zur Altersvorsorge auf Grundlage Ihrer Eingaben und des
+        jeweils hinterlegten Rechtsstands. Die Ergebnisse sind keine Steuer-, Rechts- oder Anlageberatung und
+        ersetzen diese nicht. Beiträge, Tarife und Leistungen Dritter (etwa Versicherer) sind Beispiele ohne
+        Gewähr; maßgeblich sind deren Angebote.
+      </P>
+
+      <H2>3. Konto</H2>
+      <Liste>
+        <li>Ein Konto ist persönlich. Zugangsdaten dürfen nicht an Dritte weitergegeben werden; jede Person
+          braucht ein eigenes Konto.</li>
+        <li>Sie halten Ihr Passwort geheim und informieren den Anbieter, wenn Sie einen Missbrauch vermuten.</li>
+        <li>Sie können Ihr Konto jederzeit selbst löschen (im Rechner unter „Konto“).</li>
+      </Liste>
+
+      <H2>4. Rechte am JS-Rentenplaner</H2>
+      <P>
+        Software, Rechenlogik, Texte, Gestaltung und Grafiken des JS-Rentenplaners sind urheberrechtlich
+        geschützt (insbesondere §§ 2, 69a ff. UrhG). Alle Rechte liegen beim Anbieter, soweit nicht anders
+        angegeben.
+      </P>
+      <P>
+        Sie erhalten für die Dauer Ihres Kontos ein einfaches, nicht übertragbares Recht, den JS-Rentenplaner im
+        Browser für eigene Zwecke und für die Beratung Ihrer Kunden zu nutzen. Ausdrucke und PDF-Ausgaben der
+        Ergebnisse dürfen Sie an Ihre Kunden und deren Arbeitgeber weitergeben.
+      </P>
+
+      <H2>5. Nicht erlaubt</H2>
+      <P>Ohne vorherige schriftliche Zustimmung des Anbieters ist es nicht erlaubt,</P>
+      <Liste>
+        <li>den Programmcode oder die Rechenlogik ganz oder teilweise zu kopieren, zu speichern, zu verbreiten
+          oder öffentlich zugänglich zu machen,</li>
+        <li>den Programmcode zu bearbeiten, zurückzuentwickeln oder zu dekompilieren — ausgenommen, soweit
+          §§ 69d, 69e UrhG dies zwingend erlauben,</li>
+        <li>den JS-Rentenplaner oder wesentliche Teile davon nachzubauen oder in eigene Anwendungen zu
+          übernehmen,</li>
+        <li>Inhalte automatisiert abzurufen (etwa durch Skripte oder Crawler) oder den Dienst übermäßig zu
+          belasten,</li>
+        <li>die Zugangsbeschränkung zu umgehen oder Dritten Zugang zu verschaffen.</li>
+      </Liste>
+
+      <H2>6. Verfügbarkeit und Änderungen</H2>
+      <P>
+        Der Anbieter bemüht sich um einen störungsfreien Betrieb, schuldet aber keine bestimmte Verfügbarkeit.
+        Funktionen und Rechenregeln können angepasst werden, etwa an einen neuen Rechtsstand.
+      </P>
+
+      <H2>7. Haftung</H2>
+      <P>
+        Der Anbieter haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie für Schäden aus der
+        Verletzung von Leben, Körper oder Gesundheit. Bei leichter Fahrlässigkeit haftet er nur für die
+        Verletzung wesentlicher Pflichten und begrenzt auf den vorhersehbaren, typischen Schaden. Für
+        Entscheidungen, die auf Grundlage der Modellrechnungen getroffen werden, übernimmt der Anbieter keine
+        Haftung. [Haftungsregelung anwaltlich prüfen lassen — insbesondere, falls die Nutzung kostenpflichtig
+        wird.]
+      </P>
+
+      <H2>8. Sperrung und Kündigung</H2>
+      <P>
+        Sie können die Nutzung jederzeit beenden, indem Sie Ihr Konto löschen. Bei Verstößen gegen diese
+        Bedingungen kann der Anbieter das Konto sperren oder löschen; weitergehende Ansprüche, insbesondere auf
+        Unterlassung und Schadensersatz, bleiben vorbehalten.
+      </P>
+
+      <H2>9. Änderungen dieser Bedingungen</H2>
+      <P>
+        Der Anbieter kann diese Bedingungen mit Wirkung für die Zukunft ändern. Eine neue Fassung wird Ihnen
+        beim nächsten Besuch angezeigt; die weitere Nutzung setzt Ihre Zustimmung voraus.
+      </P>
+
+      <H2>10. Schlussbestimmungen</H2>
+      <P>
+        Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts. Ist eine
+        Bestimmung unwirksam, bleiben die übrigen wirksam. [Gerichtsstand für Kaufleute: Sitz des Anbieters —
+        prüfen lassen.]
+      </P>
+    </>
+  );
+}
+

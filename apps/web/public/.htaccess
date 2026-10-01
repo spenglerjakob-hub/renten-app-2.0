@@ -50,6 +50,7 @@ DirectoryIndex index.html
   # Pflichtseiten, von jeder Seite aus verlinkt. Ebenfalls VOR dem Auffangmuster.
   RewriteRule ^impressum/?$ /impressum.html [NC,L]
   RewriteRule ^datenschutz/?$ /datenschutz.html [NC,L]
+  RewriteRule ^nutzungsbedingungen/?$ /nutzungsbedingungen.html [NC,L]
 
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]

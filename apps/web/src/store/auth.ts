@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabase, supabaseKonfiguriert, adresseBeimStart } from '../lib/supabase';
+import { zustimmungDaten } from '../lib/nutzungsbedingungen';
 
 /**
  * Anmeldung mit E-Mail und Passwort.
@@ -353,7 +354,9 @@ export const useAuth = create<AuthStore>((set, get) => ({
     const { data, error } = await supabase.auth.signUp({
       email,
       password: passwort,
-      options: { emailRedirectTo: window.location.origin },
+      // Zustimmung zu den Nutzungsbedingungen: Die Maske laesst ohne Haken
+      // nicht absenden, festgehalten wird Fassung und Zeitpunkt.
+      options: { emailRedirectTo: window.location.origin, data: zustimmungDaten() },
     });
 
     if (error) {

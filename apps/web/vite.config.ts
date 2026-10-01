@@ -5,8 +5,16 @@ import react from '@vitejs/plugin-react';
 
 const hier = fileURLToPath(new URL('.', import.meta.url));
 
+const URHEBERHINWEIS = `/*! JS-Rentenplaner — (c) ${new Date().getFullYear()} Betreiber laut https://js-rentenplaner.de/impressum.
+ * Alle Rechte vorbehalten. Urheberrechtlich geschuetzt (§§ 69a ff. UrhG). Kopieren, Bearbeiten,
+ * Zurueckentwickeln und Weiterverwenden des Programmcodes und der Rechenlogik nur nach den
+ * Nutzungsbedingungen: https://js-rentenplaner.de/nutzungsbedingungen */`;
+
 export default defineConfig({
   plugins: [react()],
+  // Der Web Worker (Projektion im Hintergrund) wird getrennt gebaut — er
+  // traegt die ganze Engine und bekommt denselben Hinweis.
+  worker: { rollupOptions: { output: { banner: URHEBERHINWEIS } } },
   build: {
     target: 'es2022',
     // Statisches Bundle, ausgeliefert ueber ein CDN. Die Berechnung laeuft im
@@ -15,7 +23,7 @@ export default defineConfig({
       // Einstiegspunkte: der Rechner, die Landingpage zum
       // Altersvorsorgedepot, der Vorsorge-Check, die drei
       // Arbeitgeber-Seiten (Matching-Modell, Zuschussmodell, Festbetrag) sowie
-      // Impressum und Datenschutz (ein Bundle, zwei Seiten). Die Landingpages sollen
+      // Impressum, Datenschutz und Nutzungsbedingungen (ein Bundle, drei Seiten). Die Landingpages sollen
       // schnell laden und nicht das ganze Bundle des Rechners mitziehen;
       // Rollup trennt sie deshalb und teilt nur, was wirklich gemeinsam
       // gebraucht wird.
@@ -29,9 +37,14 @@ export default defineConfig({
         bkv: resolve(hier, 'bkv.html'),
         impressum: resolve(hier, 'impressum.html'),
         datenschutz: resolve(hier, 'datenschutz.html'),
+        nutzungsbedingungen: resolve(hier, 'nutzungsbedingungen.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },
+        // Urheberhinweis am Anfang jeder ausgelieferten JS-Datei. Wer die
+        // Programmdateien herunterlaedt, sieht als Erstes, dass sie geschuetzt
+        // sind und wo die Bedingungen stehen. `/*!` haelt der Minifier stehen.
+        banner: URHEBERHINWEIS,
       },
     },
   },
