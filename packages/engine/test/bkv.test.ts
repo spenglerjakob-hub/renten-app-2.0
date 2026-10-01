@@ -170,11 +170,13 @@ describe('Pauschal nach § 40 Abs. 1 S. 1 Nr. 1', () => {
     expect(weg(g, 'pauschal40').moeglich).toBe(false);
   });
 
-  it('unter 20 Mitarbeitern moeglich, aber mit Hinweis und nicht im Vorschlag', () => {
-    const k = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50, anzahlMitarbeiter: 10 }), steuer, p);
-    expect(weg(k, 'pauschal40').moeglich).toBe(true);
-    expect(weg(k, 'pauschal40').grund).toContain('Einzelfall');
+  it('unter 20 Mitarbeitern gesperrt, mit Hinweis auf die Ausnahme', () => {
+    const k = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50, anzahlMitarbeiter: 19 }), steuer, p);
+    expect(weg(k, 'pauschal40').moeglich).toBe(false);
+    expect(weg(k, 'pauschal40').grund).toContain('Erst ab 20');
     expect(k.vorauswahl).not.toBe('pauschal40');
+    const genau20 = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50, anzahlMitarbeiter: 20 }), steuer, p);
+    expect(weg(genau20, 'pauschal40').moeglich).toBe(true);
   });
 
   it('beim Mitarbeiter bleibt mehr als mit § 37b — keine Sozialabgaben', () => {

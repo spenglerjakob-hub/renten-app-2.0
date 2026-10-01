@@ -45,8 +45,8 @@ import { arbeitgeberSvErsparnis, type MatchingSteuer } from './matching-modell.j
  *     Zahl von Faellen" (§ 40 Abs. 1 S. 1 Nr. 1 EStG), auf Antrag beim
  *     Betriebsstaettenfinanzamt. Sonstiger Bezug heisst: Beitraege nur
  *     HALBJAEHRLICH ODER JAEHRLICH — genau umgekehrt wie beim Sachbezug.
- *     Hoechstens 1.000 EUR je Mitarbeiter und Jahr; ohne Pruefung ab 20
- *     einbezogenen Mitarbeitern (R 40.1 Abs. 1 LStR). Ein einheitlicher
+ *     Hoechstens 1.000 EUR je Mitarbeiter und Jahr; erst ab 20 einbezogenen
+ *     Mitarbeitern (R 40.1 Abs. 1 LStR — darunter nur als Ausnahme). Ein einheitlicher
  *     Durchschnittssteuersatz nach R 40.1 Abs. 3; traegt ihn der Arbeitgeber,
  *     gilt der Nettosteuersatz t / (1 − t), weil die uebernommene Steuer selbst
  *     ein Vorteil ist. Waelzt er sie ab, traegt der Mitarbeiter sie zum
@@ -304,15 +304,20 @@ export function bkvModell(e: BkvEingaben, steuerOpt: MatchingSteuer, p: LegalPar
   const pauschsteuer40 = beitrag * satz40 * (1 + 0.055 + kist);
   const anzahl = Math.max(1, Math.round(e.anzahlMitarbeiter));
   const ueberGrenze40 = beitrag * 12 > PAUSCHAL_40_GRENZE_JAHR + 1e-9;
+  // Unter 20 Mitarbeitern laesst R 40.1 Abs. 1 S. 4 LStR die Pauschalierung
+  // nur ausnahmsweise zu, wenn das Finanzamt besondere Verhaeltnisse
+  // anerkennt. Darauf baut kein Angebot — der Weg ist dann gesperrt, der
+  // Grund nennt die Ausnahme.
+  const zuWenige40 = anzahl < PAUSCHAL_40_MINDEST_MA;
   const pauschal40 = weg(
     'pauschal40', 'Pauschal nach § 40 (SV-frei)',
     `Beitrag halbjährlich oder jährlich, pauschal versteuert — ohne Sozialabgaben`,
-    !ueberGrenze40,
-    ueberGrenze40
-      ? `Der Jahresbeitrag von ${euro(beitrag * 12)} liegt über dem Höchstbetrag von ${euro(PAUSCHAL_40_GRENZE_JAHR)}.`
+    !ueberGrenze40 && !zuWenige40,
+    zuWenige40
+      ? `Erst ab ${PAUSCHAL_40_MINDEST_MA} Mitarbeitern („größere Zahl von Fällen“) — darunter nur ausnahmsweise mit Zustimmung des Finanzamts.`
+      : ueberGrenze40
+        ? `Der Jahresbeitrag von ${euro(beitrag * 12)} liegt über dem Höchstbetrag von ${euro(PAUSCHAL_40_GRENZE_JAHR)}.`
       : inFreigrenze ? 'Möglich, aber unnötig teuer — in der Freigrenze ist die bKV ohnehin frei.'
-      : anzahl < PAUSCHAL_40_MINDEST_MA
-        ? `Bei ${anzahl} Mitarbeitern prüft das Finanzamt die „größere Zahl von Fällen“ im Einzelfall — ohne Prüfung ab ${PAUSCHAL_40_MINDEST_MA}.`
       : undefined,
     { beitrag, abgaben: 0, pauschsteuer: traegtMa ? 0 : pauschsteuer40 },
     { eigenanteil: 0, abzuege: traegtMa ? pauschsteuer40 : 0 },
@@ -342,9 +347,7 @@ export function bkvModell(e: BkvEingaben, steuerOpt: MatchingSteuer, p: LegalPar
   // Vorschlag: steuerfrei, wo es geht. Sonst der Weg, bei dem je Euro
   // Arbeitgeberkosten am meisten beim Mitarbeiter ankommt — unter denen,
   // in denen der Arbeitgeber den ganzen Tarif traegt, wenn Aufteilen nicht geht.
-  // § 40 kommt nur ohne Einzelfallpruefung in den Vorschlag.
-  const kandidaten = [pauschal37b, barlohn,
-    ...(pauschal40.moeglich && anzahl >= PAUSCHAL_40_MINDEST_MA ? [pauschal40] : [])];
+  const kandidaten = [pauschal37b, barlohn, ...(pauschal40.moeglich ? [pauschal40] : [])];
   const vorauswahl: BkvWegId = inFreigrenze ? 'sachbezug'
     : aufteilen.moeglich ? 'aufteilen'
     : kandidaten.reduce((a, b) => (b.hebel > a.hebel ? b : a)).id;

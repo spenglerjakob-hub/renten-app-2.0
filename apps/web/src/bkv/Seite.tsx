@@ -632,7 +632,7 @@ const UMSETZUNG: Record<BkvWegId, ReactNode[]> = {
     <>Beiträge <strong>halbjährlich oder jährlich</strong> zahlen — monatlich wären sie laufender Lohn, kein sonstiger Bezug</>,
     <><strong>Antrag beim Betriebsstättenfinanzamt</strong>; der einheitliche Satz wird nach R 40.1 Abs. 3 LStR aus den
       Durchschnittswerten der Mitarbeiter ermittelt</>,
-    <>„Größere Zahl von Fällen“: ohne Prüfung ab <strong>20 Mitarbeitern</strong>, darunter im Einzelfall</>,
+    <>Erst ab <strong>20 Mitarbeitern</strong> („größere Zahl von Fällen“), darunter nur ausnahmsweise mit Zustimmung des Finanzamts</>,
     <>Höchstens <strong>1.000 € je Mitarbeiter und Jahr</strong> (§ 40 Abs. 1 S. 3 EStG)</>,
     <><strong>Sozialversicherungsfrei</strong> (§ 1 Abs. 1 S. 1 Nr. 2 SvEV)</>,
     <>Pauschsteuer tragen Sie (Nettosteuersatz) oder per <strong>Abwälzung</strong> der Mitarbeiter — vorab mit dem
