@@ -16,6 +16,9 @@ const eingaben = (over: Partial<BkvEingaben> = {}): BkvEingaben => ({
   privatVersichert: false,
   pkvPraemieMonat: 0,
   kinder: { hatKinder: false, kinderUnter25: 0 },
+  anzahlMitarbeiter: 20,
+  pauschsatz40: null,
+  pauschsteuer40TraegtMitarbeiter: false,
   ...over,
 });
 const weg = (r: BkvErgebnis, id: BkvWegId) => r.wege.find((w) => w.id === id)!;
@@ -81,7 +84,7 @@ describe('Ueber der Freigrenze: die anderen Wege', () => {
   });
 
   it('Pauschal: 30 % plus Soli beim Arbeitgeber, beim Mitarbeiter nur Sozialabgaben', () => {
-    const w = weg(r, 'pauschal');
+    const w = weg(r, 'pauschal37b');
     expect(w.arbeitgeber.pauschsteuerMonat).toBeCloseTo(42.67 * 0.3 * 1.055, 6);
     expect(w.arbeitgeber.abgabenMonat).toBeGreaterThan(42.67 * 0.2);
     // Arbeitnehmeranteil SV rund 21 % — keine Lohnsteuer
@@ -94,7 +97,7 @@ describe('Ueber der Freigrenze: die anderen Wege', () => {
 
   it('Pauschal mit Kirchensteuer im Nachweisverfahren', () => {
     const mit = bkvModell(eingaben({ beitragMonat: 60 }), { ...steuer, kirchensteuerpflichtig: true }, p);
-    expect(weg(mit, 'pauschal').arbeitgeber.pauschsteuerMonat).toBeCloseTo(60 * 0.3 * (1 + 0.055 + 0.09), 6);
+    expect(weg(mit, 'pauschal37b').arbeitgeber.pauschsteuerMonat).toBeCloseTo(60 * 0.3 * (1 + 0.055 + 0.09), 6);
   });
 
   it('Barlohn: kostet so viel wie eine Gehaltserhoehung mit gleichem Netto', () => {
@@ -105,7 +108,7 @@ describe('Ueber der Freigrenze: die anderen Wege', () => {
   });
 
   it('Pauschal bringt beim Mitarbeiter mehr an als Barlohn, kostet aber mehr', () => {
-    const pa = weg(r, 'pauschal');
+    const pa = weg(r, 'pauschal37b');
     const ba = weg(r, 'barlohn');
     expect(pa.mitarbeiter.vorteilMonat).toBeGreaterThan(ba.mitarbeiter.vorteilMonat);
     expect(pa.arbeitgeber.nettoKostenMonat).toBeGreaterThan(ba.arbeitgeber.nettoKostenMonat);
@@ -122,7 +125,66 @@ describe('Ueber der Freigrenze: die anderen Wege', () => {
   it('Freigrenze von anderen Sachbezuegen ausgeschoepft: Aufteilen geht nicht', () => {
     const voll = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50 }), steuer, p);
     expect(weg(voll, 'aufteilen').moeglich).toBe(false);
-    expect(['pauschal', 'barlohn']).toContain(voll.vorauswahl);
+    expect(['pauschal37b', 'pauschal40', 'barlohn']).toContain(voll.vorauswahl);
+  });
+});
+
+describe('Pauschal nach § 40 Abs. 1 S. 1 Nr. 1', () => {
+  const r = bkvModell(eingaben({ beitragMonat: 42.67, weitereSachbezuegeMonat: 20 }), steuer, p);
+  const w = weg(r, 'pauschal40');
+
+  it('keine Sozialabgaben, Kosten = (Beitrag + Pauschsteuer) nach Steuern', () => {
+    expect(w.moeglich).toBe(true);
+    expect(w.grund).toBeUndefined();
+    expect(w.arbeitgeber.abgabenMonat).toBe(0);
+    expect(w.mitarbeiter.belastungMonat).toBe(0);
+    expect(w.arbeitgeber.nettoKostenMonat).toBeCloseTo((42.67 + w.arbeitgeber.pauschsteuerMonat) * 0.7, 6);
+  });
+
+  it('geschaetzter Nettosteuersatz ergibt den Faktor 1,3 bis 1,5', () => {
+    expect(r.pauschsatz40.geschaetzt).toBe(true);
+    expect(r.pauschsatz40.satz).toBeGreaterThan(0.2);
+    expect(w.faktor).toBeGreaterThan(1.2);
+    expect(w.faktor).toBeLessThan(1.6);
+    expect(w.arbeitgeber.pauschsteuerMonat).toBeCloseTo(42.67 * r.pauschsatz40.satz * 1.055, 6);
+  });
+
+  it('Satz vom Finanzamt wird uebernommen', () => {
+    const f = bkvModell(eingaben({ beitragMonat: 42.67, pauschsatz40: 0.25 }), steuer, p);
+    expect(f.pauschsatz40).toEqual({ satz: 0.25, geschaetzt: false });
+    expect(weg(f, 'pauschal40').arbeitgeber.pauschsteuerMonat).toBeCloseTo(42.67 * 0.25 * 1.055, 6);
+  });
+
+  it('abgewaelzt: Arbeitgeber zahlt nur den Beitrag, Mitarbeiter die Steuer zum Bruttosatz', () => {
+    const a = bkvModell(eingaben({ beitragMonat: 42.67, pauschsteuer40TraegtMitarbeiter: true }), steuer, p);
+    const wa = weg(a, 'pauschal40');
+    expect(wa.arbeitgeber.kostenVorSteuerMonat).toBeCloseTo(42.67, 6);
+    expect(wa.arbeitgeber.pauschsteuerMonat).toBe(0);
+    expect(a.pauschsatz40.satz).toBeLessThan(r.pauschsatz40.satz);
+    expect(r.pauschsatz40.satz).toBeCloseTo(a.pauschsatz40.satz / (1 - a.pauschsatz40.satz), 6);
+    expect(wa.mitarbeiter.abzuegeMonat).toBeCloseTo(42.67 * a.pauschsatz40.satz * 1.055, 6);
+  });
+
+  it('ueber 1.000 EUR im Jahr nicht moeglich', () => {
+    const g = bkvModell(eingaben({ beitragMonat: 90 }), steuer, p);
+    expect(weg(g, 'pauschal40').moeglich).toBe(false);
+  });
+
+  it('unter 20 Mitarbeitern moeglich, aber mit Hinweis und nicht im Vorschlag', () => {
+    const k = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50, anzahlMitarbeiter: 10 }), steuer, p);
+    expect(weg(k, 'pauschal40').moeglich).toBe(true);
+    expect(weg(k, 'pauschal40').grund).toContain('Einzelfall');
+    expect(k.vorauswahl).not.toBe('pauschal40');
+  });
+
+  it('beim Mitarbeiter bleibt mehr als mit § 37b — keine Sozialabgaben', () => {
+    expect(w.mitarbeiter.vorteilMonat).toBeGreaterThan(weg(r, 'pauschal37b').mitarbeiter.vorteilMonat);
+    expect(w.hebel).toBeGreaterThan(weg(r, 'pauschal37b').hebel);
+  });
+
+  it('ab 20 Mitarbeitern im Vorschlag, wenn Aufteilen nicht geht', () => {
+    const v = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50 }), steuer, p);
+    expect(v.vorauswahl).toBe('pauschal40');
   });
 });
 

@@ -38,7 +38,8 @@ const BEISPIELE: { budget: number; beitrag: number; abMitarbeitern?: number }[] 
 
 /** Kurzname fuer Tabellenkopf und Druckzeile */
 const SPALTE: Record<BkvWegId, string> = {
-  sachbezug: 'Sachbezug', aufteilen: 'Aufteilen', pauschal: 'Pauschal', barlohn: 'Barlohn', arbeitnehmer: 'Selbstzahler',
+  sachbezug: 'Sachbezug', aufteilen: 'Aufteilen', pauschal37b: '§ 37b', pauschal40: '§ 40', barlohn: 'Barlohn',
+  arbeitnehmer: 'Selbstzahler',
 };
 
 export function Seite() {
@@ -55,6 +56,10 @@ export function Seite() {
   const [bundesland, setBundesland] = useState<string>('Nordrhein-Westfalen');
   const [verheiratet, setVerheiratet] = useState(false);
   const [kirchensteuer, setKirchensteuer] = useState(false);
+  /** § 40: Satz vom Finanzamt statt der Schaetzung */
+  const [eigenerSatz40, setEigenerSatz40] = useState(false);
+  const [satz40, setSatz40] = useState(0.25);
+  const [traegtMa40, setTraegtMa40] = useState(false);
 
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
@@ -68,7 +73,12 @@ export function Seite() {
     privatVersichert: privat,
     pkvPraemieMonat: privat ? praemie : 0,
     kinder: { hatKinder: false, kinderUnter25: 0 },
-  }, steuerOpt, p), [beitrag, weitere, brutto, steuersatz, umlagen, privat, praemie, steuerOpt]);
+    anzahlMitarbeiter: Math.max(1, Math.round(anzahl)),
+    pauschsatz40: eigenerSatz40 ? satz40 : null,
+    pauschsteuer40TraegtMitarbeiter: traegtMa40,
+  }, steuerOpt, p), [
+    beitrag, weitere, brutto, steuersatz, umlagen, privat, praemie, steuerOpt, anzahl, eigenerSatz40, satz40, traegtMa40,
+  ]);
 
   // Ein gewaehlter Weg, der durch neue Eingaben unmoeglich wird (Sachbezug
   // ueber 50 EUR), faellt auf den Vorschlag zurueck — die Wahl bleibt
@@ -77,6 +87,9 @@ export function Seite() {
   const aktiv: BkvWeg = gewaehlt?.moeglich ? gewaehlt : r.wege.find((w) => w.id === r.vorauswahl)!;
   const ag = aktiv.arbeitgeber;
   const ma = aktiv.mitarbeiter;
+  const pauschsatzText = aktiv.id === 'pauschal40'
+    ? `${prozent(r.pauschsatz40.satz, 1)}${r.pauschsatz40.geschaetzt ? ' (geschätzt)' : ''}`
+    : prozent(PAUSCHSTEUER_37B, 0);
   const g = aktiv.gehalt;
   const n = Math.max(1, Math.round(anzahl));
   const summe = Math.max(0, beitrag) + Math.max(0, weitere);
@@ -150,6 +163,33 @@ export function Seite() {
                 hilfe="Gutschein-, Tank- oder Essenskarte über Sachbezug. Die 50 € gelten für alle zusammen."
               />
             </Kasten>
+
+            {aktiv.id === 'pauschal40' && (
+              <Kasten titel="Pauschalversteuerung § 40">
+                <Schalter label="Satz vom Finanzamt eintragen" wert={eigenerSatz40} onChange={(an) => {
+                  // Beim Einschalten mit der Schaetzung starten, nicht mit einem Fantasiewert.
+                  if (an) setSatz40(Math.round(r.pauschsatz40.satz * 1000) / 1000);
+                  setEigenerSatz40(an);
+                }} />
+                {eigenerSatz40 ? (
+                  <ProzentFeld
+                    label="Pauschsteuersatz nach § 40" wert={satz40} onChange={setSatz40} min={0} max={60} stellen={1}
+                    hilfe="Den Satz ermittelt das Finanzamt bzw. der Steuerberater aus den Durchschnittswerten aller einbezogenen Mitarbeiter (R 40.1 Abs. 3 LStR). Ohne Soli und Kirchensteuer eintragen."
+                  />
+                ) : (
+                  <p className="text-xs leading-snug text-slate-600">
+                    Geschätzt aus dem Beispiel-Mitarbeiter: <strong>{prozent(r.pauschsatz40.satz, 1)}</strong>
+                    {traegtMa40 ? ' (Bruttosteuersatz)' : ' (Nettosteuersatz, weil Sie die Steuer übernehmen)'}, dazu Soli
+                    {kirchensteuer ? ' und Kirchensteuer' : ''}. Den verbindlichen Satz setzt das Finanzamt fest.
+                  </p>
+                )}
+                <Schalter label="Pauschsteuer trägt der Mitarbeiter" wert={traegtMa40} onChange={setTraegtMa40} />
+                <p className="-mt-1 text-xs leading-snug text-slate-500">
+                  Abwälzung nach § 40 Abs. 3 S. 2 EStG: Der Mitarbeiter zahlt die Steuer aus dem Netto, die
+                  Bemessungsgrundlage sinkt dadurch nicht.
+                </p>
+              </Kasten>
+            )}
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
@@ -263,7 +303,9 @@ export function Seite() {
               </div>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
                 „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
-                {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt' : 'die Freigrenze am besten nutzt'}.</>}
+                {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt'
+                  : r.vorauswahl === 'aufteilen' ? 'die Freigrenze am besten nutzt'
+                  : 'bei dem je Euro Ihrer Kosten am meisten beim Mitarbeiter ankommt'}.</>}
               </p>
             </section>
 
@@ -308,12 +350,13 @@ export function Seite() {
                     />
                     {ag.pauschsteuerMonat > 0 && (
                       <VergleichZeile
-                        text={`+ Pauschsteuer ${prozent(PAUSCHSTEUER_37B, 0)} mit Soli${kirchensteuer ? ' und Kirchensteuer' : ''}`}
+                        text={`+ Pauschsteuer ${pauschsatzText} mit Soli${kirchensteuer ? ' und Kirchensteuer' : ''}`}
                         links={`+ ${euro(ag.pauschsteuerMonat)}`} rechts="—"
                       />
                     )}
                     <VergleichZeile
-                      text="= Personalkosten vor Steuern" summe
+                      text={`= Personalkosten vor Steuern${aktiv.faktor > 1.005 ? ` (Faktor ${aktiv.faktor.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''}`}
+                      summe
                       links={euro(ag.kostenVorSteuerMonat)} rechts={euro(g.kostenVorSteuerMonat)}
                     />
                     <VergleichZeile
@@ -332,7 +375,9 @@ export function Seite() {
                     )}
                     {ma.abzuegeMonat > 0.005 && (
                       <VergleichZeile
-                        text={aktiv.id === 'pauschal' ? 'Abzüge beim Mitarbeiter (bei Pauschal nur Sozialabgaben)' : 'Steuer und Abgaben des Mitarbeiters'}
+                        text={aktiv.id === 'pauschal37b' ? 'Abzüge beim Mitarbeiter (bei § 37b nur Sozialabgaben)'
+                          : aktiv.id === 'pauschal40' ? `Pauschsteuer ${pauschsatzText}, trägt der Mitarbeiter`
+                          : 'Steuer und Abgaben des Mitarbeiters'}
                         links={euro(ma.abzuegeMonat)}
                         rechts={euro(g.svMonat + g.steuerMonat)}
                       />
@@ -439,7 +484,8 @@ export function Seite() {
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Beiträge und Leistungen
                 hängen vom Tarif ab; die Beispielbeiträge sind Richtwerte, kein Angebot. Annahme- und
                 Gesundheitsregeln legt der Versicherer fest. Der Gehaltsvergleich gilt für den eingetragenen
-                Beispiel-Mitarbeiter. Pauschalversteuerung und Aufteilung vorab mit dem Steuerberater abstimmen.
+                Beispiel-Mitarbeiter. Pauschalversteuerung und Aufteilung vorab mit dem Steuerberater abstimmen; der Satz
+                nach § 40 ist eine Schätzung aus dem Beispiel-Mitarbeiter, bis das Finanzamt ihn festsetzt.
               </p>
             </div>
 
@@ -520,7 +566,10 @@ function kostenText(w: BkvWeg): string {
   switch (w.id) {
     case 'sachbezug': return `je Mitarbeiter und Monat, für ${euroGenau(a.beitragMonat)} Beitrag`;
     case 'aufteilen': return `für Ihren Anteil von ${euroGenau(a.beitragMonat)}, steuerfrei`;
-    case 'pauschal': return `inkl. ${euro(a.pauschsteuerMonat)} Pauschsteuer und ${euro(a.abgabenMonat)} Sozialabgaben`;
+    case 'pauschal37b': return `inkl. ${euro(a.pauschsteuerMonat)} Pauschsteuer und ${euro(a.abgabenMonat)} Sozialabgaben`;
+    case 'pauschal40': return w.mitarbeiter.abzuegeMonat > 0.005
+      ? `nur der Beitrag (${euro(a.beitragMonat * 12)} im Jahr) — die Pauschsteuer trägt der Mitarbeiter`
+      : `inkl. ${euro(a.pauschsteuerMonat)} Pauschsteuer, keine Sozialabgaben — Beitrag ${euro(a.beitragMonat * 12)} im Jahr`;
     case 'barlohn': return `inkl. ${euro(a.abgabenMonat)} Arbeitgeberanteil Sozialabgaben`;
     case 'arbeitnehmer': return 'Sie bieten nur den Gruppenvertrag an';
   }
@@ -537,7 +586,14 @@ function herleitung(w: BkvWeg, g: NonNullable<BkvWeg['gehalt']>, n: number): Rea
       return <>Ihr Anteil bleibt in der Freigrenze und damit frei von Steuer und Abgaben; den Rest von
         {' '}{euroGenau(w.mitarbeiter.eigenanteilMonat)} zahlt der Mitarbeiter aus dem Netto. {gehaltSatz} Gegenüber
         der Gehaltserhöhung sparen Sie {euro(w.ersparnisGegenGehaltMonat)} im Monat — {jahr}.</>;
-    case 'pauschal':
+    case 'pauschal40':
+      return <>Pauschal versteuert nach § 40 ist der Beitrag frei von Sozialabgaben — für Sie und den Mitarbeiter.
+        {w.mitarbeiter.abzuegeMonat > 0.005
+          ? <> Die Pauschsteuer trägt der Mitarbeiter aus dem Netto, Sie zahlen nur den Beitrag.</>
+          : <> Sie übernehmen die Pauschsteuer zu einem einheitlichen Satz, den das Finanzamt auf Antrag festsetzt.</>}
+        {' '}Der Beitrag wird halbjährlich oder jährlich gezahlt; andere Sachbezüge bleiben in der Freigrenze. {gehaltSatz}
+        {w.ersparnisGegenGehaltMonat >= 0.5 ? <> Ersparnis {euro(w.ersparnisGegenGehaltMonat)} im Monat — {jahr}.</> : null}</>;
+    case 'pauschal37b':
       return <>Sie übernehmen die Lohnsteuer pauschal, der Mitarbeiter zahlt nur seine Sozialabgaben. Teurer als
         die Freigrenze, aber der ganze Tarif ist abgedeckt und andere Sachbezüge bleiben frei. {gehaltSatz}
         {w.ersparnisGegenGehaltMonat >= 0.5 ? <> Ersparnis {euro(w.ersparnisGegenGehaltMonat)} im Monat — {jahr}.</> : null}</>;
@@ -557,6 +613,8 @@ const UMSETZUNG: Record<BkvWegId, ReactNode[]> = {
     <>Der Mitarbeiter kann nur den <strong>Versicherungsschutz</strong> verlangen, kein Geld</>,
     <>Die 50 € mit <strong>anderen Sachbezügen</strong> abstimmen (Gutschein-, Tankkarte)</>,
     <>In der <strong>Lohnabrechnung</strong> als steuerfreien Sachbezug führen</>,
+    <>Sie sind <strong>Versicherungsnehmer</strong> und zahlen die Beiträge; festhalten in einer <strong>arbeitsvertraglichen
+      Vereinbarung</strong> mit klarer Definition (nur Versicherungsschutz, kein Geldanspruch)</>,
   ],
   aufteilen: [
     <>Ihr Anteil <strong>monatlich</strong> und <strong>zusätzlich zum Gehalt</strong>, nur als Versicherungsschutz</>,
@@ -564,11 +622,21 @@ const UMSETZUNG: Record<BkvWegId, ReactNode[]> = {
     <>Ihr Anteil und andere Sachbezüge zusammen höchstens <strong>50 €</strong></>,
     <>Mit Versicherer und Lohnbuchhaltung klären, dass sie die <strong>Aufteilung</strong> abbilden</>,
   ],
-  pauschal: [
+  pauschal37b: [
     <><strong>§ 37b Abs. 2 EStG:</strong> 30 % Pauschsteuer, dazu Soli und ggf. Kirchensteuer, in der Lohnsteuer-Anmeldung</>,
     <>Das Wahlrecht gilt <strong>einheitlich</strong> für alle Sachzuwendungen an Arbeitnehmer im Wirtschaftsjahr</>,
     <>Sozialversicherung bleibt <strong>pflichtig</strong> — beide Anteile werden abgerechnet</>,
-    <>Zusätzlich zum Gehalt; höchstens 10.000 € je Mitarbeiter und Jahr</>,
+    <>Zusätzlich zum Gehalt; höchstens 10.000 € je Empfänger und Jahr — nur, wenn die 50-€-Freigrenze nicht genutzt wird</>,
+  ],
+  pauschal40: [
+    <>Beiträge <strong>halbjährlich oder jährlich</strong> zahlen — monatlich wären sie laufender Lohn, kein sonstiger Bezug</>,
+    <><strong>Antrag beim Betriebsstättenfinanzamt</strong>; der einheitliche Satz wird nach R 40.1 Abs. 3 LStR aus den
+      Durchschnittswerten der Mitarbeiter ermittelt</>,
+    <>„Größere Zahl von Fällen“: ohne Prüfung ab <strong>20 Mitarbeitern</strong>, darunter im Einzelfall</>,
+    <>Höchstens <strong>1.000 € je Mitarbeiter und Jahr</strong> (§ 40 Abs. 1 S. 3 EStG)</>,
+    <><strong>Sozialversicherungsfrei</strong> (§ 1 Abs. 1 S. 1 Nr. 2 SvEV)</>,
+    <>Pauschsteuer tragen Sie (Nettosteuersatz) oder per <strong>Abwälzung</strong> der Mitarbeiter — vorab mit dem
+      Steuerberater abstimmen</>,
   ],
   barlohn: [
     <>Als <strong>Zuschuss mit Geldanspruch</strong> gestalten, dann berührt er die 50-€-Grenze nicht</>,

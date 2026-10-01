@@ -106,7 +106,7 @@ export {
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
 } from './analyse/matching-modell.js';
 export {
-  bkvModell, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B,
+  bkvModell, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, PAUSCHAL_40_GRENZE_JAHR, PAUSCHAL_40_MINDEST_MA,
   type BkvEingaben, type BkvErgebnis, type BkvWeg, type BkvWegId, type BkvGehalt,
 } from './analyse/bkv.js';
 export {
