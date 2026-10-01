@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { bkvModell, SACHBEZUG_FREIGRENZE_MONAT, type BkvEingaben } from '../src/analyse/bkv.js';
+import {
+  bkvModell, SACHBEZUG_FREIGRENZE_MONAT, type BkvEingaben, type BkvErgebnis, type BkvWegId,
+} from '../src/analyse/bkv.js';
 import { parameterFuer } from '../src/params/registry.js';
 
 const p = parameterFuer(2026, { indexRate: 0 });
@@ -16,16 +18,21 @@ const eingaben = (over: Partial<BkvEingaben> = {}): BkvEingaben => ({
   kinder: { hatKinder: false, kinderUnter25: 0 },
   ...over,
 });
+const weg = (r: BkvErgebnis, id: BkvWegId) => r.wege.find((w) => w.id === id)!;
 
-describe('bKV in der Sachbezugsfreigrenze', () => {
+describe('Sachbezug in der Freigrenze', () => {
   it('30 EUR: keine Abgaben, Arbeitgeber zahlt netto 21 EUR', () => {
     const r = bkvModell(eingaben(), steuer, p);
+    const w = weg(r, 'sachbezug');
     expect(r.inFreigrenze).toBe(true);
+    expect(r.vorauswahl).toBe('sachbezug');
     expect(r.freigrenzeRestMonat).toBeCloseTo(20, 6);
-    expect(r.arbeitgeber.abgabenMonat).toBe(0);
-    expect(r.arbeitgeber.nettoKostenMonat).toBeCloseTo(21, 6);
-    expect(r.mitarbeiter.abzuegeMonat).toBe(0);
-    expect(r.mitarbeiter.wertMonat).toBe(30);
+    expect(w.moeglich).toBe(true);
+    expect(w.arbeitgeber.abgabenMonat).toBe(0);
+    expect(w.arbeitgeber.nettoKostenMonat).toBeCloseTo(21, 6);
+    expect(w.mitarbeiter.belastungMonat).toBe(0);
+    expect(w.mitarbeiter.vorteilMonat).toBe(30);
+    expect(w.hebel).toBeCloseTo(30 / 21, 6);
   });
 
   it('genau 50 EUR liegen noch in der Freigrenze', () => {
@@ -34,52 +41,101 @@ describe('bKV in der Sachbezugsfreigrenze', () => {
     expect(r.freigrenzeRestMonat).toBe(0);
   });
 
-  it('andere Sachbezuege zaehlen mit und verkleinern den Rest', () => {
+  it('andere Sachbezuege zaehlen mit; Aufteilen ist dann nicht noetig', () => {
     const r = bkvModell(eingaben({ weitereSachbezuegeMonat: 15 }), steuer, p);
     expect(r.inFreigrenze).toBe(true);
     expect(r.freigrenzeRestMonat).toBeCloseTo(5, 6);
+    expect(weg(r, 'aufteilen').moeglich).toBe(false);
     expect(r.hinweise.some((h) => h.includes('alle Sachbezüge zusammen'))).toBe(true);
   });
-});
 
-describe('bKV ueber der Freigrenze', () => {
-  it('40 + 20 EUR: der GESAMTE Betrag wird pflichtig', () => {
-    const r = bkvModell(eingaben({ beitragMonat: 40, weitereSachbezuegeMonat: 20 }), steuer, p);
-    expect(r.inFreigrenze).toBe(false);
-    expect(r.freigrenzeRestMonat).toBe(0);
-    expect(r.arbeitgeber.abgabenMonat).toBeGreaterThan(40 * 0.2);
-    expect(r.mitarbeiter.abzuegeMonat).toBeGreaterThan(40 * 0.3);
-    expect(r.arbeitgeber.nettoKostenMonat).toBeCloseTo((40 + r.arbeitgeber.abgabenMonat) * 0.7, 6);
-    expect(r.hinweise.some((h) => h.includes('GESAMTE'))).toBe(true);
-  });
-});
-
-describe('Vergleich mit einer Gehaltserhoehung', () => {
-  it('gleiches Netto beim Mitarbeiter, teurer fuer den Arbeitgeber', () => {
-    const r = bkvModell(eingaben(), steuer, p);
-    const g = r.gehalt!;
+  it('Gehaltsvergleich: gleiches Netto, fuer den Arbeitgeber teurer', () => {
+    const w = weg(bkvModell(eingaben(), steuer, p), 'sachbezug');
+    const g = w.gehalt!;
     expect(g.nettoMonat).toBeCloseTo(30, 1);
     expect(g.bruttoMonat).toBeGreaterThan(50);
     expect(g.svMonat + g.steuerMonat).toBeCloseTo(g.bruttoMonat - g.nettoMonat, 1);
     expect(g.kostenVorSteuerMonat - g.steuerersparnisMonat).toBeCloseTo(g.nettoKostenMonat, 6);
-    expect(r.ersparnisGegenGehaltMonat).toBeGreaterThan(10);
+    expect(w.ersparnisGegenGehaltMonat).toBeGreaterThan(10);
+  });
+});
+
+describe('Ueber der Freigrenze: die anderen Wege', () => {
+  const r = bkvModell(eingaben({ beitragMonat: 42.67, weitereSachbezuegeMonat: 20 }), steuer, p);
+
+  it('Sachbezug ist nicht moeglich, Hinweis auf den GESAMTEN Betrag', () => {
+    expect(r.inFreigrenze).toBe(false);
+    expect(weg(r, 'sachbezug').moeglich).toBe(false);
+    expect(r.hinweise.some((h) => h.includes('GESAMTE'))).toBe(true);
   });
 
-  it('ueber der Freigrenze: Gehalt muss nur das geminderte Netto erreichen', () => {
-    const r = bkvModell(eingaben({ beitragMonat: 60 }), steuer, p);
-    expect(r.gehalt!.nettoMonat).toBeCloseTo(60 - r.mitarbeiter.abzuegeMonat, 1);
+  it('Aufteilen: Arbeitgeber 30 EUR steuerfrei, Mitarbeiter den Rest aus dem Netto', () => {
+    const w = weg(r, 'aufteilen');
+    expect(r.vorauswahl).toBe('aufteilen');
+    expect(w.moeglich).toBe(true);
+    expect(w.arbeitgeber.beitragMonat).toBeCloseTo(30, 6);
+    expect(w.arbeitgeber.abgabenMonat).toBe(0);
+    expect(w.arbeitgeber.nettoKostenMonat).toBeCloseTo(21, 6);
+    expect(w.mitarbeiter.eigenanteilMonat).toBeCloseTo(12.67, 6);
+    expect(w.mitarbeiter.vorteilMonat).toBeCloseTo(30, 6);
   });
 
+  it('Pauschal: 30 % plus Soli beim Arbeitgeber, beim Mitarbeiter nur Sozialabgaben', () => {
+    const w = weg(r, 'pauschal');
+    expect(w.arbeitgeber.pauschsteuerMonat).toBeCloseTo(42.67 * 0.3 * 1.055, 6);
+    expect(w.arbeitgeber.abgabenMonat).toBeGreaterThan(42.67 * 0.2);
+    // Arbeitnehmeranteil SV rund 21 % — keine Lohnsteuer
+    expect(w.mitarbeiter.abzuegeMonat).toBeGreaterThan(42.67 * 0.18);
+    expect(w.mitarbeiter.abzuegeMonat).toBeLessThan(42.67 * 0.24);
+    expect(w.arbeitgeber.nettoKostenMonat).toBeCloseTo(
+      (42.67 + w.arbeitgeber.abgabenMonat + w.arbeitgeber.pauschsteuerMonat) * 0.7, 6,
+    );
+  });
+
+  it('Pauschal mit Kirchensteuer im Nachweisverfahren', () => {
+    const mit = bkvModell(eingaben({ beitragMonat: 60 }), { ...steuer, kirchensteuerpflichtig: true }, p);
+    expect(weg(mit, 'pauschal').arbeitgeber.pauschsteuerMonat).toBeCloseTo(60 * 0.3 * (1 + 0.055 + 0.09), 6);
+  });
+
+  it('Barlohn: kostet so viel wie eine Gehaltserhoehung mit gleichem Netto', () => {
+    const w = weg(r, 'barlohn');
+    expect(w.mitarbeiter.abzuegeMonat).toBeGreaterThan(42.67 * 0.3);
+    expect(w.gehalt!.nettoMonat).toBeCloseTo(w.mitarbeiter.vorteilMonat, 1);
+    expect(w.ersparnisGegenGehaltMonat).toBeLessThan(0.05);
+  });
+
+  it('Pauschal bringt beim Mitarbeiter mehr an als Barlohn, kostet aber mehr', () => {
+    const pa = weg(r, 'pauschal');
+    const ba = weg(r, 'barlohn');
+    expect(pa.mitarbeiter.vorteilMonat).toBeGreaterThan(ba.mitarbeiter.vorteilMonat);
+    expect(pa.arbeitgeber.nettoKostenMonat).toBeGreaterThan(ba.arbeitgeber.nettoKostenMonat);
+  });
+
+  it('Mitarbeiter zahlt selbst: keine Kosten, kein Vorteil', () => {
+    const w = weg(r, 'arbeitnehmer');
+    expect(w.arbeitgeber.nettoKostenMonat).toBe(0);
+    expect(w.mitarbeiter.eigenanteilMonat).toBeCloseTo(42.67, 6);
+    expect(w.mitarbeiter.vorteilMonat).toBeCloseTo(0, 6);
+    expect(w.gehalt).toBeNull();
+  });
+
+  it('Freigrenze von anderen Sachbezuegen ausgeschoepft: Aufteilen geht nicht', () => {
+    const voll = bkvModell(eingaben({ beitragMonat: 20, weitereSachbezuegeMonat: 50 }), steuer, p);
+    expect(weg(voll, 'aufteilen').moeglich).toBe(false);
+    expect(['pauschal', 'barlohn']).toContain(voll.vorauswahl);
+  });
+});
+
+describe('Randfaelle', () => {
   it('privat versichert rechnet ohne Fehler', () => {
-    const r = bkvModell(eingaben({ jahresbrutto: 90_000, privatVersichert: true, pkvPraemieMonat: 600 }), steuer, p);
-    expect(r.gehalt).not.toBeNull();
-    expect(Number.isFinite(r.ersparnisGegenGehaltMonat)).toBe(true);
-    expect(r.ersparnisGegenGehaltMonat).toBeGreaterThan(0);
+    const r = bkvModell(eingaben({ jahresbrutto: 90_000, privatVersichert: true, pkvPraemieMonat: 600, beitragMonat: 60 }), steuer, p);
+    for (const w of r.wege) expect(Number.isFinite(w.arbeitgeber.nettoKostenMonat)).toBe(true);
+    expect(weg(r, 'sachbezug').gehalt).not.toBeNull();
   });
 
   it('ohne Beitrag gibt es keinen Vergleich', () => {
     const r = bkvModell(eingaben({ beitragMonat: 0 }), steuer, p);
-    expect(r.gehalt).toBeNull();
-    expect(r.ersparnisGegenGehaltMonat).toBe(0);
+    expect(weg(r, 'sachbezug').gehalt).toBeNull();
+    expect(weg(r, 'sachbezug').ersparnisGegenGehaltMonat).toBe(0);
   });
 });

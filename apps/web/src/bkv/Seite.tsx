@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Building2, CircleCheck, HeartPulse, ListChecks, Printer, Stethoscope, TriangleAlert, Wallet,
 } from 'lucide-react';
-import { bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT } from '@renten/engine';
+import {
+  bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, type BkvWeg, type BkvWegId,
+} from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung } from '../arbeitgeber/bausteine';
@@ -34,7 +36,14 @@ const BEISPIELE: { budget: number; beitrag: number; abMitarbeitern?: number }[] 
   { budget: 1500, beitrag: 42.67 },
 ];
 
+/** Kurzname fuer Tabellenkopf und Druckzeile */
+const SPALTE: Record<BkvWegId, string> = {
+  sachbezug: 'Sachbezug', aufteilen: 'Aufteilen', pauschal: 'Pauschal', barlohn: 'Barlohn', arbeitnehmer: 'Selbstzahler',
+};
+
 export function Seite() {
+  /** Vom Nutzer gewaehlter Weg — null: der Vorschlag der Rechnung */
+  const [wahl, setWahl] = useState<BkvWegId | null>(null);
   const [beitrag, setBeitrag] = useState(21.88);
   const [weitere, setWeitere] = useState(0);
   const [anzahl, setAnzahl] = useState(10);
@@ -61,11 +70,15 @@ export function Seite() {
     kinder: { hatKinder: false, kinderUnter25: 0 },
   }, steuerOpt, p), [beitrag, weitere, brutto, steuersatz, umlagen, privat, praemie, steuerOpt]);
 
-  const ag = r.arbeitgeber;
-  const ma = r.mitarbeiter;
-  const g = r.gehalt;
+  // Ein gewaehlter Weg, der durch neue Eingaben unmoeglich wird (Sachbezug
+  // ueber 50 EUR), faellt auf den Vorschlag zurueck — die Wahl bleibt
+  // gespeichert und greift wieder, sobald er moeglich ist.
+  const gewaehlt = r.wege.find((w) => w.id === wahl);
+  const aktiv: BkvWeg = gewaehlt?.moeglich ? gewaehlt : r.wege.find((w) => w.id === r.vorauswahl)!;
+  const ag = aktiv.arbeitgeber;
+  const ma = aktiv.mitarbeiter;
+  const g = aktiv.gehalt;
   const n = Math.max(1, Math.round(anzahl));
-  const wertNetto = ma.wertMonat - ma.abzuegeMonat;
   const summe = Math.max(0, beitrag) + Math.max(0, weitere);
   const skala = Math.max(SACHBEZUG_FREIGRENZE_MONAT * 1.2, summe);
   /** Gewaehlter Beispieltarif, der bei dieser Mitarbeiterzahl nicht abschliessbar ist */
@@ -87,7 +100,7 @@ export function Seite() {
 
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Beitrag {euroGenau(beitrag)} je Mitarbeiter und Monat{weitere > 0 ? `, weitere Sachbezüge ${euroGenau(weitere)}` : ''},
-          {' '}{n} Mitarbeiter. Unternehmenssteuer {prozent(steuersatz, 0)}{umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}.
+          {' '}{n} Mitarbeiter, Weg: {aktiv.titel}. Unternehmenssteuer {prozent(steuersatz, 0)}{umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}.
           Beispiel-Mitarbeiter für den Gehaltsvergleich: {euro(brutto)} brutto im Jahr,
           {' '}{privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'}, {bundesland},
           {' '}{verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Rechtsstand {p.jahr}.
@@ -174,25 +187,28 @@ export function Seite() {
 
           {/* --- Ergebnis ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
+            <p className="-mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 print:mb-0">
+              Gewählter Weg: <span className="text-indigo-700">{aktiv.titel}</span>
+            </p>
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
                 symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Kostet Sie netto" betrag={ag.nettoKostenMonat}
-                unten={`je Mitarbeiter und Monat, für ${euroGenau(ag.beitragMonat)} Beitrag`}
+                unten={kostenText(aktiv)}
               />
               <Kachel
                 symbol={<HeartPulse className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
-                titel="Kommt beim Mitarbeiter an" betrag={wertNetto} genau={r.inFreigrenze}
-                unten={r.inFreigrenze
+                titel="Vorteil beim Mitarbeiter" betrag={ma.vorteilMonat} genau={ma.abzuegeMonat < 0.005}
+                unten={ma.belastungMonat < 0.005
                   ? 'Versicherungsschutz, ohne Steuer und Abgaben'
-                  : `nach ${euro(ma.abzuegeMonat)} Steuer und Abgaben`}
+                  : `Schutz für ${euroGenau(aktiv.schutzMonat)}, davon trägt er ${euroGenau(ma.belastungMonat)}`}
               />
               <Kachel
                 symbol={<Wallet className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
-                titel="Gespart gegenüber Gehalt" betrag={r.ersparnisGegenGehaltMonat}
-                unten={!g ? 'kein Beitrag eingetragen'
-                  : !r.inFreigrenze ? 'über der Freigrenze kein Vorteil mehr'
-                  : `je Mitarbeiter und Monat — ${euro(r.ersparnisGegenGehaltMonat * 12 * n)} im Jahr bei ${n}`}
+                titel="Gespart gegenüber Gehalt" betrag={aktiv.ersparnisGegenGehaltMonat}
+                unten={!g ? 'kein Vergleich — Sie zahlen nichts dazu'
+                  : aktiv.ersparnisGegenGehaltMonat < 0.5 ? 'kostet so viel wie eine Gehaltserhöhung'
+                  : `je Mitarbeiter und Monat — ${euro(aktiv.ersparnisGegenGehaltMonat * 12 * n)} im Jahr bei ${n}`}
                 gross
               />
             </section>
@@ -229,23 +245,51 @@ export function Seite() {
                 {r.inFreigrenze
                   ? <>In der Freigrenze: keine Lohnsteuer, keine Sozialabgaben — weder für Sie noch für den Mitarbeiter.
                     {r.freigrenzeRestMonat > 0.005 && <> Noch {euroGenau(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
-                  : <>Über der Freigrenze ist der <strong>gesamte</strong> Betrag steuer- und beitragspflichtig — die
-                    bKV wird wie Gehalt behandelt und verliert ihren Vorteil.</>}
+                  : <>Als Sachbezug wäre der <strong>gesamte</strong> Betrag steuer- und beitragspflichtig, auch die
+                    anderen Sachbezüge. Unten stehen die Wege, die stattdessen bleiben.</>}
               </p>
             </section>
 
+            {/* --- Die Wege im Vergleich — anklickbar --------------------------- */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
+              <h2 className="text-sm font-black text-slate-900">Welcher Weg passt?</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
+                Je Mitarbeiter und Monat, für einen Tarif von {euroGenau(beitrag)}.<span className="print:hidden"> Antippen, um einen Weg zu wählen:</span>
+              </p>
+              <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-2 space-y-1.5 print:space-y-1">
+                {r.wege.map((w) => (
+                  <WegZeile key={w.id} weg={w} aktiv={w.id === aktiv.id} onWaehlen={() => setWahl(w.id)} />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+                „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
+                {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt' : 'die Freigrenze am besten nutzt'}.</>}
+              </p>
+            </section>
+
+            {r.hinweise.length > 0 && (
+              <section className="space-y-1.5">
+                {r.hinweise.map((h, i) => (
+                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-[11px] leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
+                    {h}
+                  </p>
+                ))}
+              </section>
+            )}
+
             {/* --- Vergleich mit einer Gehaltserhoehung ------------------------ */}
-            {g && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-                <h2 className="text-sm font-black text-slate-900">Und als Gehaltserhöhung?</h2>
+            {/* Im Druck beginnt hier Seite 2: Seite 1 traegt Kacheln, Check und Wege. */}
+            {g ? (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-before-page print:break-inside-avoid print:p-2 print:shadow-none">
+                <h2 className="text-sm font-black text-slate-900">{aktiv.titel} — und als Gehaltserhöhung?</h2>
                 <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
-                  Damit beim Mitarbeiter netto dasselbe ankommt, im Monat:
+                  Damit beim Mitarbeiter netto derselbe Vorteil ankommt, im Monat:
                 </p>
                 <table className="mt-2 w-full text-xs print:mt-1 print:text-[10px]">
                   <thead>
                     <tr className="text-left text-[11px] text-slate-500">
                       <th className="py-0.5 font-medium" />
-                      <th className="py-0.5 text-right font-bold text-emerald-700">bKV</th>
+                      <th className="py-0.5 text-right font-bold text-emerald-700">{SPALTE[aktiv.id]}</th>
                       <th className="py-0.5 pl-3 text-right font-bold text-slate-600">
                         <span className="sm:hidden">Gehalt</span><span className="hidden sm:inline">Gehaltserhöhung</span>
                       </th>
@@ -253,15 +297,21 @@ export function Seite() {
                   </thead>
                   <tbody className="text-slate-700">
                     <VergleichZeile
-                      text="Zahlung des Arbeitgebers"
+                      text={aktiv.id === 'aufteilen' ? 'Zahlung des Arbeitgebers (Ihr Anteil)' : 'Zahlung des Arbeitgebers'}
                       links={<>{euroGenau(ag.beitragMonat)}<Zusatz> Beitrag</Zusatz></>}
                       rechts={<>{euro(g.bruttoMonat)}<Zusatz> brutto</Zusatz></>}
                     />
                     <VergleichZeile
                       text={`+ Arbeitgeberanteil Sozialversicherung${umlagen > 0 ? ' und Umlagen' : ''}`}
-                      links={r.inFreigrenze ? <>0 €<Zusatz> frei</Zusatz></> : `+ ${euro(ag.abgabenMonat)}`}
+                      links={ag.abgabenMonat < 0.005 ? <>0 €<Zusatz> frei</Zusatz></> : `+ ${euro(ag.abgabenMonat)}`}
                       rechts={`+ ${euro(g.agAbgabenMonat)}`}
                     />
+                    {ag.pauschsteuerMonat > 0 && (
+                      <VergleichZeile
+                        text={`+ Pauschsteuer ${prozent(PAUSCHSTEUER_37B, 0)} mit Soli${kirchensteuer ? ' und Kirchensteuer' : ''}`}
+                        links={`+ ${euro(ag.pauschsteuerMonat)}`} rechts="—"
+                      />
+                    )}
                     <VergleichZeile
                       text="= Personalkosten vor Steuern" summe
                       links={euro(ag.kostenVorSteuerMonat)} rechts={euro(g.kostenVorSteuerMonat)}
@@ -274,43 +324,50 @@ export function Seite() {
                       text="= kostet Sie netto" summe hervor
                       links={euro(ag.nettoKostenMonat)} rechts={euro(g.nettoKostenMonat)}
                     />
+                    {ma.eigenanteilMonat > 0.005 && (
+                      <VergleichZeile
+                        text="Eigenanteil des Mitarbeiters, aus dem Netto"
+                        links={euroGenau(ma.eigenanteilMonat)} rechts="—"
+                      />
+                    )}
+                    {ma.abzuegeMonat > 0.005 && (
+                      <VergleichZeile
+                        text={aktiv.id === 'pauschal' ? 'Abzüge beim Mitarbeiter (bei Pauschal nur Sozialabgaben)' : 'Steuer und Abgaben des Mitarbeiters'}
+                        links={euro(ma.abzuegeMonat)}
+                        rechts={euro(g.svMonat + g.steuerMonat)}
+                      />
+                    )}
                     <VergleichZeile
-                      text="Beim Mitarbeiter kommt an" summe
-                      links={<>{euro(wertNetto)}<Zusatz> Schutz</Zusatz></>}
+                      text="Vorteil beim Mitarbeiter, netto" summe
+                      links={euro(ma.vorteilMonat)}
                       rechts={<>{euro(g.nettoMonat)}<Zusatz> netto</Zusatz></>}
                     />
                   </tbody>
                 </table>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
-                  {r.inFreigrenze
-                    ? <>Von {euro(g.bruttoMonat)} Gehaltserhöhung gehen beim Mitarbeiter {euro(g.svMonat)} Sozialabgaben
-                      und {euro(g.steuerMonat)} Steuer ab, bei Ihnen kommen {euro(g.agAbgabenMonat)} Arbeitgeberanteil
-                      dazu. Die bKV bringt denselben Wert für {euro(r.ersparnisGegenGehaltMonat)} weniger im Monat —
-                      bei {n} Mitarbeiter{n === 1 ? '' : 'n'} {euro(r.ersparnisGegenGehaltMonat * 12 * n)} im Jahr.</>
-                    : <>Über der Freigrenze wird die bKV wie Gehalt abgerechnet — beide Wege kosten dann gleich viel.
-                      Den Beitrag oder die anderen Sachbezüge so wählen, dass die Summe bei höchstens
-                      {' '}{euro(SACHBEZUG_FREIGRENZE_MONAT)} bleibt.</>}
+                  {herleitung(aktiv, g, n)}
                 </p>
                 <div className="mt-3 space-y-2 print:hidden">
-                  <Balken text="bKV, kostet Sie netto" betrag={ag.nettoKostenMonat}
+                  <Balken text={`${aktiv.titel}, kostet Sie netto`} betrag={ag.nettoKostenMonat}
                     max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-emerald-500" />
                   <Balken text="Gehaltserhöhung, kostet Sie netto" betrag={g.nettoKostenMonat}
                     max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-slate-400" />
                 </div>
               </section>
-            )}
-
-            {r.hinweise.length > 0 && (
-              <section className="space-y-1.5">
-                {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-[11px] leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
-                    {h}
-                  </p>
-                ))}
+            ) : aktiv.id === 'arbeitnehmer' && (
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-sm print:break-before-page print:p-2 print:text-[10px] print:shadow-none">
+                <h2 className="text-sm font-black text-slate-900">Mitarbeiter zahlt selbst</h2>
+                <p className="mt-1">
+                  Sie schließen den Gruppenvertrag ab, der Mitarbeiter zahlt {euroGenau(beitrag)} im Monat aus dem
+                  Netto. Für Sie entstehen keine Beiträge, nur etwas Aufwand in der Abrechnung. Sein Vorteil sind die
+                  Gruppenkonditionen — je nach Tarif ohne Gesundheitsprüfung und Wartezeiten. Als Benefit wirkt das
+                  schwächer: Der Mitarbeiter sieht vor allem die Kosten.
+                </p>
               </section>
             )}
 
-            <div className="space-y-4 print:break-before-page print:space-y-2">
+
+            <div className="space-y-4 print:space-y-2">
               <p className="hidden text-lg font-black text-slate-900 print:block">Vorteile und Umsetzung</p>
 
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
@@ -353,16 +410,12 @@ export function Seite() {
               <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:col-span-2 print:col-span-2 print:break-inside-avoid print:p-2 print:shadow-none">
                   <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <ListChecks className="h-4 w-4 text-indigo-600" aria-hidden /> Damit die Freigrenze hält
+                    <ListChecks className="h-4 w-4 text-indigo-600" aria-hidden /> Umsetzung: {aktiv.titel}
                   </h2>
                   <ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
-                    <li>• <strong>Monatlich zahlen</strong> — eine Jahreszahlung fließt in einem Monat zu und sprengt die Grenze</li>
-                    <li>• <strong>Zusätzlich zum Gehalt</strong> gewähren, nicht per Gehaltsumwandlung</li>
-                    <li>• Der Mitarbeiter kann nur den <strong>Versicherungsschutz</strong> verlangen, kein Geld</li>
-                    <li>• Die 50 € mit <strong>anderen Sachbezügen</strong> abstimmen (Gutschein-, Tankkarte)</li>
+                    {UMSETZUNG[aktiv.id].map((punkt, i) => <li key={i}>• {punkt}</li>)}
                     <li>• Gruppenvertrag: <strong>Mindestteilnehmerzahl</strong> und Annahmeregeln im Angebot prüfen</li>
                     <li>• Allen Mitarbeitern oder klar abgegrenzten Gruppen anbieten (<strong>Gleichbehandlung</strong>)</li>
-                    <li>• In der <strong>Lohnabrechnung</strong> als Sachbezug führen</li>
                   </ul>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
@@ -370,13 +423,13 @@ export function Seite() {
                     Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                   </h2>
                   <dl className="mt-1 space-y-0.5 text-xs text-slate-700">
-                    <div className="flex justify-between gap-2"><dt>Beiträge</dt><dd className="tabular-nums">{euro(ag.beitragMonat * 12 * n)}</dd></div>
+                    <div className="flex justify-between gap-2"><dt>Beiträge{aktiv.id === 'aufteilen' ? ' (Ihr Anteil)' : ''}</dt><dd className="tabular-nums">{euro(ag.beitragMonat * 12 * n)}</dd></div>
                     <div className="flex justify-between gap-2"><dt>Kosten netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
                     {g && (
                       <div className="flex justify-between gap-2"><dt>als Gehalt netto</dt><dd className="tabular-nums">{euro(g.nettoKostenMonat * 12 * n)}</dd></div>
                     )}
                     <div className="flex justify-between gap-2 border-t border-slate-200 pt-0.5">
-                      <dt>gespart</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.ersparnisGegenGehaltMonat * 12 * n)}</dd>
+                      <dt>gespart</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(aktiv.ersparnisGegenGehaltMonat * 12 * n)}</dd>
                     </div>
                   </dl>
                 </div>
@@ -386,7 +439,7 @@ export function Seite() {
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Beiträge und Leistungen
                 hängen vom Tarif ab; die Beispielbeiträge sind Richtwerte, kein Angebot. Annahme- und
                 Gesundheitsregeln legt der Versicherer fest. Der Gehaltsvergleich gilt für den eingetragenen
-                Beispiel-Mitarbeiter.
+                Beispiel-Mitarbeiter. Pauschalversteuerung und Aufteilung vorab mit dem Steuerberater abstimmen.
               </p>
             </div>
 
@@ -412,3 +465,118 @@ export function Seite() {
     </div>
   );
 }
+
+/** Eine Zeile im Wege-Vergleich: Radio-Knopf mit den drei Zahlen, die zaehlen. */
+function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; onWaehlen: () => void }) {
+  return (
+    <button
+      type="button" role="radio" aria-checked={aktiv} disabled={!w.moeglich} onClick={onWaehlen}
+      // druck-kopf: Knoepfe verschwinden sonst im Druck — hier traegt der
+      // Knopf den Vergleich selbst.
+      className={`druck-kopf flex w-full flex-col gap-1.5 rounded-xl border px-3 py-2 text-left sm:flex-row sm:items-center sm:gap-3 print:flex-row print:items-center print:gap-2 print:px-2 print:py-1 ${
+        !w.moeglich ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+        : aktiv ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
+        : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'
+      }`}
+    >
+      <span className="flex min-w-0 flex-1 items-start gap-2">
+        <span aria-hidden className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 ${
+          aktiv ? 'border-indigo-600 bg-indigo-600 shadow-[inset_0_0_0_2px_white]' : 'border-slate-300 bg-white'
+        }`} />
+        <span className="min-w-0">
+          <span className={`block text-xs font-bold ${w.moeglich ? 'text-slate-900' : ''}`}>{w.titel}</span>
+          <span className="block text-[11px] leading-snug text-slate-500 print:text-[9px]">{w.kurz}</span>
+          {w.grund && (
+            <span className={`block text-[11px] leading-snug print:text-[9px] ${
+              w.moeglich ? 'text-amber-700' : w.id === 'sachbezug' ? 'text-rose-600' : 'text-slate-500'
+            }`}>
+              {w.grund}
+            </span>
+          )}
+        </span>
+      </span>
+      {w.moeglich && (
+        <span className="grid shrink-0 grid-cols-3 gap-2 pl-5 text-right sm:w-64 sm:pl-0 print:w-56 print:pl-0">
+          <Zahl titel="Sie netto" wert={euro(w.arbeitgeber.nettoKostenMonat)} />
+          <Zahl titel="MA trägt" wert={euro(w.mitarbeiter.belastungMonat)} />
+          <Zahl titel="Vorteil MA" wert={euro(w.mitarbeiter.vorteilMonat)} hervor />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function Zahl({ titel, wert, hervor }: { titel: string; wert: string; hervor?: boolean }) {
+  return (
+    <span className="block">
+      <span className="block text-[10px] leading-tight text-slate-500">{titel}</span>
+      <span className={`block text-xs tabular-nums ${hervor ? 'font-black text-emerald-700' : 'font-bold text-slate-800'}`}>{wert}</span>
+    </span>
+  );
+}
+
+function kostenText(w: BkvWeg): string {
+  const a = w.arbeitgeber;
+  switch (w.id) {
+    case 'sachbezug': return `je Mitarbeiter und Monat, für ${euroGenau(a.beitragMonat)} Beitrag`;
+    case 'aufteilen': return `für Ihren Anteil von ${euroGenau(a.beitragMonat)}, steuerfrei`;
+    case 'pauschal': return `inkl. ${euro(a.pauschsteuerMonat)} Pauschsteuer und ${euro(a.abgabenMonat)} Sozialabgaben`;
+    case 'barlohn': return `inkl. ${euro(a.abgabenMonat)} Arbeitgeberanteil Sozialabgaben`;
+    case 'arbeitnehmer': return 'Sie bieten nur den Gruppenvertrag an';
+  }
+}
+
+function herleitung(w: BkvWeg, g: NonNullable<BkvWeg['gehalt']>, n: number): ReactNode {
+  const jahr = `bei ${n} Mitarbeiter${n === 1 ? '' : 'n'} ${euro(w.ersparnisGegenGehaltMonat * 12 * n)} im Jahr`;
+  const gehaltSatz = <>Von {euro(g.bruttoMonat)} Gehaltserhöhung gehen beim Mitarbeiter {euro(g.svMonat)} Sozialabgaben
+    und {euro(g.steuerMonat)} Steuer ab, bei Ihnen kommen {euro(g.agAbgabenMonat)} Arbeitgeberanteil dazu.</>;
+  switch (w.id) {
+    case 'sachbezug':
+      return <>{gehaltSatz} Die bKV bringt denselben Vorteil für {euro(w.ersparnisGegenGehaltMonat)} weniger im Monat — {jahr}.</>;
+    case 'aufteilen':
+      return <>Ihr Anteil bleibt in der Freigrenze und damit frei von Steuer und Abgaben; den Rest von
+        {' '}{euroGenau(w.mitarbeiter.eigenanteilMonat)} zahlt der Mitarbeiter aus dem Netto. {gehaltSatz} Gegenüber
+        der Gehaltserhöhung sparen Sie {euro(w.ersparnisGegenGehaltMonat)} im Monat — {jahr}.</>;
+    case 'pauschal':
+      return <>Sie übernehmen die Lohnsteuer pauschal, der Mitarbeiter zahlt nur seine Sozialabgaben. Teurer als
+        die Freigrenze, aber der ganze Tarif ist abgedeckt und andere Sachbezüge bleiben frei. {gehaltSatz}
+        {w.ersparnisGegenGehaltMonat >= 0.5 ? <> Ersparnis {euro(w.ersparnisGegenGehaltMonat)} im Monat — {jahr}.</> : null}</>;
+    case 'barlohn':
+      return <>Als Barlohn ist der Beitrag Gehalt — beide Wege kosten gleich viel. Der Vorteil gegenüber einer
+        Gehaltserhöhung liegt nur in den Gruppenkonditionen des Tarifs, nicht in Steuer und Abgaben.</>;
+    case 'arbeitnehmer':
+      return null;
+  }
+}
+
+/** Was je Weg in der Umsetzung zu beachten ist — vor den allgemeinen Punkten. */
+const UMSETZUNG: Record<BkvWegId, ReactNode[]> = {
+  sachbezug: [
+    <><strong>Monatlich zahlen</strong> — eine Jahreszahlung fließt in einem Monat zu und sprengt die Grenze</>,
+    <><strong>Zusätzlich zum Gehalt</strong> gewähren, nicht per Gehaltsumwandlung</>,
+    <>Der Mitarbeiter kann nur den <strong>Versicherungsschutz</strong> verlangen, kein Geld</>,
+    <>Die 50 € mit <strong>anderen Sachbezügen</strong> abstimmen (Gutschein-, Tankkarte)</>,
+    <>In der <strong>Lohnabrechnung</strong> als steuerfreien Sachbezug führen</>,
+  ],
+  aufteilen: [
+    <>Ihr Anteil <strong>monatlich</strong> und <strong>zusätzlich zum Gehalt</strong>, nur als Versicherungsschutz</>,
+    <>Der <strong>Eigenanteil</strong> wird vom Nettolohn einbehalten — nicht per Gehaltsumwandlung</>,
+    <>Ihr Anteil und andere Sachbezüge zusammen höchstens <strong>50 €</strong></>,
+    <>Mit Versicherer und Lohnbuchhaltung klären, dass sie die <strong>Aufteilung</strong> abbilden</>,
+  ],
+  pauschal: [
+    <><strong>§ 37b Abs. 2 EStG:</strong> 30 % Pauschsteuer, dazu Soli und ggf. Kirchensteuer, in der Lohnsteuer-Anmeldung</>,
+    <>Das Wahlrecht gilt <strong>einheitlich</strong> für alle Sachzuwendungen an Arbeitnehmer im Wirtschaftsjahr</>,
+    <>Sozialversicherung bleibt <strong>pflichtig</strong> — beide Anteile werden abgerechnet</>,
+    <>Zusätzlich zum Gehalt; höchstens 10.000 € je Mitarbeiter und Jahr</>,
+  ],
+  barlohn: [
+    <>Als <strong>Zuschuss mit Geldanspruch</strong> gestalten, dann berührt er die 50-€-Grenze nicht</>,
+    <>In der Lohnabrechnung wie Gehalt: Lohnsteuer und Sozialabgaben</>,
+    <>Als Sachlohn über 50 € wäre es genauso teuer — und die anderen Sachbezüge fielen mit aus der Grenze</>,
+  ],
+  arbeitnehmer: [
+    <>Der Mitarbeiter zahlt aus dem <strong>Netto</strong>, Sie leiten den Beitrag weiter oder er zahlt direkt</>,
+    <>Kein Benefit im steuerlichen Sinn — ein Zuschuss lässt sich später ergänzen</>,
+  ],
+};
