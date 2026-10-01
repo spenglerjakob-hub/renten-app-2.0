@@ -70,11 +70,11 @@ export function Seite() {
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
       <Kopf />
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
           Betriebsrente im Matching-Modell
         </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
+        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
           Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie als Arbeitgeber legen einen eigenen
           Beitrag in eine Unterstützungskasse dazu. Beide zahlen deutlich weniger, als in der
           Altersvorsorge ankommt — und der Mitarbeiter hat einen guten Grund zu bleiben.

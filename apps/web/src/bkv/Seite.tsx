@@ -88,11 +88,11 @@ export function Seite() {
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
       <Kopf />
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
           Betriebliche Krankenversicherung: Gesundheit als Benefit
         </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
+        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
           Sie zahlen für Ihre Mitarbeiter eine private Zusatzversicherung — für Zahnersatz, Brille, Vorsorge oder
           Facharzttermine. Bis {euro(SACHBEZUG_FREIGRENZE_MONAT)} im Monat ist das ein steuer- und abgabenfreier
           Sachbezug: Beim Mitarbeiter kommt jeder Euro an, und Sie zahlen keine Lohnnebenkosten darauf.

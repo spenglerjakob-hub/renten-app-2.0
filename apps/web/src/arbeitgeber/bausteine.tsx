@@ -239,7 +239,7 @@ export function GehaltVergleich(props: {
 export function Kopf() {
   return (
     <header className="bg-slate-900 text-white print:bg-white print:text-slate-900">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6 print:px-0 print:py-1">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4 sm:px-6 print:px-0 print:py-1">
         <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
         <div>
           <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
