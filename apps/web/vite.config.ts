@@ -26,6 +26,7 @@ export default defineConfig({
         arbeitgeber: resolve(hier, 'arbeitgeber.html'),
         zuschuss: resolve(hier, 'zuschussmodell.html'),
         festbetrag: resolve(hier, 'festbetrag.html'),
+        bkv: resolve(hier, 'bkv.html'),
         impressum: resolve(hier, 'impressum.html'),
         datenschutz: resolve(hier, 'datenschutz.html'),
       },

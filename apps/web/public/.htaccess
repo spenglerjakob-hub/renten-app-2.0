@@ -43,6 +43,8 @@ DirectoryIndex index.html
   RewriteRule ^zuschussmodell/?$ /zuschussmodell.html [NC,L]
   # Und das Festbetragsmodell.
   RewriteRule ^festbetrag/?$ /festbetrag.html [NC,L]
+  # Und die betriebliche Krankenversicherung.
+  RewriteRule ^bkv/?$ /bkv.html [NC,L]
 
   # --- Impressum und Datenschutz ------------------------------------------
   # Pflichtseiten, von jeder Seite aus verlinkt. Ebenfalls VOR dem Auffangmuster.

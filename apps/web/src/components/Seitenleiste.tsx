@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, LineChart, Scale, X,
+  Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, HeartPulse, LineChart, Scale, X,
 } from 'lucide-react';
 import { RechtsLinks } from './RechtsLinks';
 
@@ -56,6 +56,10 @@ const ARBEITGEBER: Seite[] = [
   {
     href: '/arbeitgeber', titel: 'Matching-Modell', text: 'Entgeltumwandlung + Unterstützungskasse',
     symbol: <Building2 className="h-4 w-4" aria-hidden />,
+  },
+  {
+    href: '/bkv', titel: 'Betriebliche Krankenversicherung', text: 'Gesundheit als steuerfreier Sachbezug',
+    symbol: <HeartPulse className="h-4 w-4" aria-hidden />,
   },
 ];
 

@@ -106,6 +106,9 @@ export {
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
 } from './analyse/matching-modell.js';
 export {
+  bkvModell, SACHBEZUG_FREIGRENZE_MONAT, type BkvEingaben, type BkvErgebnis,
+} from './analyse/bkv.js';
+export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,
   type FoerderKontext, type FoerderBefund,
 } from './analyse/foerdercheck.js';
