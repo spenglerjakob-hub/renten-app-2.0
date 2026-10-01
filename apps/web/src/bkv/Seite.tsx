@@ -3,7 +3,7 @@ import {
   Building2, CircleCheck, HeartPulse, ListChecks, Printer, Stethoscope, TriangleAlert, Wallet,
 } from 'lucide-react';
 import { bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT } from '@renten/engine';
-import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung } from '../arbeitgeber/bausteine';
 
@@ -14,23 +14,28 @@ import { Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung
  * beitragsfrei. Die Seite zeigt, was sie den Arbeitgeber kostet, warum sie
  * guenstiger ist als dieselbe Leistung als Gehaltserhoehung — und wo die
  * Freigrenze kippt. Die Beitraege haengen vom Tarif ab; die Knoepfe sind
- * Beispiele, das echte Angebot wird eingetragen.
+ * Beispielbeitraege eines Budgettarifs, das echte Angebot wird eingetragen.
  *
  * Eigenes Bundle, ohne Anmeldung, nichts wird gespeichert.
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });
 
-/** Beispiele fuer Budgettarife: Jahresbudget und ungefaehrer Monatsbeitrag. Kein Angebot. */
-const BEISPIELE = [
-  { budget: 300, beitrag: 13 },
-  { budget: 600, beitrag: 22 },
-  { budget: 900, beitrag: 31 },
-  { budget: 1200, beitrag: 40 },
+/**
+ * Beispiel: AXA-Budgettarif, Beitrag je Mitarbeiter und Monat (Stand 10/2026).
+ * Kein Angebot — Beitraege aendern sich, das echte Angebot wird eingetragen.
+ * Das kleinste Budget nimmt der Versicherer erst ab 10 Mitarbeitern an.
+ */
+const BEISPIELE: { budget: number; beitrag: number; abMitarbeitern?: number }[] = [
+  { budget: 300, beitrag: 11.92, abMitarbeitern: 10 },
+  { budget: 600, beitrag: 21.88 },
+  { budget: 900, beitrag: 28.72 },
+  { budget: 1200, beitrag: 36.33 },
+  { budget: 1500, beitrag: 42.67 },
 ];
 
 export function Seite() {
-  const [beitrag, setBeitrag] = useState(30);
+  const [beitrag, setBeitrag] = useState(21.88);
   const [weitere, setWeitere] = useState(0);
   const [anzahl, setAnzahl] = useState(10);
   const [steuersatz, setSteuersatz] = useState(0.3);
@@ -63,6 +68,8 @@ export function Seite() {
   const wertNetto = ma.wertMonat - ma.abzuegeMonat;
   const summe = Math.max(0, beitrag) + Math.max(0, weitere);
   const skala = Math.max(SACHBEZUG_FREIGRENZE_MONAT * 1.2, summe);
+  /** Gewaehlter Beispieltarif, der bei dieser Mitarbeiterzahl nicht abschliessbar ist */
+  const zuKlein = BEISPIELE.find((b) => b.abMitarbeitern && b.beitrag === beitrag && n < b.abMitarbeitern);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
@@ -79,7 +86,7 @@ export function Seite() {
         </p>
 
         <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
-          Annahmen: Beitrag {euro(beitrag)} je Mitarbeiter und Monat{weitere > 0 ? `, weitere Sachbezüge ${euro(weitere)}` : ''},
+          Annahmen: Beitrag {euroGenau(beitrag)} je Mitarbeiter und Monat{weitere > 0 ? `, weitere Sachbezüge ${euroGenau(weitere)}` : ''},
           {' '}{n} Mitarbeiter. Unternehmenssteuer {prozent(steuersatz, 0)}{umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}.
           Beispiel-Mitarbeiter für den Gehaltsvergleich: {euro(brutto)} brutto im Jahr,
           {' '}{privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'}, {bundesland},
@@ -90,29 +97,45 @@ export function Seite() {
           {/* --- Eingaben ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-4 print:hidden">
             <Kasten titel="bKV-Angebot">
+              <ZahlFeld label="Mitarbeiter mit bKV" wert={anzahl} onChange={setAnzahl} min={1} schritt={1} stufen />
               <ZahlFeld
                 label="Beitrag je Mitarbeiter und Monat" wert={beitrag} onChange={setBeitrag} einheit="€" schritt={1} min={0} gross
                 hilfe="Laut Angebot des Versicherers. Monatlich zahlen — eine Jahreszahlung sprengt die Freigrenze."
               />
               <div>
-                <p className="text-[11px] text-slate-500">Beispiele für Budgettarife (Richtwerte, kein Angebot):</p>
+                <p className="text-[11px] text-slate-500">
+                  Beispiel: AXA-Budgettarif, Jahresbudget je Mitarbeiter (Beiträge Stand 10/2026, kein Angebot):
+                </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {BEISPIELE.map((b) => (
-                    <button key={b.budget} type="button" onClick={() => setBeitrag(b.beitrag)}
-                      className={`rounded-md border px-2 py-1.5 text-left text-[11px] leading-tight hover:bg-slate-50 ${
-                        beitrag === b.beitrag ? 'border-indigo-400 bg-indigo-50 text-indigo-900' : 'border-slate-300 bg-white text-slate-700'
-                      }`}>
-                      <span className="block font-bold">{euro(b.budget)} Budget</span>
-                      <span className="block text-slate-500">≈ {euro(b.beitrag)} / Monat</span>
-                    </button>
-                  ))}
+                  {BEISPIELE.map((b) => {
+                    const gesperrt = b.abMitarbeitern !== undefined && n < b.abMitarbeitern;
+                    return (
+                      <button key={b.budget} type="button" onClick={() => setBeitrag(b.beitrag)} disabled={gesperrt}
+                        title={gesperrt ? `Erst ab ${b.abMitarbeitern} Mitarbeitern abschließbar` : undefined}
+                        className={`rounded-md border px-2 py-1.5 text-left text-[11px] leading-tight ${
+                          gesperrt ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                          : beitrag === b.beitrag ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}>
+                        <span className="block font-bold">Budget {euro(b.budget)}</span>
+                        <span className={`block ${gesperrt ? '' : 'text-slate-500'}`}>{euroGenau(b.beitrag)} / Monat</span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {zuKlein ? (
+                  <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+                    Das Budget {euro(zuKlein.budget)} gibt es erst ab {zuKlein.abMitarbeitern} Mitarbeitern — bei {n} bitte
+                    ein größeres Budget wählen.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-slate-500">Budget 300 € erst ab 10 Mitarbeitern abschließbar.</p>
+                )}
               </div>
               <ZahlFeld
                 label="Weitere Sachbezüge im Monat" wert={weitere} onChange={setWeitere} einheit="€" schritt={5} min={0}
                 hilfe="Gutschein-, Tank- oder Essenskarte über Sachbezug. Die 50 € gelten für alle zusammen."
               />
-              <ZahlFeld label="Mitarbeiter mit bKV" wert={anzahl} onChange={setAnzahl} min={1} schritt={1} stufen />
             </Kasten>
 
             <Kasten titel="Unternehmen">
@@ -155,11 +178,11 @@ export function Seite() {
               <Kachel
                 symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Kostet Sie netto" betrag={ag.nettoKostenMonat}
-                unten={`je Mitarbeiter und Monat, für ${euro(ag.beitragMonat)} Beitrag`}
+                unten={`je Mitarbeiter und Monat, für ${euroGenau(ag.beitragMonat)} Beitrag`}
               />
               <Kachel
                 symbol={<HeartPulse className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
-                titel="Kommt beim Mitarbeiter an" betrag={wertNetto}
+                titel="Kommt beim Mitarbeiter an" betrag={wertNetto} genau={r.inFreigrenze}
                 unten={r.inFreigrenze
                   ? 'Versicherungsschutz, ohne Steuer und Abgaben'
                   : `nach ${euro(ma.abzuegeMonat)} Steuer und Abgaben`}
@@ -182,7 +205,7 @@ export function Seite() {
                 {r.inFreigrenze
                   ? <CircleCheck className="h-4 w-4 text-emerald-600" aria-hidden />
                   : <TriangleAlert className="h-4 w-4 text-rose-600" aria-hidden />}
-                Sachbezug-Check: {euro(summe)} von {euro(SACHBEZUG_FREIGRENZE_MONAT)}
+                Sachbezug-Check: {euroGenau(summe)} von {euro(SACHBEZUG_FREIGRENZE_MONAT)}
               </h2>
               <div className="relative mt-2 h-4 overflow-hidden rounded-full bg-slate-100 print:[print-color-adjust:exact]">
                 <div
@@ -199,13 +222,13 @@ export function Seite() {
                 />
               </div>
               <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500">
-                <span>bKV {euro(beitrag)}{weitere > 0 ? ` + weitere Sachbezüge ${euro(weitere)}` : ''}</span>
+                <span>bKV {euroGenau(beitrag)}{weitere > 0 ? ` + weitere Sachbezüge ${euroGenau(weitere)}` : ''}</span>
                 <span>Freigrenze {euro(SACHBEZUG_FREIGRENZE_MONAT)} (§ 8 Abs. 2 S. 11 EStG)</span>
               </div>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
                 {r.inFreigrenze
                   ? <>In der Freigrenze: keine Lohnsteuer, keine Sozialabgaben — weder für Sie noch für den Mitarbeiter.
-                    {r.freigrenzeRestMonat > 0.005 && <> Noch {euro(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
+                    {r.freigrenzeRestMonat > 0.005 && <> Noch {euroGenau(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
                   : <>Über der Freigrenze ist der <strong>gesamte</strong> Betrag steuer- und beitragspflichtig — die
                     bKV wird wie Gehalt behandelt und verliert ihren Vorteil.</>}
               </p>
@@ -231,7 +254,7 @@ export function Seite() {
                   <tbody className="text-slate-700">
                     <VergleichZeile
                       text="Zahlung des Arbeitgebers"
-                      links={<>{euro(ag.beitragMonat)}<Zusatz> Beitrag</Zusatz></>}
+                      links={<>{euroGenau(ag.beitragMonat)}<Zusatz> Beitrag</Zusatz></>}
                       rechts={<>{euro(g.bruttoMonat)}<Zusatz> brutto</Zusatz></>}
                     />
                     <VergleichZeile

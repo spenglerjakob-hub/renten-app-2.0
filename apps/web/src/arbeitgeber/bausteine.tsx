@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Info } from 'lucide-react';
 import type { GehaltsVergleich } from '@renten/engine';
 import { Logo } from '../components/Logo';
-import { euro, prozent } from '../components/Feld';
+import { euro, euroGenau, prozent } from '../components/Feld';
 
 /**
  * Bausteine der beiden Arbeitgeber-Seiten (Matching-Modell und
@@ -89,12 +89,16 @@ export function WechselSpalte({ titel, farbe, children }: { titel: string; farbe
   );
 }
 
-export function Kachel(props: { symbol: ReactNode; farbe: string; titel: string; betrag: number; unten: string; gross?: boolean }) {
+export function Kachel(props: {
+  symbol: ReactNode; farbe: string; titel: string; betrag: number; unten: string; gross?: boolean;
+  /** Mit Cent — fuer Tarifbeitraege wie 21,88 EUR, die sonst gerundet neben dem genauen Wert stuenden */
+  genau?: boolean;
+}) {
   return (
     <div className={`rounded-2xl border-2 p-4 print:p-2 ${props.farbe}`}>
       <div className="flex items-center gap-1.5 text-xs font-bold">{props.symbol}{props.titel}</div>
       <p className={`mt-1 font-black tabular-nums ${props.gross ? 'text-3xl print:text-2xl' : 'text-2xl print:text-xl'}`}>
-        {euro(props.betrag)}
+        {props.genau ? euroGenau(props.betrag) : euro(props.betrag)}
       </p>
       <p className="text-[11px] opacity-80">{props.unten}</p>
     </div>

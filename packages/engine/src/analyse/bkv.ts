@@ -80,6 +80,11 @@ export interface BkvErgebnis {
 }
 
 const euro = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
+/** Mit Cent, wenn es Cent gibt — Tarifbeitraege wie 21,88 EUR. */
+const euroCent = (n: number) => {
+  const w = Math.round(n * 100) / 100;
+  return `${w.toLocaleString('de-DE', { minimumFractionDigits: Number.isInteger(w) ? 0 : 2, maximumFractionDigits: 2 })} €`;
+};
 
 function unterGrenze(brutto: number, betrag: number, bbg: number): number {
   const vorher = Math.min(Math.max(0, brutto), bbg);
@@ -157,7 +162,7 @@ export function bkvModell(e: BkvEingaben, steuerOpt: MatchingSteuer, p: LegalPar
   // --- Hinweise --------------------------------------------------------------
   if (!inFreigrenze) {
     hinweise.push(
-      `bKV und andere Sachbezüge liegen zusammen bei ${euro(summe)} im Monat — über der Freigrenze von `
+      `bKV und andere Sachbezüge liegen zusammen bei ${euroCent(summe)} im Monat — über der Freigrenze von `
       + `${euro(SACHBEZUG_FREIGRENZE_MONAT)}. Weil es eine Freigrenze ist und kein Freibetrag, wird damit der `
       + 'GESAMTE Betrag steuer- und beitragspflichtig, nicht nur der Teil darüber. Abhilfe: Beitrag oder andere '
       + 'Sachbezüge senken — oder mit dem Steuerberater eine Pauschalversteuerung prüfen.',
@@ -165,7 +170,7 @@ export function bkvModell(e: BkvEingaben, steuerOpt: MatchingSteuer, p: LegalPar
   } else if (weitere > 0) {
     hinweise.push(
       `Die Freigrenze von ${euro(SACHBEZUG_FREIGRENZE_MONAT)} gilt für alle Sachbezüge zusammen. Mit den anderen `
-      + `Sachbezügen bleiben noch ${euro(SACHBEZUG_FREIGRENZE_MONAT - summe)} frei.`,
+      + `Sachbezügen bleiben noch ${euroCent(SACHBEZUG_FREIGRENZE_MONAT - summe)} frei.`,
     );
   }
   hinweise.push(
