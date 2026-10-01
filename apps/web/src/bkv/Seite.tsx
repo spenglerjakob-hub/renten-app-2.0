@@ -98,7 +98,7 @@ export function Seite() {
           Sachbezug: Beim Mitarbeiter kommt jeder Euro an, und Sie zahlen keine Lohnnebenkosten darauf.
         </p>
 
-        <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
+        <p className="mt-2 hidden text-xs print:text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Beitrag {euroGenau(beitrag)} je Mitarbeiter und Monat{weitere > 0 ? `, weitere Sachbezüge ${euroGenau(weitere)}` : ''},
           {' '}{n} Mitarbeiter, Weg: {aktiv.titel}. Unternehmenssteuer {prozent(steuersatz, 0)}{umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}.
           Beispiel-Mitarbeiter für den Gehaltsvergleich: {euro(brutto)} brutto im Jahr,
@@ -116,7 +116,7 @@ export function Seite() {
                 hilfe="Laut Angebot des Versicherers. Monatlich zahlen — eine Jahreszahlung sprengt die Freigrenze."
               />
               <div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs print:text-[11px] text-slate-500">
                   Beispiel: AXA-Budgettarif, Jahresbudget je Mitarbeiter (Beiträge Stand 10/2026, kein Angebot):
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -125,7 +125,7 @@ export function Seite() {
                     return (
                       <button key={b.budget} type="button" onClick={() => setBeitrag(b.beitrag)} disabled={gesperrt}
                         title={gesperrt ? `Erst ab ${b.abMitarbeitern} Mitarbeitern abschließbar` : undefined}
-                        className={`rounded-md border px-2 py-1.5 text-left text-[11px] leading-tight ${
+                        className={`rounded-md border px-2 py-1.5 text-left text-xs print:text-[11px] leading-tight ${
                           gesperrt ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
                           : beitrag === b.beitrag ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -137,12 +137,12 @@ export function Seite() {
                   })}
                 </div>
                 {zuKlein ? (
-                  <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+                  <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs print:text-[11px] leading-snug text-amber-900">
                     Das Budget {euro(zuKlein.budget)} gibt es erst ab {zuKlein.abMitarbeitern} Mitarbeitern — bei {n} bitte
                     ein größeres Budget wählen.
                   </p>
                 ) : (
-                  <p className="mt-1 text-[11px] text-slate-500">Budget 300 € erst ab 10 Mitarbeitern abschließbar.</p>
+                  <p className="mt-1 text-xs print:text-[11px] text-slate-500">Budget 300 € erst ab 10 Mitarbeitern abschließbar.</p>
                 )}
               </div>
               <ZahlFeld
@@ -164,7 +164,7 @@ export function Seite() {
             </Kasten>
 
             <Kasten titel="Beispiel-Mitarbeiter">
-              <p className="-mt-1 text-[11px] leading-snug text-slate-500">
+              <p className="-mt-1 text-xs print:text-[11px] leading-snug text-slate-500">
                 Nur für den Vergleich mit einer Gehaltserhöhung — die bKV selbst kostet bei jedem Gehalt gleich viel.
               </p>
               <ZahlFeld label="Bruttogehalt im Jahr" wert={brutto} onChange={setBrutto} einheit="€" schritt={1000} />
@@ -187,7 +187,7 @@ export function Seite() {
 
           {/* --- Ergebnis ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
-            <p className="-mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 print:mb-0">
+            <p className="-mb-2 text-xs print:text-[11px] font-bold uppercase tracking-wide text-slate-500 print:mb-0">
               Gewählter Weg: <span className="text-indigo-700">{aktiv.titel}</span>
             </p>
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
@@ -237,11 +237,11 @@ export function Seite() {
                   style={{ left: `${(SACHBEZUG_FREIGRENZE_MONAT / skala) * 100}%` }}
                 />
               </div>
-              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500">
+              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-xs print:text-[11px] text-slate-500">
                 <span>bKV {euroGenau(beitrag)}{weitere > 0 ? ` + weitere Sachbezüge ${euroGenau(weitere)}` : ''}</span>
                 <span>Freigrenze {euro(SACHBEZUG_FREIGRENZE_MONAT)} (§ 8 Abs. 2 S. 11 EStG)</span>
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+              <p className="mt-1.5 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
                 {r.inFreigrenze
                   ? <>In der Freigrenze: keine Lohnsteuer, keine Sozialabgaben — weder für Sie noch für den Mitarbeiter.
                     {r.freigrenzeRestMonat > 0.005 && <> Noch {euroGenau(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
@@ -253,7 +253,7 @@ export function Seite() {
             {/* --- Die Wege im Vergleich — anklickbar --------------------------- */}
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
               <h2 className="text-sm font-black text-slate-900">Welcher Weg passt?</h2>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
+              <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
                 Je Mitarbeiter und Monat, für einen Tarif von {euroGenau(beitrag)}.<span className="print:hidden"> Antippen, um einen Weg zu wählen:</span>
               </p>
               <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-2 space-y-1.5 print:space-y-1">
@@ -261,7 +261,7 @@ export function Seite() {
                   <WegZeile key={w.id} weg={w} aktiv={w.id === aktiv.id} onWaehlen={() => setWahl(w.id)} />
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
                 „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
                 {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt' : 'die Freigrenze am besten nutzt'}.</>}
               </p>
@@ -270,7 +270,7 @@ export function Seite() {
             {r.hinweise.length > 0 && (
               <section className="space-y-1.5">
                 {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-[11px] leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
+                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
                     {h}
                   </p>
                 ))}
@@ -282,12 +282,12 @@ export function Seite() {
             {g ? (
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-before-page print:break-inside-avoid print:p-2 print:shadow-none">
                 <h2 className="text-sm font-black text-slate-900">{aktiv.titel} — und als Gehaltserhöhung?</h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
+                <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
                   Damit beim Mitarbeiter netto derselbe Vorteil ankommt, im Monat:
                 </p>
-                <table className="mt-2 w-full text-xs print:mt-1 print:text-[10px]">
+                <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
                   <thead>
-                    <tr className="text-left text-[11px] text-slate-500">
+                    <tr className="text-left text-xs print:text-[11px] text-slate-500">
                       <th className="py-0.5 font-medium" />
                       <th className="py-0.5 text-right font-bold text-emerald-700">{SPALTE[aktiv.id]}</th>
                       <th className="py-0.5 pl-3 text-right font-bold text-slate-600">
@@ -344,7 +344,7 @@ export function Seite() {
                     />
                   </tbody>
                 </table>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
                   {herleitung(aktiv, g, n)}
                 </p>
                 <div className="mt-3 space-y-2 print:hidden">
@@ -355,7 +355,7 @@ export function Seite() {
                 </div>
               </section>
             ) : aktiv.id === 'arbeitnehmer' && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-sm print:break-before-page print:p-2 print:text-[10px] print:shadow-none">
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-[13px] leading-relaxed text-slate-700 shadow-sm print:break-before-page print:p-2 print:text-[10px] print:shadow-none">
                 <h2 className="text-sm font-black text-slate-900">Mitarbeiter zahlt selbst</h2>
                 <p className="mt-1">
                   Sie schließen den Gruppenvertrag ab, der Mitarbeiter zahlt {euroGenau(beitrag)} im Monat aus dem
@@ -375,7 +375,7 @@ export function Seite() {
                   <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                     <Building2 className="h-4 w-4 text-emerald-600" aria-hidden /> Was Sie davon haben
                   </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
                     <li><strong>Bindung:</strong> ein Benefit, den Mitarbeiter im Alltag spüren — beim Zahnarzt, beim
                       Optiker, beim Facharzt. Wer kündigt, verliert ihn.</li>
                     <li><strong>Arbeitgebermarke:</strong> in Stellenanzeigen sichtbar und ein Argument gegenüber
@@ -392,7 +392,7 @@ export function Seite() {
                   <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                     <Stethoscope className="h-4 w-4 text-sky-600" aria-hidden /> Was Ihre Mitarbeiter davon haben
                   </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
                     <li><strong>Ohne Gesundheitsprüfung</strong> und meist ohne Wartezeiten — oft sind auch laufende
                       Behandlungen und bestehende Erkrankungen mitversichert.</li>
                     <li><strong>Budgettarif:</strong> ein Jahresbudget für Zahnreinigung, Brille, Vorsorge oder
@@ -403,7 +403,7 @@ export function Seite() {
                       Kosten.</li>
                     <li>Beim Ausscheiden meist <strong>privat weiterführbar</strong>, ohne neue Gesundheitsprüfung.</li>
                   </ul>
-                  <p className="mt-1 text-[10px] text-slate-500 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
+                  <p className="mt-1 text-xs text-slate-500 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
                 </div>
               </section>
 
@@ -412,7 +412,7 @@ export function Seite() {
                   <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                     <ListChecks className="h-4 w-4 text-indigo-600" aria-hidden /> Umsetzung: {aktiv.titel}
                   </h2>
-                  <ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
+                  <ul className="mt-1 space-y-0.5 text-[13px] leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
                     {UMSETZUNG[aktiv.id].map((punkt, i) => <li key={i}>• {punkt}</li>)}
                     <li>• Gruppenvertrag: <strong>Mindestteilnehmerzahl</strong> und Annahmeregeln im Angebot prüfen</li>
                     <li>• Allen Mitarbeitern oder klar abgegrenzten Gruppen anbieten (<strong>Gleichbehandlung</strong>)</li>
@@ -422,7 +422,7 @@ export function Seite() {
                   <h2 className="text-sm font-black text-slate-900">
                     Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                   </h2>
-                  <dl className="mt-1 space-y-0.5 text-xs text-slate-700">
+                  <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
                     <div className="flex justify-between gap-2"><dt>Beiträge{aktiv.id === 'aufteilen' ? ' (Ihr Anteil)' : ''}</dt><dd className="tabular-nums">{euro(ag.beitragMonat * 12 * n)}</dd></div>
                     <div className="flex justify-between gap-2"><dt>Kosten netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
                     {g && (
@@ -435,7 +435,7 @@ export function Seite() {
                 </div>
               </section>
 
-              <p className="text-[10px] leading-relaxed text-slate-500 print:text-[8px]">
+              <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Beiträge und Leistungen
                 hängen vom Tarif ab; die Beispielbeiträge sind Richtwerte, kein Angebot. Annahme- und
                 Gesundheitsregeln legt der Versicherer fest. Der Gehaltsvergleich gilt für den eingetragenen
@@ -443,7 +443,7 @@ export function Seite() {
               </p>
             </div>
 
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs print:hidden">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] print:text-xs print:hidden">
               <span className="text-slate-500">Betriebsrente für Ihre Mitarbeiter:</span>
               <a href="/zuschussmodell" className="font-bold text-indigo-700 hover:underline">Zuschussmodell →</a>
               <span aria-hidden className="text-slate-300">·</span>
@@ -484,10 +484,10 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
           aktiv ? 'border-indigo-600 bg-indigo-600 shadow-[inset_0_0_0_2px_white]' : 'border-slate-300 bg-white'
         }`} />
         <span className="min-w-0">
-          <span className={`block text-xs font-bold ${w.moeglich ? 'text-slate-900' : ''}`}>{w.titel}</span>
-          <span className="block text-[11px] leading-snug text-slate-500 print:text-[9px]">{w.kurz}</span>
+          <span className={`block text-[13px] print:text-xs font-bold ${w.moeglich ? 'text-slate-900' : ''}`}>{w.titel}</span>
+          <span className="block text-xs leading-snug text-slate-500 print:text-[9px]">{w.kurz}</span>
           {w.grund && (
-            <span className={`block text-[11px] leading-snug print:text-[9px] ${
+            <span className={`block text-xs leading-snug print:text-[9px] ${
               w.moeglich ? 'text-amber-700' : w.id === 'sachbezug' ? 'text-rose-600' : 'text-slate-500'
             }`}>
               {w.grund}
@@ -509,8 +509,8 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
 function Zahl({ titel, wert, hervor }: { titel: string; wert: string; hervor?: boolean }) {
   return (
     <span className="block">
-      <span className="block text-[10px] leading-tight text-slate-500">{titel}</span>
-      <span className={`block text-xs tabular-nums ${hervor ? 'font-black text-emerald-700' : 'font-bold text-slate-800'}`}>{wert}</span>
+      <span className="block text-xs print:text-[10px] leading-tight text-slate-500">{titel}</span>
+      <span className={`block text-[13px] print:text-xs tabular-nums ${hervor ? 'font-black text-emerald-700' : 'font-bold text-slate-800'}`}>{wert}</span>
     </span>
   );
 }

@@ -83,7 +83,7 @@ export function Seite() {
         <AndereModelle aktuell="/arbeitgeber" />
 
         {/* Die Annahmen fuer das Papier — die Eingabespalte entfaellt im Druck. */}
-        <p className="mt-2 hidden text-[10px] leading-snug text-slate-600 print:block">
+        <p className="mt-2 hidden text-xs print:text-[10px] leading-snug text-slate-600 print:block">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
           {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)} in die
           {' '}{weg === 'dv' ? 'Direktversicherung' : 'Unterstützungskasse'}, Matching {euro(matching)}
@@ -123,7 +123,7 @@ export function Seite() {
               <ZahlFeld label="Umwandlung im Monat" wert={umwandlung} onChange={setUmwandlung} einheit="€" schritt={10} />
               <button
                 type="button" onClick={optimal}
-                className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100"
+                className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[13px] print:text-xs font-bold text-indigo-800 hover:bg-indigo-100"
               >
                 <Wand2 className="h-3.5 w-3.5" aria-hidden /> Optimal aufteilen
               </button>
@@ -180,7 +180,7 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-[11px] text-rose-700">
+                  <p className="pt-1 text-xs print:text-[11px] text-rose-700">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
                   </p>
                 )}
@@ -193,7 +193,7 @@ export function Seite() {
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pl-3 text-[11px] leading-snug text-slate-500 print:text-[9px]">
+                <p className="pl-3 text-xs leading-snug text-slate-500 print:text-[9px]">
                   Zuwendungen an eine rückgedeckte Unterstützungskasse sind Betriebsausgabe (§ 4d EStG), der Pflichtzuschuss in die Direktversicherung ebenso (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand.
                 </p>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
@@ -224,7 +224,7 @@ export function Seite() {
                 <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                   <Link2 className="h-4 w-4 text-indigo-600" aria-hidden /> Bindung
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
+                <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
                   Der Arbeitgeberanteil wird erst nach <strong>drei Jahren</strong> Zusagedauer unverfallbar
                   (§ 1b BetrAVG). Wer früher geht, verliert ihn — wer später geht, verliert den laufenden
                   Matching-Beitrag. Die eigene Umwandlung gehört dem Mitarbeiter sofort.
@@ -234,7 +234,7 @@ export function Seite() {
                 <h2 className="text-sm font-black text-slate-900">
                   Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                 </h2>
-                <dl className="mt-1 space-y-0.5 text-xs text-slate-700">
+                <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
                   <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
                   <div className="flex justify-between gap-2"><dt>Altersvorsorge der Mitarbeiter</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertrag.gesamtMonat * 12 * n)}</dd></div>
                   <div className="flex justify-between gap-2"><dt>davon vom Arbeitgeber</dt><dd className="tabular-nums">{euro((ag.pflichtzuschussMonat + ag.ukasseMonat) * 12 * n)}</dd></div>
@@ -246,14 +246,14 @@ export function Seite() {
             {r.hinweise.length > 0 && (
               <section className="space-y-1.5">
                 {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-[11px] leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
+                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
                     {h}
                   </p>
                 ))}
               </section>
             )}
 
-            <p className="text-[10px] leading-relaxed text-slate-500 print:text-[8px]">
+            <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
               Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Nicht enthalten: Beitrag zum
               Pensions-Sicherungs-Verein und Verwaltungskosten der Unterstützungskasse sowie die Besteuerung und
               Verbeitragung der späteren Leistungen.
@@ -275,7 +275,7 @@ export function Seite() {
                 <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                   <ArrowRightLeft className="h-4 w-4 text-indigo-600" aria-hidden /> Wenn ein Mitarbeiter wechselt
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                <p className="mt-1 text-[13px] print:text-xs leading-relaxed text-slate-600">
                   Das Modell trennt die beiden Töpfe: Das Geld des Mitarbeiters liegt in der Direktversicherung und
                   geht mit ihm, das Matching liegt in der Unterstützungskasse und bleibt hier.
                 </p>
@@ -311,7 +311,7 @@ export function Seite() {
                 <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
                 </h2>
-                <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
+                <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-[13px] leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
                   <li>• Matching-Regel für alle Beschäftigten gleich (Gleichbehandlung)</li>
                   <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
                   <li>• Pflichtzuschuss fließt in die Direktversicherung (§ 1a Abs. 1a BetrAVG)</li>
@@ -321,7 +321,7 @@ export function Seite() {
                 </ul>
               </section>
 
-              <p className="text-[10px] leading-relaxed text-slate-500 print:text-[8px]">
+              <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
                 Überblick zum Rechtsstand {p.jahr}, keine Rechtsberatung. Die Einzelheiten regeln die Versorgungsordnung
                 und die Satzung der Unterstützungskasse — die Ausgestaltung sollte ein bAV-Spezialist prüfen.
               </p>

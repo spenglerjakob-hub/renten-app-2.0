@@ -13,7 +13,7 @@ import { euro, euroGenau, prozent } from '../components/Feld';
 export function Kasten({ titel, children }: { titel: string; children: ReactNode }) {
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">{titel}</h2>
+      <h2 className="text-[13px] print:text-xs font-bold uppercase tracking-wide text-slate-500">{titel}</h2>
       {children}
     </section>
   );
@@ -27,7 +27,7 @@ export function Kasten({ titel, children }: { titel: string; children: ReactNode
  */
 export function UmlagenErklaerung({ onWaehlen }: { onWaehlen: (satz: number) => void }) {
   return (
-    <details className="group rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+    <details className="group rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] print:text-xs text-slate-700">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 font-bold text-indigo-800">
         <Info className="h-3.5 w-3.5" aria-hidden /> Was sind die Umlagen?
       </summary>
@@ -81,8 +81,8 @@ export function UmlagenErklaerung({ onWaehlen }: { onWaehlen: (satz: number) => 
 export function WechselSpalte({ titel, farbe, children }: { titel: string; farbe: string; children: ReactNode }) {
   return (
     <div className={`rounded-xl border p-3 print:p-2 ${farbe}`}>
-      <h3 className="text-xs font-black text-slate-900">{titel}</h3>
-      <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+      <h3 className="text-[13px] print:text-xs font-black text-slate-900">{titel}</h3>
+      <ul className="mt-1 list-disc space-y-1 pl-4 text-xs leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
         {children}
       </ul>
     </div>
@@ -96,11 +96,11 @@ export function Kachel(props: {
 }) {
   return (
     <div className={`rounded-2xl border-2 p-4 print:p-2 ${props.farbe}`}>
-      <div className="flex items-center gap-1.5 text-xs font-bold">{props.symbol}{props.titel}</div>
+      <div className="flex items-center gap-1.5 text-[13px] print:text-xs font-bold">{props.symbol}{props.titel}</div>
       <p className={`mt-1 font-black tabular-nums ${props.gross ? 'text-3xl print:text-2xl' : 'text-2xl print:text-xl'}`}>
         {props.genau ? euroGenau(props.betrag) : euro(props.betrag)}
       </p>
-      <p className="text-[11px] opacity-80">{props.unten}</p>
+      <p className="text-xs print:text-[11px] opacity-80">{props.unten}</p>
     </div>
   );
 }
@@ -109,7 +109,7 @@ export function Bon({ titel, children }: { titel: string; children: ReactNode })
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
       <h2 className="text-sm font-black text-slate-900">{titel} im Monat</h2>
-      <dl className="mt-1 space-y-0.5 text-xs">{children}</dl>
+      <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs">{children}</dl>
     </div>
   );
 }
@@ -141,7 +141,7 @@ export function VergleichZeile(props: { text: string; links: ReactNode; rechts: 
 export function Balken({ text, betrag, max, farbe }: { text: string; betrag: number; max: number; farbe: string }) {
   return (
     <div>
-      <div className="flex justify-between gap-2 text-xs text-slate-700">
+      <div className="flex justify-between gap-2 text-[13px] print:text-xs text-slate-700">
         <span>{text}</span>
         <span className="font-bold tabular-nums">{euro(betrag)}</span>
       </div>
@@ -176,12 +176,12 @@ export function GehaltVergleich(props: {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
       <h2 className="text-sm font-black text-slate-900">Dasselbe Geld als Gehaltserhöhung?</h2>
-      <p className="mt-1 text-xs leading-relaxed text-slate-600 print:text-[10px]">
+      <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
         Beide Wege kosten den Arbeitgeber gleich viel. So entsteht die Zahl, Monat für Monat:
       </p>
-      <table className="mt-2 w-full text-xs print:mt-1 print:text-[10px]">
+      <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
         <thead>
-          <tr className="text-left text-[11px] text-slate-500">
+          <tr className="text-left text-xs print:text-[11px] text-slate-500">
             <th className="py-0.5 font-medium" />
             <th className="py-0.5 text-right font-bold text-emerald-700">
               <span className="sm:hidden">Modell</span><span className="hidden sm:inline">{props.modell}</span>
@@ -220,7 +220,7 @@ export function GehaltVergleich(props: {
           />
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+      <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
         Von {euro(g.bruttoMonat)} Gehaltserhöhung gehen beim Mitarbeiter {euro(g.svMonat)} Sozialabgaben
         und {euro(g.steuerMonat)} Steuer ab. Im Modell kommt der Arbeitgeberbeitrag ungekürzt in der
         Altersvorsorge an — zusammen mit der eigenen Umwandlung {euro(props.gesamtVorsorge)}.
@@ -243,7 +243,7 @@ export function Kopf() {
         <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
         <div>
           <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
-          <p className="text-[11px] text-slate-400 print:hidden">Ihre Zukunft. Smart geplant.</p>
+          <p className="text-xs print:text-[11px] text-slate-400 print:hidden">Ihre Zukunft. Smart geplant.</p>
         </div>
       </div>
     </header>
@@ -260,7 +260,7 @@ const MODELLE = [
 /** Querverweis auf die jeweils anderen Arbeitgebermodelle. */
 export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] }) {
   return (
-    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs print:hidden">
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] print:text-xs print:hidden">
       <span className="text-slate-500">Andere Modelle:</span>
       {MODELLE.filter((m) => m.href !== aktuell).map((m, i) => (
         <span key={m.href} className="flex items-center gap-2">
