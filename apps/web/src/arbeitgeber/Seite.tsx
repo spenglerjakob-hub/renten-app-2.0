@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
-  bisherFuerKopf, betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
+  betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
 } from './bausteine';
 
 /**
@@ -44,7 +44,7 @@ export function Seite() {
   const [bisher, setBisher] = useState<BisherigeAngaben>(KEINE_BISHERIGEN);
 
   const optimal = () => setUmwandlung(optimaleUmwandlung(
-    weg, { jahresbrutto: brutto, privatVersichert: privat, pkvPraemieMonat: privat ? praemie : 0, bisher: bisherFuerKopf(bisher) }, bundesland, p,
+    weg, { jahresbrutto: brutto, privatVersichert: privat, pkvPraemieMonat: privat ? praemie : 0 }, bundesland, p,
   ));
 
   const eingaben = useMemo((): MatchingEingaben => ({
@@ -58,8 +58,7 @@ export function Seite() {
     privatVersichert: privat,
     pkvPraemieMonat: privat ? praemie : 0,
     kinder: { hatKinder: false, kinderUnter25: 0 },
-    bisher: bisherFuerKopf(bisher),
-  }), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie, bisher]);
+  }), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie]);
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
   );
@@ -72,7 +71,13 @@ export function Seite() {
   // aufgestockt, auch wenn die neuen Teilnehmer in die Unterstuetzungskasse umwandeln.
   const betrieb = useMemo(
     () => betriebUmstieg(
-      (e, gruppe) => matchingModell(gruppe === 'bestand' ? { ...e, weg: 'dv' } : e, steuerOpt, p),
+      (e, gruppe) => {
+        const x = matchingModell(gruppe === 'bestand' ? { ...e, weg: 'dv' } : e, steuerOpt, p);
+        return {
+          kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertrag.gesamtMonat,
+          agBeitragMonat: x.arbeitgeber.pflichtzuschussMonat + x.arbeitgeber.ukasseMonat,
+        };
+      },
       eingaben, betriebAngaben(bisher, n), steuerOpt, p,
     ),
     [eingaben, bisher, n, steuerOpt],
@@ -150,7 +155,7 @@ export function Seite() {
               )}
             </Kasten>
 
-            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} vlZiel="Unterstützungskasse" neuTeilnehmer={n} />
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} neuTeilnehmer={n} />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
@@ -235,7 +240,7 @@ export function Seite() {
               />
             )}
             {hatBisherige(bisher) && (
-              <UmstiegVergleich u={r.umstieg} betrieb={betrieb} vlUmgang={bisher.vlUmgang} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurBildschirm" />
+              <UmstiegVergleich betrieb={betrieb} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurBildschirm" />
             )}
 
             <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
@@ -341,7 +346,7 @@ export function Seite() {
               </section>
 
               {hatBisherige(bisher) && (
-                <UmstiegVergleich u={r.umstieg} betrieb={betrieb} vlUmgang={bisher.vlUmgang} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" kopfImDruck={false} />
+                <UmstiegVergleich betrieb={betrieb} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" kopfImDruck={false} />
               )}
 
               <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">

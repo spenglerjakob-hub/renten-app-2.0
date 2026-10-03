@@ -947,21 +947,26 @@ export function festbetragGehaltsStaffel(
 }
 
 /* ==========================================================================
- * DER GANZE BETRIEB: Was kostet der Umstieg im Jahr, wenn das neue Modell per
- * Versorgungsordnung bzw. Gesamtzusage alle bisherigen Leistungen ersetzt?
+ * DER GANZE BETRIEB: Was kostet der Umstieg im Jahr?
  *
- * Fuenf Gruppen, jede je Kopf exakt mit dem Modell der Seite gerechnet:
- *   - neue Teilnehmer ohne / mit VL — sie wandeln den Betrag der Seite um,
- *   - Bestandsvertraege ohne / mit VL — sie laufen weiter, werden aber auf das
- *     neue Modell aufgestockt (z. B. 15 % Zuschuss → 50 % oder 50 EUR fest);
- *     bisher: der alte Zuschuss auf die bestehende Umwandlung,
- *   - VL-Bezieher ohne Betriebsrente — ihre VL folgt dem Schalter: entfaellt
- *     ('anrechnen') oder wird reine Arbeitgeber-bAV ('zusaetzlich').
- * Die Anzahlen gibt der Berater vor; keine Schaetzung von Ueberschneidungen.
+ * Gruppen, jede je Kopf exakt mit dem Modell der Seite gerechnet:
+ *   - neue Teilnehmer: wandeln den Betrag der Seite um,
+ *   - VL-Bezieher, die die VL in Altersvorsorge umwandeln — als
+ *     ENTGELTUMWANDLUNG: Die VL bleibt Lohn, wird aber beitragsfrei
+ *     umgewandelt, der Zuschuss des Modells kommt obendrauf. Ein Teil davon
+ *     wandelt zusaetzlich Gehalt um (VL + Betrag der Seite),
+ *   - VL-Bezieher, die ihre VL behalten — fuer sie aendert sich nichts,
+ *   - Bestandsvertraege: laufen weiter und werden auf das Modell aufgestockt
+ *     (z. B. 15 % Zuschuss → 50 % oder 50 EUR fest).
+ *
+ * Kostenansatz: Gehalt, das ohnehin gezahlt wird, zaehlt nicht. Bei den
+ * VL-Beziehern steht die VL (mit Arbeitgeberanteil SV und Umlagen) bisher wie
+ * neu in der Rechnung; neu kommt hinzu, was das Modell auf die Umwandlung
+ * kostet (Zuschuss abzueglich gesparter Abgaben).
  * ======================================================================== */
 
 export interface BetriebAngaben {
-  /** Neue Teilnehmer — sie wandeln den Betrag der Seite um */
+  /** Mitarbeiter, die Gehalt umwandeln — einschliesslich der VL-Bezieher, die zusaetzlich Gehalt umwandeln */
   neuTeilnehmer: number;
   bestand: {
     anzahl: number;
@@ -972,17 +977,16 @@ export interface BetriebAngaben {
   };
   vl: {
     betragMonat: number;
-    umgang: BisherigeLeistungen['vlUmgang'];
-    /** VL-Bezieher unter den neuen Teilnehmern */
-    beiNeuen: number;
-    /** VL-Bezieher mit bestehender Betriebsrente */
-    beiBestand: number;
-    /** VL-Bezieher ohne Betriebsrente — sie wandeln nicht um */
-    ohneBav: number;
+    /** Wie viele bekamen bislang VL */
+    anzahl: number;
+    /** Davon wandeln die VL in Altersvorsorge um */
+    umwandler: number;
+    /** Davon wandeln zusaetzlich Gehalt um (zaehlen zu den neuen Teilnehmern) */
+    davonMitGehalt: number;
   };
 }
 
-export type BetriebGruppe = 'neu' | 'neuMitVl' | 'bestand' | 'bestandMitVl' | 'vlOhneBav';
+export type BetriebGruppe = 'neu' | 'vlGehalt' | 'vlUmwandlung' | 'vlBehalten' | 'bestand';
 
 export interface BetriebZeile {
   gruppe: BetriebGruppe;
@@ -993,6 +997,28 @@ export interface BetriebZeile {
   neuNettoJahr: number;
 }
 
+/** Die Rechnung fuer einen VL-Bezieher, der (nur) seine VL umwandelt, Monat. */
+export interface BetriebKopfVl {
+  vlMonat: number;
+  /** VL mit Arbeitgeberanteil SV und Umlagen */
+  bisherVorSteuerMonat: number;
+  /** Arbeitgeberanteil SV und Umlagen auf die VL */
+  vlAbgabenMonat: number;
+  /** Was das Modell auf die umgewandelte VL kostet: Zuschuss abzueglich gesparter Abgaben */
+  modellMonat: number;
+  /** Zuschuss des Modells auf die VL */
+  zuschussMonat: number;
+  /** Abgaben, die auf die VL noch anfallen (0, wenn sie ganz beitragsfrei ist) */
+  abgabenNeuMonat: number;
+  neuVorSteuerMonat: number;
+  bisherNettoMonat: number;
+  neuNettoMonat: number;
+  /** Was im Vertrag ankommt */
+  vorsorgeMonat: number;
+  /** Was die VL dem Mitarbeiter heute netto bringt */
+  vlNettoMitarbeiterMonat: number;
+}
+
 export interface BetriebErgebnis {
   /** Nur Gruppen mit Anzahl > 0 */
   zeilen: BetriebZeile[];
@@ -1000,6 +1026,8 @@ export interface BetriebErgebnis {
   neuNettoJahr: number;
   /** Mehrkosten des Umstiegs im Jahr (negativ: der Arbeitgeber spart) */
   mehrkostenNettoJahr: number;
+  /** Beispiel fuer einen VL-Umwandler — nur, wenn es welche gibt */
+  kopfVl: BetriebKopfVl | null;
 }
 
 /** Was alle drei Modelle an Eingaben gemeinsam haben. */
@@ -1007,10 +1035,13 @@ export type ModellBasis = Pick<MatchingEingaben,
   'jahresbrutto' | 'umwandlungMonat' | 'unternehmensSteuersatz' | 'umlagenSatz'
   | 'privatVersichert' | 'pkvPraemieMonat' | 'kinder' | 'bisher'>;
 
-/** Ergebnis eines Modells, soweit die Betriebsrechnung es braucht. */
+/** Ergebnis eines Modells, soweit die Betriebsrechnung es braucht (Monat). */
 export interface ModellKosten {
-  arbeitgeber: { kostenVorSteuerMonat: number };
-  umstieg: Umstieg | null;
+  kostenVorSteuerMonat: number;
+  /** Was insgesamt in die Altersvorsorge fliesst */
+  vorsorgeMonat: number;
+  /** Beitrag des Arbeitgebers in die Altersvorsorge (Zuschuss, Matching) */
+  agBeitragMonat: number;
 }
 
 /**
@@ -1027,69 +1058,75 @@ export function betriebUmstieg<E extends ModellBasis>(
   p: LegalParameters,
 ): BetriebErgebnis {
   const satz = Math.min(0.6, Math.max(0, basis.unternehmensSteuersatz));
-  const netto = (vorSteuerMonat: number) => vorSteuerMonat * (1 - satz) * 12;
+  const nettoJahr = (vorSteuerMonat: number) => vorSteuerMonat * (1 - satz) * 12;
   const ganz = (n: number) => Math.max(0, Math.round(n));
 
   const neu = ganz(a.neuTeilnehmer);
   const bestand = ganz(a.bestand.anzahl);
-  const vlBetrag = Math.max(0, a.vl.betragMonat);
-  const mitVl = vlBetrag > 0;
-  const vlNeu = mitVl ? Math.min(ganz(a.vl.beiNeuen), neu) : 0;
-  const vlBestand = mitVl ? Math.min(ganz(a.vl.beiBestand), bestand) : 0;
-  const vlOhne = mitVl ? ganz(a.vl.ohneBav) : 0;
+  const vl = Math.max(0, a.vl.betragMonat);
+  const vlAnzahl = vl > 0 ? ganz(a.vl.anzahl) : 0;
+  const umwandler = Math.min(ganz(a.vl.umwandler), vlAnzahl);
+  const mitGehalt = Math.min(ganz(a.vl.davonMitGehalt), umwandler, neu);
+  const nurVl = umwandler - mitGehalt;
+  const behalten = vlAnzahl - umwandler;
 
-  const vl: BisherigeLeistungen = { vlMonat: vlBetrag, vlUmgang: a.vl.umgang, bavBestandMonat: 0 };
-  const ohneBisher = { ...basis, bisher: undefined };
-  const mitBisher = { ...basis, bisher: vl };
-  const bestandE = (b?: BisherigeLeistungen): E =>
-    ({ ...basis, umwandlungMonat: Math.max(0, a.bestand.umwandlungMonat), bisher: b });
+  const ohneBisher: E = { ...basis, bisher: undefined };
+  const mit = (umwandlungMonat: number): E => ({ ...ohneBisher, umwandlungMonat: Math.max(0, umwandlungMonat) });
 
-  // Was die VL heute kostet (VL + AG-SV + Umlagen) — fuer jeden Bezieher gleich.
+  // Was die VL heute kostet (VL + AG-SV + Umlagen) und dem Mitarbeiter bringt.
   const erwerbOpt = {
     ...steuerOpt,
     kinder: basis.kinder,
     privatVersichert: basis.privatVersichert,
     pkvPraemieMonat: basis.privatVersichert ? basis.pkvPraemieMonat : 0,
   };
-  const vlNurUmstieg = mitVl
-    ? umstiegRechnen(vl, basis.jahresbrutto, 0, 0, svKontext({ ...basis, bisher: undefined }), erwerbOpt,
-      satz, Math.max(0, basis.umlagenSatz), steuerOpt.bundesland, p)
+  const vlHeute = vl > 0
+    ? umstiegRechnen({ vlMonat: vl, vlUmgang: 'anrechnen', bavBestandMonat: 0 }, basis.jahresbrutto, 0, 0,
+      svKontext({ ...basis, bisher: undefined }), erwerbOpt, satz, Math.max(0, basis.umlagenSatz), steuerOpt.bundesland, p)
     : null;
-  const vlBisherMonat = vlNurUmstieg?.bisher.kostenVorSteuerMonat ?? 0;
-
-  // Bestandsvertrag heute: der alte Zuschuss auf die bestehende Umwandlung —
-  // mindestens der Pflichtzuschuss, wie im Zuschussmodell.
-  const altVertragMonat = bestand > 0
-    ? zuschussModell({ ...bestandE(undefined), quote: Math.max(0, a.bestand.zuschussQuote), deckelMonat: 1e9 },
-      steuerOpt, p).arbeitgeber.kostenVorSteuerMonat
-    : 0;
+  const vlKosten = vlHeute?.bisher.kostenVorSteuerMonat ?? 0;
 
   const zeilen: BetriebZeile[] = [];
   const zeile = (gruppe: BetriebGruppe, anzahl: number, bisherMonat: number, neuMonat: number) => {
     if (anzahl > 0) {
-      zeilen.push({ gruppe, anzahl, bisherNettoJahr: netto(bisherMonat) * anzahl, neuNettoJahr: netto(neuMonat) * anzahl });
+      zeilen.push({ gruppe, anzahl, bisherNettoJahr: nettoJahr(bisherMonat) * anzahl, neuNettoJahr: nettoJahr(neuMonat) * anzahl });
     }
   };
 
-  if (neu - vlNeu > 0) {
-    zeile('neu', neu - vlNeu, 0, modell(ohneBisher as E, 'neu').arbeitgeber.kostenVorSteuerMonat);
+  if (neu - mitGehalt > 0) {
+    zeile('neu', neu - mitGehalt, 0, modell(ohneBisher, 'neu').kostenVorSteuerMonat);
   }
-  if (vlNeu > 0) {
-    const u = modell(mitBisher as E, 'neu').umstieg!;
-    zeile('neuMitVl', vlNeu, u.bisher.kostenVorSteuerMonat, u.neu.kostenVorSteuerMonat);
+  if (mitGehalt > 0) {
+    zeile('vlGehalt', mitGehalt, vlKosten, vlKosten + modell(mit(basis.umwandlungMonat + vl), 'neu').kostenVorSteuerMonat);
   }
-  if (bestand - vlBestand > 0) {
-    zeile('bestand', bestand - vlBestand, altVertragMonat, modell(bestandE(undefined), 'bestand').arbeitgeber.kostenVorSteuerMonat);
+  let kopfVl: BetriebKopfVl | null = null;
+  if (umwandler > 0 && vlHeute) {
+    const r = modell(mit(vl), 'neu');
+    kopfVl = {
+      vlMonat: vl,
+      bisherVorSteuerMonat: vlKosten,
+      vlAbgabenMonat: vlHeute.bisher.agAbgabenMonat,
+      modellMonat: r.kostenVorSteuerMonat,
+      zuschussMonat: r.agBeitragMonat,
+      abgabenNeuMonat: Math.max(0, vlKosten + r.kostenVorSteuerMonat - vl - r.agBeitragMonat),
+      neuVorSteuerMonat: vlKosten + r.kostenVorSteuerMonat,
+      bisherNettoMonat: vlKosten * (1 - satz),
+      neuNettoMonat: (vlKosten + r.kostenVorSteuerMonat) * (1 - satz),
+      vorsorgeMonat: r.vorsorgeMonat,
+      vlNettoMitarbeiterMonat: vlHeute.vlNettoMitarbeiterMonat,
+    };
+    zeile('vlUmwandlung', nurVl, vlKosten, kopfVl.neuVorSteuerMonat);
   }
-  if (vlBestand > 0) {
-    const u = modell(bestandE(vl), 'bestand').umstieg!;
-    zeile('bestandMitVl', vlBestand, altVertragMonat + u.bisher.kostenVorSteuerMonat, u.neu.kostenVorSteuerMonat);
-  }
-  if (vlOhne > 0) {
-    zeile('vlOhneBav', vlOhne, vlBisherMonat, a.vl.umgang === 'zusaetzlich' ? vlBetrag : 0);
+  if (behalten > 0) zeile('vlBehalten', behalten, vlKosten, vlKosten);
+  if (bestand > 0) {
+    // Heute: der alte Zuschuss auf die bestehende Umwandlung — mindestens der
+    // Pflichtzuschuss, wie im Zuschussmodell.
+    const altE = { ...mit(a.bestand.umwandlungMonat), quote: Math.max(0, a.bestand.zuschussQuote), deckelMonat: 1e9 };
+    const alt = zuschussModell(altE, steuerOpt, p).arbeitgeber.kostenVorSteuerMonat;
+    zeile('bestand', bestand, alt, modell(mit(a.bestand.umwandlungMonat), 'bestand').kostenVorSteuerMonat);
   }
 
   const bisherNettoJahr = zeilen.reduce((s, z) => s + z.bisherNettoJahr, 0);
   const neuNettoJahr = zeilen.reduce((s, z) => s + z.neuNettoJahr, 0);
-  return { zeilen, bisherNettoJahr, neuNettoJahr, mehrkostenNettoJahr: neuNettoJahr - bisherNettoJahr };
+  return { zeilen, bisherNettoJahr, neuNettoJahr, mehrkostenNettoJahr: neuNettoJahr - bisherNettoJahr, kopfVl };
 }

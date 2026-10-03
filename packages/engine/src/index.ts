@@ -105,7 +105,7 @@ export {
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
   type BisherigeLeistungen, type Umstieg,
-  betriebUmstieg, type BetriebAngaben, type BetriebGruppe, type BetriebZeile, type BetriebErgebnis,
+  betriebUmstieg, type BetriebAngaben, type BetriebGruppe, type BetriebZeile, type BetriebErgebnis, type BetriebKopfVl,
   type ModellBasis, type ModellKosten,
 } from './analyse/matching-modell.js';
 export {

@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
-  bisherFuerKopf, betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
+  betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
 
 /**
@@ -50,8 +50,7 @@ export function Seite() {
     privatVersichert: privat,
     pkvPraemieMonat: privat ? praemie : 0,
     kinder: { hatKinder: false, kinderUnter25: 0 },
-    bisher: bisherFuerKopf(bisher),
-  }), [brutto, umwandlung, festbetrag, mindest, steuersatz, umlagen, privat, praemie, bisher]);
+  }), [brutto, umwandlung, festbetrag, mindest, steuersatz, umlagen, privat, praemie]);
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
   );
@@ -68,7 +67,10 @@ export function Seite() {
   const ag = r.arbeitgeber;
   const n = Math.max(1, Math.round(anzahl));
   const betrieb = useMemo(
-    () => betriebUmstieg((e) => festbetragModell(e, steuerOpt, p), eingaben, betriebAngaben(bisher, n), steuerOpt, p),
+    () => betriebUmstieg((e) => {
+      const x = festbetragModell(e, steuerOpt, p);
+      return { kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertragMonat, agBeitragMonat: x.arbeitgeber.zuschussMonat };
+    }, eingaben, betriebAngaben(bisher, n), steuerOpt, p),
     [eingaben, bisher, n, steuerOpt],
   );
 
@@ -137,7 +139,7 @@ export function Seite() {
               />
             </Kasten>
 
-            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} vlZiel="Direktversicherung" neuTeilnehmer={n} />
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} neuTeilnehmer={n} />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
@@ -270,7 +272,7 @@ export function Seite() {
               />
             )}
             {hatBisherige(bisher) && (
-              <UmstiegVergleich u={r.umstieg} betrieb={betrieb} vlUmgang={bisher.vlUmgang} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />
+              <UmstiegVergleich betrieb={betrieb} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />
             )}
 
             {r.hinweise.length > 0 && (
