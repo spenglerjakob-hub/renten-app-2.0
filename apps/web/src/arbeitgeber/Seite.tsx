@@ -76,6 +76,7 @@ export function Seite() {
         return {
           kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertrag.gesamtMonat,
           agBeitragMonat: x.arbeitgeber.pflichtzuschussMonat + x.arbeitgeber.ukasseMonat,
+          agBeitragMaxMonat: matching,
         };
       },
       eingaben, betriebAngaben(bisher, n), steuerOpt, p,

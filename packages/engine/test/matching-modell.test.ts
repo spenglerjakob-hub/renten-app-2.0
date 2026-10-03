@@ -399,9 +399,10 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
     vl: { betragMonat: 0, anzahl: 0, umwandler: 0, davonMitGehalt: 0 },
     ...over,
   });
+  let ZMAX = 100;
   const zm = (e: ZuschussEingaben) => {
     const r = zuschussModell(e, steuer, p);
-    return { kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertragMonat, agBeitragMonat: r.arbeitgeber.zuschussMonat };
+    return { kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertragMonat, agBeitragMonat: r.arbeitgeber.zuschussMonat, agBeitragMaxMonat: ZMAX };
   };
   const vl = (anzahl: number, umwandler: number, davonMitGehalt: number) =>
     ({ betragMonat: 40, anzahl, umwandler, davonMitGehalt });
@@ -426,7 +427,7 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
   it('Bestand 15 % → Festbetrag 50 EUR', () => {
     const fm = (e: FestbetragEingaben) => {
       const r = festbetragModell(e, steuer, p);
-      return { kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertragMonat, agBeitragMonat: r.arbeitgeber.zuschussMonat };
+      return { kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertragMonat, agBeitragMonat: r.arbeitgeber.zuschussMonat, agBeitragMaxMonat: ZMAX };
     };
     const basis: FestbetragEingaben = { ...zEin(), festbetragMonat: 50, mindestUmwandlungMonat: 50 };
     const b = betriebUmstieg(fm, basis, angaben({ neuTeilnehmer: 0, bestand: { anzahl: 2, umwandlungMonat: 100, zuschussQuote: 0.15 } }), steuer, p);
@@ -434,25 +435,44 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
     expect(b.mehrkostenNettoJahr).toBeCloseTo(2 * (festbetragModell(basis, steuer, p).arbeitgeber.nettoKostenMonat - alt) * 12, 6);
   });
 
-  it('VL-Umwandler: Entgeltumwandlung der VL, Zuschuss obendrauf', () => {
+  it('VL ohne eigene Umwandlung: wird 1:1 Arbeitgeberbeitrag, abgabenfrei', () => {
     const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 0, vl: vl(5, 5, 0) }), steuer, p);
     const k = b.kopfVl!;
     expect(b.zeilen.map((z) => z.gruppe)).toEqual(['vlUmwandlung']);
     expect(k.bisherVorSteuerMonat).toBeCloseTo(40 + 40 * 0.2115, 1);
-    // 20 EUR Zuschuss abzueglich rund 8,50 EUR gesparter Abgaben
-    expect(k.modellMonat).toBeCloseTo(20 - 40 * 0.2115, 1);
-    expect(k.neuVorSteuerMonat).toBeCloseTo(60, 0);
-    expect(k.vorsorgeMonat).toBeCloseTo(60, 6);
-    expect(k.zuschussMonat).toBeCloseTo(20, 6);
-    expect(k.abgabenNeuMonat).toBeCloseTo(0, 6);
-    expect(b.mehrkostenNettoJahr).toBeCloseTo(5 * k.modellMonat * 0.7 * 12, 6);
+    expect(k.neuVorSteuerMonat).toBe(40);
+    expect(k.mitUmwandlungBisMonat).toBe(100);
+    // Der Arbeitgeber spart die Abgaben auf die VL.
+    expect(b.mehrkostenNettoJahr).toBeCloseTo(-5 * k.vlAbgabenMonat * 0.7 * 12, 6);
   });
 
-  it('VL + Gehalt: Modell auf Umwandlung plus VL', () => {
+  it('VL + eigene Umwandlung: Zuschuss kommt dazu, hoechstens bis zum Deckel', () => {
+    // 100 EUR Umwandlung → 50 EUR Zuschuss; mit 40 EUR VL 90 EUR (unter dem Deckel von 100)
     const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 3, vl: vl(3, 3, 3) }), steuer, p);
     expect(b.zeilen.map((z) => [z.gruppe, z.anzahl])).toEqual([['vlGehalt', 3]]);
-    const modell = zuschussModell(zEin({ umwandlungMonat: 140 }), steuer, p).arbeitgeber.nettoKostenMonat;
-    expect(b.mehrkostenNettoJahr).toBeCloseTo(3 * modell * 12, 6);
+    const m = zuschussModell(zEin({ jahresbrutto: 54_000 - 480 }), steuer, p).arbeitgeber;
+    const neuMonat = m.kostenVorSteuerMonat - m.zuschussMonat + 90;
+    expect(b.zeilen[0]!.neuNettoJahr).toBeCloseTo(3 * neuMonat * 0.7 * 12, 6);
+    // 200 EUR Umwandlung → Zuschuss 100 EUR = Deckel: mit VL bleibt es bei 100
+    const g = betriebUmstieg(zm, zEin({ umwandlungMonat: 200 }), angaben({ neuTeilnehmer: 1, vl: vl(1, 1, 1) }), steuer, p);
+    const m2 = zuschussModell(zEin({ umwandlungMonat: 200, jahresbrutto: 54_000 - 480 }), steuer, p).arbeitgeber;
+    expect(g.zeilen[0]!.neuNettoJahr).toBeCloseTo((m2.kostenVorSteuerMonat - m2.zuschussMonat + 100) * 0.7 * 12, 6);
+  });
+
+  it('Festbetrag 50 EUR: mit VL 40 und eigener Umwandlung hoechstens 50 EUR', () => {
+    ZMAX = 50;
+    const fm = (e: FestbetragEingaben) => {
+      const r = festbetragModell(e, steuer, p);
+      return { kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertragMonat, agBeitragMonat: r.arbeitgeber.zuschussMonat, agBeitragMaxMonat: 50 };
+    };
+    const basis: FestbetragEingaben = { ...zEin(), festbetragMonat: 50, mindestUmwandlungMonat: 50 };
+    const b = betriebUmstieg(fm, basis, angaben({ neuTeilnehmer: 1, vl: vl(2, 2, 1) }), steuer, p);
+    const m = festbetragModell({ ...basis, jahresbrutto: 54_000 - 480 }, steuer, p).arbeitgeber;
+    const z = Object.fromEntries(b.zeilen.map((x) => [x.gruppe, x]));
+    expect(z.vlGehalt!.neuNettoJahr).toBeCloseTo((m.kostenVorSteuerMonat - m.zuschussMonat + 50) * 0.7 * 12, 6);
+    expect(z.vlUmwandlung!.neuNettoJahr).toBeCloseTo(40 * 0.7 * 12, 6);
+    expect(b.kopfVl!.mitUmwandlungBisMonat).toBe(50);
+    ZMAX = 100;
   });
 
   it('VL behalten: bisher = neu', () => {
@@ -475,6 +495,7 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
       return {
         kostenVorSteuerMonat: r.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: r.vertrag.gesamtMonat,
         agBeitragMonat: r.arbeitgeber.pflichtzuschussMonat + r.arbeitgeber.ukasseMonat,
+        agBeitragMaxMonat: e.matchingMonat,
       };
     };
     const b = betriebUmstieg(mm, eingaben({ weg: 'ukasse' }), angaben({ bestand: { anzahl: 2, umwandlungMonat: 100, zuschussQuote: 0.15 } }), steuer, p);

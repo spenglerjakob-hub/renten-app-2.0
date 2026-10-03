@@ -69,7 +69,7 @@ export function Seite() {
   const betrieb = useMemo(
     () => betriebUmstieg((e) => {
       const x = festbetragModell(e, steuerOpt, p);
-      return { kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertragMonat, agBeitragMonat: x.arbeitgeber.zuschussMonat };
+      return { kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertragMonat, agBeitragMonat: x.arbeitgeber.zuschussMonat, agBeitragMaxMonat: festbetrag };
     }, eingaben, betriebAngaben(bisher, n), steuerOpt, p),
     [eingaben, bisher, n, steuerOpt],
   );

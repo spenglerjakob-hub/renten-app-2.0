@@ -383,7 +383,7 @@ export function BisherigeLeistungenFelder(props: {
               <ZahlFeld
                 label="davon wandeln die VL in Altersvorsorge um" wert={b.vlUmwandler} min={0} schritt={1} stufen
                 onChange={(v) => setze({ vlUmwandler: v })}
-                hilfe="Als Entgeltumwandlung: Die VL fließt beitragsfrei in die Betriebsrente, der Zuschuss des Modells kommt obendrauf."
+                hilfe="Die VL wird zum Arbeitgeberbeitrag in die Betriebsrente — steuer- und beitragsfrei."
               />
               <Obergrenze wert={b.vlUmwandler} max={b.vlAnzahl} text="mehr bekommen keine VL" />
               <p className="text-[13px] text-slate-700">
@@ -394,7 +394,7 @@ export function BisherigeLeistungenFelder(props: {
                   <ZahlFeld
                     label="davon wandeln zusätzlich Gehalt um" wert={b.vlMitGehalt} min={0} schritt={1} stufen
                     onChange={(v) => setze({ vlMitGehalt: v })}
-                    hilfe="Sie wandeln VL und den Betrag oben um und zählen zu den „Mitarbeitern im Modell“."
+                    hilfe="Sie wandeln den Betrag oben um und zählen zu den „Mitarbeitern im Modell“. Ihr Arbeitgeberbeitrag steigt um den Zuschuss des Modells — höchstens bis zu dessen Höchstbetrag, die VL eingerechnet."
                   />
                   <Obergrenze
                     wert={b.vlMitGehalt} max={Math.min(umwandler, Math.max(0, props.neuTeilnehmer))}
@@ -415,8 +415,8 @@ export function BisherigeLeistungenFelder(props: {
 
 const GRUPPE: Record<BetriebGruppe, string> = {
   neu: 'Neue Teilnehmer (Gehaltsumwandlung)',
-  vlGehalt: 'VL + Gehalt umgewandelt',
-  vlUmwandlung: 'VL in Altersvorsorge umgewandelt',
+  vlGehalt: 'VL + eigene Umwandlung',
+  vlUmwandlung: 'VL als Arbeitgeberbeitrag in die bAV',
   vlBehalten: 'VL bleibt',
   bestand: 'Bestehende Verträge, aufgestockt',
 };
@@ -488,7 +488,7 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
       {k && (
         <div className={kopfImDruck ? '' : 'print:hidden'}>
           <h3 className="mt-3 text-[13px] font-bold text-slate-800 print:mt-1.5 print:text-[10px]">
-            Je Mitarbeiter, der seine VL umwandelt, im Monat
+            Je Mitarbeiter, der seine VL in die Betriebsrente gibt, im Monat
           </h3>
           <table className="mt-1 w-full text-[13px] print:text-[10px]">
             <thead>
@@ -501,14 +501,12 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
             <tbody className="text-slate-700">
               <VergleichZeile
                 text="VL" links={<>{euroGenau(k.vlMonat)}<Zusatz> als Lohn</Zusatz></>}
-                rechts={<>{euroGenau(k.vlMonat)}<Zusatz> umgewandelt</Zusatz></>}
+                rechts={<>{euroGenau(k.vlMonat)}<Zusatz> in die bAV</Zusatz></>}
               />
               <VergleichZeile
                 text={`Arbeitgeberanteil Sozialversicherung${mitUmlagen ? ' und Umlagen' : ''}`}
-                links={`+ ${euro(k.vlAbgabenMonat)}`}
-                rechts={k.abgabenNeuMonat < 0.5 ? <>0 €<Zusatz> frei</Zusatz></> : `+ ${euro(k.abgabenNeuMonat)}`}
+                links={`+ ${euro(k.vlAbgabenMonat)}`} rechts={<>0 €<Zusatz> frei</Zusatz></>}
               />
-              <VergleichZeile text="Zuschuss des Modells" links="—" rechts={`+ ${euro(k.zuschussMonat)}`} />
               <VergleichZeile
                 text="= Personalkosten vor Steuern" summe
                 links={euro(k.bisherVorSteuerMonat)} rechts={euro(k.neuVorSteuerMonat)}
@@ -520,9 +518,9 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
             </tbody>
           </table>
           <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
-            Heute bringt ihm die VL {euro(k.vlNettoMitarbeiterMonat)} netto. Umgewandelt fließen {euro(k.vorsorgeMonat)} im
-            Monat in seine Betriebsrente — die VL ungekürzt plus Ihr Zuschuss. Die Abgaben auf die VL sparen Sie und der
-            Mitarbeiter.
+            Heute bringt ihm die VL {euro(k.vlNettoMitarbeiterMonat)} netto — künftig fließen die vollen {euroGenau(k.vlMonat)} in
+            seine Betriebsrente, und Sie sparen die Abgaben. Wandelt er zusätzlich Gehalt um, steigt Ihr Beitrag um den
+            Zuschuss des Modells, höchstens auf {euro(k.mitUmwandlungBisMonat)} im Monat (VL eingerechnet).
           </p>
         </div>
       )}
@@ -530,9 +528,10 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
       <p className="mt-2 text-xs leading-relaxed text-slate-500 print:mt-1 print:text-[9px] print:leading-snug">
         {hat('bestand') && <>Bestehende Verträge laufen weiter und werden auf das neue Modell aufgestockt — als Nachtrag zur Versorgungszusage. </>}
         {(hat('vlUmwandlung') || hat('vlGehalt')) && <>
-          Die Umwandlung der VL ist eine Entgeltumwandlung und wird mit dem Mitarbeiter vereinbart; beruhen die VL auf
-          einem Tarifvertrag, muss er das zulassen. Ein bestehender VL-Vertrag kann ruhen oder privat weiterlaufen; eine
-          Arbeitnehmer-Sparzulage entfällt gegebenenfalls.</>}
+          Die Umstellung der VL auf einen Arbeitgeberbeitrag wird mit dem Mitarbeiter vereinbart; beruhen die VL auf einem
+          Tarifvertrag, muss er das zulassen. Ob die bisherige VL auf den gesetzlichen Pflichtzuschuss angerechnet werden
+          darf, in der Versorgungsordnung ausdrücklich regeln. Ein bestehender VL-Vertrag kann ruhen oder privat
+          weiterlaufen; eine Arbeitnehmer-Sparzulage entfällt gegebenenfalls.</>}
       </p>
     </section>
   );

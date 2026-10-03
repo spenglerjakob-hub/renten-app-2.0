@@ -951,18 +951,21 @@ export function festbetragGehaltsStaffel(
  *
  * Gruppen, jede je Kopf exakt mit dem Modell der Seite gerechnet:
  *   - neue Teilnehmer: wandeln den Betrag der Seite um,
- *   - VL-Bezieher, die die VL in Altersvorsorge umwandeln — als
- *     ENTGELTUMWANDLUNG: Die VL bleibt Lohn, wird aber beitragsfrei
- *     umgewandelt, der Zuschuss des Modells kommt obendrauf. Ein Teil davon
- *     wandelt zusaetzlich Gehalt um (VL + Betrag der Seite),
+ *   - VL-Bezieher, die die VL in Altersvorsorge umwandeln: Die VL wird zum
+ *     ARBEITGEBERBEITRAG in die Betriebsrente — steuer- und beitragsfrei,
+ *     ohne Zuschuss obendrauf. Wandelt der Mitarbeiter zusaetzlich Gehalt um,
+ *     kommt der Zuschuss des Modells dazu, aber nur bis zu dessen
+ *     Hoechstbetrag (Festbetrag, Deckel, Matching) — die VL ist darin
+ *     enthalten: Beitrag = min(VL + Zuschuss, max(VL, Hoechstbetrag)),
  *   - VL-Bezieher, die ihre VL behalten — fuer sie aendert sich nichts,
  *   - Bestandsvertraege: laufen weiter und werden auf das Modell aufgestockt
  *     (z. B. 15 % Zuschuss → 50 % oder 50 EUR fest).
  *
- * Kostenansatz: Gehalt, das ohnehin gezahlt wird, zaehlt nicht. Bei den
- * VL-Beziehern steht die VL (mit Arbeitgeberanteil SV und Umlagen) bisher wie
- * neu in der Rechnung; neu kommt hinzu, was das Modell auf die Umwandlung
- * kostet (Zuschuss abzueglich gesparter Abgaben).
+ * Kostenansatz: Gehalt, das ohnehin gezahlt wird, zaehlt nicht. Bisher
+ * kostet die VL sich selbst plus Arbeitgeberanteil SV und Umlagen. Neu kostet
+ * der Arbeitgeberbeitrag (ohne Abgaben) plus, bei eigener Umwandlung, deren
+ * Abgabenersparnis als Minus. Vereinfachung: Ob VL und Umwandlung zusammen den
+ * beitragsfreien Rahmen sprengen, prueft die Gruppenrechnung nicht nach.
  * ======================================================================== */
 
 export interface BetriebAngaben {
@@ -997,26 +1000,21 @@ export interface BetriebZeile {
   neuNettoJahr: number;
 }
 
-/** Die Rechnung fuer einen VL-Bezieher, der (nur) seine VL umwandelt, Monat. */
+/** Die Rechnung fuer einen VL-Bezieher, der seine VL in die Betriebsrente gibt — ohne eigene Umwandlung, Monat. */
 export interface BetriebKopfVl {
   vlMonat: number;
+  /** Arbeitgeberanteil SV und Umlagen auf die VL — faellt neu weg */
+  vlAbgabenMonat: number;
   /** VL mit Arbeitgeberanteil SV und Umlagen */
   bisherVorSteuerMonat: number;
-  /** Arbeitgeberanteil SV und Umlagen auf die VL */
-  vlAbgabenMonat: number;
-  /** Was das Modell auf die umgewandelte VL kostet: Zuschuss abzueglich gesparter Abgaben */
-  modellMonat: number;
-  /** Zuschuss des Modells auf die VL */
-  zuschussMonat: number;
-  /** Abgaben, die auf die VL noch anfallen (0, wenn sie ganz beitragsfrei ist) */
-  abgabenNeuMonat: number;
+  /** Die VL als Arbeitgeberbeitrag, abgabenfrei */
   neuVorSteuerMonat: number;
   bisherNettoMonat: number;
   neuNettoMonat: number;
-  /** Was im Vertrag ankommt */
-  vorsorgeMonat: number;
   /** Was die VL dem Mitarbeiter heute netto bringt */
   vlNettoMitarbeiterMonat: number;
+  /** Arbeitgeberbeitrag, wenn er zusaetzlich Gehalt umwandelt — hoechstens */
+  mitUmwandlungBisMonat: number;
 }
 
 export interface BetriebErgebnis {
@@ -1042,6 +1040,8 @@ export interface ModellKosten {
   vorsorgeMonat: number;
   /** Beitrag des Arbeitgebers in die Altersvorsorge (Zuschuss, Matching) */
   agBeitragMonat: number;
+  /** Hoechster Arbeitgeberbeitrag des Modells (Festbetrag, Deckel, Matching) */
+  agBeitragMaxMonat: number;
 }
 
 /**
@@ -1072,6 +1072,9 @@ export function betriebUmstieg<E extends ModellBasis>(
 
   const ohneBisher: E = { ...basis, bisher: undefined };
   const mit = (umwandlungMonat: number): E => ({ ...ohneBisher, umwandlungMonat: Math.max(0, umwandlungMonat) });
+  // Wer seine VL in die Betriebsrente gibt, bekommt sie nicht mehr als Lohn.
+  const ohneVlLohn = (umwandlungMonat: number): E =>
+    ({ ...mit(umwandlungMonat), jahresbrutto: Math.max(0, basis.jahresbrutto - vl * 12) });
 
   // Was die VL heute kostet (VL + AG-SV + Umlagen) und dem Mitarbeiter bringt.
   const erwerbOpt = {
@@ -1096,26 +1099,27 @@ export function betriebUmstieg<E extends ModellBasis>(
   if (neu - mitGehalt > 0) {
     zeile('neu', neu - mitGehalt, 0, modell(ohneBisher, 'neu').kostenVorSteuerMonat);
   }
-  if (mitGehalt > 0) {
-    zeile('vlGehalt', mitGehalt, vlKosten, vlKosten + modell(mit(basis.umwandlungMonat + vl), 'neu').kostenVorSteuerMonat);
-  }
   let kopfVl: BetriebKopfVl | null = null;
   if (umwandler > 0 && vlHeute) {
-    const r = modell(mit(vl), 'neu');
+    // Mit eigener Umwandlung: Der Zuschuss des Modells kommt zur VL dazu, bis
+    // zum Hoechstbetrag des Modells. Die Kosten des Modells (Zuschuss abzueglich
+    // gesparter Abgaben auf die Umwandlung) werden um den hoeheren Beitrag
+    // korrigiert.
+    const r = modell(ohneVlLohn(basis.umwandlungMonat), 'neu');
+    const beitrag = Math.min(vl + r.agBeitragMonat, Math.max(vl, r.agBeitragMaxMonat));
+    if (mitGehalt > 0) zeile('vlGehalt', mitGehalt, vlKosten, r.kostenVorSteuerMonat - r.agBeitragMonat + beitrag);
     kopfVl = {
       vlMonat: vl,
-      bisherVorSteuerMonat: vlKosten,
       vlAbgabenMonat: vlHeute.bisher.agAbgabenMonat,
-      modellMonat: r.kostenVorSteuerMonat,
-      zuschussMonat: r.agBeitragMonat,
-      abgabenNeuMonat: Math.max(0, vlKosten + r.kostenVorSteuerMonat - vl - r.agBeitragMonat),
-      neuVorSteuerMonat: vlKosten + r.kostenVorSteuerMonat,
+      bisherVorSteuerMonat: vlKosten,
+      neuVorSteuerMonat: vl,
       bisherNettoMonat: vlKosten * (1 - satz),
-      neuNettoMonat: (vlKosten + r.kostenVorSteuerMonat) * (1 - satz),
-      vorsorgeMonat: r.vorsorgeMonat,
+      neuNettoMonat: vl * (1 - satz),
       vlNettoMitarbeiterMonat: vlHeute.vlNettoMitarbeiterMonat,
+      mitUmwandlungBisMonat: Math.max(vl, r.agBeitragMaxMonat),
     };
-    zeile('vlUmwandlung', nurVl, vlKosten, kopfVl.neuVorSteuerMonat);
+    // Ohne eigene Umwandlung: die VL als Arbeitgeberbeitrag, abgabenfrei.
+    zeile('vlUmwandlung', nurVl, vlKosten, vl);
   }
   if (behalten > 0) zeile('vlBehalten', behalten, vlKosten, vlKosten);
   if (bestand > 0) {
