@@ -1,13 +1,13 @@
 import { Fragment, useMemo, type ReactNode } from 'react';
 import {
-  parameterFuer, versorgungsluecke, foerdercheck,
+  parameterFuer, versorgungsluecke, foerdercheck, loesungsvergleich,
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
-import { tuevPositionen, foerderBasis } from '../features/tuev-berechnung';
+import { tuevPositionen, foerderBasis, angebotPositionen } from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -22,6 +22,7 @@ import { Sparziel } from './Sparziel';
 import { Foerderung } from './Foerderung';
 import { Merkblatt } from './Merkblatt';
 import { TuevBogen } from './TuevBogen';
+import { Loesungsvergleich } from './Loesungsvergleich';
 
 /**
  * Das gedruckte Gutachten.
@@ -105,6 +106,21 @@ export function Gutachten({
     const b = foerderBasis(szenario, ergebnis ? zeile : null);
     return { ...b, befunde: foerdercheck(b.kontext, b.steuerOpt, b.p) };
   }, [szenario, ergebnis, zeile]);
+
+  /*
+    Der Loesungsvergleich der letzten Etappe — nur im ausfuehrlichen Umfang,
+    und nur, wenn es eine Luecke gibt oder Angebote erfasst sind. Sonst
+    stuende eine Seite ueber Loesungen fuer ein Problem, das es nicht gibt.
+  */
+  const loesungen = useMemo(() => {
+    if (!lang || (luecke <= 0 && szenario.loesungen.angebote.length === 0)) return null;
+    const l = szenario.loesungen;
+    return {
+      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, l.nettoMonat,
+        { agZuschussQuote: l.agZuschussQuote }),
+      angebote: angebotPositionen(szenario),
+    };
+  }, [lang, luecke, szenario, foerderung]);
 
   const gedeckt = zeile.zielNettoMonat > 0
     ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
@@ -266,6 +282,16 @@ export function Gutachten({
             zeile={zeile}
             rendite={SPARZIEL_VORGABE.rendite}
             ohneBeitrag={foerderung.ohneBeitrag}
+          />
+        ),
+      }] : []),
+      ...(loesungen ? [{
+        titel: ['Lösungen im Vergleich'],
+        knoten: (
+          <Loesungsvergleich
+            loesungen={loesungen.liste}
+            nettoMonat={szenario.loesungen.nettoMonat}
+            angebote={loesungen.angebote}
           />
         ),
       }] : []),
