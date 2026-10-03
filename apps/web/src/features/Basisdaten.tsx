@@ -25,10 +25,23 @@ const KV_TEXT = {
   pkv: 'privat versichert',
 } as const;
 
-export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
+/**
+ * Teile der Basisdaten. Das Formular zeigt alle untereinander, der
+ * Assistent je Schritt einen — es sind dieselben Felder auf denselben
+ * Speicher, keine zweite Fassung.
+ */
+export type BasisTeil = 'ziel' | 'haushalt' | 'einkommen' | 'personen';
+
+export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: {
   ergebnis?: ProjektionsErgebnis | null;
   onEhepartnerDialog?: () => void;
+  /** Nur diesen Teil zeigen, ohne Einklappen — fuer den Assistenten */
+  teil?: BasisTeil;
+  /** Wechsel in den Assistenten; ohne Angabe fuehrt der Hinweis zum Vorsorge-Check */
+  onAssistent?: () => void;
 } = {}) {
+  const zeige = (t: BasisTeil) => teil === undefined || teil === t;
+  const einklappbar = teil === undefined;
   const s = useSzenario((x) => x.szenario);
   const { setzeHaushalt, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
   const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
@@ -71,16 +84,30 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
     <div className="space-y-4">
       {/* Wer lieber gefuehrt wird: derselbe Datensatz, Schritt fuer Schritt
           und mit Hinweis auf die jeweilige Unterlage. */}
-      <a
-        href="/vorsorge-check"
-        className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
-      >
-        <span>
-          <strong>Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
-          einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
-        </span>
-        <span className="shrink-0 font-bold">Zum Check →</span>
-      </a>
+      {teil === undefined && (onAssistent ? (
+        <button
+          type="button"
+          onClick={onAssistent}
+          className="flex w-full items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
+        >
+          <span>
+            <strong>Lieber Schritt für Schritt?</strong> Der Assistent fragt alle Angaben
+            einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
+          </span>
+          <span className="shrink-0 font-bold">Zum Assistenten →</span>
+        </button>
+      ) : (
+        <a
+          href="/vorsorge-check"
+          className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
+        >
+          <span>
+            <strong>Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
+            einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
+          </span>
+          <span className="shrink-0 font-bold">Zum Check →</span>
+        </a>
+      ))}
 
       {/*
         Das Zielnetto steht VOR dem Haushaltsraster und in einem eigenen
@@ -88,7 +115,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         dabei misst sich alles Weitere an dieser Zahl: der Bedarf, die
         Versorgungsluecke, die noetige Sparrate, das ganze Gutachten.
       */}
-      <section className="rounded-xl border-2 border-indigo-300 bg-white p-3 shadow-sm sm:p-4">
+      {zeige('ziel') && <section className="rounded-xl border-2 border-indigo-300 bg-white p-3 shadow-sm sm:p-4">
         <h3 className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
           <Target className="h-3.5 w-3.5" aria-hidden /> Ihr Ziel
         </h3>
@@ -150,12 +177,12 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
               jeweiligen Person.</>
           )}
         </p>
-      </section>
+      </section>}
 
       {/* Einklappbar: Der Block wird einmal ausgefuellt und danach selten
           wieder angefasst — offen kostet er jedes Mal eine halbe
           Bildschirmlaenge auf dem Weg zu den Personen darunter. */}
-      <Abschnitt titel="Haushalt" einklappbar>
+      {zeige('haushalt') && <Abschnitt titel="Haushalt" einklappbar={einklappbar}>
         <div className="grid gap-3 sm:grid-cols-2">
           <AuswahlFeld
             label="Bundesland (Kirchensteuer, Besoldung)"
@@ -305,7 +332,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
           <Schalter label="Kirchensteuerpflichtig" wert={s.haushalt.kirchensteuer}
             onChange={(b) => setzeHaushalt({ kirchensteuer: b })} />
         </div>
-      </Abschnitt>
+      </Abschnitt>}
 
       {/*
         Einklappbar wie der Haushalt darueber, und aus demselben Grund: Die
@@ -318,9 +345,9 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         Person B ueberhaupt gibt. Zugeklappt ist er mit weg. Das ist
         hinnehmbar, solange der Block offen startet.
       */}
-      <Abschnitt
+      {zeige('einkommen') && <Abschnitt
         titel={s.einkommenGetrennt ? `Einkommen — ${nameVon('A')}` : 'Heutiges Einkommen'}
-        einklappbar
+        einklappbar={einklappbar}
       >
         <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} />
 
@@ -338,10 +365,10 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
             </p>
           </div>
         )}
-      </Abschnitt>
+      </Abschnitt>}
 
-      {s.haushalt.verheiratet && s.einkommenGetrennt && (
-        <Abschnitt titel={`Einkommen — ${nameVon('B')}`} einklappbar>
+      {zeige('einkommen') && s.haushalt.verheiratet && s.einkommenGetrennt && (
+        <Abschnitt titel={`Einkommen — ${nameVon('B')}`} einklappbar={einklappbar}>
           <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} />
         </Abschnitt>
       )}
@@ -353,8 +380,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         nichts mehr bewirkten. Geloescht wird nichts: schaltet man wieder auf
         "Verheiratet", sind alle Eingaben von Person B noch da.
       */}
-      {s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
-        <Abschnitt key={p.id} titel={personName(p)} einklappbar>
+      {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
+        <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
           <div className="grid gap-3 sm:grid-cols-2">
             <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
               platzhalter={`Person ${p.id}`} />
@@ -473,7 +500,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog }: {
         </Abschnitt>
       ))}
 
-      {!s.haushalt.verheiratet && (
+      {zeige('personen') && !s.haushalt.verheiratet && (
         <p className="text-xs text-slate-500">
           Für einen zweiten Haushaltspartner oben &bdquo;Verheiratet&ldquo; aktivieren.
         </p>

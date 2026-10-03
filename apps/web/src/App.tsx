@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
-  PanelLeft, Layers, BarChart3, SearchCheck,
+  PanelLeft, Target, BarChart3, SearchCheck,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -11,6 +11,7 @@ import {
 import { useSzenario } from './store/szenario';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
+import { Assistent } from './features/Assistent';
 import { Vertraege } from './features/Vertraege';
 import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
@@ -30,6 +31,7 @@ import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
 import { Seitenleiste, type Abschnitt } from './components/Seitenleiste';
+import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
 import { RechtsLinks } from './components/RechtsLinks';
 import { personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro, TON } from './components/Feld';
@@ -45,6 +47,41 @@ const REITER: { id: Reiter; text: string }[] = [
 ];
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
+
+/** Die vier Etappen der Beratung — siehe `JourneyLeiste`. */
+type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen';
+const ETAPPEN: readonly Etappe<Schritt>[] = [
+  { id: 'daten', text: 'Daten & Ziel', kurz: 'Daten & Ziel' },
+  { id: 'ergebnis', text: 'Ergebnis', kurz: 'Ergebnis' },
+  { id: 'sparen', text: 'Sparrechner', kurz: 'Sparen' },
+  { id: 'loesungen', text: 'Vertrags-TÜV & Lösungen', kurz: 'TÜV & Lösungen' },
+];
+
+/*
+  Die zuletzt offene Etappe — eine Bequemlichkeit je Geraet, nichts, was
+  gerechnet wird. Fehlt der Speicher, beginnt die Beratung vorn.
+*/
+const SPEICHER_ETAPPE = 'rentenplaner.etappe.v1';
+const SPEICHER_EINGABE = 'rentenplaner.eingabeart.v1';
+function ladeEtappe(): Schritt {
+  try {
+    const s = localStorage.getItem(SPEICHER_ETAPPE);
+    if (ETAPPEN.some((e) => e.id === s)) return s as Schritt;
+  } catch { /* Speicher gesperrt */ }
+  return 'daten';
+}
+
+/** Ueberschrift einer Etappe: Nummer, Titel, ein Satz, worum es geht. */
+function EtappenKopf({ nr, titel, text }: { nr: number; titel: string; text: string }) {
+  return (
+    <div className="px-1">
+      <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">
+        <span className="text-indigo-600">{nr}.</span> {titel}
+      </h2>
+      <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">{text}</p>
+    </div>
+  );
+}
 
 /**
  * Rueckfallebene, wenn der Rechenkern keine Zeitachse liefern kann — etwa
@@ -107,6 +144,21 @@ export default function App() {
   const [kontoOffen, setKontoOffen] = useState(false);
   const [checkOffen, setCheckOffen] = useState(false);
   const [leisteOffen, setLeisteOffen] = useState(false);
+  const [schritt, setSchritt] = useState<Schritt>(ladeEtappe);
+  const geheZu = useCallback((s: Schritt) => {
+    setSchritt(s);
+    try { localStorage.setItem(SPEICHER_ETAPPE, s); } catch { /* Speicher gesperrt */ }
+    window.scrollTo({ top: 0 });
+  }, []);
+  const [eingabeArt, setEingabeArtRoh] = useState<'assistent' | 'formular'>(() => {
+    try { return localStorage.getItem(SPEICHER_EINGABE) === 'formular' ? 'formular' : 'assistent'; } catch { return 'assistent'; }
+  });
+  const setEingabeArt = (a: 'assistent' | 'formular') => {
+    setEingabeArtRoh(a);
+    try { localStorage.setItem(SPEICHER_EINGABE, a); } catch { /* Speicher gesperrt */ }
+  };
+  /** Der noetige Startbeitrag aus dem Sparrechner — die Loesungen koennen ihn uebernehmen. */
+  const [sparrate, setSparrate] = useState<number | null>(null);
 
   /*
     Angeforderte Vorsorge-Checks laden, sobald jemand angemeldet ist — auch
@@ -234,14 +286,158 @@ export default function App() {
 
   const schliesseLeiste = useCallback(() => setLeisteOffen(false), []);
   const abschnitte: Abschnitt[] = [
-    { id: 'eingaben', text: 'Allgemeine Daten & Ziel', symbol: <User className="h-4 w-4" aria-hidden />, beiSprung: () => setBasisOffen(true) },
-    { id: 'vertraege', text: 'Versorgungsschichten', symbol: <Layers className="h-4 w-4" aria-hidden /> },
-    { id: 'ergebnis', text: 'Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden /> },
-    { id: 'vertrags-tuev', text: 'Vertrags-TÜV', symbol: <SearchCheck className="h-4 w-4" aria-hidden /> },
+    { id: 'journey', text: '1. Daten & Ziel', symbol: <User className="h-4 w-4" aria-hidden />, beiSprung: () => { setBasisOffen(true); geheZu('daten'); } },
+    { id: 'journey', text: '2. Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('ergebnis') },
+    { id: 'journey', text: '3. Sparrechner', symbol: <Target className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('sparen') },
+    { id: 'journey', text: '4. Vertrags-TÜV & Lösungen', symbol: <SearchCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('loesungen') },
     ...(supabaseKonfiguriert && angemeldet
-      ? [{ id: 'check-anfragen', text: 'Vorsorge-Check anfordern', symbol: <Inbox className="h-4 w-4" aria-hidden />, beiSprung: () => setCheckOffen(true) }]
+      ? [{ id: 'check-anfragen', text: 'Vorsorge-Check anfordern', symbol: <Inbox className="h-4 w-4" aria-hidden />, beiSprung: () => { setCheckOffen(true); geheZu('daten'); } }]
       : []),
   ];
+
+  /*
+    GESAMT ODER EINZELN — der Umschalter steht oben in jeder Etappe, die
+    rechnet, weil er alles darunter betrifft: Kopfzahlen, Kassenbon, Verlauf,
+    Steuer, Sparrechner, Vertrags-Pruefung und den Ausdruck. Gerechnet wird
+    dafuer nicht anders, sondern ein anderes Szenario.
+  */
+  const paarUmschalter = paar && (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
+      <Reiterleiste
+        reiter={[
+          { id: 'haushalt' as const, text: 'Gesamt' },
+          { id: 'einzeln' as const, text: 'Einzeln' },
+        ]}
+        aktiv={betrachtung}
+        onWechsel={setBetrachtung}
+        beschriftung="Haushalt oder einzelne Person"
+      />
+      {betrachtung === 'einzeln' && (
+        <Reiterleiste
+          reiter={szenario.personen
+            .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
+            .map((p) => ({ id: p.id, text: personName(p) }))}
+          aktiv={wer}
+          onWechsel={setWer}
+          beschriftung="Welche Person"
+        />
+      )}
+      <p className="px-3 py-2 text-xs leading-relaxed text-slate-500">
+        {betrachtung === 'einzeln'
+          ? `Nur die Verträge und Einkünfte von ${personNameAus(szenario.personen, wer)} — allein veranlagt, mit Grundtarif statt Splitting.`
+          : 'Beide Partner zusammen, wie bisher: eine Veranlagung mit Splittingtarif.'}
+      </p>
+    </div>
+  );
+
+  const kopfzahlen = (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
+        <h3 className="mb-0.5 text-[10px] font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
+          Bedarf im Jahr {zeile.jahr}
+        </h3>
+        <p className="text-lg font-bold tabular-nums sm:text-3xl">
+          {euro(zeile.zielNettoMonat * faktor)}
+        </p>
+      </div>
+      <div
+        className={`flex flex-col justify-center rounded-xl border bg-white p-3 shadow-sm sm:p-6 ${
+          luecke > 0 ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
+        }`}
+      >
+        <h3 className="mb-0.5 text-[10px] font-semibold leading-tight sm:mb-1 sm:text-sm">
+          Versorgungslücke
+        </h3>
+        <p className="text-lg font-bold tabular-nums sm:text-3xl">
+          {luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
+        </p>
+      </div>
+    </div>
+  );
+
+  /*
+    DAS JAHR DER UEBERSICHT, verstellbar — aber nur bei Paaren. Bei einer
+    Person faellt der erste mit dem einzigen Rentenbeginn zusammen; ein Regler
+    haette dort nichts zu zeigen ausser spaeteren Jahren derselben Rente.
+  */
+  const jahrRegler = paar && !einzeln && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
+    <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          Angezeigtes Jahr
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setJahrWahl(Math.max(ersterRuhestand, (gezeigtesJahr ?? ersterRuhestand) - 1))}
+            aria-label="Ein Jahr zurück"
+            className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+            disabled={(gezeigtesJahr ?? ersterRuhestand) <= ersterRuhestand}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          <span className="min-w-[3.5rem] text-center text-sm font-black tabular-nums text-slate-900">
+            {zeile.jahr}
+          </span>
+          <button
+            type="button"
+            onClick={() => setJahrWahl(Math.min(
+              zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr,
+              (gezeigtesJahr ?? ersterRuhestand) + 1,
+            ))}
+            aria-label="Ein Jahr vor"
+            className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+            disabled={(gezeigtesJahr ?? ersterRuhestand)
+              >= zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+          >
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={ersterRuhestand}
+        max={zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+        step={1}
+        value={gezeigtesJahr ?? ersterRuhestand}
+        onChange={(e) => setJahrWahl(Number(e.target.value))}
+        aria-label="Jahr der Übersicht"
+        className="mt-2 w-full accent-indigo-600"
+      />
+      {/* Ohne diesen Satz wirkt das hohe Netto einer gemischten Phase wie
+          ein Rechenfehler: Da laeuft noch ein Gehalt. */}
+      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+        {zeile.gemischtePhase
+          ? 'Ein Partner arbeitet noch — im Netto steckt daher weiter ein Gehalt.'
+          : 'Beide im Ruhestand.'}
+      </p>
+    </div>
+  );
+
+  const schichten = (
+    <section id="vertraege" className={`scroll-mt-28 overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
+      <Reiterleiste
+        reiter={REITER}
+        aktiv={reiter}
+        onWechsel={setReiter}
+        beschriftung="Versorgungsschichten"
+      />
+      {/* Kein eigener Grundton: die Flaeche traegt den der Karte, damit
+          die weissen Vertragskarten darauf hervortreten. */}
+      <div className="min-h-[300px] p-3 sm:min-h-[400px] sm:p-4">
+        {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
+        {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
+        {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
+        {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
+      </div>
+    </section>
+  );
+
+  const rechnetText = (
+    <p className="rounded-lg bg-white px-4 py-8 text-center text-sm text-slate-500">
+      Berechnung läuft …
+    </p>
+  );
 
   return (
     /*
@@ -448,295 +644,243 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 p-2 sm:gap-8 sm:p-6 lg:grid-cols-12 print:hidden">
-        {/*
-          LINKE SPALTE: EINGABEN
+      <main id="journey" className="mx-auto max-w-6xl scroll-mt-28 space-y-4 p-2 sm:space-y-6 sm:p-6 print:hidden">
+        <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
 
-          Getoenter Grund mit kraeftigem Rand, wie auf der Seite zum
-          Altersvorsorgedepot. Rechts stehen die Ergebnisse auf weissen
-          Karten. Ohne diesen Unterschied sehen Eingabe und Ergebnis gleich
-          aus, und man muss erst lesen, um zu wissen, wo man etwas eintraegt.
-        */}
-        <div className="space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-5 print:hidden">
-          <div id="eingaben" className="scroll-mt-28">
-          <AkkordeonKarte
-            titel="Allgemeine Daten & Ziel"
-            offen={basisOffen}
-            onUmschalten={() => setBasisOffen((v) => !v)}
-            symbol={<User className="h-4 w-4 text-indigo-400" aria-hidden />}
-            ton="eingabe"
-          >
-            <Basisdaten
-              ergebnis={ergebnis ?? null}
-              onEhepartnerDialog={() => setEhepartnerDialog(true)}
-            />
-          </AkkordeonKarte>
+        {fehler && (
+          <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            Die Berechnung ist fehlgeschlagen: {fehler}
           </div>
+        )}
 
-          <section id="vertraege" className={`scroll-mt-28 overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
-            <Reiterleiste
-              reiter={REITER}
-              aktiv={reiter}
-              onWechsel={setReiter}
-              beschriftung="Versorgungsschichten"
+        {hinweise.length > 0 && schritt !== 'daten' && (
+          <div role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <ul className="list-inside list-disc space-y-1">
+              {hinweise.map((h, i) => <li key={i}>{h}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* ---------- 1. DATEN & ZIEL ---------- */}
+        {schritt === 'daten' && (
+          <>
+            <EtappenKopf
+              nr={1}
+              titel="Ihre Daten und Ihr Ziel"
+              text="Wer Sie sind, was Sie verdienen, was schon an Vorsorge da ist — und mit wie viel Geld im Monat Sie im Ruhestand leben möchten."
             />
-            {/* Kein eigener Grundton: die Flaeche traegt den der Karte, damit
-                die weissen Vertragskarten darauf hervortreten. */}
-            <div className="min-h-[300px] p-3 sm:min-h-[400px] sm:p-4">
-              {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-              {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-              {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-              {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
-            </div>
-          </section>
-
-          <AkkordeonKarte
-            titel="Konto"
-            offen={kontoOffen}
-            onUmschalten={() => setKontoOffen((v) => !v)}
-            symbol={<Wallet className="h-4 w-4 text-indigo-400" aria-hidden />}
-            ton="eingabe"
-          >
-            <Konto />
-          </AkkordeonKarte>
-
-          {supabaseKonfiguriert && angemeldet && (
-            <div id="check-anfragen" className="scroll-mt-28">
-            <AkkordeonKarte
-              titel="Vorsorge-Check anfordern"
-              offen={checkOffen}
-              onUmschalten={() => setCheckOffen((v) => !v)}
-              symbol={<Inbox className="h-4 w-4 text-indigo-400" aria-hidden />}
-              kopfzeile={neueEingaenge > 0 ? (
-                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                  {neueEingaenge} eingegangen
-                </span>
-              ) : undefined}
-              ton="eingabe"
-              klasse="print:hidden"
-            >
-              <CheckAnfragen />
-            </AkkordeonKarte>
-            </div>
-          )}
-        </div>
-
-        {/* RECHTE SPALTE: ERGEBNIS */}
-        <div id="ergebnis" className="scroll-mt-28 space-y-4 sm:space-y-6 lg:col-span-6 xl:col-span-7 print:col-span-12">
-          {fehler && (
-            <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
-              Die Berechnung ist fehlgeschlagen: {fehler}
-            </div>
-          )}
-
-          {hinweise.length > 0 && (
-            <div role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <ul className="list-inside list-disc space-y-1">
-                {hinweise.map((h, i) => <li key={i}>{h}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/*
-            GESAMT ODER EINZELN — der Umschalter steht ganz oben, weil er
-            alles darunter betrifft: Kopfzahlen, Kassenbon, Verlauf, Steuer,
-            Sparrechner, Vertrags-Pruefung und den Ausdruck. Gerechnet wird
-            dafuer nicht anders, sondern ein anderes Szenario.
-          */}
-          {paar && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
-              <Reiterleiste
-                reiter={[
-                  { id: 'haushalt' as const, text: 'Gesamt' },
-                  { id: 'einzeln' as const, text: 'Einzeln' },
-                ]}
-                aktiv={betrachtung}
-                onWechsel={setBetrachtung}
-                beschriftung="Haushalt oder einzelne Person"
-              />
-              {betrachtung === 'einzeln' && (
-                <Reiterleiste
-                  reiter={szenario.personen
-                    .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
-                    .map((p) => ({ id: p.id, text: personName(p) }))}
-                  aktiv={wer}
-                  onWechsel={setWer}
-                  beschriftung="Welche Person"
-                />
-              )}
-              <p className="px-3 py-2 text-xs leading-relaxed text-slate-500">
-                {betrachtung === 'einzeln'
-                  ? `Nur die Verträge und Einkünfte von ${personNameAus(szenario.personen, wer)} — allein veranlagt, mit Grundtarif statt Splitting.`
-                  : 'Beide Partner zusammen, wie bisher: eine Veranlagung mit Splittingtarif.'}
-              </p>
-            </div>
-          )}
-
-          {ergebnis ? (
-            <>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
-                  <h3 className="mb-0.5 text-[10px] font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
-                    Bedarf im Jahr {zeile.jahr}
-                  </h3>
-                  <p className="text-lg font-bold tabular-nums sm:text-3xl">
-                    {euro(zeile.zielNettoMonat * faktor)}
-                  </p>
-                </div>
-                <div
-                  className={`flex flex-col justify-center rounded-xl border bg-white p-3 shadow-sm sm:p-6 ${
-                    luecke > 0 ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
+            {/*
+              LINKS die Angaben zur Person, RECHTS die Vertraege. Getoenter
+              Grund mit kraeftigem Rand, wie auf der Seite zum
+              Altersvorsorgedepot: Hier traegt man ein; die Ergebnisse stehen
+              in den folgenden Etappen auf weissen Karten.
+            */}
+            {/*
+              ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
+              nennt die Unterlage, das Formular zeigt alles auf einen Blick.
+              Beide schreiben in denselben Speicher — umschalten verliert nichts.
+            */}
+            <div className="flex rounded-lg border border-slate-200 bg-slate-200/50 p-1 print:hidden" role="group" aria-label="Art der Eingabe">
+              {([['assistent', 'Schritt für Schritt'], ['formular', 'Alle Angaben auf einen Blick']] as const).map(([id, text]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setEingabeArt(id)}
+                  aria-pressed={eingabeArt === id}
+                  className={`flex-1 rounded-md py-1.5 text-[11px] font-bold sm:py-2 sm:text-xs ${
+                    eingabeArt === id ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  <h3 className="mb-0.5 text-[10px] font-semibold leading-tight sm:mb-1 sm:text-sm">
-                    Versorgungslücke
-                  </h3>
-                  <p className="text-lg font-bold tabular-nums sm:text-3xl">
-                    {luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
-                  </p>
-                </div>
-              </div>
+                  {text}
+                </button>
+              ))}
+            </div>
 
-              <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
-
-              {/*
-                Der Sparrechner steht bewusst DIREKT unter der Luecke: dort
-                stellt sich die Frage, was zu tun waere.
-              */}
-              <Sparrechner zeile={zeile} />
-
-              {/*
-                Direkt darunter, weil die Praemie im Ruhestand fuer einen
-                privat Versicherten oft der groesste einzelne Posten der
-                Luecke ist. Bei gesetzlich Versicherten faellt der Block
-                stillschweigend weg.
-              */}
-              <PkvRechner zeile={zeile} />
-
-              {/*
-                DAS JAHR DER UEBERSICHT, verstellbar — aber nur bei Paaren.
-                Bei einer Person faellt der erste mit dem einzigen
-                Rentenbeginn zusammen; ein Regler haette dort nichts zu
-                zeigen ausser spaeteren Jahren derselben Rente.
-              */}
-              {paar && !einzeln && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
-                <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Angezeigtes Jahr
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setJahrWahl(Math.max(ersterRuhestand, (gezeigtesJahr ?? ersterRuhestand) - 1))}
-                        aria-label="Ein Jahr zurück"
-                        className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                        disabled={(gezeigtesJahr ?? ersterRuhestand) <= ersterRuhestand}
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                      <span className="min-w-[3.5rem] text-center text-sm font-black tabular-nums text-slate-900">
-                        {zeile.jahr}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setJahrWahl(Math.min(
-                          zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr,
-                          (gezeigtesJahr ?? ersterRuhestand) + 1,
-                        ))}
-                        aria-label="Ein Jahr vor"
-                        className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                        disabled={(gezeigtesJahr ?? ersterRuhestand)
-                          >= zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
-                      >
-                        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min={ersterRuhestand}
-                    max={zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
-                    step={1}
-                    value={gezeigtesJahr ?? ersterRuhestand}
-                    onChange={(e) => setJahrWahl(Number(e.target.value))}
-                    aria-label="Jahr der Übersicht"
-                    className="mt-2 w-full accent-indigo-600"
+            {eingabeArt === 'assistent' ? (
+              <Assistent
+                ergebnis={ergebnis ?? null}
+                onEhepartnerDialog={() => setEhepartnerDialog(true)}
+                vertraege={schichten}
+                onFertig={() => geheZu('ergebnis')}
+              />
+            ) : (
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
+              <div id="eingaben" className="scroll-mt-28 lg:col-span-6">
+                <AkkordeonKarte
+                  titel="Allgemeine Daten & Ziel"
+                  offen={basisOffen}
+                  onUmschalten={() => setBasisOffen((v) => !v)}
+                  symbol={<User className="h-4 w-4 text-indigo-400" aria-hidden />}
+                  ton="eingabe"
+                >
+                  <Basisdaten
+                    ergebnis={ergebnis ?? null}
+                    onEhepartnerDialog={() => setEhepartnerDialog(true)}
+                    onAssistent={() => setEingabeArt('assistent')}
                   />
+                </AkkordeonKarte>
+              </div>
+
+              <div className="space-y-4 sm:space-y-6 lg:col-span-6">
+                {schichten}
+
+                <AkkordeonKarte
+                  titel="Konto"
+                  offen={kontoOffen}
+                  onUmschalten={() => setKontoOffen((v) => !v)}
+                  symbol={<Wallet className="h-4 w-4 text-indigo-400" aria-hidden />}
+                  ton="eingabe"
+                >
+                  <Konto />
+                </AkkordeonKarte>
+
+                {supabaseKonfiguriert && angemeldet && (
+                  <div id="check-anfragen" className="scroll-mt-28">
+                  <AkkordeonKarte
+                    titel="Vorsorge-Check anfordern"
+                    offen={checkOffen}
+                    onUmschalten={() => setCheckOffen((v) => !v)}
+                    symbol={<Inbox className="h-4 w-4 text-indigo-400" aria-hidden />}
+                    kopfzeile={neueEingaenge > 0 ? (
+                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        {neueEingaenge} eingegangen
+                      </span>
+                    ) : undefined}
+                    ton="eingabe"
+                    klasse="print:hidden"
+                  >
+                    <CheckAnfragen />
+                  </AkkordeonKarte>
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+            {/* Im Assistenten fuehrt dessen eigener letzter Knopf weiter. */}
+            {eingabeArt === 'formular' && (
+              <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Zum Ergebnis" />
+            )}
+          </>
+        )}
+
+        {/* ---------- 2. ERGEBNIS ---------- */}
+        {schritt === 'ergebnis' && (
+          <>
+            <EtappenKopf
+              nr={2}
+              titel="Ihr Ergebnis"
+              text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
+            />
+            {paarUmschalter}
+            {ergebnis ? (
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
+                <div className="space-y-4 sm:space-y-6 lg:col-span-5">
+                  {kopfzahlen}
+                  <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
-                    Ohne diesen Satz wirkt das hohe Netto einer gemischten
-                    Phase wie ein Rechenfehler: Da laeuft noch ein Gehalt.
+                    Die Praemie im Ruhestand ist fuer einen privat Versicherten
+                    oft der groesste einzelne Posten der Luecke. Bei gesetzlich
+                    Versicherten faellt der Block stillschweigend weg.
                   */}
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                    {zeile.gemischtePhase
-                      ? 'Ein Partner arbeitet noch — im Netto steckt daher weiter ein Gehalt.'
-                      : 'Beide im Ruhestand.'}
-                  </p>
+                  <PkvRechner zeile={zeile} />
+                  {jahrRegler}
                 </div>
-              )}
+                <div className="space-y-4 sm:space-y-6 lg:col-span-7">
+                  <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setAnsicht('kassenbon')}
+                      aria-pressed={ansicht === 'kassenbon'}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
+                        ansicht === 'kassenbon' ? 'bg-white shadow' : 'text-slate-500'
+                      }`}
+                    >
+                      <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Kassenbon
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnsicht('verlauf')}
+                      aria-pressed={ansicht === 'verlauf'}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
+                        ansicht === 'verlauf' ? 'bg-white shadow' : 'text-slate-500'
+                      }`}
+                    >
+                      <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Verlauf
+                    </button>
+                  </div>
 
-              <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
-                <button
-                  type="button"
-                  onClick={() => setAnsicht('kassenbon')}
-                  aria-pressed={ansicht === 'kassenbon'}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
-                    ansicht === 'kassenbon' ? 'bg-white shadow' : 'text-slate-500'
-                  }`}
-                >
-                  <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Kassenbon
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAnsicht('verlauf')}
-                  aria-pressed={ansicht === 'verlauf'}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
-                    ansicht === 'verlauf' ? 'bg-white shadow' : 'text-slate-500'
-                  }`}
-                >
-                  <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Verlauf
-                </button>
+                  <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
+                    <Kassenbon
+                      ergebnis={ergebnis}
+                      zeile={zeile}
+                      szenario={ansichtSzenario}
+                      kaufkraftHeute={kaufkraftHeute}
+                      person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+                    />
+                  </div>
+                  <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
+                    <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
+                  </div>
+
+                  <Rechtsstand
+                    ergebnis={ergebnis}
+                    tarifIndex={szenario.annahmen.tarifIndex}
+                    rentendynamik={szenario.annahmen.rentendynamik}
+                    inflation={szenario.annahmen.inflation}
+                  />
+                </div>
               </div>
+            ) : rechnetText}
+            <JourneyWeiter
+              etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu}
+              weiterText={luecke > 0 ? 'Was kostet es, die Lücke zu schließen?' : undefined}
+            />
+          </>
+        )}
 
-              <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
-                <Kassenbon
-                  ergebnis={ergebnis}
-                  zeile={zeile}
-                  szenario={ansichtSzenario}
-                  kaufkraftHeute={kaufkraftHeute}
-                  person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
-                />
+        {/* ---------- 3. SPARRECHNER ---------- */}
+        {schritt === 'sparen' && (
+          <>
+            <EtappenKopf
+              nr={3}
+              titel="Die Lücke schließen"
+              text="Wie viel Sie ab heute monatlich zurücklegen müssten, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten."
+            />
+            {paarUmschalter}
+            {ergebnis ? (
+              <div className="space-y-4 sm:space-y-6">
+                {kopfzahlen}
+                <Sparrechner zeile={zeile} immerOffen onStartbeitrag={setSparrate} />
               </div>
-              <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
-                <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
-              </div>
+            ) : rechnetText}
+            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Womit? Lösungen vergleichen" />
+          </>
+        )}
 
-              <Rechtsstand
-                ergebnis={ergebnis}
-                tarifIndex={szenario.annahmen.tarifIndex}
-                rentendynamik={szenario.annahmen.rentendynamik}
-                inflation={szenario.annahmen.inflation}
-              />
-            </>
-          ) : (
-            <p className="rounded-lg bg-white px-4 py-8 text-center text-sm text-slate-500">
-              Berechnung läuft …
-            </p>
-          )}
+        {/* ---------- 4. VERTRAGS-TUEV & LOESUNGEN ---------- */}
+        {schritt === 'loesungen' && (
+          <>
+            <EtappenKopf
+              nr={4}
+              titel="Vertrags-TÜV & Lösungen"
+              text="Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den Sie neu in die Altersvorsorge stecken."
+            />
+            {paarUmschalter}
+            <div className="-mx-2 sm:-mx-6">
+              <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
+            </div>
+            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
+          </>
+        )}
 
-          <p className="text-right text-[11px] text-slate-400 print:hidden" aria-live="polite">
-            {rechnet ? 'rechnet …' : `berechnet in ${dauerMs.toFixed(0)} ms im Hintergrund`}
-          </p>
-        </div>
+        <p className="text-right text-[11px] text-slate-400 print:hidden" aria-live="polite">
+          {rechnet ? 'rechnet …' : `berechnet in ${dauerMs.toFixed(0)} ms im Hintergrund`}
+        </p>
       </main>
 
       <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
 
       <Seitenleiste offen={leisteOffen} onSchliessen={schliesseLeiste} abschnitte={abschnitte} />
-
-      <div className="print:hidden">
-        <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
-      </div>
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500 print:hidden">
         <p>

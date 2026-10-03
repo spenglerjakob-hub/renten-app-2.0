@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Target } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
@@ -17,16 +17,26 @@ import {
  * Beitragsdynamik, weil ein Vertrag mit 3 % Steigerung heute deutlich
  * weniger kostet als einer ohne.
  */
-export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
+export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
+  zeile: Jahreszeile;
+  /** Als eigene Etappe der Beratung: ohne Aufklappen, gleich mit Inhalt */
+  immerOffen?: boolean;
+  /** Meldet den noetigen Startbeitrag — die Loesungen koennen ihn uebernehmen */
+  onStartbeitrag?: (n: number | null) => void;
+}) {
   const szenario = useSzenario((x) => x.szenario);
   const schmal = useSchmal();
-  const [offen, setOffen] = useState(false);
+  const [aufgeklappt, setOffen] = useState(false);
+  const offen = immerOffen || aufgeklappt;
   const [eingaben, setEingaben] = useState<SparzielEingaben>(SPARZIEL_VORGABE);
 
   const r = useMemo(
     () => sparzielRechnen(szenario, zeile, eingaben),
     [szenario, zeile, eingaben],
   );
+
+  const startbeitrag = r?.gewaehlt.startbeitrag ?? null;
+  useEffect(() => { onStartbeitrag?.(startbeitrag); }, [startbeitrag, onStartbeitrag]);
 
   const setze = (teil: Partial<SparzielEingaben>) =>
     setEingaben((x) => ({ ...x, ...teil }));
@@ -37,7 +47,8 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
         type="button"
         onClick={() => setOffen((x) => !x)}
         aria-expanded={offen}
-        className="flex w-full items-center justify-between gap-3 p-3 text-left sm:p-4"
+        disabled={immerOffen}
+        className="flex w-full items-center justify-between gap-3 p-3 text-left disabled:cursor-default sm:p-4"
       >
         <span className="flex items-center gap-2">
           <Target className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
@@ -50,10 +61,12 @@ export function Sparrechner({ zeile }: { zeile: Jahreszeile }) {
             </span>
           </span>
         </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
-          aria-hidden
-        />
+        {!immerOffen && (
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        )}
       </button>
 
       <div className={`border-t border-slate-100 p-3 sm:p-4 ${offen ? 'block' : 'hidden'}`}>
