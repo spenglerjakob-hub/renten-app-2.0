@@ -583,8 +583,8 @@ export function BetriebJahr({ betrieb }: { betrieb: BetriebErgebnis }) {
         {/* Der alte 15-%-Zuschuss kostet oft weniger, als die Umwandlung an Abgaben spart — dann
             war der Bestand bisher ein kleiner Gewinn, der nun in der Aufstockung aufgeht. */}
         {hatBestand && (bestandWeg >= 0
-          ? zeile('− bisherige Kosten Bestandsverträge, netto', `− ${euro(bestandWeg)}`)
-          : zeile('+ bisherige Ersparnis Bestandsverträge, netto', `+ ${euro(-bestandWeg)}`))}
+          ? zeile('− Bestandsverträge bisher', `− ${euro(bestandWeg)}`)
+          : zeile('+ Bestandsverträge bisher (Ersparnis)', `+ ${euro(-bestandWeg)}`))}
         {zeile(mehr >= 0 ? '= Mehrkosten, netto' : '= Ersparnis, netto', euro(Math.abs(mehr)),
           'border-t border-slate-200 pt-0.5 font-bold text-slate-900')}
         {zeile('Beiträge in die Altersvorsorge', euro(betrieb.agBeitragJahr), 'pt-1')}
