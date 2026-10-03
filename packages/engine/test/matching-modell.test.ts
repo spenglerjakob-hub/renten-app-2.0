@@ -3,6 +3,7 @@ import {
   matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis, type MatchingEingaben,
   zuschussModell, zuschussVollAusschoepfen, zuschussStaffel, type ZuschussEingaben,
   festbetragModell, festbetragGehaltsStaffel, type FestbetragEingaben,
+  betriebUmstieg, type BetriebAngaben,
 } from '../src/analyse/matching-modell.js';
 import { vertragsTuev, type TuevKontext } from '../src/analyse/vertrags-tuev.js';
 import { parameterFuer } from '../src/params/registry.js';
@@ -383,5 +384,76 @@ describe('Bisherige Leistungen: VL und bestehende bAV', () => {
     expect(r.hinweise.some((h) => h.includes('Bestehende Verträge belegen'))).toBe(true);
     expect(zuschussVollAusschoepfen(basis({ bisher }), steuer.bundesland, p)).toBe(0);
     expect(optimaleUmwandlung('dv', basis({ bisher }), steuer.bundesland, p)).toBe(0);
+  });
+});
+
+describe('Umstieg fuer den ganzen Betrieb', () => {
+  const zEin = (over: Partial<ZuschussEingaben> = {}): ZuschussEingaben => ({
+    jahresbrutto: 54_000, umwandlungMonat: 100, quote: 0.5, deckelMonat: 100,
+    unternehmensSteuersatz: 0.3, umlagenSatz: 0, privatVersichert: false, pkvPraemieMonat: 0,
+    kinder: { hatKinder: false, kinderUnter25: 0 }, ...over,
+  });
+  const angaben = (over: Partial<BetriebAngaben> = {}): BetriebAngaben => ({
+    neuTeilnehmer: 10,
+    bestand: { anzahl: 0, umwandlungMonat: 100, zuschussQuote: 0.15 },
+    vl: { betragMonat: 0, umgang: 'anrechnen', beiNeuen: 0, beiBestand: 0, ohneBav: 0 },
+    ...over,
+  });
+  const zm = (e: ZuschussEingaben) => zuschussModell(e, steuer, p);
+
+  it('nur neue Teilnehmer: bisher 0, neu = n × Modell netto × 12', () => {
+    const b = betriebUmstieg(zm, zEin(), angaben(), steuer, p);
+    expect(b.zeilen.map((z) => z.gruppe)).toEqual(['neu']);
+    expect(b.bisherNettoJahr).toBe(0);
+    expect(b.neuNettoJahr).toBeCloseTo(10 * zm(zEin()).arbeitgeber.nettoKostenMonat * 12, 6);
+  });
+
+  it('Bestand 15 % → Zuschussmodell 50 %: Aufstockung kostet die Differenz', () => {
+    const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 0, bestand: { anzahl: 3, umwandlungMonat: 100, zuschussQuote: 0.15 } }), steuer, p);
+    const alt = zm(zEin({ quote: 0.15, deckelMonat: 1e9 })).arbeitgeber.nettoKostenMonat;
+    const neu = zm(zEin()).arbeitgeber.nettoKostenMonat;
+    expect(b.zeilen.map((z) => z.gruppe)).toEqual(['bestand']);
+    expect(b.mehrkostenNettoJahr).toBeCloseTo(3 * (neu - alt) * 12, 6);
+    expect(b.mehrkostenNettoJahr).toBeGreaterThan(0);
+  });
+
+  it('Bestand 15 % → Festbetrag 50 EUR', () => {
+    const fm = (e: FestbetragEingaben) => festbetragModell(e, steuer, p);
+    const basis: FestbetragEingaben = { ...zEin(), festbetragMonat: 50, mindestUmwandlungMonat: 50 };
+    const b = betriebUmstieg(fm, basis, angaben({ neuTeilnehmer: 0, bestand: { anzahl: 2, umwandlungMonat: 100, zuschussQuote: 0.15 } }), steuer, p);
+    const alt = zm(zEin({ quote: 0.15, deckelMonat: 1e9 })).arbeitgeber.nettoKostenMonat;
+    expect(b.mehrkostenNettoJahr).toBeCloseTo(2 * (fm(basis).arbeitgeber.nettoKostenMonat - alt) * 12, 6);
+  });
+
+  it('VL ohne Betriebsrente: angerechnet faellt weg, zusaetzlich wird abgabenfreie bAV', () => {
+    const vl = (umgang: 'anrechnen' | 'zusaetzlich') =>
+      angaben({ neuTeilnehmer: 0, vl: { betragMonat: 40, umgang, beiNeuen: 0, beiBestand: 0, ohneBav: 5 } });
+    const an = betriebUmstieg(zm, zEin(), vl('anrechnen'), steuer, p);
+    const zu = betriebUmstieg(zm, zEin(), vl('zusaetzlich'), steuer, p);
+    expect(an.neuNettoJahr).toBe(0);
+    expect(an.bisherNettoJahr).toBeCloseTo(5 * (40 + 40 * 0.2115) * 0.7 * 12, -1);
+    expect(an.mehrkostenNettoJahr).toBeLessThan(0);
+    expect(zu.neuNettoJahr).toBeCloseTo(5 * 40 * 0.7 * 12, 6);
+    expect(zu.mehrkostenNettoJahr).toBeLessThan(0);
+    expect(zu.mehrkostenNettoJahr).toBeGreaterThan(an.mehrkostenNettoJahr);
+  });
+
+  it('neue Teilnehmer mit VL: Zeile = Kopfrechnung × Anzahl, Anzahl geklemmt', () => {
+    const vl = { betragMonat: 40, umgang: 'zusaetzlich' as const, beiNeuen: 99, beiBestand: 0, ohneBav: 0 };
+    const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 4, vl }), steuer, p);
+    const u = zm(zEin({ bisher: { vlMonat: 40, vlUmgang: 'zusaetzlich', bavBestandMonat: 0 } })).umstieg!;
+    expect(b.zeilen.map((z) => [z.gruppe, z.anzahl])).toEqual([['neuMitVl', 4]]);
+    expect(b.mehrkostenNettoJahr).toBeCloseTo(4 * u.mehrkostenNettoMonat * 12, 6);
+  });
+
+  it('Matching: Bestand rechnet in der Direktversicherung', () => {
+    const calls: string[] = [];
+    const mm = (e: MatchingEingaben, g: 'neu' | 'bestand') => {
+      calls.push(`${g}:${g === 'bestand' ? 'dv' : e.weg}`);
+      return matchingModell(g === 'bestand' ? { ...e, weg: 'dv' } : e, steuer, p);
+    };
+    const b = betriebUmstieg(mm, eingaben({ weg: 'ukasse' }), angaben({ bestand: { anzahl: 2, umwandlungMonat: 100, zuschussQuote: 0.15 } }), steuer, p);
+    expect(calls).toEqual(['neu:ukasse', 'bestand:dv']);
+    expect(b.zeilen).toHaveLength(2);
   });
 });

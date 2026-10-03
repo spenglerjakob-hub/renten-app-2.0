@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Building2, CheckCircle2, HandCoins, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
 import {
-  zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER, type BisherigeLeistungen,
+  zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER, betriebUmstieg,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
+  bisherFuerKopf, betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
 
 /**
@@ -36,7 +37,7 @@ export function Seite() {
   const [steuersatz, setSteuersatz] = useState(0.3);
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
-  const [bisher, setBisher] = useState<BisherigeLeistungen>(KEINE_BISHERIGEN);
+  const [bisher, setBisher] = useState<BisherigeAngaben>(KEINE_BISHERIGEN);
 
   const eingaben = useMemo(() => ({
     jahresbrutto: brutto,
@@ -48,7 +49,7 @@ export function Seite() {
     privatVersichert: privat,
     pkvPraemieMonat: privat ? praemie : 0,
     kinder: { hatKinder: false, kinderUnter25: 0 },
-    bisher,
+    bisher: bisherFuerKopf(bisher),
   }), [brutto, umwandlung, quote, deckel, steuersatz, umlagen, privat, praemie, bisher]);
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
@@ -61,6 +62,10 @@ export function Seite() {
   const ma = r.mitarbeiter;
   const ag = r.arbeitgeber;
   const n = Math.max(1, Math.round(anzahl));
+  const betrieb = useMemo(
+    () => betriebUmstieg((e) => zuschussModell(e, steuerOpt, p), eingaben, betriebAngaben(bisher, n), steuerOpt, p),
+    [eingaben, bisher, n, steuerOpt],
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
@@ -82,8 +87,7 @@ export function Seite() {
           {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)}, Zuschuss
           {' '}{prozent(quote, 0)} bis {euro(deckel)}. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
-          {bisher.vlMonat > 0 ? ` Bisher ${euroGenau(bisher.vlMonat)} VL, künftig ${bisher.vlUmgang === 'anrechnen' ? 'angerechnet' : 'zusätzlich in der Betriebsrente'}.` : ''}
-          {bisher.bavBestandMonat > 0 ? ` Bestehende bAV ${euro(bisher.bavBestandMonat)} im Monat.` : ''}
+          {bisherAnnahmen(bisher)}
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-2 print:block">
@@ -128,7 +132,7 @@ export function Seite() {
               <ZahlFeld label="Höchstens im Monat" wert={deckel} onChange={setDeckel} einheit="€" schritt={10} />
             </Kasten>
 
-            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} vlZiel="Direktversicherung" />
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} vlZiel="Direktversicherung" neuTeilnehmer={n} />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
@@ -256,7 +260,9 @@ export function Seite() {
                 gesamtVorsorge={r.vertragMonat}
               />
             )}
-            {r.umstieg && <UmstiegVergleich u={r.umstieg} n={n} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />}
+            {hatBisherige(bisher) && (
+              <UmstiegVergleich u={r.umstieg} betrieb={betrieb} vlUmgang={bisher.vlUmgang} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />
+            )}
 
             {r.hinweise.length > 0 && (
               <section className="space-y-1.5">
@@ -269,7 +275,7 @@ export function Seite() {
             )}
 
             {/* Mit VL beginnt Seite 2 schon beim Vergleich mit heute (siehe UmstiegVergleich). */}
-            <div className={`space-y-4 print:space-y-2 ${r.umstieg ? '' : 'print:break-before-page'}`}>
+            <div className={`space-y-4 print:space-y-2 ${hatBisherige(bisher) ? '' : 'print:break-before-page'}`}>
               <p className="hidden text-lg font-black text-slate-900 print:block">Umsetzung</p>
 
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">

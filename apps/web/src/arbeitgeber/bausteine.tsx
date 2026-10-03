@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { Info } from 'lucide-react';
-import type { BisherigeLeistungen, GehaltsVergleich, Umstieg } from '@renten/engine';
+import type {
+  BetriebAngaben, BetriebErgebnis, BetriebGruppe, BisherigeLeistungen, GehaltsVergleich, Umstieg,
+} from '@renten/engine';
 import { Logo } from '../components/Logo';
-import { AuswahlFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
+import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 
 /**
  * Bausteine der beiden Arbeitgeber-Seiten (Matching-Modell und
@@ -278,7 +280,63 @@ export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['
  * des Umstiegs, nicht nur die Kosten des Modells.
  * ======================================================================== */
 
-export const KEINE_BISHERIGEN: BisherigeLeistungen = { vlMonat: 0, vlUmgang: 'anrechnen', bavBestandMonat: 0 };
+/**
+ * Was der Betrieb heute leistet — der Zustand der Seite. Das neue Modell
+ * ersetzt per Versorgungsordnung bzw. Gesamtzusage alle alten VL; bestehende
+ * Betriebsrenten laufen weiter und werden auf das Modell aufgestockt.
+ */
+export interface BisherigeAngaben {
+  vlMonat: number;
+  vlUmgang: BisherigeLeistungen['vlUmgang'];
+  vlBeiNeuen: number;
+  vlBeiBestand: number;
+  vlOhneBav: number;
+  bestandAnzahl: number;
+  bestandUmwandlungMonat: number;
+  bestandQuote: number;
+}
+
+export const KEINE_BISHERIGEN: BisherigeAngaben = {
+  vlMonat: 0, vlUmgang: 'anrechnen', vlBeiNeuen: 0, vlBeiBestand: 0, vlOhneBav: 0,
+  bestandAnzahl: 0, bestandUmwandlungMonat: 100, bestandQuote: 0.15,
+};
+
+/** Gibt es ueberhaupt etwas Bisheriges? Dann erscheint der Vergleich. */
+export const hatBisherige = (b: BisherigeAngaben) => b.vlMonat > 0 || b.bestandAnzahl > 0;
+
+/**
+ * Die Beispielrechnung je Kopf (Kacheln, Bons) zeigt einen NEUEN Teilnehmer —
+ * mit VL nur, wenn unter den neuen Teilnehmern VL-Bezieher sind.
+ */
+export function bisherFuerKopf(b: BisherigeAngaben): BisherigeLeistungen | undefined {
+  return b.vlMonat > 0 && b.vlBeiNeuen > 0
+    ? { vlMonat: b.vlMonat, vlUmgang: b.vlUmgang, bavBestandMonat: 0 }
+    : undefined;
+}
+
+export function betriebAngaben(b: BisherigeAngaben, neuTeilnehmer: number): BetriebAngaben {
+  return {
+    neuTeilnehmer,
+    bestand: { anzahl: b.bestandAnzahl, umwandlungMonat: b.bestandUmwandlungMonat, zuschussQuote: b.bestandQuote },
+    vl: {
+      betragMonat: b.vlMonat, umgang: b.vlUmgang,
+      beiNeuen: b.vlBeiNeuen, beiBestand: b.vlBeiBestand, ohneBav: b.vlOhneBav,
+    },
+  };
+}
+
+/** Kurzfassung fuer die Druckzeile „Annahmen“. */
+export function bisherAnnahmen(b: BisherigeAngaben): string {
+  const teile: string[] = [];
+  if (b.bestandAnzahl > 0) {
+    teile.push(`${b.bestandAnzahl} bestehende Verträge (Ø ${euro(b.bestandUmwandlungMonat)} Umwandlung, bisher ${prozent(b.bestandQuote, 0)} Zuschuss) werden aufgestockt.`);
+  }
+  if (b.vlMonat > 0) {
+    teile.push(`VL ${euroGenau(b.vlMonat)} (${b.vlBeiNeuen} neue Teilnehmer, ${b.vlBeiBestand} mit Bestand, ${b.vlOhneBav} ohne bAV), `
+      + `künftig ${b.vlUmgang === 'anrechnen' ? 'angerechnet' : 'zusätzlich in der Betriebsrente'}.`);
+  }
+  return teile.length ? ' ' + teile.join(' ') : '';
+}
 
 /**
  * Der Kasten fuer die linke Spalte. `vlZiel` sagt, wohin die VL bei
@@ -286,43 +344,91 @@ export const KEINE_BISHERIGEN: BisherigeLeistungen = { vlMonat: 0, vlUmgang: 'an
  * Unterstuetzungskasse.
  */
 export function BisherigeLeistungenFelder(props: {
-  wert: BisherigeLeistungen;
-  onChange: (b: BisherigeLeistungen) => void;
+  wert: BisherigeAngaben;
+  onChange: (b: BisherigeAngaben) => void;
   vlZiel: 'Direktversicherung' | 'Unterstützungskasse';
+  /** Neue Teilnehmer — Obergrenze fuer die VL-Bezieher unter ihnen */
+  neuTeilnehmer: number;
 }) {
   const { wert: b, onChange } = props;
+  const setze = (teil: Partial<BisherigeAngaben>) => onChange({ ...b, ...teil });
   return (
     <Kasten titel="Bisherige Leistungen">
+      <p className="-mt-1 text-xs leading-snug text-slate-500">
+        Das neue Modell ersetzt per Versorgungsordnung die bisherigen Leistungen. „Mitarbeiter im Modell“ unten
+        sind die neuen Teilnehmer.
+      </p>
+
+      <ZahlFeld
+        label="Mitarbeiter mit bestehender Betriebsrente" wert={b.bestandAnzahl} min={0} schritt={1} stufen
+        onChange={(v) => setze({ bestandAnzahl: v })}
+        hilfe="Die Verträge laufen weiter und werden auf das neue Modell aufgestockt."
+      />
+      {b.bestandAnzahl > 0 && (
+        <>
+          <ZahlFeld
+            label="Ø Entgeltumwandlung je bestehendem Vertrag" wert={b.bestandUmwandlungMonat} einheit="€" schritt={10} min={0}
+            onChange={(v) => setze({ bestandUmwandlungMonat: v })}
+          />
+          <ProzentFeld
+            label="Bisheriger Arbeitgeberzuschuss" wert={b.bestandQuote} min={0} max={100}
+            onChange={(v) => setze({ bestandQuote: v })}
+            hilfe="Meist der gesetzliche Pflichtzuschuss von 15 %."
+          />
+        </>
+      )}
+
       <ZahlFeld
         label="VL des Arbeitgebers je Mitarbeiter im Monat" wert={b.vlMonat} einheit="€" schritt={5} min={0}
-        onChange={(v) => onChange({ ...b, vlMonat: v })}
-        hilfe="Vermögenswirksame Leistungen, die der Arbeitgeber heute zahlt. Das Bruttogehalt oben versteht sich einschließlich VL."
+        onChange={(v) => setze({ vlMonat: v })}
+        hilfe="Das Bruttogehalt oben versteht sich einschließlich VL."
       />
       {b.vlMonat > 0 && (
-        <AuswahlFeld
-          label="Die VL im neuen Modell" wert={b.vlUmgang}
-          onChange={(v) => onChange({ ...b, vlUmgang: v })}
-          optionen={[
-            { wert: 'anrechnen', text: 'wird angerechnet (entfällt)' },
-            { wert: 'zusaetzlich', text: 'fließt zusätzlich in die Betriebsrente' },
-          ]}
-          hilfe={b.vlUmgang === 'anrechnen'
-            ? 'Die VL entfällt; der Arbeitgeberbeitrag des Modells ersetzt sie.'
-            : `Die VL wird zum Arbeitgeberbeitrag in die ${props.vlZiel} — steuer- und beitragsfrei statt als Lohn.`}
-        />
+        <>
+          <AuswahlFeld
+            label="Die VL im neuen Modell" wert={b.vlUmgang}
+            onChange={(v) => setze({ vlUmgang: v })}
+            optionen={[
+              { wert: 'anrechnen', text: 'wird angerechnet (entfällt)' },
+              { wert: 'zusaetzlich', text: 'fließt zusätzlich in die Betriebsrente' },
+            ]}
+            hilfe={b.vlUmgang === 'anrechnen'
+              ? 'Die VL entfällt — bei Teilnehmern ersetzt sie der Arbeitgeberbeitrag, sonst ersatzlos.'
+              : `Die VL wird zum Arbeitgeberbeitrag in die ${props.vlZiel} — steuer- und beitragsfrei statt als Lohn, auch bei Mitarbeitern ohne eigene Umwandlung.`}
+          />
+          <p className="text-xs font-semibold text-slate-600">Wie viele bekommen heute VL?</p>
+          <div className="grid grid-cols-3 items-end gap-2">
+            <ZahlFeld label="neue Teilnehmer" wert={b.vlBeiNeuen} min={0} max={Math.max(0, props.neuTeilnehmer)} schritt={1}
+              onChange={(v) => setze({ vlBeiNeuen: v })} />
+            <ZahlFeld label="mit Bestand" wert={b.vlBeiBestand} min={0} max={Math.max(0, b.bestandAnzahl)} schritt={1}
+              onChange={(v) => setze({ vlBeiBestand: v })} />
+            <ZahlFeld label="ohne bAV" wert={b.vlOhneBav} min={0} schritt={1}
+              onChange={(v) => setze({ vlOhneBav: v })} />
+          </div>
+        </>
       )}
-      <ZahlFeld
-        label="Bereits laufende bAV-Beiträge im Monat" wert={b.bavBestandMonat} einheit="€" schritt={10} min={0}
-        onChange={(v) => onChange({ ...b, bavBestandMonat: v })}
-        hilfe="Bestehende Direktversicherung oder Pensionskasse, Arbeitgeber und Mitarbeiter zusammen. Sie läuft weiter und belegt den steuer- und beitragsfreien Rahmen schon teilweise."
-      />
     </Kasten>
   );
 }
 
-/** Bisher gegen neu — erscheint nur, wenn heute VL gezahlt werden. */
-export function UmstiegVergleich({ u, n, steuersatz, mitUmlagen, druck = 'seite2' }: {
-  u: Umstieg; n: number; steuersatz: number; mitUmlagen: boolean;
+const GRUPPE: Record<BetriebGruppe, string> = {
+  neu: 'Neue Teilnehmer',
+  neuMitVl: 'Neue Teilnehmer mit VL',
+  bestand: 'Bestehende Verträge, aufgestockt',
+  bestandMitVl: 'Bestehende Verträge mit VL',
+  vlOhneBav: 'VL ohne Betriebsrente',
+};
+
+/**
+ * Bisher gegen neu: je Kopf (ein neuer Teilnehmer mit VL, falls es ihn gibt)
+ * und fuer den ganzen Betrieb im Jahr.
+ */
+export function UmstiegVergleich({ u, betrieb, vlUmgang, steuersatz, mitUmlagen, druck = 'seite2', kopfImDruck = true }: {
+  u: Umstieg | null;
+  betrieb: BetriebErgebnis;
+  vlUmgang: BisherigeLeistungen['vlUmgang'];
+  steuersatz: number;
+  mitUmlagen: boolean;
   /**
    * Wie der Abschnitt im Druck steht: 'seite2' beginnt Seite 2 (Zuschuss,
    * Festbetrag — Seite 1 ist voll, die Umsetzung folgt ohne eigenen
@@ -330,71 +436,104 @@ export function UmstiegVergleich({ u, n, steuersatz, mitUmlagen, druck = 'seite2
    * Bildschirm beim Gehaltsvergleich, im Druck am Ende von Seite 2.
    */
   druck?: 'seite2' | 'nurBildschirm' | 'nurDruck';
+  /** Die Rechnung je Kopf im Druck zeigen — auf der Matching-Seite fehlt dafuer der Platz. */
+  kopfImDruck?: boolean;
 }) {
-  const mehr = u.mehrkostenNettoMonat;
+  const mehr = betrieb.mehrkostenNettoJahr;
   const druckKlasse = druck === 'seite2' ? 'print:break-before-page'
     : druck === 'nurBildschirm' ? 'print:hidden' : 'hidden print:block';
+  const vlOhne = betrieb.zeilen.find((z) => z.gruppe === 'vlOhneBav');
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none ${druckKlasse}`}>
       <h2 className="text-sm font-black text-slate-900">Was ändert sich gegenüber heute?</h2>
-      <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
-        Heute {euroGenau(u.vlMonat)} VL als Lohn — künftig {u.vlUmgang === 'anrechnen'
-          ? 'angerechnet auf den Arbeitgeberbeitrag'
-          : 'zusätzlich als Beitrag in die Betriebsrente'}. Je Mitarbeiter und Monat:
-      </p>
-      <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
+
+      <h3 className="mt-2 text-[13px] font-bold text-slate-800 print:mt-1 print:text-[10px]">Für den ganzen Betrieb, im Jahr nach Steuern</h3>
+      <table className="mt-1 w-full text-[13px] print:text-[10px]">
         <thead>
-          <tr className="text-left text-xs text-slate-500">
+          <tr className="text-left text-xs text-slate-500 print:text-[9px]">
             <th className="py-0.5 font-medium" />
-            <th className="py-0.5 text-right font-bold text-slate-600">Bisher</th>
+            <th className="py-0.5 text-right font-medium">Anzahl</th>
+            <th className="py-0.5 pl-3 text-right font-bold text-slate-600">Bisher</th>
             <th className="py-0.5 pl-3 text-right font-bold text-emerald-700">Neu</th>
           </tr>
         </thead>
         <tbody className="text-slate-700">
-          <VergleichZeile text="VL als Lohn" links={euroGenau(u.bisher.vlMonat)} rechts="—" />
-          <VergleichZeile
-            text={`Arbeitgeberanteil Sozialversicherung${mitUmlagen ? ' und Umlagen' : ''} auf die VL`}
-            links={`+ ${euro(u.bisher.agAbgabenMonat)}`} rechts="—"
-          />
-          {u.neu.vlInBavMonat > 0 && (
-            <VergleichZeile text="VL als Beitrag in die Betriebsrente (abgabenfrei)" links="—" rechts={euroGenau(u.neu.vlInBavMonat)} />
-          )}
-          <VergleichZeile
-            text="Modell: Zuschuss abzüglich gesparter Abgaben" links="—"
-            rechts={`${u.neu.modellKostenVorSteuerMonat < 0 ? '− ' : ''}${euro(Math.abs(u.neu.modellKostenVorSteuerMonat))}`}
-          />
-          <VergleichZeile
-            text="= Personalkosten vor Steuern" summe
-            links={euro(u.bisher.kostenVorSteuerMonat)} rechts={euro(u.neu.kostenVorSteuerMonat)}
-          />
-          <VergleichZeile
-            text={`− Steuerersparnis (${prozent(steuersatz, 0)} Betriebsausgabe)`}
-            links={`− ${euro(u.bisher.steuerersparnisMonat)}`} rechts={`− ${euro(u.neu.steuerersparnisMonat)}`}
-          />
-          <VergleichZeile
-            text="= kostet den Arbeitgeber netto" summe hervor
-            links={euro(u.bisher.nettoKostenMonat)} rechts={euro(u.neu.nettoKostenMonat)}
-          />
+          {betrieb.zeilen.map((z) => (
+            <tr key={z.gruppe} className="border-t border-slate-100">
+              <td className="py-0.5 pr-2">
+                {GRUPPE[z.gruppe]}
+                {z.gruppe === 'vlOhneBav' && <Zusatz>{vlUmgang === 'anrechnen' ? ' (VL entfällt)' : ' (VL als Arbeitgeber-bAV)'}</Zusatz>}
+              </td>
+              <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{z.anzahl}</td>
+              <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euro(z.bisherNettoJahr)}</td>
+              <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euro(z.neuNettoJahr)}</td>
+            </tr>
+          ))}
+          <tr className="border-t border-slate-300 bg-amber-50 font-bold text-slate-900">
+            <td className="py-0.5 pr-2">Insgesamt</td>
+            <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{betrieb.zeilen.reduce((s, z) => s + z.anzahl, 0)}</td>
+            <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euro(betrieb.bisherNettoJahr)}</td>
+            <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euro(betrieb.neuNettoJahr)}</td>
+          </tr>
         </tbody>
       </table>
       <p className={`mt-2 rounded-lg px-3 py-2 text-[13px] font-bold print:px-2 print:py-1 print:text-[10px] ${
-        mehr > 0.5 ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'
+        mehr > 6 ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'
       }`}>
-        {mehr > 0.5
-          ? <>Tatsächliche Mehrkosten gegenüber heute: {euro(mehr)} im Monat je Mitarbeiter — bei {n} Mitarbeiter{n === 1 ? '' : 'n'} {euro(mehr * 12 * n)} im Jahr.</>
-          : mehr < -0.5
-            ? <>Der Umstieg kostet weniger als heute: {euro(-mehr)} im Monat je Mitarbeiter gespart — bei {n} Mitarbeiter{n === 1 ? '' : 'n'} {euro(-mehr * 12 * n)} im Jahr.</>
+        {mehr > 6
+          ? <>Tatsächliche Mehrkosten des Umstiegs: {euro(mehr)} im Jahr ({euro(mehr / 12)} im Monat).</>
+          : mehr < -6
+            ? <>Der Umstieg kostet weniger als heute: {euro(-mehr)} im Jahr gespart ({euro(-mehr / 12)} im Monat).</>
             : <>Der Umstieg kostet praktisch dasselbe wie heute.</>}
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
-        Beim Mitarbeiter: Heute bringt ihm die VL {euro(u.vlNettoMitarbeiterMonat)} netto. Künftig fließen insgesamt
-        {' '}{euro(u.vorsorgeMitVlMonat)} im Monat in seine Betriebsrente{u.vlUmgang === 'anrechnen'
-          ? ' — die VL selbst fällt weg; das gehört offen ins Gespräch.' : ', die VL darin ungekürzt statt netto.'}
-        {' '}VL beruhen meist auf Tarifvertrag, Betriebsvereinbarung oder Arbeitsvertrag: Wegfall oder Umwidmung braucht
-        eine Vereinbarung mit dem Mitarbeiter bzw. eine tarifliche Öffnung. Sein VL-Vertrag kann ruhen oder privat
-        weiterlaufen; eine Arbeitnehmer-Sparzulage entfällt gegebenenfalls.
+
+      {u && (
+        <div className={kopfImDruck ? '' : 'print:hidden'}>
+          <h3 className="mt-3 text-[13px] font-bold text-slate-800 print:mt-1.5 print:text-[10px]">
+            Je neuem Teilnehmer mit VL, im Monat
+          </h3>
+          <table className="mt-1 w-full text-[13px] print:text-[10px]">
+            <thead>
+              <tr className="text-left text-xs text-slate-500 print:text-[9px]">
+                <th className="py-0.5 font-medium" />
+                <th className="py-0.5 text-right font-bold text-slate-600">Bisher</th>
+                <th className="py-0.5 pl-3 text-right font-bold text-emerald-700">Neu</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              <VergleichZeile text="VL als Lohn" links={euroGenau(u.bisher.vlMonat)} rechts="—" />
+              <VergleichZeile
+                text={`Arbeitgeberanteil Sozialversicherung${mitUmlagen ? ' und Umlagen' : ''} auf die VL`}
+                links={`+ ${euro(u.bisher.agAbgabenMonat)}`} rechts="—"
+              />
+              {u.neu.vlInBavMonat > 0 && (
+                <VergleichZeile text="VL als Beitrag in die Betriebsrente (abgabenfrei)" links="—" rechts={euroGenau(u.neu.vlInBavMonat)} />
+              )}
+              <VergleichZeile
+                text="Modell: Zuschuss abzüglich gesparter Abgaben" links="—"
+                rechts={`${u.neu.modellKostenVorSteuerMonat < 0 ? '− ' : ''}${euro(Math.abs(u.neu.modellKostenVorSteuerMonat))}`}
+              />
+              <VergleichZeile
+                text={`= netto nach Steuern (${prozent(steuersatz, 0)})`} summe hervor
+                links={euro(u.bisher.nettoKostenMonat)} rechts={euro(u.neu.nettoKostenMonat)}
+              />
+            </tbody>
+          </table>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+            Heute bringt ihm die VL {euro(u.vlNettoMitarbeiterMonat)} netto. Künftig fließen {euro(u.vorsorgeMitVlMonat)} im
+            Monat in seine Betriebsrente{u.vlUmgang === 'anrechnen' ? ' — die VL selbst fällt weg; das gehört offen ins Gespräch.' : ', die VL darin ungekürzt statt netto.'}
+          </p>
+        </div>
+      )}
+
+      <p className="mt-2 text-xs leading-relaxed text-slate-500 print:mt-1 print:text-[9px] print:leading-snug">
+        {betrieb.zeilen.some((z) => z.gruppe === 'bestand' || z.gruppe === 'bestandMitVl')
+          && <>Bestehende Verträge laufen weiter und werden auf das neue Modell aufgestockt — als Nachtrag zur Versorgungszusage. </>}
+        {(u || vlOhne || betrieb.zeilen.some((z) => z.gruppe === 'bestandMitVl')) && <>
+          VL beruhen meist auf Tarifvertrag, Betriebsvereinbarung oder Arbeitsvertrag: Die Ablösung durch die
+          Versorgungsordnung braucht eine Vereinbarung bzw. eine tarifliche Öffnung. VL-Verträge können ruhen oder privat
+          weiterlaufen; eine Arbeitnehmer-Sparzulage entfällt gegebenenfalls.</>}
       </p>
     </section>
   );
 }
-
