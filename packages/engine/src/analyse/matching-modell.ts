@@ -998,6 +998,10 @@ export interface BetriebZeile {
   bisherNettoJahr: number;
   /** Kosten der Gruppe im neuen Modell, netto nach Steuern, Jahr */
   neuNettoJahr: number;
+  /** Beitraege des Arbeitgebers in die Altersvorsorge, Jahr */
+  agBeitragJahr: number;
+  /** Was insgesamt in die Altersvorsorge fliesst, Jahr */
+  vorsorgeJahr: number;
 }
 
 /** Die Rechnung fuer einen VL-Bezieher, der seine VL in die Betriebsrente gibt — ohne eigene Umwandlung, Monat. */
@@ -1024,6 +1028,8 @@ export interface BetriebErgebnis {
   neuNettoJahr: number;
   /** Mehrkosten des Umstiegs im Jahr (negativ: der Arbeitgeber spart) */
   mehrkostenNettoJahr: number;
+  agBeitragJahr: number;
+  vorsorgeJahr: number;
   /** Beispiel fuer einen VL-Umwandler — nur, wenn es welche gibt */
   kopfVl: BetriebKopfVl | null;
 }
@@ -1090,14 +1096,24 @@ export function betriebUmstieg<E extends ModellBasis>(
   const vlKosten = vlHeute?.bisher.kostenVorSteuerMonat ?? 0;
 
   const zeilen: BetriebZeile[] = [];
-  const zeile = (gruppe: BetriebGruppe, anzahl: number, bisherMonat: number, neuMonat: number) => {
+  const zeile = (
+    gruppe: BetriebGruppe, anzahl: number, bisherMonat: number, neuMonat: number,
+    agBeitragMonat: number, vorsorgeMonat: number,
+  ) => {
     if (anzahl > 0) {
-      zeilen.push({ gruppe, anzahl, bisherNettoJahr: nettoJahr(bisherMonat) * anzahl, neuNettoJahr: nettoJahr(neuMonat) * anzahl });
+      zeilen.push({
+        gruppe, anzahl,
+        bisherNettoJahr: nettoJahr(bisherMonat) * anzahl,
+        neuNettoJahr: nettoJahr(neuMonat) * anzahl,
+        agBeitragJahr: agBeitragMonat * 12 * anzahl,
+        vorsorgeJahr: vorsorgeMonat * 12 * anzahl,
+      });
     }
   };
 
   if (neu - mitGehalt > 0) {
-    zeile('neu', neu - mitGehalt, 0, modell(ohneBisher, 'neu').kostenVorSteuerMonat);
+    const r = modell(ohneBisher, 'neu');
+    zeile('neu', neu - mitGehalt, 0, r.kostenVorSteuerMonat, r.agBeitragMonat, r.vorsorgeMonat);
   }
   let kopfVl: BetriebKopfVl | null = null;
   if (umwandler > 0 && vlHeute) {
@@ -1107,7 +1123,10 @@ export function betriebUmstieg<E extends ModellBasis>(
     // korrigiert.
     const r = modell(ohneVlLohn(basis.umwandlungMonat), 'neu');
     const beitrag = Math.min(vl + r.agBeitragMonat, Math.max(vl, r.agBeitragMaxMonat));
-    if (mitGehalt > 0) zeile('vlGehalt', mitGehalt, vlKosten, r.kostenVorSteuerMonat - r.agBeitragMonat + beitrag);
+    if (mitGehalt > 0) {
+      zeile('vlGehalt', mitGehalt, vlKosten, r.kostenVorSteuerMonat - r.agBeitragMonat + beitrag,
+        beitrag, Math.max(0, basis.umwandlungMonat) + beitrag);
+    }
     kopfVl = {
       vlMonat: vl,
       vlAbgabenMonat: vlHeute.bisher.agAbgabenMonat,
@@ -1119,18 +1138,24 @@ export function betriebUmstieg<E extends ModellBasis>(
       mitUmwandlungBisMonat: Math.max(vl, r.agBeitragMaxMonat),
     };
     // Ohne eigene Umwandlung: die VL als Arbeitgeberbeitrag, abgabenfrei.
-    zeile('vlUmwandlung', nurVl, vlKosten, vl);
+    zeile('vlUmwandlung', nurVl, vlKosten, vl, vl, vl);
   }
-  if (behalten > 0) zeile('vlBehalten', behalten, vlKosten, vlKosten);
+  if (behalten > 0) zeile('vlBehalten', behalten, vlKosten, vlKosten, 0, 0);
   if (bestand > 0) {
     // Heute: der alte Zuschuss auf die bestehende Umwandlung — mindestens der
     // Pflichtzuschuss, wie im Zuschussmodell.
     const altE = { ...mit(a.bestand.umwandlungMonat), quote: Math.max(0, a.bestand.zuschussQuote), deckelMonat: 1e9 };
     const alt = zuschussModell(altE, steuerOpt, p).arbeitgeber.kostenVorSteuerMonat;
-    zeile('bestand', bestand, alt, modell(mit(a.bestand.umwandlungMonat), 'bestand').kostenVorSteuerMonat);
+    const r = modell(mit(a.bestand.umwandlungMonat), 'bestand');
+    zeile('bestand', bestand, alt, r.kostenVorSteuerMonat, r.agBeitragMonat, r.vorsorgeMonat);
   }
 
   const bisherNettoJahr = zeilen.reduce((s, z) => s + z.bisherNettoJahr, 0);
   const neuNettoJahr = zeilen.reduce((s, z) => s + z.neuNettoJahr, 0);
-  return { zeilen, bisherNettoJahr, neuNettoJahr, mehrkostenNettoJahr: neuNettoJahr - bisherNettoJahr, kopfVl };
+  return {
+    zeilen, bisherNettoJahr, neuNettoJahr, mehrkostenNettoJahr: neuNettoJahr - bisherNettoJahr,
+    agBeitragJahr: zeilen.reduce((s, z) => s + z.agBeitragJahr, 0),
+    vorsorgeJahr: zeilen.reduce((s, z) => s + z.vorsorgeJahr, 0),
+    kopfVl,
+  };
 }

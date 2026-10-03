@@ -472,6 +472,9 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
     expect(z.vlGehalt!.neuNettoJahr).toBeCloseTo((m.kostenVorSteuerMonat - m.zuschussMonat + 50) * 0.7 * 12, 6);
     expect(z.vlUmwandlung!.neuNettoJahr).toBeCloseTo(40 * 0.7 * 12, 6);
     expect(b.kopfVl!.mitUmwandlungBisMonat).toBe(50);
+    // Beitraege: 50 (VL + Festbetrag) und 40 (nur VL); Vorsorge: 100 + 50 und 40
+    expect(b.agBeitragJahr).toBeCloseTo((50 + 40) * 12, 6);
+    expect(b.vorsorgeJahr).toBeCloseTo((150 + 40) * 12, 6);
     ZMAX = 100;
   });
 

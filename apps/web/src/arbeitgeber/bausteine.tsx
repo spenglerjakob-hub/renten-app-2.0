@@ -4,7 +4,7 @@ import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
 } from '@renten/engine';
 import { Logo } from '../components/Logo';
-import { ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
+import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 
 /**
  * Bausteine der beiden Arbeitgeber-Seiten (Matching-Modell und
@@ -294,13 +294,15 @@ export interface BisherigeAngaben {
   vlUmwandler: number;
   /** Davon wandeln zusaetzlich Gehalt um */
   vlMitGehalt: number;
+  /** Was aus dem VL-Vertrag der Umsteiger wird — nur Information, kostet den Arbeitgeber nichts */
+  vlVertrag: 'ruht' | 'privat';
   bestandAnzahl: number;
   bestandUmwandlungMonat: number;
   bestandQuote: number;
 }
 
 export const KEINE_BISHERIGEN: BisherigeAngaben = {
-  vlMonat: 0, vlAnzahl: 0, vlUmwandler: 0, vlMitGehalt: 0,
+  vlMonat: 0, vlAnzahl: 0, vlUmwandler: 0, vlMitGehalt: 0, vlVertrag: 'ruht',
   bestandAnzahl: 0, bestandUmwandlungMonat: 100, bestandQuote: 0.15,
 };
 
@@ -324,7 +326,8 @@ export function bisherAnnahmen(b: BisherigeAngaben): string {
   if (b.vlMonat > 0 && b.vlAnzahl > 0) {
     const umw = Math.min(b.vlUmwandler, b.vlAnzahl);
     teile.push(`${b.vlAnzahl} bekamen bislang ${euroGenau(b.vlMonat)} VL: ${umw} wandeln sie in Altersvorsorge um`
-      + `${b.vlMitGehalt > 0 ? ` (davon ${Math.min(b.vlMitGehalt, umw)} auch Gehalt)` : ''}, ${b.vlAnzahl - umw} behalten sie.`);
+      + `${b.vlMitGehalt > 0 ? ` (davon ${Math.min(b.vlMitGehalt, umw)} auch Gehalt)` : ''}, ${b.vlAnzahl - umw} behalten sie.`
+      + (umw > 0 ? ` Bisheriger VL-Vertrag: ${b.vlVertrag === 'ruht' ? 'ruht' : 'läuft privat weiter'}.` : ''));
   }
   return teile.length ? ' ' + teile.join(' ') : '';
 }
@@ -400,6 +403,17 @@ export function BisherigeLeistungenFelder(props: {
                     wert={b.vlMitGehalt} max={Math.min(umwandler, Math.max(0, props.neuTeilnehmer))}
                     text={b.vlMitGehalt > umwandler ? 'mehr wandeln die VL nicht um' : 'mehr Mitarbeiter sind nicht im Modell'}
                   />
+                  <AuswahlFeld
+                    label="Der bisherige VL-Vertrag" wert={b.vlVertrag}
+                    onChange={(v) => setze({ vlVertrag: v })}
+                    optionen={[
+                      { wert: 'ruht', text: 'ruht (beitragsfrei gestellt)' },
+                      { wert: 'privat', text: 'läuft privat weiter' },
+                    ]}
+                    hilfe={b.vlVertrag === 'ruht'
+                      ? 'Das Guthaben bleibt stehen und wird weiter verzinst; es fließen keine Beiträge mehr.'
+                      : `Der Mitarbeiter zahlt die ${euroGenau(b.vlMonat)} künftig selbst aus dem Netto. Für Sie ändert sich nichts.`}
+                  />
                 </>
               )}
             </div>
@@ -425,8 +439,9 @@ const GRUPPE: Record<BetriebGruppe, string> = {
  * Bisher gegen neu: fuer den ganzen Betrieb im Jahr und — falls es
  * VL-Umwandler gibt — je VL-Umwandler im Monat.
  */
-export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'seite2', kopfImDruck = true }: {
+export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, druck = 'seite2', kopfImDruck = true }: {
   betrieb: BetriebErgebnis;
+  vlVertrag: BisherigeAngaben['vlVertrag'];
   steuersatz: number;
   mitUmlagen: boolean;
   /**
@@ -521,6 +536,9 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
             Heute bringt ihm die VL {euro(k.vlNettoMitarbeiterMonat)} netto — künftig fließen die vollen {euroGenau(k.vlMonat)} in
             seine Betriebsrente, und Sie sparen die Abgaben. Wandelt er zusätzlich Gehalt um, steigt Ihr Beitrag um den
             Zuschuss des Modells, höchstens auf {euro(k.mitUmwandlungBisMonat)} im Monat (VL eingerechnet).
+            {vlVertrag === 'ruht'
+              ? ' Sein bisheriger VL-Vertrag ruht: Das Guthaben bleibt stehen, Beiträge fließen keine mehr.'
+              : ` Sein bisheriger VL-Vertrag läuft privat weiter — die ${euroGenau(k.vlMonat)} zahlt er dann selbst aus dem Netto.`}
           </p>
         </div>
       )}
@@ -530,9 +548,49 @@ export function UmstiegVergleich({ betrieb, steuersatz, mitUmlagen, druck = 'sei
         {(hat('vlUmwandlung') || hat('vlGehalt')) && <>
           Die Umstellung der VL auf einen Arbeitgeberbeitrag wird mit dem Mitarbeiter vereinbart; beruhen die VL auf einem
           Tarifvertrag, muss er das zulassen. Ob die bisherige VL auf den gesetzlichen Pflichtzuschuss angerechnet werden
-          darf, in der Versorgungsordnung ausdrücklich regeln. Ein bestehender VL-Vertrag kann ruhen oder privat
-          weiterlaufen; eine Arbeitnehmer-Sparzulage entfällt gegebenenfalls.</>}
+          darf, in der Versorgungsordnung ausdrücklich regeln. Eine Arbeitnehmer-Sparzulage gibt es nur auf
+          VL-Verträge, in die weiter eingezahlt wird.</>}
       </p>
     </section>
   );
 }
+
+/**
+ * „Im Jahr, ganzer Betrieb“ — ersetzt auf den Seiten die Box „Bei n
+ * Mitarbeitern im Jahr“, sobald es bisherige Leistungen gibt: Was das Neue
+ * kostet, was an VL und altem Zuschuss wegfaellt, und was in die
+ * Altersvorsorge fliesst.
+ */
+export function BetriebJahr({ betrieb }: { betrieb: BetriebErgebnis }) {
+  const summe = (gruppen: BetriebGruppe[], feld: 'bisherNettoJahr' | 'neuNettoJahr') =>
+    betrieb.zeilen.filter((z) => gruppen.includes(z.gruppe)).reduce((s, z) => s + z[feld], 0);
+  // Wer seine VL behaelt, steht bisher wie neu gleich in der Rechnung — hier ohne Belang.
+  const neu = summe(['neu', 'vlGehalt', 'vlUmwandlung', 'bestand'], 'neuNettoJahr');
+  const vlWeg = summe(['vlGehalt', 'vlUmwandlung'], 'bisherNettoJahr');
+  const bestandWeg = summe(['bestand'], 'bisherNettoJahr');
+  const hatBestand = betrieb.zeilen.some((z) => z.gruppe === 'bestand');
+  const anzahl = betrieb.zeilen.reduce((s, z) => s + z.anzahl, 0);
+  const zeile = (text: string, wert: string, klasse = '') => (
+    <div className={`flex justify-between gap-2 ${klasse}`}><dt>{text}</dt><dd className="tabular-nums">{wert}</dd></div>
+  );
+  const mehr = betrieb.mehrkostenNettoJahr;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
+      <h2 className="text-sm font-black text-slate-900">Im Jahr, {anzahl} Mitarbeiter</h2>
+      <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
+        {zeile('Kosten des neuen Modells, netto', euro(neu))}
+        {vlWeg > 0.5 && zeile('− entfallene Kosten für VL, netto', `− ${euro(vlWeg)}`)}
+        {/* Der alte 15-%-Zuschuss kostet oft weniger, als die Umwandlung an Abgaben spart — dann
+            war der Bestand bisher ein kleiner Gewinn, der nun in der Aufstockung aufgeht. */}
+        {hatBestand && (bestandWeg >= 0
+          ? zeile('− bisherige Kosten Bestandsverträge, netto', `− ${euro(bestandWeg)}`)
+          : zeile('+ bisherige Ersparnis Bestandsverträge, netto', `+ ${euro(-bestandWeg)}`))}
+        {zeile(mehr >= 0 ? '= Mehrkosten, netto' : '= Ersparnis, netto', euro(Math.abs(mehr)),
+          'border-t border-slate-200 pt-0.5 font-bold text-slate-900')}
+        {zeile('Beiträge in die Altersvorsorge', euro(betrieb.agBeitragJahr), 'pt-1')}
+        {zeile('Altersvorsorge insgesamt', euro(betrieb.vorsorgeJahr), 'font-bold text-emerald-700')}
+      </dl>
+    </div>
+  );
+}
+

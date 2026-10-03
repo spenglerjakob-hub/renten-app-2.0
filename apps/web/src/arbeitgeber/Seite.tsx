@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
-  betriebAngaben, bisherAnnahmen, hatBisherige, type BisherigeAngaben,
+  betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, type BisherigeAngaben,
 } from './bausteine';
 
 /**
@@ -241,7 +241,7 @@ export function Seite() {
               />
             )}
             {hatBisherige(bisher) && (
-              <UmstiegVergleich betrieb={betrieb} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurBildschirm" />
+              <UmstiegVergleich betrieb={betrieb} vlVertrag={bisher.vlVertrag} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurBildschirm" />
             )}
 
             <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
@@ -255,16 +255,18 @@ export function Seite() {
                   Matching-Beitrag. Die eigene Umwandlung gehört dem Mitarbeiter sofort.
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
-                <h2 className="text-sm font-black text-slate-900">
-                  Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
-                </h2>
-                <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
-                  <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
-                  <div className="flex justify-between gap-2"><dt>Altersvorsorge der Mitarbeiter</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertrag.gesamtMonat * 12 * n)}</dd></div>
-                  <div className="flex justify-between gap-2"><dt>davon vom Arbeitgeber</dt><dd className="tabular-nums">{euro((ag.pflichtzuschussMonat + ag.ukasseMonat) * 12 * n)}</dd></div>
-                </dl>
-              </div>
+              {hatBisherige(bisher) ? <BetriebJahr betrieb={betrieb} /> : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
+                  <h2 className="text-sm font-black text-slate-900">
+                    Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
+                  </h2>
+                  <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
+                    <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
+                    <div className="flex justify-between gap-2"><dt>Altersvorsorge der Mitarbeiter</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertrag.gesamtMonat * 12 * n)}</dd></div>
+                    <div className="flex justify-between gap-2"><dt>davon vom Arbeitgeber</dt><dd className="tabular-nums">{euro((ag.pflichtzuschussMonat + ag.ukasseMonat) * 12 * n)}</dd></div>
+                  </dl>
+                </div>
+              )}
             </section>
 
 
@@ -347,7 +349,7 @@ export function Seite() {
               </section>
 
               {hatBisherige(bisher) && (
-                <UmstiegVergleich betrieb={betrieb} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" kopfImDruck={false} />
+                <UmstiegVergleich betrieb={betrieb} vlVertrag={bisher.vlVertrag} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" kopfImDruck={false} />
               )}
 
               <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
