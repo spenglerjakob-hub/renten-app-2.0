@@ -314,3 +314,74 @@ describe('Festbetragsmodell: 50 EUR fuer jeden, der mindestens 50 EUR einzahlt',
     expect(r.mitarbeiter.nettoAufwandMonat).toBeCloseTo(t.echterAufwandMonat, 2);
   });
 });
+
+describe('Bisherige Leistungen: VL und bestehende bAV', () => {
+  const basis = (over: Partial<ZuschussEingaben> = {}): ZuschussEingaben => ({
+    jahresbrutto: 54_000,
+    umwandlungMonat: 100,
+    quote: 0.5,
+    deckelMonat: 100,
+    unternehmensSteuersatz: 0.3,
+    umlagenSatz: 0,
+    privatVersichert: false,
+    pkvPraemieMonat: 0,
+    kinder: { hatKinder: false, kinderUnter25: 0 },
+    ...over,
+  });
+  const vl = (vlUmgang: 'anrechnen' | 'zusaetzlich', vlMonat = 40, bavBestandMonat = 0) =>
+    ({ vlMonat, vlUmgang, bavBestandMonat });
+
+  it('ohne bisherige Leistungen: unveraendert, kein Umstieg', () => {
+    const ohne = zuschussModell(basis(), steuer, p);
+    const null0 = zuschussModell(basis({ bisher: vl('anrechnen', 0, 0) }), steuer, p);
+    expect(ohne.umstieg).toBeNull();
+    expect(null0.umstieg).toBeNull();
+    expect(null0.arbeitgeber.nettoKostenMonat).toBeCloseTo(ohne.arbeitgeber.nettoKostenMonat, 9);
+    expect(matchingModell(eingaben(), steuer, p).umstieg).toBeNull();
+  });
+
+  it('angerechnet: Mehrkosten = Modell netto (Brutto ohne VL) − bisherige VL netto', () => {
+    const r = zuschussModell(basis({ bisher: vl('anrechnen') }), steuer, p);
+    const u = r.umstieg!;
+    expect(u.bisher.vlMonat).toBe(40);
+    expect(u.bisher.agAbgabenMonat).toBeCloseTo(40 * 0.2115, 1);
+    expect(u.bisher.nettoKostenMonat).toBeCloseTo(u.bisher.kostenVorSteuerMonat * 0.7, 9);
+    expect(u.neu.vlInBavMonat).toBe(0);
+    const modell = zuschussModell(basis({ jahresbrutto: 54_000 - 480 }), steuer, p);
+    expect(r.arbeitgeber.nettoKostenMonat).toBeCloseTo(modell.arbeitgeber.nettoKostenMonat, 9);
+    expect(u.mehrkostenNettoMonat).toBeCloseTo(modell.arbeitgeber.nettoKostenMonat - u.bisher.nettoKostenMonat, 9);
+    expect(u.vlNettoMitarbeiterMonat).toBeGreaterThan(15);
+    expect(u.vlNettoMitarbeiterMonat).toBeLessThan(30);
+  });
+
+  it('zusaetzlich: VL ohne Abgaben in derselben Direktversicherung, belegt den Rahmen zuerst', () => {
+    const ohne = zuschussModell(basis({ umwandlungMonat: 238, jahresbrutto: 54_000 - 480 }), steuer, p);
+    const r = zuschussModell(basis({ umwandlungMonat: 238, bisher: vl('zusaetzlich') }), steuer, p);
+    const u = r.umstieg!;
+    expect(u.neu.vlInBavMonat).toBe(40);
+    expect(u.neu.kostenVorSteuerMonat).toBeCloseTo(u.neu.modellKostenVorSteuerMonat + 40, 9);
+    expect(u.vorsorgeMitVlMonat).toBeCloseTo(r.vertragMonat + 40, 9);
+    // 238 + 100 Zuschuss fuellen den Rahmen schon — mit 40 EUR VL davor werden 40 EUR der Umwandlung pflichtig.
+    expect(ohne.mitarbeiter.svPflichtigMonat).toBeLessThan(1);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeCloseTo(40, 0);
+    expect(u.mehrkostenNettoMonat).toBeGreaterThan(zuschussModell(basis({ umwandlungMonat: 238, bisher: vl('anrechnen') }), steuer, p).umstieg!.mehrkostenNettoMonat);
+  });
+
+  it('Matching zusaetzlich: VL in die Unterstuetzungskasse, der DV-Rahmen bleibt frei', () => {
+    const ohne = matchingModell(eingaben({ jahresbrutto: 54_000 - 480 }), steuer, p);
+    const r = matchingModell(eingaben({ bisher: vl('zusaetzlich') }), steuer, p);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeCloseTo(ohne.mitarbeiter.svPflichtigMonat, 6);
+    expect(r.umstieg!.neu.vlInBavMonat).toBe(40);
+    expect(r.umstieg!.vorsorgeMitVlMonat).toBeCloseTo(r.vertrag.gesamtMonat + 40, 9);
+  });
+
+  it('Bestand fuellt den Rahmen: neue Umwandlung voll pflichtig, voll ausgeschoepft bei 0', () => {
+    const svGrenzeMonat = (0.04 * p.bbgRvJahr) / 12;
+    const bisher = vl('anrechnen', 0, svGrenzeMonat);
+    const r = zuschussModell(basis({ bisher }), steuer, p);
+    expect(r.mitarbeiter.svPflichtigMonat).toBeCloseTo(100, 6);
+    expect(r.hinweise.some((h) => h.includes('Bestehende Verträge belegen'))).toBe(true);
+    expect(zuschussVollAusschoepfen(basis({ bisher }), steuer.bundesland, p)).toBe(0);
+    expect(optimaleUmwandlung('dv', basis({ bisher }), steuer.bundesland, p)).toBe(0);
+  });
+});

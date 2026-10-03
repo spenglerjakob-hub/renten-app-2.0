@@ -39,6 +39,65 @@ import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './v
 
 export type UmwandlungsWeg = 'dv' | 'ukasse';
 
+/**
+ * Was der Arbeitgeber HEUTE schon leistet — damit die Seite zeigen kann, was
+ * der Umstieg auf das Modell tatsaechlich MEHR kostet.
+ *
+ * VL (vermoegenswirksame Leistungen) sind heute Lohn: steuer- und
+ * beitragspflichtig, der Arbeitgeber zahlt seinen SV-Anteil darauf. Im neuen
+ * Modell sind sie in beiden Varianten kein Lohn mehr:
+ *   - 'anrechnen': Die VL entfaellt, der Arbeitgeberbeitrag des Modells
+ *     ersetzt sie.
+ *   - 'zusaetzlich': Die VL fliesst als zusaetzlicher Arbeitgeberbeitrag in
+ *     die Betriebsrente — steuer- und beitragsfrei statt als Lohn. Im
+ *     Zuschuss- und Festbetragsmodell in dieselbe Direktversicherung (sie
+ *     belegt den Rahmen dann zuerst), im Matching-Modell in die
+ *     Unterstuetzungskasse (ohne Rahmen).
+ * Das eingegebene Jahresbrutto versteht sich EINSCHLIESSLICH der VL.
+ *
+ * Bestehende bAV-Beitraege in Direktversicherung oder Pensionskasse laufen
+ * weiter und belegen die Rahmen von 4 % und 8 % schon. Vereinfachung: Sie
+ * belegen ihn VOR dem neuen Vertrag. Streng genommen kaemen erst alle
+ * Arbeitgeberbeitraege, dann die Umwandlungen (siehe `BavVorbelegung` im TUEV)
+ * — fuer die Kosten des Arbeitgebers macht das kaum einen Unterschied.
+ */
+export interface BisherigeLeistungen {
+  /** VL des Arbeitgebers je Mitarbeiter, Monat */
+  vlMonat: number;
+  vlUmgang: 'anrechnen' | 'zusaetzlich';
+  /** Laufende Beitraege in bestehende DV/Pensionskasse (Arbeitgeber und Mitarbeiter), Monat */
+  bavBestandMonat: number;
+}
+
+/** Bisher gegen neu — nur, wenn heute VL gezahlt werden. */
+export interface Umstieg {
+  vlMonat: number;
+  vlUmgang: BisherigeLeistungen['vlUmgang'];
+  bisher: {
+    vlMonat: number;
+    /** Arbeitgeberanteil SV und Umlagen auf die VL */
+    agAbgabenMonat: number;
+    kostenVorSteuerMonat: number;
+    steuerersparnisMonat: number;
+    nettoKostenMonat: number;
+  };
+  neu: {
+    /** Kosten des Modells vor Steuern (Zuschuss abzueglich gesparter Abgaben) */
+    modellKostenVorSteuerMonat: number;
+    /** Die VL als Arbeitgeberbeitrag in der Betriebsrente — 0 bei 'anrechnen' */
+    vlInBavMonat: number;
+    kostenVorSteuerMonat: number;
+    steuerersparnisMonat: number;
+    nettoKostenMonat: number;
+  };
+  /** Was der Umstieg den Arbeitgeber gegenueber heute mehr kostet, netto (negativ: er spart) */
+  mehrkostenNettoMonat: number;
+  /** Was die VL dem Mitarbeiter heute netto bringt */
+  vlNettoMitarbeiterMonat: number;
+  /** Was insgesamt in die Betriebsrente fliesst, mit der VL */
+  vorsorgeMitVlMonat: number;
+}
+
 export interface MatchingEingaben {
   /** Jahresbrutto des Mitarbeiters vor der Umwandlung */
   jahresbrutto: number;
@@ -64,6 +123,8 @@ export interface MatchingEingaben {
   /** Monatliche PKV-Praemie — Bezugsgroesse fuer den Arbeitgeberzuschuss */
   pkvPraemieMonat: number;
   kinder: KinderStatus;
+  /** Was der Arbeitgeber heute schon leistet (VL, bestehende bAV) */
+  bisher?: BisherigeLeistungen;
 }
 
 export interface MatchingSteuer {
@@ -123,6 +184,8 @@ export interface MatchingErgebnis {
   hebelMitarbeiter: number;
   /** Im Vertrag je Euro Nettokosten des Arbeitgebers */
   hebelArbeitgeber: number;
+  /** Gegenueber den bisherigen VL — null ohne VL */
+  umstieg: Umstieg | null;
   hinweise: string[];
 }
 
@@ -166,6 +229,28 @@ export function arbeitgeberSvErsparnis(
   return rvAv + kvPv;
 }
 
+/** Jahresbrutto ohne die VL — im neuen Modell sind sie kein Lohn mehr. */
+const bruttoOhneVl = (brutto: number, b?: BisherigeLeistungen): number =>
+  Math.max(0, brutto - Math.max(0, b?.vlMonat ?? 0) * 12);
+
+/**
+ * Rahmen in der Direktversicherung, den bestehende Vertraege und — bei
+ * 'zusaetzlich' — die umgewidmete VL schon belegen, Jahr. `vlInDv`: Die VL
+ * fliesst in die Direktversicherung (Zuschuss-/Festbetragsmodell), nicht in
+ * die Unterstuetzungskasse (Matching).
+ */
+function vorbelegtJahr(b: BisherigeLeistungen | undefined, vlInDv: boolean): number {
+  if (!b) return 0;
+  const bestand = Math.max(0, b.bavBestandMonat) * 12;
+  const vl = vlInDv && b.vlUmgang === 'zusaetzlich' ? Math.max(0, b.vlMonat) * 12 : 0;
+  return bestand + vl;
+}
+
+/** Der beitragsfreie Rahmen (4 %) nach der Vorbelegung, Jahr. */
+const svRahmen = (p: LegalParameters, vorbelegt: number) => Math.max(0, SV_FREI_QUOTE * p.bbgRvJahr - vorbelegt);
+/** Der steuerfreie Rahmen (8 %) nach der Vorbelegung, Jahr. */
+const steuerRahmen = (p: LegalParameters, vorbelegt: number) => Math.max(0, STEUER_FREI_QUOTE * p.bbgRvJahr - vorbelegt);
+
 interface Aufteilung {
   /** Umwandlung, Jahr */
   e: number;
@@ -183,8 +268,12 @@ interface Aufteilung {
  * Arbeitgebers begrenzt, die wiederum am beitragsfreien Teil haengt. Die
  * Schleife daempft, damit sie auch im PKV-Fall sicher zur Ruhe kommt.
  */
-function aufteilen(e: number, weg: UmwandlungsWeg, sk: SvKontext, bundesland: string, p: LegalParameters): Aufteilung {
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+function aufteilen(
+  e: number, weg: UmwandlungsWeg, sk: SvKontext, bundesland: string, p: LegalParameters, vorbelegt = 0,
+): Aufteilung {
+  // Die Umwandlung in die Unterstuetzungskasse hat ihren eigenen Rahmen
+  // (§ 14 Abs. 1 S. 2 SGB IV) — bestehende Direktversicherungen belegen ihn nicht.
+  const svGrenze = weg === 'ukasse' ? SV_FREI_QUOTE * p.bbgRvJahr : svRahmen(p, vorbelegt);
   if (weg === 'ukasse') {
     const svFrei = Math.min(e, svGrenze);
     return { e, z: 0, svFrei, agSv: arbeitgeberSvErsparnis(svFrei, sk, bundesland, p) };
@@ -202,12 +291,15 @@ function aufteilen(e: number, weg: UmwandlungsWeg, sk: SvKontext, bundesland: st
   return { e, z, svFrei, agSv: arbeitgeberSvErsparnis(svFrei, sk, bundesland, p) };
 }
 
-const svKontext = (e: Pick<MatchingEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat'>): SvKontext => ({
+type SvEingaben = Pick<MatchingEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'bisher'>;
+
+/** SV-Kontext des Modells — mit dem Brutto OHNE VL. */
+const svKontext = (e: SvEingaben): SvKontext => ({
   beamter: false,
   selbststaendig: false,
   privatVersichert: e.privatVersichert,
   pkvPraemieMonat: e.pkvPraemieMonat,
-  jahresbrutto: e.jahresbrutto,
+  jahresbrutto: bruttoOhneVl(e.jahresbrutto, e.bisher),
 });
 
 /**
@@ -219,17 +311,19 @@ const svKontext = (e: Pick<MatchingEingaben, 'jahresbrutto' | 'privatVersichert'
  */
 export function optimaleUmwandlung(
   weg: UmwandlungsWeg,
-  e: Pick<MatchingEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat'>,
+  e: SvEingaben,
   bundesland: string,
   p: LegalParameters,
 ): number {
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
-  if (weg === 'ukasse') return Math.floor(svGrenze / 12 * 100) / 100;
+  if (weg === 'ukasse') return Math.floor(SV_FREI_QUOTE * p.bbgRvJahr / 12 * 100) / 100;
+  // Im Matching-Modell fliesst die VL in die Unterstuetzungskasse — nur der Bestand belegt den Rahmen.
+  const vorbelegt = vorbelegtJahr(e.bisher, false);
+  const svGrenze = svRahmen(p, vorbelegt);
   const sk = svKontext(e);
   let lo = 0, hi = svGrenze;
   for (let i = 0; i < 60; i++) {
     const mitte = (lo + hi) / 2;
-    const a = aufteilen(mitte, weg, sk, bundesland, p);
+    const a = aufteilen(mitte, weg, sk, bundesland, p, vorbelegt);
     if (a.e + a.z > svGrenze) hi = mitte; else lo = mitte;
   }
   return Math.floor(lo / 12 * 100) / 100;
@@ -240,6 +334,73 @@ export function optimaleUmwandlung(
  * und was davon beim Mitarbeiter netto ankommt. `null`, wenn das Modell den
  * Arbeitgeber nichts kostet.
  */
+/**
+ * Bisher gegen neu. `modellKostenVorSteuer` und `vlInBav` als Jahresbetraege;
+ * `bruttoMitVl` ist das eingegebene Brutto (mit VL), `sk` der Kontext dazu.
+ */
+function umstiegRechnen(
+  b: BisherigeLeistungen | undefined,
+  bruttoMitVl: number,
+  modellKostenVorSteuer: number,
+  vorsorgeModell: number,
+  sk: SvKontext,
+  erwerbOpt: Parameters<typeof bruttoZuNetto>[1],
+  satz: number,
+  umlagenSatz: number,
+  bundesland: string,
+  p: LegalParameters,
+): Umstieg | null {
+  const vl = Math.max(0, b?.vlMonat ?? 0) * 12;
+  if (!b || vl <= 0) return null;
+  // Heute: VL als Lohn. Der Arbeitgeber zahlt darauf seinen SV-Anteil und
+  // die Umlagen — genau das, was er spart, wenn sie kein Lohn mehr sind.
+  const k = { ...sk, jahresbrutto: bruttoMitVl };
+  const abgaben = arbeitgeberSvErsparnis(vl, k, bundesland, p) + unterGrenze(bruttoMitVl, vl, p.bbgRvJahr) * umlagenSatz;
+  const bisherKosten = vl + abgaben;
+  const vlInBav = b.vlUmgang === 'zusaetzlich' ? vl : 0;
+  const neuKosten = modellKostenVorSteuer + vlInBav;
+  const vlNetto = bruttoZuNetto(bruttoMitVl, erwerbOpt, p).jahresnetto
+    - bruttoZuNetto(Math.max(0, bruttoMitVl - vl), erwerbOpt, p).jahresnetto;
+  return {
+    vlMonat: vl / 12,
+    vlUmgang: b.vlUmgang,
+    bisher: {
+      vlMonat: vl / 12,
+      agAbgabenMonat: abgaben / 12,
+      kostenVorSteuerMonat: bisherKosten / 12,
+      steuerersparnisMonat: bisherKosten * satz / 12,
+      nettoKostenMonat: bisherKosten * (1 - satz) / 12,
+    },
+    neu: {
+      modellKostenVorSteuerMonat: modellKostenVorSteuer / 12,
+      vlInBavMonat: vlInBav / 12,
+      kostenVorSteuerMonat: neuKosten / 12,
+      steuerersparnisMonat: neuKosten * satz / 12,
+      nettoKostenMonat: neuKosten * (1 - satz) / 12,
+    },
+    mehrkostenNettoMonat: (neuKosten - bisherKosten) * (1 - satz) / 12,
+    vlNettoMitarbeiterMonat: vlNetto / 12,
+    vorsorgeMitVlMonat: (vorsorgeModell + vlInBav) / 12,
+  };
+}
+
+/** Hinweis zum Bestand — fuer alle drei Modelle gleich. */
+function bisherHinweise(b: BisherigeLeistungen | undefined, vorbelegt: number, p: LegalParameters): string[] {
+  // Was zur VL zu sagen ist (Vereinbarung noetig, was beim Mitarbeiter
+  // wegfaellt), steht beim Vergleich bisher/neu auf der Seite — dort, wo die
+  // Zahlen stehen, und im Druck auf derselben Seite.
+  const h: string[] = [];
+  const bestand = Math.max(0, b?.bavBestandMonat ?? 0) * 12;
+  if (bestand > 0) {
+    h.push(
+      `Bestehende Verträge belegen ${euro(bestand / 12)} des beitragsfreien Rahmens von `
+      + `${euro(SV_FREI_QUOTE * p.bbgRvJahr / 12)}${vorbelegt > bestand + 0.5 ? ', die umgewidmete VL weitere ' + euro((vorbelegt - bestand) / 12) : ''}. `
+      + `Für den neuen Vertrag bleiben ${euro(svRahmen(p, vorbelegt) / 12)} beitragsfrei.`,
+    );
+  }
+  return h;
+}
+
 function gehaltsVergleich(
   kostenVorSteuer: number,
   e: Pick<MatchingEingaben, 'jahresbrutto'>,
@@ -279,14 +440,20 @@ function gehaltsVergleich(
 }
 
 export function matchingModell(
-  e: MatchingEingaben,
+  eIn: MatchingEingaben,
   steuerOpt: MatchingSteuer,
   p: LegalParameters,
 ): MatchingErgebnis {
   const hinweise: string[] = [];
+  // Gerechnet wird mit dem Brutto OHNE VL — im neuen Modell sind sie kein
+  // Lohn mehr. Die VL selbst fliesst hier in die Unterstuetzungskasse und
+  // belegt keinen Rahmen; der Bestand schon.
+  const b = eIn.bisher;
+  const e: MatchingEingaben = { ...eIn, jahresbrutto: bruttoOhneVl(eIn.jahresbrutto, b), bisher: undefined };
+  const vorbelegt = vorbelegtJahr(b, false);
   const sk = svKontext(e);
-  const steuerGrenze = STEUER_FREI_QUOTE * p.bbgRvJahr;
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const steuerGrenze = steuerRahmen(p, vorbelegt);
+  const svGrenze = svRahmen(p, vorbelegt);
   const satz = Math.min(0.6, Math.max(0, e.unternehmensSteuersatz));
   const umlagenSatz = Math.max(0, e.umlagenSatz);
 
@@ -299,7 +466,7 @@ export function matchingModell(
   const heute = bruttoZuNetto(Math.max(0, e.jahresbrutto), erwerbOpt, p);
 
   // --- Mitarbeiter ---------------------------------------------------------
-  const a = aufteilen(Math.max(0, e.umwandlungMonat) * 12, e.weg, sk, steuerOpt.bundesland, p);
+  const a = aufteilen(Math.max(0, e.umwandlungMonat) * 12, e.weg, sk, steuerOpt.bundesland, p, vorbelegt);
   const steuerFrei = e.weg === 'dv' ? Math.min(a.e, Math.max(0, steuerGrenze - a.z)) : a.e;
   const wirkung = svWirkung(a.svFrei, sk, p);
   const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
@@ -322,7 +489,7 @@ export function matchingModell(
 
   // --- Hinweise ------------------------------------------------------------
   if (e.weg === 'dv' && a.e + a.z > svGrenze + 6) {
-    const optimal = optimaleUmwandlung('dv', e, steuerOpt.bundesland, p);
+    const optimal = optimaleUmwandlung('dv', eIn, steuerOpt.bundesland, p);
     hinweise.push(
       `Umwandlung und Pflichtzuschuss liegen zusammen um ${euro((a.e + a.z - svGrenze) / 12)} im Monat `
       + `über dem beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Zuschuss wird zuerst `
@@ -361,6 +528,10 @@ export function matchingModell(
     );
   }
 
+  const umstieg = umstiegRechnen(b, eIn.jahresbrutto, kostenVorSteuer, dv + uk, sk, erwerbOpt, satz, umlagenSatz, steuerOpt.bundesland, p);
+  // Bei Umwandlung in die Unterstuetzungskasse belegt der Bestand den Rahmen nicht.
+  hinweise.push(...bisherHinweise(e.weg === 'dv' ? b : (b && { ...b, bavBestandMonat: 0 }), e.weg === 'dv' ? vorbelegt : 0, p));
+
   return {
     mitarbeiter: {
       umwandlungMonat: a.e / 12,
@@ -382,6 +553,7 @@ export function matchingModell(
     gehalt,
     hebelMitarbeiter: aufwandAn > 0 ? (dv + uk) / aufwandAn : 0,
     hebelArbeitgeber: nettoAg > 0 ? (dv + uk) / nettoAg : 0,
+    umstieg,
     hinweise,
   };
 }
@@ -430,6 +602,8 @@ export interface ZuschussErgebnis {
   gehalt: GehaltsVergleich | null;
   hebelMitarbeiter: number;
   hebelArbeitgeber: number;
+  /** Gegenueber den bisherigen VL — null ohne VL */
+  umstieg: Umstieg | null;
   hinweise: string[];
 }
 
@@ -453,9 +627,9 @@ const quotenRegel = (quote: number, deckelMonat: number): ZuschussRegel =>
 
 /** Zuschuss, Pflichtzuschuss und beitragsfreier Teil fuer eine Umwandlung (Jahr). */
 function zuschussAufteilen(
-  e: number, regelFn: ZuschussRegel, sk: SvKontext, bundesland: string, p: LegalParameters,
+  e: number, regelFn: ZuschussRegel, sk: SvKontext, bundesland: string, p: LegalParameters, vorbelegt = 0,
 ): ZuschussAufteilung {
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const svGrenze = svRahmen(p, vorbelegt);
   const regel = Math.max(0, regelFn(e));
   let ag = regel, pflicht = 0, svFrei = 0, agSv = 0;
   // Nur wenn die Regel unter dem Pflichtzuschuss liegt, haengen beide
@@ -479,11 +653,11 @@ function zuschussAufteilen(
  * 2026: 238 EUR.
  */
 export function zuschussVollAusschoepfen(
-  e: Pick<ZuschussEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'quote' | 'deckelMonat'>,
+  e: Pick<ZuschussEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'quote' | 'deckelMonat' | 'bisher'>,
   bundesland: string,
   p: LegalParameters,
 ): number {
-  return rahmenVoll(e, quotenRegel(e.quote, e.deckelMonat), bundesland, p);
+  return rahmenVoll(e, quotenRegel(e.quote, e.deckelMonat), bundesland, p, vorbelegtJahr(e.bisher, true));
 }
 
 /**
@@ -493,17 +667,18 @@ export function zuschussVollAusschoepfen(
  * genuegt eine Bisektion.
  */
 function rahmenVoll(
-  e: Pick<ZuschussEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat'>,
+  e: SvEingaben,
   regel: ZuschussRegel,
   bundesland: string,
   p: LegalParameters,
+  vorbelegt = 0,
 ): number {
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
+  const svGrenze = svRahmen(p, vorbelegt);
   const sk = svKontext(e);
   let lo = 0, hi = svGrenze;
   for (let i = 0; i < 60; i++) {
     const mitte = (lo + hi) / 2;
-    const a = zuschussAufteilen(mitte, regel, sk, bundesland, p);
+    const a = zuschussAufteilen(mitte, regel, sk, bundesland, p, vorbelegt);
     if (a.e + a.ag > svGrenze) hi = mitte; else lo = mitte;
   }
   return Math.floor(lo / 12 * 100) / 100;
@@ -519,16 +694,21 @@ type KernEingaben = Omit<ZuschussEingaben, 'quote' | 'deckelMonat'>;
  * stehen nach dem Hinweis zum Rahmen und vor denen zur Krankenversicherung.
  */
 function zuschussKern(
-  e: KernEingaben,
+  eIn: KernEingaben,
   regel: ZuschussRegel,
   steuerOpt: MatchingSteuer,
   p: LegalParameters,
   eigeneHinweise: (a: ZuschussAufteilung) => string[],
 ): ZuschussErgebnis {
   const hinweise: string[] = [];
+  // Brutto ohne VL; Bestand und (bei 'zusaetzlich') die VL belegen den Rahmen
+  // der Direktversicherung zuerst.
+  const b = eIn.bisher;
+  const e: KernEingaben = { ...eIn, jahresbrutto: bruttoOhneVl(eIn.jahresbrutto, b), bisher: undefined };
+  const vorbelegt = vorbelegtJahr(b, true);
   const sk = svKontext(e);
-  const svGrenze = SV_FREI_QUOTE * p.bbgRvJahr;
-  const steuerGrenze = STEUER_FREI_QUOTE * p.bbgRvJahr;
+  const svGrenze = svRahmen(p, vorbelegt);
+  const steuerGrenze = steuerRahmen(p, vorbelegt);
   const satz = Math.min(0.6, Math.max(0, e.unternehmensSteuersatz));
   const umlagenSatz = Math.max(0, e.umlagenSatz);
   const erwerbOpt = {
@@ -539,7 +719,7 @@ function zuschussKern(
   };
   const heute = bruttoZuNetto(Math.max(0, e.jahresbrutto), erwerbOpt, p);
 
-  const a = zuschussAufteilen(Math.max(0, e.umwandlungMonat) * 12, regel, sk, steuerOpt.bundesland, p);
+  const a = zuschussAufteilen(Math.max(0, e.umwandlungMonat) * 12, regel, sk, steuerOpt.bundesland, p, vorbelegt);
 
   // --- Mitarbeiter ---------------------------------------------------------
   const steuerFrei = Math.min(a.e, Math.max(0, steuerGrenze - a.ag));
@@ -559,7 +739,7 @@ function zuschussKern(
 
   // --- Hinweise ------------------------------------------------------------
   if (a.e > 0 && vertrag > svGrenze + 6) {
-    const voll = rahmenVoll(e, regel, steuerOpt.bundesland, p);
+    const voll = rahmenVoll(e, regel, steuerOpt.bundesland, p, vorbelegt);
     hinweise.push(
       `Umwandlung und Zuschuss liegen zusammen um ${euro((vertrag - svGrenze) / 12)} im Monat über dem `
       + `beitragsfreien Rahmen von ${euro(svGrenze / 12)}. Der Zuschuss wird zuerst angerechnet, auf `
@@ -586,6 +766,9 @@ function zuschussKern(
     );
   }
 
+  const umstieg = umstiegRechnen(b, eIn.jahresbrutto, kostenVorSteuer, vertrag, sk, erwerbOpt, satz, umlagenSatz, steuerOpt.bundesland, p);
+  hinweise.push(...bisherHinweise(b, vorbelegt, p));
+
   return {
     mitarbeiter: {
       umwandlungMonat: a.e / 12,
@@ -609,6 +792,7 @@ function zuschussKern(
     gehalt,
     hebelMitarbeiter: aufwandAn > 0 ? vertrag / aufwandAn : 0,
     hebelArbeitgeber: nettoAg > 0 ? vertrag / nettoAg : 0,
+    umstieg,
     hinweise,
   };
 }

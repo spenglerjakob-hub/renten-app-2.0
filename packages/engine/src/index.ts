@@ -104,6 +104,7 @@ export {
   type FestbetragEingaben, type FestbetragErgebnis, type FestbetragStufe,
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
+  type BisherigeLeistungen, type Umstieg,
 } from './analyse/matching-modell.js';
 export {
   bkvModell, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, PAUSCHAL_40_GRENZE_JAHR, PAUSCHAL_40_MINDEST_MA,

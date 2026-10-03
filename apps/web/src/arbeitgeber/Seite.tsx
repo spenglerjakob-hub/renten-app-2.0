@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { ArrowRightLeft, Building2, HandCoins, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
 import {
-  matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg,
+  matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg, type BisherigeLeistungen,
 } from '@renten/engine';
-import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
+  BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
 } from './bausteine';
 
 /**
@@ -39,9 +40,10 @@ export function Seite() {
   const [steuersatz, setSteuersatz] = useState(0.3);
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
+  const [bisher, setBisher] = useState<BisherigeLeistungen>(KEINE_BISHERIGEN);
 
   const optimal = () => setUmwandlung(optimaleUmwandlung(
-    weg, { jahresbrutto: brutto, privatVersichert: privat, pkvPraemieMonat: privat ? praemie : 0 }, bundesland, p,
+    weg, { jahresbrutto: brutto, privatVersichert: privat, pkvPraemieMonat: privat ? praemie : 0, bisher }, bundesland, p,
   ));
 
   const r = useMemo(() => matchingModell(
@@ -56,10 +58,11 @@ export function Seite() {
       privatVersichert: privat,
       pkvPraemieMonat: privat ? praemie : 0,
       kinder: { hatKinder: false, kinderUnter25: 0 },
+      bisher,
     },
     { verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer },
     p,
-  ), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie, verheiratet, bundesland, kirchensteuer]);
+  ), [brutto, umwandlung, weg, matching, inklusive, steuersatz, umlagen, privat, praemie, verheiratet, bundesland, kirchensteuer, bisher]);
 
   const ma = r.mitarbeiter;
   const ag = r.arbeitgeber;
@@ -89,6 +92,8 @@ export function Seite() {
           {' '}{weg === 'dv' ? 'Direktversicherung' : 'Unterstützungskasse'}, Matching {euro(matching)}
           {weg === 'dv' && inklusive ? ' einschließlich Pflichtzuschuss' : ''}. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
+          {bisher.vlMonat > 0 ? ` Bisher ${euroGenau(bisher.vlMonat)} VL, künftig ${bisher.vlUmgang === 'anrechnen' ? 'angerechnet' : 'zusätzlich in der Betriebsrente'}.` : ''}
+          {bisher.bavBestandMonat > 0 ? ` Bestehende bAV ${euro(bisher.bavBestandMonat)} im Monat.` : ''}
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-2 print:block">
@@ -135,6 +140,8 @@ export function Seite() {
                 <Schalter label="Pflichtzuschuss ist im Matching enthalten" wert={inklusive} onChange={setInklusive} />
               )}
             </Kasten>
+
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} vlZiel="Unterstützungskasse" />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
@@ -218,6 +225,7 @@ export function Seite() {
                 gesamtVorsorge={r.vertrag.gesamtMonat}
               />
             )}
+            {r.umstieg && <UmstiegVergleich u={r.umstieg} n={n} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurBildschirm" />}
 
             <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
@@ -320,6 +328,8 @@ export function Seite() {
                   <li>• Was mit verfallenen Anteilen geschieht (Satzung der Unterstützungskasse)</li>
                 </ul>
               </section>
+
+              {r.umstieg && <UmstiegVergleich u={r.umstieg} n={n} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" />}
 
               <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
                 Überblick zum Rechtsstand {p.jahr}, keine Rechtsberatung. Die Einzelheiten regeln die Versorgungsordnung
