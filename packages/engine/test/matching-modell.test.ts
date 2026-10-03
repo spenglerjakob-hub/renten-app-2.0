@@ -485,6 +485,28 @@ describe('Umstieg fuer den ganzen Betrieb', () => {
     expect(b.mehrkostenNettoJahr).toBeCloseTo(0, 9);
   });
 
+  it('VL entfaellt: bisher die VL-Kosten, neu nichts', () => {
+    const behalten = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 0, vl: vl(4, 0, 0) }), steuer, p);
+    const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 0, vl: { ...vl(4, 0, 0), entfaellt: 3 } }), steuer, p);
+    expect(b.zeilen.map((z) => [z.gruppe, z.anzahl])).toEqual([['vlBehalten', 1], ['vlEntfaellt', 3]]);
+    const z = b.zeilen[1]!;
+    expect(z.bisherNettoJahr).toBeCloseTo(behalten.bisherNettoJahr * 3 / 4, 6);
+    expect(z.neuNettoJahr).toBe(0);
+    expect(z.agBeitragJahr).toBe(0);
+    expect(z.vorsorgeJahr).toBe(0);
+    expect(b.mehrkostenNettoJahr).toBeCloseTo(-z.bisherNettoJahr, 6);
+  });
+
+  it('VL entfaellt: hoechstens die Nicht-Umwandler, die Gesamtzahl bleibt', () => {
+    const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 0, vl: { ...vl(6, 4, 0), entfaellt: 5 } }), steuer, p);
+    expect(b.zeilen.map((z) => [z.gruppe, z.anzahl])).toEqual([['vlUmwandlung', 4], ['vlEntfaellt', 2]]);
+    const summe = (entfaellt: number) => betriebUmstieg(zm, zEin(), angaben({
+      neuTeilnehmer: 20, vl: { ...vl(6, 2, 1), entfaellt },
+    }), steuer, p).zeilen.reduce((s, x) => s + x.anzahl, 0);
+    expect(summe(0)).toBe(26);
+    expect(summe(3)).toBe(26);
+  });
+
   it('klemmt: Umwandler ≤ Bezieher, mit Gehalt ≤ Umwandler', () => {
     const b = betriebUmstieg(zm, zEin(), angaben({ neuTeilnehmer: 2, vl: vl(6, 9, 5) }), steuer, p);
     expect(b.zeilen.map((z) => [z.gruppe, z.anzahl])).toEqual([['neu', 2], ['vlGehalt', 5], ['vlUmwandlung', 1]]);

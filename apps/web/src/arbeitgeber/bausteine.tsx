@@ -294,6 +294,8 @@ export interface BisherigeAngaben {
   vlUmwandler: number;
   /** Davon wandeln zusaetzlich Gehalt um */
   vlMitGehalt: number;
+  /** Von den uebrigen entfaellt die VL ersatzlos (nur per Betriebsvereinbarung oder mit Zustimmung) */
+  vlEntfaellt: number;
   /** Was aus dem VL-Vertrag der Umsteiger wird — nur Information, kostet den Arbeitgeber nichts */
   vlVertrag: 'ruht' | 'privat';
   bestandAnzahl: number;
@@ -302,7 +304,7 @@ export interface BisherigeAngaben {
 }
 
 export const KEINE_BISHERIGEN: BisherigeAngaben = {
-  vlMonat: 0, vlAnzahl: 0, vlUmwandler: 0, vlMitGehalt: 0, vlVertrag: 'ruht',
+  vlMonat: 0, vlAnzahl: 0, vlUmwandler: 0, vlMitGehalt: 0, vlEntfaellt: 0, vlVertrag: 'ruht',
   bestandAnzahl: 0, bestandUmwandlungMonat: 100, bestandQuote: 0.15,
 };
 
@@ -313,7 +315,7 @@ export function betriebAngaben(b: BisherigeAngaben, neuTeilnehmer: number): Betr
   return {
     neuTeilnehmer,
     bestand: { anzahl: b.bestandAnzahl, umwandlungMonat: b.bestandUmwandlungMonat, zuschussQuote: b.bestandQuote },
-    vl: { betragMonat: b.vlMonat, anzahl: b.vlAnzahl, umwandler: b.vlUmwandler, davonMitGehalt: b.vlMitGehalt },
+    vl: { betragMonat: b.vlMonat, anzahl: b.vlAnzahl, umwandler: b.vlUmwandler, davonMitGehalt: b.vlMitGehalt, entfaellt: b.vlEntfaellt },
   };
 }
 
@@ -325,8 +327,10 @@ export function bisherAnnahmen(b: BisherigeAngaben): string {
   }
   if (b.vlMonat > 0 && b.vlAnzahl > 0) {
     const umw = Math.min(b.vlUmwandler, b.vlAnzahl);
+    const weg = Math.min(b.vlEntfaellt, b.vlAnzahl - umw);
     teile.push(`${b.vlAnzahl} bekamen bislang ${euroGenau(b.vlMonat)} VL: ${umw} wandeln sie in Altersvorsorge um`
-      + `${b.vlMitGehalt > 0 ? ` (davon ${Math.min(b.vlMitGehalt, umw)} auch Gehalt)` : ''}, ${b.vlAnzahl - umw} behalten sie.`
+      + `${b.vlMitGehalt > 0 ? ` (davon ${Math.min(b.vlMitGehalt, umw)} auch Gehalt)` : ''}`
+      + `${weg > 0 ? `, bei ${weg} entfällt sie` : ''}, ${b.vlAnzahl - umw - weg} behalten sie.`
       + (umw > 0 ? ` Bisheriger VL-Vertrag: ${b.vlVertrag === 'ruht' ? 'ruht' : 'läuft privat weiter'}.` : ''));
   }
   return teile.length ? ' ' + teile.join(' ') : '';
@@ -346,6 +350,8 @@ export function BisherigeLeistungenFelder(props: {
   const { wert: b, onChange } = props;
   const setze = (teil: Partial<BisherigeAngaben>) => onChange({ ...b, ...teil });
   const umwandler = Math.min(b.vlUmwandler, b.vlAnzahl);
+  const rest = Math.max(0, b.vlAnzahl - umwandler);
+  const entfaellt = Math.min(b.vlEntfaellt, rest);
   return (
     <Kasten titel="Bisherige Leistungen">
       <ZahlFeld
@@ -385,9 +391,6 @@ export function BisherigeLeistungenFelder(props: {
                 hilfe="Die VL wird zum Arbeitgeberbeitrag in die Betriebsrente — steuer- und beitragsfrei."
               />
               <Obergrenze wert={b.vlUmwandler} max={b.vlAnzahl} text="mehr bekommen keine VL" />
-              <p className="text-[13px] text-slate-700">
-                → <strong>{Math.max(0, b.vlAnzahl - umwandler)}</strong> behalten ihre VL wie bisher.
-              </p>
               {umwandler > 0 && (
                 <>
                   <ZahlFeld
@@ -409,6 +412,19 @@ export function BisherigeLeistungenFelder(props: {
                   />
                 </>
               )}
+              {rest > 0 && (
+                <>
+                  <ZahlFeld
+                    label="davon entfällt die VL (keine Teilnahme)" wert={b.vlEntfaellt} min={0} schritt={1} stufen
+                    onChange={(v) => setze({ vlEntfaellt: v })}
+                    hilfe="Nur, wenn die VL auf einer Betriebsvereinbarung oder betriebsvereinbarungsoffenen Gesamtzusage beruht — abgelöst durch eine neue Betriebsvereinbarung mit dem Betriebsrat. Bei Tarifvertrag, Arbeitsvertrag oder betrieblicher Übung nur mit Zustimmung des Mitarbeiters."
+                  />
+                  <Obergrenze wert={b.vlEntfaellt} max={rest} text="die übrigen wandeln ihre VL um" />
+                </>
+              )}
+              <p className="text-[13px] text-slate-700">
+                → <strong>{rest - entfaellt}</strong> behalten ihre VL wie bisher.
+              </p>
             </div>
           )}
         </>
@@ -426,6 +442,7 @@ const GRUPPE: Record<BetriebGruppe, string> = {
   vlGehalt: 'VL + eigene Umwandlung',
   vlUmwandlung: 'VL als Arbeitgeberbeitrag in die bAV',
   vlBehalten: 'VL bleibt',
+  vlEntfaellt: 'VL entfällt',
   bestand: 'Bestehende Verträge, aufgestockt',
 };
 
@@ -543,7 +560,11 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
           Die Umstellung der VL auf einen Arbeitgeberbeitrag wird mit dem Mitarbeiter vereinbart; beruhen die VL auf einem
           Tarifvertrag, muss er das zulassen. Ob die bisherige VL auf den gesetzlichen Pflichtzuschuss angerechnet werden
           darf, in der Versorgungsordnung ausdrücklich regeln. Eine Arbeitnehmer-Sparzulage gibt es nur auf
-          VL-Verträge, in die weiter eingezahlt wird.</>}
+          VL-Verträge, in die weiter eingezahlt wird. </>}
+        {hat('vlEntfaellt') && <>
+          Die VL ersatzlos zu streichen, geht nur, wenn sie auf einer Betriebsvereinbarung oder
+          betriebsvereinbarungsoffenen Gesamtzusage beruht — durch eine neue Betriebsvereinbarung mit dem Betriebsrat;
+          sonst nur mit Zustimmung des Mitarbeiters.</>}
       </p>
     </section>
   );
@@ -560,7 +581,7 @@ export function BetriebJahr({ betrieb }: { betrieb: BetriebErgebnis }) {
     betrieb.zeilen.filter((z) => gruppen.includes(z.gruppe)).reduce((s, z) => s + z[feld], 0);
   // Wer seine VL behaelt, steht bisher wie neu gleich in der Rechnung — hier ohne Belang.
   const neu = summe(['neu', 'vlGehalt', 'vlUmwandlung', 'bestand'], 'neuNettoJahr');
-  const vlWeg = summe(['vlGehalt', 'vlUmwandlung'], 'bisherNettoJahr');
+  const vlWeg = summe(['vlGehalt', 'vlUmwandlung', 'vlEntfaellt'], 'bisherNettoJahr');
   const bestandWeg = summe(['bestand'], 'bisherNettoJahr');
   const hatBestand = betrieb.zeilen.some((z) => z.gruppe === 'bestand');
   const anzahl = betrieb.zeilen.reduce((s, z) => s + z.anzahl, 0);

@@ -958,6 +958,8 @@ export function festbetragGehaltsStaffel(
  *     Hoechstbetrag (Festbetrag, Deckel, Matching) — die VL ist darin
  *     enthalten: Beitrag = min(VL + Zuschuss, max(VL, Hoechstbetrag)),
  *   - VL-Bezieher, die ihre VL behalten — fuer sie aendert sich nichts,
+ *   - VL-Bezieher, deren VL ersatzlos entfaellt (nur per Betriebsvereinbarung
+ *     oder mit Zustimmung) — bisher die VL-Kosten, neu nichts,
  *   - Bestandsvertraege: laufen weiter und werden auf das Modell aufgestockt
  *     (z. B. 15 % Zuschuss → 50 % oder 50 EUR fest).
  *
@@ -986,10 +988,12 @@ export interface BetriebAngaben {
     umwandler: number;
     /** Davon wandeln zusaetzlich Gehalt um (kommen zu den neuen Teilnehmern dazu) */
     davonMitGehalt: number;
+    /** Davon (unter den Nicht-Umwandlern) entfaellt die VL ersatzlos */
+    entfaellt?: number;
   };
 }
 
-export type BetriebGruppe = 'neu' | 'vlGehalt' | 'vlUmwandlung' | 'vlBehalten' | 'bestand';
+export type BetriebGruppe = 'neu' | 'vlGehalt' | 'vlUmwandlung' | 'vlBehalten' | 'vlEntfaellt' | 'bestand';
 
 export interface BetriebZeile {
   gruppe: BetriebGruppe;
@@ -1074,7 +1078,8 @@ export function betriebUmstieg<E extends ModellBasis>(
   const umwandler = Math.min(ganz(a.vl.umwandler), vlAnzahl);
   const mitGehalt = Math.min(ganz(a.vl.davonMitGehalt), umwandler);
   const nurVl = umwandler - mitGehalt;
-  const behalten = vlAnzahl - umwandler;
+  const entfaellt = Math.min(ganz(a.vl.entfaellt ?? 0), vlAnzahl - umwandler);
+  const behalten = vlAnzahl - umwandler - entfaellt;
 
   const ohneBisher: E = { ...basis, bisher: undefined };
   const mit = (umwandlungMonat: number): E => ({ ...ohneBisher, umwandlungMonat: Math.max(0, umwandlungMonat) });
@@ -1141,6 +1146,7 @@ export function betriebUmstieg<E extends ModellBasis>(
     zeile('vlUmwandlung', nurVl, vlKosten, vl, vl, vl);
   }
   if (behalten > 0) zeile('vlBehalten', behalten, vlKosten, vlKosten, 0, 0);
+  if (entfaellt > 0) zeile('vlEntfaellt', entfaellt, vlKosten, 0, 0, 0);
   if (bestand > 0) {
     // Heute: der alte Zuschuss auf die bestehende Umwandlung — mindestens der
     // Pflichtzuschuss, wie im Zuschussmodell.
