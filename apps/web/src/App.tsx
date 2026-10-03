@@ -26,6 +26,7 @@ import { useCheckAnfragen } from './store/check-anfragen';
 import { useAuth } from './store/auth';
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
+import { Loesungen } from './features/Loesungen';
 import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
@@ -150,6 +151,7 @@ export default function App() {
     try { localStorage.setItem(SPEICHER_ETAPPE, s); } catch { /* Speicher gesperrt */ }
     window.scrollTo({ top: 0 });
   }, []);
+  const [tuevReiter, setTuevReiter] = useState<'loesungen' | 'tuev'>('loesungen');
   const [eingabeArt, setEingabeArtRoh] = useState<'assistent' | 'formular'>(() => {
     try { return localStorage.getItem(SPEICHER_EINGABE) === 'formular' ? 'formular' : 'assistent'; } catch { return 'assistent'; }
   });
@@ -866,9 +868,30 @@ export default function App() {
               text="Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den Sie neu in die Altersvorsorge stecken."
             />
             {paarUmschalter}
-            <div className="-mx-2 sm:-mx-6">
-              <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
+            {/*
+              ZWEI FRAGEN in dieser Etappe: Womit schliesse ich die Luecke
+              (neue Loesungen und Angebote) — und taugt, was ich schon habe
+              (bestehende Vertraege)? Die erste ist die der Beratung, die
+              zweite die Pruefung auf Wunsch.
+            */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <Reiterleiste
+                reiter={[
+                  { id: 'loesungen' as const, text: 'Lösungen & Angebote' },
+                  { id: 'tuev' as const, text: 'Bestehende Verträge prüfen' },
+                ]}
+                aktiv={tuevReiter}
+                onWechsel={setTuevReiter}
+                beschriftung="Lösungen oder bestehende Verträge"
+              />
             </div>
+            {tuevReiter === 'loesungen' ? (
+              <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} />
+            ) : (
+              <div className="-mx-2 sm:-mx-6">
+                <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
+              </div>
+            )}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
           </>
         )}

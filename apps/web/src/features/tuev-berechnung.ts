@@ -2,7 +2,7 @@ import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
   versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, SV_FREI_QUOTE, euroText,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
-  type ProjektionsErgebnis, type Szenario,
+  type ProjektionsErgebnis, type Szenario, type TuevKontext,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
@@ -200,6 +200,51 @@ function andererWeg(
   };
 }
 
+/**
+ * Der Teil des TUEV-Kontexts, der nicht am Vertrag haengt: Gehalt, zvE,
+ * Krankenversicherung und GRV-Beitrag des Inhabers. Geteilt von den
+ * Vertraegen und den Angeboten des Loesungsvergleichs.
+ */
+function stammKontext(
+  szenario: SzenarioParsed,
+  basis: ReturnType<typeof tuevBasis>,
+  erwerb: ErwerbsPersonHeute | undefined,
+): Pick<TuevKontext, 'jahresbrutto' | 'zveHeute' | 'beamter' | 'privatVersichert' | 'pkvPraemieMonat'
+  | 'selbststaendig' | 'grvBeitragJahr'> {
+  return {
+    /*
+      DAS zvE KOMMT VOM HAUSHALT, BRUTTO UND ERWERBSART VOM INHABER.
+      Die Einkommensteuer wird bei Verheirateten gemeinsam veranlagt —
+      dafuer zaehlt das zusammengerechnete zvE. Wieviel Entgeltumwandlung
+      beitragsfrei bleibt und wieviel vom Hoechstbetrag des § 10 Abs. 3
+      EStG belegt ist, entscheidet sich dagegen an der Person, der der
+      Vertrag gehoert. Vorher galten beide Male die Angaben von Person A.
+    */
+    jahresbrutto: erwerb?.brutto ?? basis.jahresbrutto,
+    zveHeute: basis.zve,
+    beamter: erwerb?.beamter ?? false,
+    /*
+      Ohne diese beiden Angaben rechnete der TUEV jedem Nicht-Beamten den
+      KV/PV-Anteil als Ersparnis an — bei einem privat Versicherten das
+      Doppelte des Richtigen. Die Praemie ist Bezugsgroesse fuer den
+      Arbeitgeberzuschuss, der mit dem umgewandelten Entgelt sinkt; ohne
+      Entlastungstarif, denn der Zuschuss haengt an der Praemie.
+    */
+    privatVersichert: privatImErwerb(szenario),
+    pkvPraemieMonat: privatImErwerb(szenario)
+      ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
+      : 0,
+    /*
+      Der GRV-Beitrag entscheidet ueber den freien Hoechstbetrag des
+      § 10 Abs. 3 EStG — und damit darueber, wie viel von einer Basisrente
+      absetzbar ist. Ohne diese Angabe unterstellte der TUEV jedem den
+      fiktiven Arbeitnehmer- UND Arbeitgeberanteil.
+    */
+    selbststaendig: erwerb?.selbststaendig ?? false,
+    grvBeitragJahr: erwerb?.grvBeitragJahr ?? 0,
+  };
+}
+
 export function tuevPositionen(
   szenario: SzenarioParsed,
   zeile: Jahreszeile | null,
@@ -326,36 +371,7 @@ export function tuevPositionen(
         bavVorbelegung: v.typ.startsWith('bav') ? bavVorbelegung(szenario, v) : undefined,
       },
       {
-        /*
-          DAS zvE KOMMT VOM HAUSHALT, BRUTTO UND ERWERBSART VOM INHABER.
-          Die Einkommensteuer wird bei Verheirateten gemeinsam veranlagt —
-          dafuer zaehlt das zusammengerechnete zvE. Wieviel Entgeltumwandlung
-          beitragsfrei bleibt und wieviel vom Hoechstbetrag des § 10 Abs. 3
-          EStG belegt ist, entscheidet sich dagegen an der Person, der der
-          Vertrag gehoert. Vorher galten beide Male die Angaben von Person A.
-        */
-        jahresbrutto: erwerb?.brutto ?? basis.jahresbrutto,
-        zveHeute: basis.zve,
-        beamter: erwerb?.beamter ?? false,
-        /*
-          Ohne diese beiden Angaben rechnete der TUEV jedem Nicht-Beamten den
-          KV/PV-Anteil als Ersparnis an — bei einem privat Versicherten das
-          Doppelte des Richtigen. Die Praemie ist Bezugsgroesse fuer den
-          Arbeitgeberzuschuss, der mit dem umgewandelten Entgelt sinkt; ohne
-          Entlastungstarif, denn der Zuschuss haengt an der Praemie.
-        */
-        privatVersichert: privatImErwerb(szenario),
-        pkvPraemieMonat: privatImErwerb(szenario)
-          ? pkvImJahr(szenario.haushalt.pkv, alterHeuteA(szenario), 0).praemieMonat
-          : 0,
-        /*
-          Der GRV-Beitrag entscheidet ueber den freien Hoechstbetrag des
-          § 10 Abs. 3 EStG — und damit darueber, wie viel von einer Basisrente
-          absetzbar ist. Ohne diese Angabe unterstellte der TUEV jedem den
-          fiktiven Arbeitnehmer- UND Arbeitgeberanteil.
-        */
-        selbststaendig: erwerb?.selbststaendig ?? false,
-        grvBeitragJahr: erwerb?.grvBeitragJahr ?? 0,
+        ...stammKontext(szenario, basis, erwerb),
         rentenbeginnJahr,
         alterBeiRentenbeginn,
         ...auszahlseite,
@@ -747,4 +763,110 @@ export function laufzeitText(monate: number): string {
   if (m === 0) return jahre;
   const mon = m === 1 ? '1 Monat' : `${m} Monate`;
   return j === 0 ? mon : `${jahre}, ${mon}`;
+}
+
+/* ======================================================================
+ * ANGEBOTE DES LOESUNGSVERGLEICHS
+ * ==================================================================== */
+
+type AngebotEintrag = SzenarioParsed['loesungen']['angebote'][number];
+type LoesungsArt = AngebotEintrag['loesung'];
+
+/**
+ * Als welche Vertragsart ein Angebot gerechnet wird.
+ *
+ * ZWEI ARTEN JE ANGEBOT, weil die Auszahlseite aus der Projektion kommt und
+ * die nur Vertraege mit einer Rente als Betrag kennt. Das Altersvorsorgedepot
+ * rechnet dort aus Sparrate und Rendite — eine vom Anbieter genannte Rente
+ * fuehrte sie nicht. Fuer die AUSZAHLUNG steht es deshalb als Riester-Rente:
+ * dieselbe Besteuerung (§ 22 Nr. 5 EStG, voll nachgelagert) und dieselbe
+ * Behandlung in der Krankenversicherung. Fuer die EINZAHLUNG bleibt es das
+ * Altersvorsorgedepot mit seinen eigenen Zulagen.
+ */
+const AUSZAHL_TYP: Record<LoesungsArt, Vertrag['typ']> = {
+  bav: 'bav', avd: 'riester', basis: 'basis', privat: 'prvRente',
+};
+const EINZAHL_TYP: Record<LoesungsArt, Vertrag['typ']> = {
+  bav: 'bav', avd: 'avd', basis: 'basis', privat: 'prvRente',
+};
+const SCHICHT: Record<LoesungsArt, 1 | 2 | 3> = { bav: 2, avd: 2, basis: 1, privat: 3 };
+
+export interface AngebotPosition {
+  angebot: AngebotEintrag;
+  /** null, solange Beitrag oder Rente fehlen */
+  ergebnis: TuevErgebnis | null;
+  rentenbeginnJahr: number;
+}
+
+/**
+ * Jedes Angebot fuer sich durch den Vertrags-TUEV.
+ *
+ * FUER SICH, nicht alle zusammen: Angebote sind Alternativen. In einem
+ * gemeinsamen Szenario stiege mit jedem weiteren die Steuer auf alle — das
+ * guenstigste saehe schlechter aus, nur weil ein anderes danebensteht. Jedes
+ * Angebot kommt deshalb einzeln zu den bestehenden Vertraegen dazu, und die
+ * Projektion rechnet seine Rente nach Steuer und Krankenversicherung im
+ * ersten Ruhestandsjahr.
+ */
+export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
+  const basis = tuevBasis(szenario);
+  const heute = new Date();
+  const jetzt = heute.getFullYear();
+  // Beginn: der naechste Monatserste.
+  const naechsterMonat = heute.getMonth() + 2;
+  const beginn = naechsterMonat > 12
+    ? { jahr: jetzt + 1, monat: 1 }
+    : { jahr: jetzt, monat: naechsterMonat };
+  const avdAb = basis.p.avd.abJahr;
+
+  return szenario.loesungen.angebote.map((a) => {
+    const inhaber = a.inhaber === 'B' && szenario.haushalt.verheiratet ? 'B' : 'A';
+    const person = szenario.personen.find((x) => x.id === inhaber) ?? szenario.personen[0]!;
+    const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
+    if (a.beitragMonat <= 0 || a.renteMonat <= 0) return { angebot: a, ergebnis: null, rentenbeginnJahr };
+
+    const id = `angebot-${a.id}`;
+    const auszahlung: Vertrag = {
+      id, inhaber, schicht: SCHICHT[a.loesung], typ: AUSZAHL_TYP[a.loesung],
+      name: a.name, brutto: a.renteMonat, strategie: 'rente', altvertrag: false,
+    };
+    const klon: SzenarioParsed = { ...szenario, vertraege: [...szenario.vertraege, auszahlung] };
+    const e = projiziere(klon);
+    const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr);
+    const posten = zeile?.posten.find((x) => x.id === id);
+
+    const alterBeiRentenbeginn = rentenbeginnJahr - jahrAus(person.geburtsdatum, 1980);
+    const erwerb = erwerbVon(basis, inhaber);
+    const istBav = a.loesung === 'bav';
+    const start = a.loesung === 'avd' && beginn.jahr < avdAb ? { jahr: avdAb, monat: 1 } : beginn;
+
+    const ergebnis = vertragsTuev(
+      { ...auszahlung, typ: EINZAHL_TYP[a.loesung] },
+      {
+        // Bei der bAV ist der TUEV-Beitrag der GESAMTbeitrag, der Arbeitgeberanteil steckt darin.
+        beitragMonat: istBav ? a.beitragMonat + a.agZuschussMonat : a.beitragMonat,
+        dynamik: a.dynamik,
+        agZuschussMonat: istBav ? a.agZuschussMonat : 0,
+        kinder: [],
+        beginnJahr: start.jahr,
+        beginnMonat: start.monat,
+        lebenserwartung: szenario.loesungen.lebenserwartung,
+        // Das Angebot steht in `klon` hinter allen bestehenden Vertraegen — die gehen vor.
+        bavVorbelegung: istBav ? bavVorbelegung(klon, auszahlung) : undefined,
+      },
+      {
+        ...stammKontext(szenario, basis, erwerb),
+        rentenbeginnJahr,
+        alterBeiRentenbeginn,
+        bruttoRenteMonat: (posten?.bruttoJahr ?? 0) / 12,
+        kvPvMonat: (posten?.kvPvJahr ?? 0) / 12,
+        steuerMonat: (posten?.steuerJahr ?? 0) / 12,
+        nettoRenteMonat: (posten?.nettoJahr ?? 0) / 12,
+        bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
+      },
+      klon,
+      basis.p,
+    );
+    return { angebot: a, ergebnis, rentenbeginnJahr };
+  });
 }

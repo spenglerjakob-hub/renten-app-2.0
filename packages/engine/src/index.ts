@@ -113,6 +113,9 @@ export {
   type BkvEingaben, type BkvErgebnis, type BkvWeg, type BkvWegId, type BkvGehalt,
 } from './analyse/bkv.js';
 export {
+  loesungsvergleich, type Loesung, type LoesungId, type LoesungsOptionen,
+} from './analyse/loesungen.js';
+export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,
   type FoerderKontext, type FoerderBefund,
 } from './analyse/foerdercheck.js';

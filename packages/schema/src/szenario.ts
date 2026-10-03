@@ -464,6 +464,46 @@ export const tuevPositionSchema = z.object({
   vergleichKapitalNetto: z.number().min(0).max(100_000_000).default(0),
 });
 
+/**
+ * Ein Angebot im Loesungsvergleich: ein Vertrag, den es noch nicht gibt.
+ *
+ * Getrennt von `vertraege`, weil ein Angebot nicht in die Gesamtuebersicht
+ * gehoert — es ist eine Moeglichkeit, keine Vorsorge. Gerechnet wird es wie
+ * ein Vertrag im Vertrags-TUEV: der Beitrag gegen die Rente, die der Anbieter
+ * nennt, beides netto.
+ */
+export const angebotSchema = z.object({
+  id: z.string().min(1).max(64),
+  loesung: z.enum(['bav', 'avd', 'basis', 'privat']),
+  /** Anbieter und Tarif, frei */
+  name: z.string().max(120).default(''),
+  inhaber: z.enum(['A', 'B']).default('A'),
+  /**
+   * Der eigene Beitrag im Monat: bei der bAV die Bruttoumwandlung, beim
+   * Altersvorsorgedepot der Eigenbeitrag (die Zulagen kommen dazu).
+   */
+  beitragMonat: z.number().min(0).max(100_000).default(0),
+  /** Nur bAV: Zuschuss des Arbeitgebers im Monat */
+  agZuschussMonat: z.number().min(0).max(100_000).default(0),
+  dynamik: z.number().min(-1).max(1).default(0),
+  /** Garantierte bzw. erwartete Monatsrente zum Rentenbeginn, brutto */
+  renteMonat: z.number().min(0).max(1_000_000).default(0),
+});
+
+/**
+ * Der Loesungsvergleich: welcher Netto-Aufwand verglichen wird und die
+ * erfassten Angebote. `.default({})`, damit frueher gespeicherte Dateien
+ * weiter laden.
+ */
+export const loesungenSchema = z.object({
+  /** Was der Kunde im Monat netto aufwenden will */
+  nettoMonat: z.number().min(0).max(100_000).default(100),
+  /** Arbeitgeberzuschuss zur Entgeltumwandlung, Anteil — mindestens der Pflichtzuschuss */
+  agZuschussQuote: z.number().min(0).max(1).default(0.15),
+  lebenserwartung: z.number().int().min(60).max(120).default(85),
+  angebote: z.array(angebotSchema).max(12).default([]),
+});
+
 export const szenarioSchema = z.object({
   schemaVersion: z.literal(1),
   haushalt: haushaltSchema,
@@ -482,6 +522,7 @@ export const szenarioSchema = z.object({
 
   planer: planerSchema,
   tuev: z.array(tuevPositionSchema).max(20).default([]),
+  loesungen: loesungenSchema.default({}),
 });
 
 export type SzenarioInput = z.input<typeof szenarioSchema>;

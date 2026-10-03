@@ -7,6 +7,8 @@ import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 
 const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
 
+export type Angebot = SzenarioParsed['loesungen']['angebote'][number];
+
 /**
  * Erstes Jahr des Altersvorsorgedepots. Steht hier nur, um den Beginn eines
  * neuen TUEV-Eintrags sinnvoll vorzubelegen; gerechnet wird ausschliesslich
@@ -94,6 +96,11 @@ export interface SzenarioStore {
   tuevKindHinzufuegen: (id: string) => void;
   tuevKindAendern: (id: string, kindId: string, geburtsjahr: number) => void;
   tuevKindEntfernen: (id: string, kindId: string) => void;
+
+  setzeLoesungen: (p: Partial<Omit<SzenarioParsed['loesungen'], 'angebote'>>) => void;
+  angebotHinzufuegen: (a: Omit<Angebot, 'id'>) => void;
+  angebotAendern: (id: string, p: Partial<Angebot>) => void;
+  angebotEntfernen: (id: string) => void;
 
   vertragHinzufuegen: (schicht: 1 | 2 | 3) => void;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
@@ -288,6 +295,23 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   tuevKindEntfernen: (id, kindId) => get().setze((s) => ({
     ...s,
     tuev: s.tuev.map((x) => (x.id === id ? { ...x, kinder: x.kinder.filter((k) => k.id !== kindId) } : x)),
+  })),
+
+  setzeLoesungen: (p) => get().setze((s) => ({ ...s, loesungen: { ...s.loesungen, ...p } })),
+
+  angebotHinzufuegen: (a) => get().setze((s) => ({
+    ...s,
+    loesungen: { ...s.loesungen, angebote: [...s.loesungen.angebote, { ...a, id: neueId('a') }].slice(0, 12) },
+  })),
+
+  angebotAendern: (id, p) => get().setze((s) => ({
+    ...s,
+    loesungen: { ...s.loesungen, angebote: s.loesungen.angebote.map((x) => (x.id === id ? { ...x, ...p } : x)) },
+  })),
+
+  angebotEntfernen: (id) => get().setze((s) => ({
+    ...s,
+    loesungen: { ...s.loesungen, angebote: s.loesungen.angebote.filter((x) => x.id !== id) },
   })),
 
   vertragHinzufuegen: (schicht) => get().setze((s) => {
