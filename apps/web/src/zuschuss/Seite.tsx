@@ -134,7 +134,7 @@ export function Seite() {
               <ZahlFeld label="Höchstens im Monat" wert={deckel} onChange={setDeckel} einheit="€" schritt={10} />
             </Kasten>
 
-            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} neuTeilnehmer={n} />
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld

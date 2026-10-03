@@ -969,7 +969,7 @@ export function festbetragGehaltsStaffel(
  * ======================================================================== */
 
 export interface BetriebAngaben {
-  /** Mitarbeiter, die Gehalt umwandeln — einschliesslich der VL-Bezieher, die zusaetzlich Gehalt umwandeln */
+  /** Neue Teilnehmer, die Gehalt umwandeln — ohne die VL-Bezieher, die ihre VL umwandeln (die zaehlen eigen) */
   neuTeilnehmer: number;
   bestand: {
     anzahl: number;
@@ -984,7 +984,7 @@ export interface BetriebAngaben {
     anzahl: number;
     /** Davon wandeln die VL in Altersvorsorge um */
     umwandler: number;
-    /** Davon wandeln zusaetzlich Gehalt um (zaehlen zu den neuen Teilnehmern) */
+    /** Davon wandeln zusaetzlich Gehalt um (kommen zu den neuen Teilnehmern dazu) */
     davonMitGehalt: number;
   };
 }
@@ -1072,7 +1072,7 @@ export function betriebUmstieg<E extends ModellBasis>(
   const vl = Math.max(0, a.vl.betragMonat);
   const vlAnzahl = vl > 0 ? ganz(a.vl.anzahl) : 0;
   const umwandler = Math.min(ganz(a.vl.umwandler), vlAnzahl);
-  const mitGehalt = Math.min(ganz(a.vl.davonMitGehalt), umwandler, neu);
+  const mitGehalt = Math.min(ganz(a.vl.davonMitGehalt), umwandler);
   const nurVl = umwandler - mitGehalt;
   const behalten = vlAnzahl - umwandler;
 
@@ -1111,9 +1111,9 @@ export function betriebUmstieg<E extends ModellBasis>(
     }
   };
 
-  if (neu - mitGehalt > 0) {
+  if (neu > 0) {
     const r = modell(ohneBisher, 'neu');
-    zeile('neu', neu - mitGehalt, 0, r.kostenVorSteuerMonat, r.agBeitragMonat, r.vorsorgeMonat);
+    zeile('neu', neu, 0, r.kostenVorSteuerMonat, r.agBeitragMonat, r.vorsorgeMonat);
   }
   let kopfVl: BetriebKopfVl | null = null;
   if (umwandler > 0 && vlHeute) {

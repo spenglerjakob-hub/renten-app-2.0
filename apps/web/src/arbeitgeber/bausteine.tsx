@@ -338,14 +338,10 @@ function Obergrenze({ wert, max, text }: { wert: number; max: number; text: stri
   return <p className="-mt-2 text-xs text-amber-700">Gerechnet mit {max} — {text}.</p>;
 }
 
-/**
- * Der Kasten fuer die linke Spalte. `neuTeilnehmer` ist die Zahl im Kasten
- * Unternehmen; wer VL UND Gehalt umwandelt, gehoert dazu.
- */
+/** Der Kasten fuer die linke Spalte. */
 export function BisherigeLeistungenFelder(props: {
   wert: BisherigeAngaben;
   onChange: (b: BisherigeAngaben) => void;
-  neuTeilnehmer: number;
 }) {
   const { wert: b, onChange } = props;
   const setze = (teil: Partial<BisherigeAngaben>) => onChange({ ...b, ...teil });
@@ -397,12 +393,9 @@ export function BisherigeLeistungenFelder(props: {
                   <ZahlFeld
                     label="davon wandeln zusätzlich Gehalt um" wert={b.vlMitGehalt} min={0} schritt={1} stufen
                     onChange={(v) => setze({ vlMitGehalt: v })}
-                    hilfe="Sie wandeln den Betrag oben um und zählen zu den „Mitarbeitern im Modell“. Ihr Arbeitgeberbeitrag steigt um den Zuschuss des Modells — höchstens bis zu dessen Höchstbetrag, die VL eingerechnet."
+                    hilfe="Sie wandeln zusätzlich den Betrag oben um und kommen zu den „Mitarbeitern im Modell“ dazu. Ihr Arbeitgeberbeitrag steigt um den Zuschuss des Modells — höchstens bis zu dessen Höchstbetrag, die VL eingerechnet."
                   />
-                  <Obergrenze
-                    wert={b.vlMitGehalt} max={Math.min(umwandler, Math.max(0, props.neuTeilnehmer))}
-                    text={b.vlMitGehalt > umwandler ? 'mehr wandeln die VL nicht um' : 'mehr Mitarbeiter sind nicht im Modell'}
-                  />
+                  <Obergrenze wert={b.vlMitGehalt} max={umwandler} text="mehr wandeln die VL nicht um" />
                   <AuswahlFeld
                     label="Der bisherige VL-Vertrag" wert={b.vlVertrag}
                     onChange={(v) => setze({ vlVertrag: v })}
@@ -421,7 +414,8 @@ export function BisherigeLeistungenFelder(props: {
         </>
       )}
       <p className="text-xs leading-snug text-slate-500">
-        Das Bruttogehalt oben versteht sich einschließlich VL. „Mitarbeiter im Modell“ sind alle, die Gehalt umwandeln.
+        Das Bruttogehalt oben versteht sich einschließlich VL. „Mitarbeiter im Modell“ sind die neuen Teilnehmer, die
+        Gehalt umwandeln — ohne die VL-Bezieher oben.
       </p>
     </Kasten>
   );

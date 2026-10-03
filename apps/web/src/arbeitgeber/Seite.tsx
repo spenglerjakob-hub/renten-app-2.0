@@ -156,7 +156,7 @@ export function Seite() {
               )}
             </Kasten>
 
-            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} neuTeilnehmer={n} />
+            <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} />
 
             <Kasten titel="Unternehmen">
               <ProzentFeld
