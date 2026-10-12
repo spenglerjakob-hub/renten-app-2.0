@@ -271,7 +271,13 @@ export function Seite() {
                     ausfüllen — beim Absenden wird es erneut versucht.</>
                 : <><strong>Ihr Berater hat Sie um diese Angaben gebeten.</strong> Wenn Sie fertig sind,
                     senden Sie sie mit einem Klick an ihn — ein Konto brauchen Sie nicht. Ihr
-                    Zwischenstand bleibt auf diesem Gerät gespeichert, bis Sie absenden.</>}
+                    Zwischenstand bleibt auf diesem Gerät gespeichert, bis Sie absenden.
+                    {darfHochladen && (
+                      <span className="mt-1.5 block">
+                        <strong>Statt abtippen:</strong> Gehaltsabrechnung, Renteninformation und Verträge
+                        können Sie ab Schritt 2 einfach fotografieren oder als PDF hochladen.
+                      </span>
+                    )}</>}
           </div>
         )}
 

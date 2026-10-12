@@ -54,9 +54,19 @@ export function DokumentHochladen({
   const [fehler, setFehler] = useState<string[]>([]);
   const [entfernt, setEntfernt] = useState<string | null>(null);
   const eingabe = useRef<HTMLInputElement>(null);
+  const kamera = useRef<HTMLInputElement>(null);
+  const haken = useRef<HTMLInputElement>(null);
   const zaehler = useRef(0);
+  /** Ein Klick auf einen Knopf ohne Haken: Hinweis statt stummer Sperre. */
+  const [erinnern, setErinnern] = useState(false);
+  /*
+    KAMERA-KNOPF nur auf Touch-Geraeten. Chrome auf Android 14/15 bietet im
+    Dateidialog teils keine Kamera mehr an — `capture` oeffnet sie direkt.
+    Am PC oeffnete `capture` ohnehin nur den Dateidialog.
+  */
+  const [touch] = useState(() => window.matchMedia?.('(pointer: coarse)').matches === true);
 
-  const hochladen = async (dateien: FileList | null) => {
+  const hochladen = async (dateien: FileList | null, feld: HTMLInputElement) => {
     if (!dateien || dateien.length === 0) return;
     const liste = Array.from(dateien);
     const moeglich = liste.slice(0, frei);
@@ -80,7 +90,7 @@ export function DokumentHochladen({
         setLaeuft((l) => l.filter((x) => x.id !== id));
       }
     }
-    if (eingabe.current) eingabe.current.value = '';
+    feld.value = '';
   };
 
   const entfernen = async (d: DokumentEintrag) => {
@@ -91,63 +101,98 @@ export function DokumentHochladen({
     else setFehler([`„${d.name}“ ließ sich nicht entfernen — bitte versuchen Sie es noch einmal.`]);
   };
 
+  /** Ohne Einwilligung kein Dateidialog — aber ein Hinweis, wo der Haken fehlt. */
+  const waehlen = (feld: HTMLInputElement | null) => {
+    if (einwilligung) {
+      feld?.click();
+      return;
+    }
+    setErinnern(true);
+    haken.current?.focus();
+    haken.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const gesperrt = frei === 0 || laeuft.length > 0;
+  const knopf = 'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40';
+  const haupt = `${knopf} bg-indigo-600 text-white hover:bg-indigo-500`;
+  const neben = `${knopf} border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50`;
+
   return (
     <div className="mt-3 rounded-lg border-2 border-dashed border-indigo-200 bg-white p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-            <Camera className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden /> {titel}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-            {text ?? 'Foto oder PDF, bis 10 MB je Datei.'} Ihr Berater liest die Zahlen ab — die Felder
-            können Sie dann leer lassen.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => eingabe.current?.click()}
-          disabled={!einwilligung || frei === 0 || laeuft.length > 0}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Upload className="h-4 w-4" aria-hidden /> Datei wählen
-        </button>
-        <input
-          ref={eingabe}
-          type="file"
-          accept="image/*,application/pdf"
-          multiple
-          className="hidden"
-          aria-label={titel}
-          onChange={(e) => void hochladen(e.target.files)}
-        />
-      </div>
+      <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+        <Camera className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden /> {titel}
+      </p>
+      <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+        {text ?? 'Foto oder PDF, bis 10 MB je Datei.'} Ihr Berater liest die Zahlen ab — die Felder
+        können Sie dann leer lassen.
+      </p>
 
       {/*
         EINWILLIGUNG vor der ersten Datei, ausdruecklich auch fuer besondere
         Kategorien (Art. 9 DSGVO): Auf einer Gehaltsabrechnung steht die
         Kirchensteuer, auf einer Beitragsrechnung womoeglich ein
         Risikozuschlag. Einmal je Check — sie gilt fuer alle Schritte.
+        Sie steht VOR den Knoepfen: lesen, abhaken, waehlen.
       */}
       {!einwilligung && (
-        <label className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-md bg-indigo-50 p-2.5 text-xs leading-relaxed text-slate-700">
-          <input
-            type="checkbox"
-            checked={einwilligung}
-            onChange={(e) => onEinwilligung(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
-          />
-          <span>
-            Ich willige ein, dass meine Unterlagen beim Hochladen geschützt gespeichert und mit dem Absenden
-            meinem Berater zugänglich gemacht werden. Gelöscht werden sie, sobald er sie löscht,
-            <strong> spätestens 90 Tage</strong> nach dem Absenden — sende ich nicht ab, mit Ablauf des
-            Links. Das schließt Angaben zu Religionszugehörigkeit (Kirchensteuer) und Gesundheit ein, die auf
-            Unterlagen stehen können (Art. 9 Abs. 2 lit. a DSGVO). Widerruf jederzeit bei meinem Berater.
-            Mehr in der{' '}
-            <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
-              Datenschutzerklärung
-            </a>.
-          </span>
-        </label>
+        <>
+          <label className={`mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-md bg-indigo-50 p-2.5 text-xs leading-relaxed text-slate-700 ${
+            erinnern ? 'ring-2 ring-amber-400' : ''}`}>
+            <input
+              ref={haken}
+              type="checkbox"
+              checked={einwilligung}
+              onChange={(e) => onEinwilligung(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
+            />
+            <span>
+              Ich willige ein, dass meine Unterlagen beim Hochladen geschützt gespeichert und mit dem Absenden
+              meinem Berater zugänglich gemacht werden. Gelöscht werden sie, sobald er sie löscht,
+              <strong> spätestens 90 Tage</strong> nach dem Absenden — sende ich nicht ab, mit Ablauf des
+              Links. Das schließt Angaben zu Religionszugehörigkeit (Kirchensteuer) und Gesundheit ein, die auf
+              Unterlagen stehen können (Art. 9 Abs. 2 lit. a DSGVO). Widerruf jederzeit bei meinem Berater.
+              Mehr in der{' '}
+              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+                Datenschutzerklärung
+              </a>.
+            </span>
+          </label>
+          {erinnern && (
+            <p role="alert" className="mt-1.5 text-xs font-semibold text-amber-800">
+              Bitte setzen Sie zuerst den Haken — dann können Sie Dateien wählen.
+            </p>
+          )}
+        </>
+      )}
+
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        {touch && (
+          <button type="button" onClick={() => waehlen(kamera.current)} disabled={gesperrt} className={haupt}>
+            <Camera className="h-4 w-4" aria-hidden /> Foto aufnehmen
+          </button>
+        )}
+        <button type="button" onClick={() => waehlen(eingabe.current)} disabled={gesperrt} className={touch ? neben : haupt}>
+          <Upload className="h-4 w-4" aria-hidden /> Datei wählen
+        </button>
+      </div>
+      <input
+        ref={eingabe}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        aria-label={titel}
+        onChange={(e) => void hochladen(e.target.files, e.target)}
+      />
+      {touch && (
+        <input
+          ref={kamera}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          aria-label={`${titel}: Foto aufnehmen`}
+          onChange={(e) => void hochladen(e.target.files, e.target)}
+        />
       )}
 
       {(eigene.length > 0 || laeuft.length > 0) && (
