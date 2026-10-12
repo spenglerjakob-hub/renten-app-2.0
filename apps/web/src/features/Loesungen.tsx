@@ -5,7 +5,7 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt, TON,
 } from '../components/Feld';
-import { foerderBasis, angebotPositionen } from './tuev-berechnung';
+import { foerderBasis, angebotPositionen, angebotKenntKapital, type AngebotPosition } from './tuev-berechnung';
 import { personNameAus } from './personen';
 
 /**
@@ -65,6 +65,7 @@ export function Loesungen({ zeile, szenario, sparrate }: {
     agZuschussMonat: Math.round(x.agZuschussMonat * 100) / 100,
     dynamik: 0,
     renteMonat: 0,
+    kapital: 0,
   });
 
   return (
@@ -241,8 +242,6 @@ function Angebote({ szenario }: { szenario: SzenarioParsed }) {
   const paar = szenario.haushalt.verheiratet && szenario.personen.length > 1;
 
   const positionen = useMemo(() => angebotPositionen(szenario), [szenario]);
-  const gerechnet = positionen.filter((x) => x.ergebnis !== null);
-  const besteRendite = gerechnet.reduce((m, x) => Math.max(m, x.ergebnis!.rendite), -Infinity);
 
   return (
     <section aria-labelledby="angebote-titel">
@@ -251,15 +250,17 @@ function Angebote({ szenario }: { szenario: SzenarioParsed }) {
           <h3 id="angebote-titel" className="text-base font-bold text-indigo-900 sm:text-xl">Angebote vergleichen</h3>
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:text-sm">
             Holen Sie mit den Beiträgen oben Angebote ein und tragen Sie die Rente ein, die der Anbieter
-            zum Rentenbeginn nennt. Gerechnet wird wie im Vertrags-TÜV: was das Angebot Sie netto kostet,
-            gegen das, was im Alter nach Steuer und Krankenversicherung ankommt.
+            zum Rentenbeginn nennt — und, wo es sie gibt, die Kapitalabfindung. Gerechnet wird wie im
+            Vertrags-TÜV: was das Angebot Sie netto kostet, gegen das, was im Alter nach Steuer und
+            Krankenversicherung ankommt.
           </p>
         </div>
         {angebote.length < 12 && (
           <button
             type="button"
             onClick={() => angebotHinzufuegen({
-              loesung: 'privat', name: '', inhaber: 'A', beitragMonat: 100, agZuschussMonat: 0, dynamik: 0, renteMonat: 0,
+              loesung: 'privat', name: '', inhaber: 'A', beitragMonat: 100, agZuschussMonat: 0, dynamik: 0,
+              renteMonat: 0, kapital: 0,
             })}
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-50 print:hidden"
           >
@@ -276,57 +277,68 @@ function Angebote({ szenario }: { szenario: SzenarioParsed }) {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-            {positionen.map(({ angebot: a }, i) => (
-              <article key={a.id} className={`rounded-xl border p-3 shadow-sm ${TON.eingabe}`}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">Angebot {i + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => angebotEntfernen(a.id)}
-                    aria-label={`Angebot ${i + 1} entfernen`}
-                    className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
-                </div>
-                <div className="grid gap-2.5">
-                  <TextFeld
-                    label="Anbieter / Tarif"
-                    wert={a.name}
-                    onChange={(v) => angebotAendern(a.id, { name: v })}
-                    platzhalter={LOESUNG_TEXT[a.loesung]}
-                  />
-                  <div className={paar ? 'grid grid-cols-2 gap-2' : 'grid gap-2'}>
-                    <AuswahlFeld
-                      label="Lösung"
-                      wert={a.loesung}
-                      onChange={(v) => angebotAendern(a.id, { loesung: v })}
-                      optionen={(Object.keys(LOESUNG_TEXT) as LoesungId[]).map((id) => ({ wert: id, text: LOESUNG_TEXT[id] }))}
-                    />
-                    {paar && (
-                      <AuswahlFeld
-                        label="Für"
-                        wert={a.inhaber}
-                        onChange={(v) => angebotAendern(a.id, { inhaber: v })}
-                        optionen={szenario.personen.map((p) => ({ wert: p.id, text: personNameAus(szenario.personen, p.id) }))}
-                      />
-                    )}
+            {positionen.map(({ angebot: a }, i) => {
+              const kapitalMoeglich = angebotKenntKapital(a.loesung);
+              return (
+                <article key={a.id} className={`rounded-xl border p-3 shadow-sm ${TON.eingabe}`}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">Angebot {i + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => angebotEntfernen(a.id)}
+                      aria-label={`Angebot ${i + 1} entfernen`}
+                      className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <ZahlFeld
-                      label={a.loesung === 'bav' ? 'Umwandlung brutto' : a.loesung === 'avd' ? 'Eigenbeitrag' : 'Beitrag'}
-                      wert={a.beitragMonat}
-                      onChange={(n) => angebotAendern(a.id, { beitragMonat: n })}
-                      einheit="€"
+                  <div className="grid gap-2.5">
+                    <TextFeld
+                      label="Anbieter / Tarif"
+                      wert={a.name}
+                      onChange={(v) => angebotAendern(a.id, { name: v })}
+                      platzhalter={LOESUNG_TEXT[a.loesung]}
                     />
-                    {a.loesung === 'bav' ? (
+                    <div className={paar ? 'grid grid-cols-2 gap-2' : 'grid gap-2'}>
+                      <AuswahlFeld
+                        label="Lösung"
+                        wert={a.loesung}
+                        onChange={(v) => angebotAendern(a.id, { loesung: v })}
+                        optionen={(Object.keys(LOESUNG_TEXT) as LoesungId[]).map((id) => ({ wert: id, text: LOESUNG_TEXT[id] }))}
+                      />
+                      {paar && (
+                        <AuswahlFeld
+                          label="Für"
+                          wert={a.inhaber}
+                          onChange={(v) => angebotAendern(a.id, { inhaber: v })}
+                          optionen={szenario.personen.map((p) => ({ wert: p.id, text: personNameAus(szenario.personen, p.id) }))}
+                        />
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
                       <ZahlFeld
-                        label="Arbeitgeber"
-                        wert={a.agZuschussMonat}
-                        onChange={(n) => angebotAendern(a.id, { agZuschussMonat: n })}
+                        label={a.loesung === 'bav' ? 'Umwandlung brutto' : a.loesung === 'avd' ? 'Eigenbeitrag' : 'Beitrag'}
+                        wert={a.beitragMonat}
+                        onChange={(n) => angebotAendern(a.id, { beitragMonat: n })}
                         einheit="€"
                       />
-                    ) : (
+                      {a.loesung === 'bav' ? (
+                        <ZahlFeld
+                          label="Arbeitgeber"
+                          wert={a.agZuschussMonat}
+                          onChange={(n) => angebotAendern(a.id, { agZuschussMonat: n })}
+                          einheit="€"
+                        />
+                      ) : (
+                        <ProzentFeld
+                          label="Dynamik p. a."
+                          wert={a.dynamik}
+                          onChange={(n) => angebotAendern(a.id, { dynamik: n })}
+                          max={10}
+                        />
+                      )}
+                    </div>
+                    {a.loesung === 'bav' && (
                       <ProzentFeld
                         label="Dynamik p. a."
                         wert={a.dynamik}
@@ -334,48 +346,126 @@ function Angebote({ szenario }: { szenario: SzenarioParsed }) {
                         max={10}
                       />
                     )}
-                  </div>
-                  {a.loesung === 'bav' && (
-                    <ProzentFeld
-                      label="Dynamik p. a."
-                      wert={a.dynamik}
-                      onChange={(n) => angebotAendern(a.id, { dynamik: n })}
-                      max={10}
+                    <ZahlFeld
+                      label="Rente laut Angebot (brutto, Monat)"
+                      wert={a.renteMonat}
+                      onChange={(n) => angebotAendern(a.id, { renteMonat: n })}
+                      einheit="€"
+                      hilfe={kapitalMoeglich
+                        ? 'Garantiert oder prognostiziert, zum Rentenbeginn. Nennt das Angebot nur ein Kapital, genügt das Feld darunter.'
+                        : 'Garantiert oder prognostiziert — so, wie der Anbieter sie zum Rentenbeginn nennt.'}
                     />
-                  )}
-                  <ZahlFeld
-                    label="Rente laut Angebot (brutto, Monat)"
-                    wert={a.renteMonat}
-                    onChange={(n) => angebotAendern(a.id, { renteMonat: n })}
-                    einheit="€"
-                    hilfe="Garantiert oder prognostiziert — so, wie der Anbieter sie zum Rentenbeginn nennt."
-                  />
-                </div>
-              </article>
-            ))}
+                    {kapitalMoeglich ? (
+                      <ZahlFeld
+                        label="Kapital laut Angebot (einmalig, brutto)"
+                        wert={a.kapital}
+                        onChange={(n) => angebotAendern(a.id, { kapital: n })}
+                        einheit="€"
+                        schritt={1000}
+                        hilfe="Statt der Rente — die Abfindung zum Rentenbeginn."
+                      />
+                    ) : (
+                      <p className="text-[11px] leading-relaxed text-slate-500">
+                        Eine volle Kapitalauszahlung ist {a.loesung === 'basis' ? 'bei der Basisrente' : 'beim Altersvorsorgedepot'} nicht
+                        vorgesehen — gerechnet wird die Rente.
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
-          <AngebotsTabelle positionen={positionen} besteRendite={besteRendite} />
+          <AngebotsTabelle positionen={positionen} />
         </>
       )}
     </section>
   );
 }
 
-function AngebotsTabelle({ positionen, besteRendite }: {
-  positionen: ReturnType<typeof angebotPositionen>;
-  besteRendite: number;
-}) {
-  const zeilen: { text: string; info?: string; wert: (r: NonNullable<typeof positionen[number]['ergebnis']>) => string; stark?: boolean }[] = [
-    { text: 'Kostet Sie netto im Monat', wert: (r) => euro(r.echterAufwandMonat) },
-    { text: 'Fließt in den Vertrag', wert: (r) => euro(r.beitragMonat + r.zulageMonat) },
-    { text: 'Rente brutto', wert: (r) => euro(r.bruttoRenteMonat) },
-    { text: 'Rente netto', info: 'Nach Steuer und Kranken-/Pflegeversicherung im ersten Rentenjahr — anteilig an der Steuer des Haushalts, wie im Kassenbon.', wert: (r) => euro(r.nettoRenteMonat), stark: true },
-    { text: 'Netto-Rente je 100 € Aufwand', wert: (r) => (r.echterAufwandMonat > 0 ? euroGenau(Math.round(r.nettoRenteMonat / r.echterAufwandMonat * 10_000) / 100) : '—') },
-    { text: 'Netto-Hebel', info: 'Netto-Auszahlung über die Laufzeit je Euro Netto-Aufwand, ohne Verzinsung.', wert: (r) => `${zahl(r.nettoHebel)} ×` },
-    { text: 'Nettorendite p. a.', info: 'Der interne Zinsfuß aller Netto-Zahlungen: Aufwand in der Ansparphase gegen Netto-Rente bis zur Lebenserwartung.', wert: (r) => prozent(r.rendite, 2), stark: true },
-    { text: 'Amortisation ab Rentenbeginn', wert: (r) => `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} J.` },
+type Position = AngebotPosition;
+type Zeile =
+  | { gruppe: string }
+  | { text: string; info?: string; stark?: boolean; wert: (p: Position) => string | null };
+
+const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+
+/** Die Einzahlseite ist bei beiden Wegen dieselbe — sie kommt aus dem, der gerechnet ist. */
+const einzahlung = (p: Position) => p.rente ?? p.kapital;
+
+/** Die hoechste Nettorendite eines Angebots ueber beide Wege. */
+const besteRenditeVon = (p: Position) => Math.max(p.rente?.rendite ?? -Infinity, p.kapital?.rendite ?? -Infinity);
+
+function AngebotsTabelle({ positionen }: { positionen: Position[] }) {
+  const mitRente = positionen.some((p) => p.rente);
+  const mitKapital = positionen.some((p) => p.kapital);
+  const mitVergleich = positionen.some((p) => p.breakEven);
+  const gerechnet = positionen.filter((p) => p.rente || p.kapital);
+  const beste = gerechnet.reduce((m, p) => Math.max(m, besteRenditeVon(p)), -Infinity);
+
+  const zeilen: Zeile[] = [
+    { text: 'Kostet Sie netto im Monat', wert: (p) => { const e = einzahlung(p); return e ? euro(e.echterAufwandMonat) : null; } },
+    { text: 'Fließt in den Vertrag', wert: (p) => { const e = einzahlung(p); return e ? euro(e.beitragMonat + e.zulageMonat) : null; } },
+    ...(mitRente ? [
+      { gruppe: 'Als Rente' },
+      { text: 'Rente brutto', wert: (p: Position) => (p.rente ? euro(p.rente.bruttoRenteMonat) : null) },
+      {
+        text: 'Rente netto', stark: true,
+        info: 'Nach Steuer und Kranken-/Pflegeversicherung im ersten Rentenjahr — anteilig an der Steuer des Haushalts, wie im Kassenbon.',
+        wert: (p: Position) => (p.rente ? euro(p.rente.nettoRenteMonat) : null),
+      },
+      {
+        text: 'Netto-Rente je 100 € Aufwand',
+        wert: (p: Position) => (p.rente && p.rente.echterAufwandMonat > 0
+          ? euroGenau(Math.round(p.rente.nettoRenteMonat / p.rente.echterAufwandMonat * 10_000) / 100) : null),
+      },
+      {
+        text: 'Netto-Hebel', info: 'Netto-Auszahlung über die Laufzeit je Euro Netto-Aufwand, ohne Verzinsung.',
+        wert: (p: Position) => (p.rente ? `${zahl(p.rente.nettoHebel)} ×` : null),
+      },
+      {
+        text: 'Nettorendite p. a.', stark: true,
+        info: 'Der interne Zinsfuß aller Netto-Zahlungen: Aufwand in der Ansparphase gegen Netto-Rente bis zur Lebenserwartung.',
+        wert: (p: Position) => (p.rente ? prozent(p.rente.rendite, 2) : null),
+      },
+      {
+        text: 'Amortisation ab Rentenbeginn',
+        wert: (p: Position) => (p.rente ? `${jahre(p.rente.amortisationsJahre)} J.` : null),
+      },
+    ] : []),
+    ...(mitKapital ? [
+      { gruppe: 'Als Kapital' },
+      { text: 'Kapital brutto', wert: (p: Position) => (p.kapital ? euro(p.kapital.bruttoKapital) : null) },
+      {
+        text: '− Steuer im Zuflussjahr',
+        info: 'bAV: voll steuerpflichtig. Private Rentenversicherung: nur der Ertrag, nach 12 Jahren und ab 62 zur Hälfte.',
+        wert: (p: Position) => (p.kapital ? euro(p.kapital.steuerKapital) : null),
+      },
+      {
+        text: '− Kranken- und Pflegeversicherung',
+        info: 'Bei der bAV verteilt auf zehn Jahre (§ 229 SGB V), hier in einer Summe. Private Rentenversicherung in der KVdR beitragsfrei.',
+        wert: (p: Position) => (p.kapital ? euro(p.kapital.kvPvKapital) : null),
+      },
+      { text: 'Kapital netto', stark: true, wert: (p: Position) => (p.kapital ? euro(p.kapital.nettoKapital) : null) },
+      { text: 'Netto-Hebel', wert: (p: Position) => (p.kapital ? `${zahl(p.kapital.nettoHebel)} ×` : null) },
+      { text: 'Nettorendite p. a.', stark: true, wert: (p: Position) => (p.kapital ? prozent(p.kapital.rendite, 2) : null) },
+    ] : []),
+    ...(mitVergleich ? [
+      { gruppe: 'Rente oder Kapital?' },
+      {
+        text: 'Rente holt das Kapital ein mit',
+        info: 'Ab diesem Alter hat die Netto-Rente zusammengerechnet mehr gebracht als das Netto-Kapital — ohne Verzinsung des Kapitals.',
+        wert: (p: Position) => (p.breakEven ? `${jahre(p.breakEven.breakEvenOhneZins)} Jahren` : null),
+      },
+      {
+        text: '… mit 2 % Zins auf das Kapital',
+        wert: (p: Position) => (p.breakEven
+          ? (p.breakEven.kapitalTraegtSichSelbst ? 'nie' : `${jahre(p.breakEven.breakEvenMitZins)} Jahren`)
+          : null),
+      },
+    ] : []),
   ];
+  const spalten = positionen.length + 1;
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -384,11 +474,11 @@ function AngebotsTabelle({ positionen, besteRendite }: {
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left">
               <th className="sticky left-0 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Vergleich</th>
-              {positionen.map(({ angebot: a, ergebnis: r }, i) => (
-                <th key={a.id} className="px-3 py-2 text-right align-bottom">
+              {positionen.map((p, i) => (
+                <th key={p.angebot.id} className="px-3 py-2 text-right align-bottom">
                   <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Angebot {i + 1}</span>
-                  <span className="block font-bold leading-tight text-slate-800">{a.name || LOESUNG_TEXT[a.loesung]}</span>
-                  {r && Math.abs(r.rendite - besteRendite) < 1e-9 && positionen.filter((x) => x.ergebnis).length > 1 && (
+                  <span className="block font-bold leading-tight text-slate-800">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
+                  {gerechnet.length > 1 && (p.rente || p.kapital) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
                     <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
@@ -398,27 +488,35 @@ function AngebotsTabelle({ positionen, besteRendite }: {
             </tr>
           </thead>
           <tbody>
-            {zeilen.map((z) => (
+            {zeilen.map((z) => ('gruppe' in z ? (
+              <tr key={z.gruppe} className="border-b border-slate-200 bg-slate-50">
+                <td colSpan={spalten} className="sticky left-0 px-3 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {z.gruppe}
+                </td>
+              </tr>
+            ) : (
               <tr key={z.text} className={`border-b border-slate-100 last:border-0 ${z.stark ? 'bg-indigo-50/40 font-bold' : ''}`}>
                 <td className={`sticky left-0 px-3 py-1.5 text-slate-600 ${z.stark ? 'bg-indigo-50' : 'bg-white'}`}>
                   {z.text}{z.info && <InfoPunkt titel={z.text}>{z.info}</InfoPunkt>}
                 </td>
-                {positionen.map(({ angebot: a, ergebnis: r }) => (
-                  <td key={a.id} className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-slate-900">
-                    {r ? z.wert(r) : <span className="font-normal text-slate-400">—</span>}
-                  </td>
-                ))}
+                {positionen.map((p) => {
+                  const w = z.wert(p);
+                  return (
+                    <td key={p.angebot.id} className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-slate-900">
+                      {w ?? <span className="font-normal text-slate-400">—</span>}
+                    </td>
+                  );
+                })}
               </tr>
-            ))}
+            )))}
           </tbody>
         </table>
       </div>
-      {positionen.some((x) => x.ergebnis === null) && (
+      {positionen.some((p) => !p.rente && !p.kapital) && (
         <p className="border-t border-slate-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-          Bei Angeboten ohne Beitrag oder ohne Rente fehlt die Rechnung — tragen Sie beides ein.
+          Bei Angeboten ohne Beitrag oder ohne Rente bzw. Kapital fehlt die Rechnung — tragen Sie beides ein.
         </p>
       )}
     </div>
   );
 }
-

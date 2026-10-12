@@ -793,10 +793,17 @@ const SCHICHT: Record<LoesungsArt, 1 | 2 | 3> = { bav: 2, avd: 2, basis: 1, priv
 
 export interface AngebotPosition {
   angebot: AngebotEintrag;
-  /** null, solange Beitrag oder Rente fehlen */
-  ergebnis: TuevErgebnis | null;
+  /** Der Weg als laufende Rente — null ohne Beitrag oder ohne Rente */
+  rente: TuevErgebnis | null;
+  /** Der Weg als Kapitalabfindung — null ohne Kapital oder wo es keine gibt */
+  kapital: TuevErgebnis | null;
+  /** Ab welchem Alter die Rente das Kapital einholt — nur mit beiden Wegen */
+  breakEven: RenteOderKapital | null;
   rentenbeginnJahr: number;
 }
+
+/** Kennt diese Loesung eine volle Kapitalauszahlung? bAV und private Rentenversicherung ja. */
+export const angebotKenntKapital = (loesung: LoesungsArt) => kenntKapitalwahl(AUSZAHL_TYP[loesung]);
 
 /**
  * Jedes Angebot fuer sich durch den Vertrags-TUEV.
@@ -807,6 +814,11 @@ export interface AngebotPosition {
  * Angebot kommt deshalb einzeln zu den bestehenden Vertraegen dazu, und die
  * Projektion rechnet seine Rente nach Steuer und Krankenversicherung im
  * ersten Ruhestandsjahr.
+ *
+ * BEIDE WEGE, wenn das Angebot eine Kapitalabfindung nennt: Die Rente kommt
+ * aus der Projektion mit `strategie: 'rente'`, das Kapital aus einer zweiten
+ * mit `strategie: 'kapital'` — dieselben Regeln wie bei einem erfassten
+ * Vertrag (`wege` in `tuevPositionen`), keine eigene Steuerrechnung.
  */
 export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
   const basis = tuevBasis(szenario);
@@ -823,25 +835,41 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
     const inhaber = a.inhaber === 'B' && szenario.haushalt.verheiratet ? 'B' : 'A';
     const person = szenario.personen.find((x) => x.id === inhaber) ?? szenario.personen[0]!;
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
-    if (a.beitragMonat <= 0 || a.renteMonat <= 0) return { angebot: a, ergebnis: null, rentenbeginnJahr };
+    const mitRente = a.renteMonat > 0;
+    const mitKapital = angebotKenntKapital(a.loesung) && a.kapital > 0;
+    const leer = { angebot: a, rente: null, kapital: null, breakEven: null, rentenbeginnJahr };
+    if (a.beitragMonat <= 0 || (!mitRente && !mitKapital)) return leer;
 
     const id = `angebot-${a.id}`;
+    const start = a.loesung === 'avd' && beginn.jahr < avdAb ? { jahr: avdAb, monat: 1 } : beginn;
     const auszahlung: Vertrag = {
       id, inhaber, schicht: SCHICHT[a.loesung], typ: AUSZAHL_TYP[a.loesung],
       name: a.name, brutto: a.renteMonat, strategie: 'rente', altvertrag: false,
+      /*
+        Fuer die Kapitalwahl einer privaten Rentenversicherung braucht die
+        Steuer den Ertrag: Kapital minus eingezahlte Beitraege, und die
+        12/62-Regel braucht den Vertragsbeginn.
+      */
+      kapitalAlternative: mitKapital ? a.kapital : undefined,
+      beginnJahr: start.jahr,
+      monatsbeitrag: a.beitragMonat,
     };
-    const klon: SzenarioParsed = { ...szenario, vertraege: [...szenario.vertraege, auszahlung] };
-    const e = projiziere(klon);
-    const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr);
-    const posten = zeile?.posten.find((x) => x.id === id);
+    const projektion = (strategie: Vertrag['strategie']) => {
+      const v = { ...auszahlung, strategie };
+      const klon: SzenarioParsed = { ...szenario, vertraege: [...szenario.vertraege, v] };
+      return { klon, e: projiziere(klon) };
+    };
 
     const alterBeiRentenbeginn = rentenbeginnJahr - jahrAus(person.geburtsdatum, 1980);
     const erwerb = erwerbVon(basis, inhaber);
     const istBav = a.loesung === 'bav';
-    const start = a.loesung === 'avd' && beginn.jahr < avdAb ? { jahr: avdAb, monat: 1 } : beginn;
 
-    const ergebnis = vertragsTuev(
-      { ...auszahlung, typ: EINZAHL_TYP[a.loesung] },
+    /** Eine TUEV-Rechnung fuer EINEN Auszahlungsweg — die Einzahlseite ist bei beiden dieselbe. */
+    const rechne = (strategie: Vertrag['strategie'], klon: SzenarioParsed, auszahlseite: {
+      bruttoRenteMonat: number; kvPvMonat: number; steuerMonat: number; nettoRenteMonat: number;
+      bruttoKapital: number; steuerKapital: number; kvPvKapital: number; nettoKapital: number;
+    }) => vertragsTuev(
+      { ...auszahlung, typ: EINZAHL_TYP[a.loesung], strategie },
       {
         // Bei der bAV ist der TUEV-Beitrag der GESAMTbeitrag, der Arbeitgeberanteil steckt darin.
         beitragMonat: istBav ? a.beitragMonat + a.agZuschussMonat : a.beitragMonat,
@@ -858,15 +886,42 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
         ...stammKontext(szenario, basis, erwerb),
         rentenbeginnJahr,
         alterBeiRentenbeginn,
+        ...auszahlseite,
+      },
+      klon,
+      basis.p,
+    );
+
+    let rente: TuevErgebnis | null = null;
+    if (mitRente) {
+      const { klon, e } = projektion('rente');
+      const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr);
+      const posten = zeile?.posten.find((x) => x.id === id);
+      rente = rechne('rente', klon, {
         bruttoRenteMonat: (posten?.bruttoJahr ?? 0) / 12,
         kvPvMonat: (posten?.kvPvJahr ?? 0) / 12,
         steuerMonat: (posten?.steuerJahr ?? 0) / 12,
         nettoRenteMonat: (posten?.nettoJahr ?? 0) / 12,
         bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
-      },
-      klon,
-      basis.p,
-    );
-    return { angebot: a, ergebnis, rentenbeginnJahr };
+      });
+    }
+
+    let kapital: TuevErgebnis | null = null;
+    if (mitKapital) {
+      const { klon, e } = projektion('kapital');
+      const einmal = e.kapitalauszahlungen.find((x) => x.vertragId === id);
+      kapital = rechne('kapital', klon, {
+        bruttoRenteMonat: 0, kvPvMonat: 0, steuerMonat: 0, nettoRenteMonat: 0,
+        bruttoKapital: einmal?.bruttoKapital ?? 0,
+        steuerKapital: einmal?.steuer ?? 0,
+        kvPvKapital: einmal?.kvPvGesamt ?? 0,
+        nettoKapital: einmal?.nettoKapital ?? 0,
+      });
+    }
+
+    const breakEven = rente && kapital && rente.nettoRenteMonat > 0 && kapital.nettoKapital > 0
+      ? renteOderKapital(rente.nettoRenteMonat, kapital.nettoKapital, alterBeiRentenbeginn)
+      : null;
+    return { angebot: a, rente, kapital, breakEven, rentenbeginnJahr };
   });
 }

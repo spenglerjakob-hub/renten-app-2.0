@@ -286,7 +286,9 @@ export function Gutachten({
         ),
       }] : []),
       ...(loesungen ? [{
-        titel: ['Lösungen im Vergleich'],
+        // Die Angebote stehen auf eigenem Blatt — und deshalb auch im Verzeichnis.
+        titel: ['Lösungen im Vergleich',
+          ...(loesungen.angebote.some((a) => a.rente || a.kapital) ? ['Ihre Angebote im Vergleich'] : [])],
         knoten: (
           <Loesungsvergleich
             loesungen={loesungen.liste}

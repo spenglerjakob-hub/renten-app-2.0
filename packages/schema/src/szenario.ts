@@ -488,6 +488,12 @@ export const angebotSchema = z.object({
   dynamik: z.number().min(-1).max(1).default(0),
   /** Garantierte bzw. erwartete Monatsrente zum Rentenbeginn, brutto */
   renteMonat: z.number().min(0).max(1_000_000).default(0),
+  /**
+   * Kapitalabfindung laut Angebot, brutto, einmalig zum Rentenbeginn — statt
+   * der Rente. Nur bei bAV und privater Rentenversicherung; Basisrente und
+   * Altersvorsorgedepot kennen keine volle Kapitalauszahlung.
+   */
+  kapital: z.number().min(0).max(100_000_000).default(0),
 });
 
 /**
