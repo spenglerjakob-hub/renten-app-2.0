@@ -17,6 +17,7 @@ import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
 import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
+import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
@@ -840,6 +841,19 @@ export default function App() {
                   */}
                   <PkvRechner zeile={zeile} />
                   {jahrRegler}
+                  {/*
+                    WAS DIE LUECKE BEDEUTET. Am PC unten in der linken Spalte,
+                    die sonst nach der Steuer-Engine endet. Sie bleibt beim
+                    Scrollen stehen, solange rechts Kassenbon und Annahmen
+                    folgen; die linke Spalte ist dafuer so hoch wie die rechte.
+                    Am Telefon steht sie erst nach dem Kassenbon (unten).
+                  */}
+                  <LueckeBedeutung
+                    zeile={zeile}
+                    kaufkraftHeute={kaufkraftHeute}
+                    onSparen={() => geheZu('sparen')}
+                    klasse="hidden lg:sticky lg:top-32 lg:block"
+                  />
                 </div>
                 <div className="space-y-4 sm:space-y-6 lg:col-span-7">
                   <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
@@ -877,6 +891,13 @@ export default function App() {
                   <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                     <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
                   </div>
+
+                  <LueckeBedeutung
+                    zeile={zeile}
+                    kaufkraftHeute={kaufkraftHeute}
+                    onSparen={() => geheZu('sparen')}
+                    klasse="lg:hidden"
+                  />
 
                   <Rechtsstand
                     ergebnis={ergebnis}
