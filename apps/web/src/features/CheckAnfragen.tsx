@@ -1,12 +1,22 @@
 import { useState } from 'react';
-import { Copy, Check, Mail, Download, Trash2, RefreshCw, Link2 } from 'lucide-react';
+import {
+  Copy, Check, Mail, Download, Trash2, RefreshCw, Link2, Paperclip, ChevronDown, Eye, FileText,
+  Image as BildSymbol,
+} from 'lucide-react';
 import { useCheckAnfragen } from '../store/check-anfragen';
 import { useSzenario } from '../store/szenario';
 import { useAuth } from '../store/auth';
-import { checkLink } from '../lib/check';
-import type { CheckAnfrage } from '../lib/check';
+import { checkLink, dokumentLink, DOKUMENT_ART_TEXT, type DokumentArt } from '../lib/check';
+import type { CheckAnfrage, BeraterDokument } from '../lib/check';
 
 const datum = (iso: string) => new Date(iso).toLocaleDateString('de-DE');
+
+const groesse = (bytes: number | null) => (bytes === null ? ''
+  : bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+const ARTEN = Object.keys(DOKUMENT_ART_TEXT) as DokumentArt[];
 
 /**
  * „Vorsorge-Check anfordern" — die Seite des Beraters.
@@ -15,13 +25,80 @@ const datum = (iso: string) => new Date(iso).toLocaleDateString('de-DE');
  * einreicht, sieht nur das Konto, das den Link erzeugt hat — das regelt die
  * Datenbank, nicht diese Oberflaeche.
  */
+/**
+ * Die Unterlagen eines Eingangs: ansehen oder herunterladen.
+ *
+ * Die Links gelten fuenf Minuten und entstehen erst beim Klick — eine Liste
+ * vorab signierter Links laege sonst laenger offen als noetig.
+ */
+function Unterlagen({ dokumente }: { dokumente: BeraterDokument[] }) {
+  const [fehler, setFehler] = useState(false);
+
+  const ansehen = async (d: BeraterDokument) => {
+    setFehler(false);
+    // Das Fenster SOFORT oeffnen: Nach dem Warten auf den Link sperrte der Browser es als Popup.
+    const fenster = window.open('', '_blank');
+    const url = await dokumentLink(d.pfad);
+    if (url && fenster) {
+      fenster.opener = null;
+      fenster.location.href = url;
+    } else {
+      fenster?.close();
+      setFehler(true);
+    }
+  };
+
+  const herunterladen = async (d: BeraterDokument) => {
+    setFehler(false);
+    const url = await dokumentLink(d.pfad, d.name);
+    if (!url) { setFehler(true); return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.rel = 'noopener';
+    a.click();
+  };
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-slate-200 bg-white p-2">
+      {ARTEN.filter((art) => dokumente.some((d) => d.art === art)).map((art) => (
+        <div key={art}>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{DOKUMENT_ART_TEXT[art]}</p>
+          <ul className="mt-1 space-y-1">
+            {dokumente.filter((d) => d.art === art).map((d) => (
+              <li key={d.pfad} className="flex items-center gap-2 text-sm">
+                {d.typ === 'application/pdf'
+                  ? <FileText className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
+                  : <BildSymbol className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />}
+                <span className="min-w-0 flex-1 truncate text-slate-800">{d.name}</span>
+                <span className="hidden shrink-0 text-xs tabular-nums text-slate-500 sm:inline">{groesse(d.groesse)}</span>
+                <button type="button" onClick={() => void ansehen(d)} aria-label={`${d.name} ansehen`}
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100">
+                  <Eye className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Ansehen</span>
+                </button>
+                <button type="button" onClick={() => void herunterladen(d)} aria-label={`${d.name} herunterladen`}
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100">
+                  <Download className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Laden</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {fehler && (
+        <p role="alert" className="text-xs text-rose-700">Die Unterlage ließ sich gerade nicht öffnen — bitte noch einmal versuchen.</p>
+      )}
+    </div>
+  );
+}
+
 export function CheckAnfragen({ onUebernommen, onKonto }: {
   /** Nach „In den Rechner uebernehmen" — etwa zur Etappe mit den Angaben */
   onUebernommen?: () => void;
   /** Das Konto oeffnen, um die uebernommenen Angaben dort zu sichern */
   onKonto?: () => void;
 } = {}) {
-  const { liste, laedt, meldung, laden, anlegen, uebernehmen, loeschen, meldungLoeschen } = useCheckAnfragen();
+  const { liste, dokumente, laedt, meldung, laden, anlegen, uebernehmen, loeschen, meldungLoeschen } = useCheckAnfragen();
+  const [offeneUnterlagen, setOffeneUnterlagen] = useState<string | null>(null);
   const setze = useSzenario((s) => s.setze);
   const email = useAuth((s) => s.email);
   const [kunde, setKunde] = useState('');
@@ -42,7 +119,8 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
     const text = `Guten Tag${a.kunde ? ` ${a.kunde}` : ''},\n\n`
       + 'für unser Gespräch zu Ihrer Altersvorsorge bitte ich Sie, Ihre Angaben vorab über den '
       + 'folgenden Link zu erfassen. Die Seite sagt Ihnen bei jedem Schritt, welche Unterlage Sie '
-      + 'dafür brauchen; ein Konto ist nicht nötig.\n\n'
+      + 'dafür brauchen — statt abzutippen, können Sie auch ein Foto oder einen Scan hochladen. '
+      + 'Ein Konto ist nicht nötig.\n\n'
       + `${checkLink(a.code)}\n\n`
       + `Der Link ist bis zum ${datum(a.gueltigBis)} gültig und lässt sich einmal absenden.\n\n`
       + 'Viele Grüße';
@@ -59,11 +137,12 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-slate-600">
         Schicken Sie Ihrem Kunden einen persönlichen Link. Er erfasst seine Angaben zu Hause,
-        Schritt für Schritt und ohne Konto — und sie landen nur bei Ihnen.
+        Schritt für Schritt und ohne Konto, und kann Unterlagen als Foto oder Scan hochladen statt
+        abzutippen — alles landet nur bei Ihnen.
         {email && (
           <> Sobald ein Kunde absendet, bekommen Sie eine E-Mail an <strong>{email}</strong>.</>
         )}
-        {' '}Eingegangene Angaben werden nach <strong>90 Tagen</strong> automatisch gelöscht.
+        {' '}Eingegangene Angaben und Unterlagen werden nach <strong>90 Tagen</strong> automatisch gelöscht.
       </p>
 
       {meldung && (
@@ -144,6 +223,8 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
             {liste.map((a) => {
               const s = status(a);
               const offen = !a.eingang && new Date(a.gueltigBis).getTime() >= Date.now();
+              const unterlagen = dokumente[a.code] ?? [];
+              const zeigeUnterlagen = offeneUnterlagen === a.code;
               return (
                 <li key={a.code} className="rounded-md bg-slate-50 px-3 py-2">
                   <div className="flex items-center gap-2">
@@ -177,10 +258,24 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                         </a>
                       </>
                     )}
+                    {unterlagen.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOffeneUnterlagen(zeigeUnterlagen ? null : a.code)}
+                        aria-expanded={zeigeUnterlagen}
+                        className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" aria-hidden />
+                        {unterlagen.length} Unterlage{unterlagen.length > 1 ? 'n' : ''}
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${zeigeUnterlagen ? 'rotate-180' : ''}`} aria-hidden />
+                      </button>
+                    )}
                     <span className="flex-1" />
                     <button type="button"
                       onClick={() => {
-                        if (a.eingang && !window.confirm('Die eingereichten Angaben werden endgültig gelöscht. Fortfahren?')) return;
+                        if (a.eingang && !window.confirm(unterlagen.length > 0
+                          ? `Die eingereichten Angaben und ${unterlagen.length} Unterlage${unterlagen.length > 1 ? 'n' : ''} werden endgültig gelöscht. Fortfahren?`
+                          : 'Die eingereichten Angaben werden endgültig gelöscht. Fortfahren?')) return;
                         void loeschen(a.code);
                       }}
                       aria-label={`Anfrage ${a.kunde || 'ohne Namen'} löschen`}
@@ -192,10 +287,12 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                     Nach der Uebernahme erinnern, dass die Kundendaten noch auf
                     dem Server liegen: Erst sichern, dann den Eingang loeschen.
                   */}
+                  {zeigeUnterlagen && unterlagen.length > 0 && <Unterlagen dokumente={unterlagen} />}
                   {uebernommen === a.code && (
                     <p className="mt-1.5 text-xs leading-relaxed text-emerald-800">
                       Übernommen. Sichern Sie die Angaben im Konto unter „Als neues speichern“ und
                       löschen Sie danach diesen Eingang — er wird nicht mehr gebraucht.
+                      {unterlagen.length > 0 && ' Unterlagen, die Sie behalten möchten, laden Sie vorher herunter — sie gehen mit dem Eingang.'}
                       {onKonto && (
                         <>
                           {' '}

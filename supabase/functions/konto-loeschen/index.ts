@@ -5,6 +5,11 @@
  * per `on delete cascade` daran und geht mit: gespeicherte Szenarien,
  * Vorsorge-Check-Anfragen und die zugehoerigen Eingaenge.
  *
+ * DIE HOCHGELADENEN UNTERLAGEN gehen nicht per Kaskade — Dateien lassen sich
+ * nur ueber die Storage-API loeschen. Nach dem Loeschen des Nutzers haben sie
+ * keine Anfrage mehr und werden hier gleich mit entfernt, nicht erst beim
+ * naechtlichen Aufraeumen (Edge Function `check-dokumente`).
+ *
  * WER DARF: nur der Inhaber selbst. Das Zugriffstoken aus dem
  * Authorization-Kopf wird beim Auth-Server geprueft (`auth.getUser`); geloescht
  * wird genau der Nutzer, dem es gehoert — eine ID aus dem Anfragekoerper
@@ -40,6 +45,17 @@ function adminSchluessel(): string {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
+/**
+ * Ein zweiter Versuch nach kurzer Pause — wie in `check-dokumente`: Die
+ * Datenbank weist den Schluessel vereinzelt mit „JWT issued at future" ab.
+ */
+async function zweiVersuche<T extends { error: unknown }>(aufruf: () => PromiseLike<T>): Promise<T> {
+  const erster = await aufruf();
+  if (!erster.error) return erster;
+  await new Promise((weiter) => setTimeout(weiter, 2000));
+  return await aufruf();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return antwort(405, { fehler: 'Nur POST' });
@@ -61,6 +77,27 @@ Deno.serve(async (req) => {
     return antwort(500, { fehler: 'Loeschen fehlgeschlagen' });
   }
 
-  console.log('Konto geloescht', nutzer.id);
+  /*
+    Die Unterlagen der Vorsorge-Checks. Ein Fehler hier laesst das Loeschen
+    nicht scheitern — das Konto ist schon weg, und das naechtliche Aufraeumen
+    erfasst, was liegen geblieben ist.
+  */
+  let unterlagen = 0;
+  try {
+    for (let runde = 0; runde < 10; runde += 1) {
+      const { data, error: fehlerListe } = await zweiVersuche(() => db.rpc('check_dokumente_verwaist', { p_grenze: 1000 }));
+      if (fehlerListe) throw fehlerListe;
+      const namen = ((data as string[] | null) ?? []).filter((n) => typeof n === 'string');
+      if (namen.length === 0) break;
+      const { error: fehlerDateien } = await zweiVersuche(() => db.storage.from('check-dokumente').remove(namen));
+      if (fehlerDateien) throw fehlerDateien;
+      unterlagen += namen.length;
+      if (namen.length < 1000) break;
+    }
+  } catch (e) {
+    console.error('Unterlagen nicht aufgeraeumt', e instanceof Error ? e.message : e);
+  }
+
+  console.log('Konto geloescht', nutzer.id, unterlagen > 0 ? `(${unterlagen} Unterlagen)` : '');
   return antwort(200, { status: 'geloescht' });
 });

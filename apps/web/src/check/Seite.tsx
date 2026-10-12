@@ -8,7 +8,11 @@ import {
   schaetzeEntgeltpunkte, erwerbsBasisHeute, type VertragsTyp,
 } from '@renten/engine';
 import { exportiere } from '@renten/schema';
-import { CHECK_CODE, codePruefen, einreichen, type CodeStatus } from '../lib/check';
+import {
+  CHECK_CODE, codePruefen, einreichen, type CodeStatus, type DokumentArt, type DokumentEintrag,
+} from '../lib/check';
+import { supabaseKonfiguriert } from '../lib/supabase';
+import { DokumentHochladen } from './Dokumente';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
@@ -104,8 +108,22 @@ function ladeStand(): Stand {
   return { antworten: leereAntworten(), schritt: 0 };
 }
 
+/**
+ * Welche Unterlage zu welchem Schritt gehoert. Ist dort eine hochgeladen, gilt
+ * der Schritt als erledigt: Der Berater liest die Zahlen selbst ab.
+ */
+const ART_JE_SCHRITT: Partial<Record<number, DokumentArt>> = { 1: 'einkommen', 2: 'kv', 3: 'rente', 4: 'vertraege' };
+
+const unterlagenZu = (i: number, x: Antworten) =>
+  x.dokumente.filter((d) => d.art === ART_JE_SCHRITT[i]).length;
+
 /** Ist ein Schritt vollstaendig? Die Uebersicht nennt, was noch offen ist. */
 function vollstaendig(i: number, x: Antworten): boolean {
+  return felderVollstaendig(i, x) || unterlagenZu(i, x) > 0;
+}
+
+/** Sind die FELDER eines Schritts ausgefuellt — ohne Blick auf Unterlagen? */
+function felderVollstaendig(i: number, x: Antworten): boolean {
   const personen = x.verheiratet ? [x.a, x.b] : [x.a];
   switch (i) {
     case 0: return personen.every((p) => parseDatum(p.geburtsdatum) !== null);
@@ -159,6 +177,32 @@ export function Seite() {
 
   const setze = (p: Partial<Antworten>) =>
     setStand((s) => ({ ...s, antworten: { ...s.antworten, ...p } }));
+
+  /*
+    UNTERLAGEN — nur mit Link des Beraters und solange er gilt. Die Liste
+    wird mit FUNKTIONALEN Updates gefuehrt: Mehrere Dateien laden
+    nacheinander, und jede meldet sich erst, wenn die naechste schon laeuft.
+  */
+  const darfHochladen = ANFRAGE !== null && supabaseKonfiguriert && codeStatus !== 'ungueltig' && senden !== 'fertig';
+  const dokumentHinzu = (d: DokumentEintrag) =>
+    setStand((s) => ({ ...s, antworten: { ...s.antworten, dokumente: [...s.antworten.dokumente, d] } }));
+  const dokumentWeg = (pfad: string) =>
+    setStand((s) => ({
+      ...s, antworten: { ...s.antworten, dokumente: s.antworten.dokumente.filter((d) => d.pfad !== pfad) },
+    }));
+  const upload = (art: DokumentArt, titel: string, text?: string) => (darfHochladen && ANFRAGE ? (
+    <DokumentHochladen
+      code={ANFRAGE}
+      art={art}
+      titel={titel}
+      text={text}
+      alle={x.dokumente}
+      einwilligung={x.dokumenteEinwilligung}
+      onEinwilligung={(b) => setze({ dokumenteEinwilligung: b })}
+      onHinzu={dokumentHinzu}
+      onEntfernt={dokumentWeg}
+    />
+  ) : undefined);
   const setzePerson = (id: 'a' | 'b', p: Partial<PersonAntwort>) =>
     setStand((s) => ({ ...s, antworten: { ...s.antworten, [id]: { ...s.antworten[id], ...p } } }));
   const geheZu = (i: number) => {
@@ -282,10 +326,26 @@ export function Seite() {
           </h2>
 
           {schritt === 0 && <SchrittHaushalt x={x} setze={setze} setzePerson={setzePerson} />}
-          {schritt === 1 && <SchrittEinkommen x={x} personen={personen} setzePerson={setzePerson} />}
-          {schritt === 2 && <SchrittKv x={x} setze={setze} personen={personen} />}
-          {schritt === 3 && <SchrittRente x={x} personen={personen} setzePerson={setzePerson} />}
-          {schritt === 4 && <SchrittVertraege x={x} setze={setze} />}
+          {schritt === 1 && (
+            <SchrittEinkommen x={x} personen={personen} setzePerson={setzePerson}
+              upload={upload('einkommen', 'Statt abtippen: Gehaltsabrechnung hochladen',
+                'Foto oder PDF der letzten Abrechnung (bei Beamten der Bezügemitteilung), bis 10 MB je Datei.')} />
+          )}
+          {schritt === 2 && (
+            <SchrittKv x={x} setze={setze} personen={personen}
+              upload={upload('kv', 'Statt abtippen: Beitragsrechnung hochladen',
+                'Privat versichert: die Beitragsrechnung; gesetzlich: ein Foto der Versichertenkarte genügt.')} />
+          )}
+          {schritt === 3 && (
+            <SchrittRente x={x} personen={personen} setzePerson={setzePerson}
+              upload={upload('rente', 'Statt abtippen: Renteninformation hochladen',
+                'Die Seite mit „Höhe Ihrer künftigen Regelaltersrente“ — oder die Versorgungsauskunft.')} />
+          )}
+          {schritt === 4 && (
+            <SchrittVertraege x={x} setze={setze}
+              upload={upload('vertraege', 'Statt abtippen: Standmitteilungen hochladen',
+                'Je Vertrag die letzte Standmitteilung oder den Depotauszug, bis 10 MB je Datei.')} />
+          )}
           {schritt === 5 && <SchrittZiel x={x} setze={setze} />}
           {schritt === 6 && (
             <SchrittUebersicht
@@ -294,6 +354,8 @@ export function Seite() {
               anfrage={ANFRAGE !== null}
               einwilligung={einwilligung}
               setEinwilligung={setEinwilligung}
+              upload={upload('sonstiges', 'Weitere Unterlagen hochladen',
+                'Was sonst noch hilft — Versicherungsschein, Bescheid, Angebot. Foto oder PDF, bis 10 MB.')}
             />
           )}
           {schritt === 6 && senden === 'fehler' && (
@@ -360,7 +422,8 @@ export function Seite() {
 
         <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
           {ANFRAGE
-            ? 'Ihre Angaben bleiben in Ihrem Browser, bis Sie sie absenden. Übermittelt werden sie verschlüsselt und nur an Ihren Berater.'
+            ? `Ihre Angaben bleiben in Ihrem Browser, bis Sie sie absenden. Übermittelt werden sie verschlüsselt und nur an Ihren Berater.${
+              x.dokumente.length > 0 ? ' Hochgeladene Unterlagen liegen bis dahin geschützt auf dem Server; Ihr Berater sieht sie erst nach dem Absenden.' : ''}`
             : 'Ihre Angaben bleiben in Ihrem Browser, bis Sie „Ergebnis berechnen“ wählen.'}{' '}
           Modellrechnung ohne Gewähr; keine Steuer-, Renten- oder Anlageberatung.
         </p>
@@ -495,8 +558,10 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
 
 /* --- 2. Einkommen --------------------------------------------------------- */
 
-function SchrittEinkommen({ x, personen, setzePerson }: {
+function SchrittEinkommen({ x, personen, setzePerson, upload }: {
   x: Antworten; personen: ['a' | 'b', string][]; setzePerson: SetzePerson;
+  /** „Statt abtippen: hochladen" — nur mit Link des Beraters */
+  upload?: ReactNode;
 }) {
   return (
     <>
@@ -506,6 +571,7 @@ function SchrittEinkommen({ x, personen, setzePerson }: {
         Beamte: die <strong>Bezügemitteilung</strong> (Besoldungsgruppe, Stufe).
         Selbstständige: der Gewinn aus dem letzten <strong>Steuerbescheid</strong>, geteilt durch 12.
       </Unterlage>
+      {upload}
       {personen.map(([id, name]) => (
         <Block key={id} titel={personen.length > 1 ? name : undefined}>
           <EinkommenFelder
@@ -555,8 +621,8 @@ function GesetzlichFelder({ kasse, satz, setze }: {
   );
 }
 
-function SchrittKv({ x, setze, personen }: {
-  x: Antworten; setze: Setze; personen: ['a' | 'b', string][];
+function SchrittKv({ x, setze, personen, upload }: {
+  x: Antworten; setze: Setze; personen: ['a' | 'b', string][]; upload?: ReactNode;
 }) {
   const kB = x.kvB;
   const setzeB = (p: Partial<Antworten['kvB']>) => setze({ kvB: { ...kB, ...p } });
@@ -567,6 +633,7 @@ function SchrittKv({ x, setze, personen }: {
         kennen wir. Privat versichert: Ihre <strong>Beitragsrechnung</strong> oder das letzte
         Schreiben zur Beitragsanpassung (Monatsbeitrag gesamt, ggf. Beitragsentlastungstarif).
       </Unterlage>
+      {upload}
       <Block titel={personen.length > 1 ? personen[0]![1] : undefined}>
         <div className="grid gap-2 sm:grid-cols-2">
           {(['gesetzlich', 'privat'] as const).map((art) => (
@@ -620,8 +687,8 @@ function SchrittKv({ x, setze, personen }: {
 
 /* --- 4. Gesetzliche Rente / Pension --------------------------------------- */
 
-function SchrittRente({ x, personen, setzePerson }: {
-  x: Antworten; personen: ['a' | 'b', string][]; setzePerson: SetzePerson;
+function SchrittRente({ x, personen, setzePerson, upload }: {
+  x: Antworten; personen: ['a' | 'b', string][]; setzePerson: SetzePerson; upload?: ReactNode;
 }) {
   return (
     <>
@@ -645,6 +712,7 @@ function SchrittRente({ x, personen, setzePerson }: {
           Renteninformation / Rentenauskunft online anfordern (Deutsche Rentenversicherung)
         </a>
       </Unterlage>
+      {upload}
       {personen.map(([id, name]) => (
         <RenteJePerson key={id} p={x[id]} name={personen.length > 1 ? name : undefined}
           setze={(p) => setzePerson(id, p)} />
@@ -740,7 +808,7 @@ function RenteJePerson({ p, name, setze }: {
 
 /* --- 5. Vertraege ---------------------------------------------------------- */
 
-function SchrittVertraege({ x, setze }: { x: Antworten; setze: Setze }) {
+function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; upload?: ReactNode }) {
   const aendern = (id: string, p: Partial<VertragAntwort>) =>
     setze({ vertraege: x.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)) });
   const neu = () => setze({
@@ -758,10 +826,13 @@ function SchrittVertraege({ x, setze }: { x: Antworten; setze: Setze }) {
         den Anteil Ihres Arbeitgebers (Gehaltsabrechnung). Für Depots den aktuellen{' '}
         <strong>Depotauszug</strong>. Die gesetzliche Rente gehört nicht hierher — die kam in Schritt 4.
       </Unterlage>
+      {upload}
 
       {x.vertraege.length === 0 && (
         <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm text-slate-500">
-          Noch keine Verträge. Keine zu haben ist auch eine Angabe — dann einfach weiter.
+          {x.dokumente.some((d) => d.art === 'vertraege')
+            ? 'Ihre Standmitteilungen sind hochgeladen — Ihr Berater übernimmt die Verträge daraus.'
+            : 'Noch keine Verträge. Keine zu haben ist auch eine Angabe — dann einfach weiter.'}
         </p>
       )}
 
@@ -880,13 +951,15 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
 
 /* --- 7. Uebersicht ---------------------------------------------------------- */
 
-function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }: {
+function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, upload }: {
   x: Antworten;
   geheZu: (i: number) => void;
   /** Mit Link des Beraters: senden statt selbst berechnen */
   anfrage: boolean;
   einwilligung: boolean;
   setEinwilligung: (b: boolean) => void;
+  /** „Weitere Unterlagen" — nur mit Link */
+  upload?: ReactNode;
 }) {
   const namen = x.verheiratet ? `${x.a.name || 'Sie'} und ${x.b.name || 'Partner/in'}` : (x.a.name || 'Sie');
   const zusammenfassung = [
@@ -911,6 +984,8 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
       <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {SCHRITTE.slice(0, 6).map((t, i) => {
           const ok = vollstaendig(i, x);
+          const unterlagen = unterlagenZu(i, x);
+          const nurUnterlagen = unterlagen > 0 && !felderVollstaendig(i, x);
           return (
             <li key={t} className="flex items-center gap-3 px-3 py-2.5">
               {ok
@@ -919,7 +994,11 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-slate-800">{t}</div>
                 <div className="truncate text-xs text-slate-500">
-                  {ok ? zusammenfassung[i] : 'Noch offen — der Rechner nimmt dafür einen Standardwert.'}
+                  {nurUnterlagen
+                    ? `${unterlagen} Unterlage${unterlagen > 1 ? 'n' : ''} hochgeladen — Ihr Berater liest die Zahlen ab`
+                    : ok
+                      ? `${zusammenfassung[i]}${unterlagen > 0 ? ` · ${unterlagen} Unterlage${unterlagen > 1 ? 'n' : ''}` : ''}`
+                      : 'Noch offen — der Rechner nimmt dafür einen Standardwert.'}
                 </div>
               </div>
               <button type="button" onClick={() => geheZu(i)}
@@ -930,6 +1009,8 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
           );
         })}
       </ul>
+
+      {upload}
 
       {anfrage ? (
         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
@@ -958,8 +1039,9 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung }
               className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600"
             />
             <span>
-              Ich willige ein, dass meine Angaben an meinen Berater übermittelt und für die Beratung
-              gespeichert werden — bis er sie gelöscht hat, <strong>höchstens 90 Tage</strong>. Das
+              Ich willige ein, dass meine Angaben{x.dokumente.length > 0 && ' und die hochgeladenen Unterlagen'} an
+              meinen Berater übermittelt und für die Beratung gespeichert werden — bis er sie gelöscht hat,{' '}
+              <strong>höchstens 90 Tage</strong>. Das
               schließt ausdrücklich Angaben ein, die Rückschlüsse auf meine Religionszugehörigkeit
               (Kirchensteuer) oder meine Gesundheit (Zuschlag der privaten Krankenversicherung) zulassen
               (Art. 9 Abs. 2 lit. a DSGVO). Die Einwilligung ist freiwillig und kann jederzeit mit Wirkung

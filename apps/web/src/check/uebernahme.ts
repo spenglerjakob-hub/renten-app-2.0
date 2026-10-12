@@ -3,6 +3,7 @@ import {
   parseDatum, toDe, regelaltersrentenbeginn, type AvdKind, type VertragsTyp,
 } from '@renten/engine';
 import { TYPEN } from '../features/vertragsarten';
+import type { DokumentEintrag } from '../lib/check';
 
 /**
  * Was der Vorsorge-Check abfragt — und wie daraus ein Szenario wird.
@@ -75,6 +76,14 @@ export interface Antworten {
   kvB: KvPartner;
   vertraege: VertragAntwort[];
   zielNettoHeute: number;
+  /**
+   * Hochgeladene Unterlagen — nur mit Link des Beraters. Sie gehen NICHT ins
+   * Szenario: Die Dateien liegen im Speicher, hier steht nur, was der Kunde
+   * hochgeladen hat, damit er es sieht und zuruecknehmen kann.
+   */
+  dokumente: DokumentEintrag[];
+  /** Einwilligung zum Hochladen — einmal je Check, vor der ersten Datei */
+  dokumenteEinwilligung: boolean;
 }
 
 const JETZT = new Date().getFullYear();
@@ -114,6 +123,8 @@ export function leereAntworten(): Antworten {
     },
     vertraege: [],
     zielNettoHeute: 0,
+    dokumente: [],
+    dokumenteEinwilligung: false,
   };
 }
 

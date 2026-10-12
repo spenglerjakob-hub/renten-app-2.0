@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { importiere, type SzenarioParsed } from '@renten/schema';
 import {
-  anfragenLaden, anfrageAnlegen, anfrageLoeschen, eingangLaden, type CheckAnfrage,
+  anfragenLaden, anfrageAnlegen, anfrageLoeschen, eingangLaden, dokumenteLaden, dokumenteAufraeumen,
+  type CheckAnfrage, type BeraterDokument,
 } from '../lib/check';
 
 /**
@@ -13,6 +14,12 @@ import {
  */
 export interface CheckStore {
   liste: CheckAnfrage[];
+  /**
+   * Hochgeladene Unterlagen je Code — nur eingegangene, das regelt die
+   * Datenbank. Ein Fehler beim Laden laesst die Liste stehen: Die Angaben
+   * sind wichtiger als die Fotos dazu.
+   */
+  dokumente: Record<string, BeraterDokument[]>;
   laedt: boolean;
   meldung: { art: 'ok' | 'fehler'; text: string } | null;
 
@@ -48,6 +55,7 @@ function fehlertext(e: unknown): string {
 
 export const useCheckAnfragen = create<CheckStore>((set, get) => ({
   liste: [],
+  dokumente: {},
   laedt: false,
   meldung: null,
 
@@ -66,7 +74,14 @@ export const useCheckAnfragen = create<CheckStore>((set, get) => ({
       const jetzt = Date.now();
       const verfallen = liste.filter((a) => !a.eingang && new Date(a.gueltigBis).getTime() < jetzt);
       await Promise.all(verfallen.map((a) => anfrageLoeschen(a.code).catch(() => undefined)));
+      // Was der Kunde zu einem verfallenen Link schon hochgeladen hatte, ist jetzt verwaist.
+      if (verfallen.length > 0) dokumenteAufraeumen();
       set({ liste: liste.filter((a) => !verfallen.includes(a)) });
+      const dokumente: Record<string, BeraterDokument[]> = {};
+      try {
+        for (const d of await dokumenteLaden()) (dokumente[d.code] ??= []).push(d);
+      } catch { /* ohne Unterlagen weiter — die Angaben stehen trotzdem da */ }
+      set({ dokumente });
     } catch (e) {
       set({ meldung: { art: 'fehler', text: fehlertext(e) } });
     } finally {
@@ -103,7 +118,15 @@ export const useCheckAnfragen = create<CheckStore>((set, get) => ({
   loeschen: async (code) => {
     try {
       await anfrageLoeschen(code);
-      set({ liste: get().liste.filter((a) => a.code !== code) });
+      const dokumente = { ...get().dokumente };
+      delete dokumente[code];
+      set({ liste: get().liste.filter((a) => a.code !== code), dokumente });
+      /*
+        Die Dateien gehen nicht per Kaskade mit — sofort aufraeumen statt erst
+        nachts. Auch ohne sichtbare Unterlagen: Vor dem Absenden hochgeladene
+        sieht der Berater gar nicht, verwaist sind sie trotzdem.
+      */
+      dokumenteAufraeumen();
     } catch (e) {
       set({ meldung: { art: 'fehler', text: fehlertext(e) } });
     }

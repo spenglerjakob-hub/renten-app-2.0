@@ -196,6 +196,17 @@ function Datenschutz() {
         Berater sie löscht, <strong>spätestens nach 90 Tagen</strong>. Ihre Einwilligung können Sie jederzeit
         mit Wirkung für die Zukunft bei Ihrem Berater widerrufen.
       </P>
+      <P>
+        <strong>Hochgeladene Unterlagen.</strong> Mit Link können Sie statt abzutippen Fotos, Scans oder PDFs
+        Ihrer Unterlagen hochladen (etwa Gehaltsabrechnung, Renteninformation, Standmitteilungen) — nach Ihrer
+        ausdrücklichen Einwilligung vor der ersten Datei, auch für Angaben besonderer Kategorien, die darauf
+        stehen können (Art. 9 Abs. 2 lit. a DSGVO). Fotos werden schon in Ihrem Browser verkleinert und ohne
+        eingebettete Metadaten wie den Aufnahmeort gespeichert. Die Dateien liegen in einem nicht öffentlichen
+        Speicher bei Supabase in der EU. Sie selbst können sie nicht mehr abrufen, aber bis zum Absenden
+        wieder entfernen; Ihr Berater kann sie erst nach dem Absenden ansehen. Gelöscht werden sie mit den
+        Angaben, sobald der Berater sie löscht, <strong>spätestens 90 Tage nach dem Absenden</strong> — senden
+        Sie nicht ab, mit Ablauf des Links.
+      </P>
 
       <H2>8. E-Mail-Benachrichtigung an Berater</H2>
       <P>
@@ -229,7 +240,10 @@ function Datenschutz() {
       <H2>11. Speicherdauer im Überblick</H2>
       <Liste>
         <li>Konto und gespeicherte Szenarien: bis zur Löschung des Kontos.</li>
-        <li>Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben höchstens 90 Tage.</li>
+        <li>
+          Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
+          90 Tage; Unterlagen eines nicht abgesendeten Checks bis zum Ablauf des Links.
+        </li>
         <li>Server-Logdateien: [Frist laut Hostinger].</li>
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
@@ -250,7 +264,9 @@ function Datenschutz() {
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
-        Angaben nicht mehr, sobald sie abgeschickt sind.
+        Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
+        öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
+        gültige, signierte Verweise.
       </P>
     </>
   );
