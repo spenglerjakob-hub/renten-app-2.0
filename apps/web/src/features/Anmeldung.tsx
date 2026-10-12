@@ -22,7 +22,9 @@ export function Anmeldung() {
     linkBestaetigen, bestaetigungErneutSenden,
   } = useAuth();
 
-  const [maske, setMaske] = useState<Maske>('anmelden');
+  // `/?registrieren` (Knopf "Kostenlos testen" der Preisseite) oeffnet gleich die Registrierung.
+  const [maske, setMaske] = useState<Maske>(() =>
+    (new URLSearchParams(window.location.search).has('registrieren') ? 'registrieren' : 'anmelden'));
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [passwort2, setPasswort2] = useState('');

@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./preise": {
+      "types": "./dist/preise.d.ts",
+      "import": "./dist/preise.js"
     }
   },
   "scripts": {

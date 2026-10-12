@@ -52,6 +52,11 @@ DirectoryIndex index.html
   RewriteRule ^datenschutz/?$ /datenschutz.html [NC,L]
   RewriteRule ^nutzungsbedingungen/?$ /nutzungsbedingungen.html [NC,L]
 
+  # --- Preise -----------------------------------------------------------
+  # Oeffentlich, ohne Anmeldung, VOR dem Auffangmuster. Vorerst unverlinkt
+  # und fuer Suchmaschinen gesperrt (Kopfzeile unten, Meta-Tag im HTML).
+  RewriteRule ^preise/?$ /preise.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
@@ -70,6 +75,12 @@ DirectoryIndex index.html
   # weiterhin die alte Fassung.
   <FilesMatch "\.html$">
     Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Die Preisseite bis zum Start des Abos nicht in Suchmaschinen — zusaetzlich
+  # zum Meta-Tag, denn manche Crawler lesen nur die Kopfzeile.
+  <FilesMatch "^preise\.html$">
+    Header set X-Robots-Tag "noindex, nofollow"
   </FilesMatch>
 
   # --- Sicherheitskopfzeilen ----------------------------------------------

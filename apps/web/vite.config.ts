@@ -38,6 +38,8 @@ export default defineConfig({
         impressum: resolve(hier, 'impressum.html'),
         datenschutz: resolve(hier, 'datenschutz.html'),
         nutzungsbedingungen: resolve(hier, 'nutzungsbedingungen.html'),
+        // Die Preisseite des Abos — oeffentlich, vorerst unverlinkt und noindex.
+        preise: resolve(hier, 'preise.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },

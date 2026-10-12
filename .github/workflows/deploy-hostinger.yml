@@ -81,6 +81,14 @@ jobs:
           test -f apps/web/dist/bkv.html || { echo "bKV-Seite fehlt"; exit 1; }
           awk '/bkv\.html/ { a=NR } /RewriteRule \. \/index\.html/ { b=NR } END { exit !(a && b && a < b) }' apps/web/dist/.htaccess \
             || { echo "Umschreibungsregel fuer /bkv fehlt oder steht hinter dem Auffangmuster"; exit 1; }
+          # Die Preisseite. Nur die RewriteRule zaehlt — "preise.html" steht
+          # auch in der Kopfzeilen-Regel weiter unten.
+          test -f apps/web/dist/preise.html || { echo "Preisseite fehlt"; exit 1; }
+          awk '/RewriteRule \^preise/ { a=NR } /RewriteRule \. \/index\.html/ { b=NR } END { exit !(a && b && a < b) }' apps/web/dist/.htaccess \
+            || { echo "Umschreibungsregel fuer /preise fehlt oder steht hinter dem Auffangmuster"; exit 1; }
+          # Bis zum Start des Abos nicht in Suchmaschinen. Faellt beim Start mit weg.
+          grep -q 'name="robots" content="noindex' apps/web/dist/preise.html \
+            || { echo "Preisseite ohne noindex — sie soll vorerst nicht in Suchmaschinen"; exit 1; }
           # Impressum und Datenschutz sind Pflicht — ohne sie nicht ausliefern.
           for s in impressum datenschutz nutzungsbedingungen; do
             test -f apps/web/dist/$s.html || { echo "$s fehlt"; exit 1; }
