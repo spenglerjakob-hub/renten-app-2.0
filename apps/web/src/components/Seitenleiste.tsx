@@ -43,7 +43,7 @@ export interface Werkzeug {
   onOeffnen: () => void;
 }
 
-interface Seite {
+export interface Seite {
   href: string;
   titel: string;
   text: string;
@@ -52,7 +52,7 @@ interface Seite {
   oeffentlich?: boolean;
 }
 
-const KUNDEN: Seite[] = [
+export const KUNDEN: Seite[] = [
   {
     href: '/vorsorge-check', titel: 'Vorsorge-Check', text: 'Angaben Schritt für Schritt erfassen',
     symbol: <ClipboardList className="h-4 w-4" aria-hidden />,
@@ -63,7 +63,7 @@ const KUNDEN: Seite[] = [
   },
 ];
 
-const ARBEITGEBER: Seite[] = [
+export const ARBEITGEBER: Seite[] = [
   {
     href: '/zuschussmodell', titel: 'Zuschussmodell', text: '50 % Zuschuss, ein Vertrag',
     symbol: <HandCoins className="h-4 w-4" aria-hidden />,

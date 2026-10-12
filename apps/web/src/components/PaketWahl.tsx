@@ -1,14 +1,14 @@
-import { useId } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { useId, useState } from 'react';
+import { CreditCard, Minus, Plus } from 'lucide-react';
 import {
-  MAX_NUTZER, JAHR_MONATE, preisJeNutzer, gesamtpreis, ersparnis,
+  PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, gesamtpreis, ersparnis,
   type Intervall, type PaketId,
 } from '@renten/schema/preise';
 
 /**
  * Bausteine der Paketwahl: Zahlweise, Nutzerzahl, Preis eines Pakets.
  *
- * Fuer die Preisseite und spaeter fuer Sperrseite und "Abo & Team". Hier
+ * Fuer die Preisseite, die Sperrseite und "Abo & Team". Hier
  * steht keine Zahl — gerechnet wird ausschliesslich mit preise.ts aus
  * `@renten/schema`. Beides schlank gehalten, ueber den Unterpfad `/preise`
  * und ohne `components/Feld`: Sonst zoegen Szenario-Pruefung (zod) bzw. die
@@ -25,7 +25,7 @@ export const preisText = (n: number) => (Number.isInteger(n) ? euroFormat : euro
 export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWechsel: (i: Intervall) => void }) {
   const gratis = 12 - JAHR_MONATE;
   return (
-    <div role="radiogroup" aria-label="Zahlweise" className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+    <div role="radiogroup" aria-label="Zahlweise" className="inline-flex max-w-full rounded-lg border border-slate-200 bg-slate-100 p-1">
       {([['monat', 'Monatlich'], ['jahr', 'Jährlich']] as const).map(([id, text]) => (
         <button
           key={id}
@@ -33,13 +33,14 @@ export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWech
           role="radio"
           aria-checked={wert === id}
           onClick={() => onWechsel(id)}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-bold ${
+          // Wird es eng, rutscht "2 Monate gratis" unter "Jaehrlich" statt aus dem Bild.
+          className={`flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-md px-3 py-1.5 text-sm font-bold ${
             wert === id ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           {text}
           {id === 'jahr' && gratis > 0 && (
-            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+            <span className="whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
               {gratis} Monate gratis
             </span>
           )}
@@ -114,6 +115,110 @@ export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: 
           Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Paket buchen: Zahlweise, Nutzerzahl, Paket — und weiter zur Kasse.
+ *
+ * Fuer Sperrseite und "Abo & Team". Solange die Zahlung nicht eingerichtet
+ * ist (`bereit` falsch), bleibt der Knopf gesperrt; die Wahl laesst sich
+ * trotzdem schon ansehen.
+ */
+export function PaketBuchung({
+  bereit, onBuchen, vorauswahl = 'alles', nutzerVorschlag = 1, laedt = false, fehler = null,
+  gesperrtText = 'Die Buchung wird gerade eingerichtet und startet in Kürze.',
+}: {
+  bereit: boolean;
+  onBuchen: (paket: PaketId, intervall: Intervall, nutzer: number) => void;
+  /** Steht unter dem gesperrten Knopf */
+  gesperrtText?: string;
+  vorauswahl?: PaketId;
+  /** Etwa die Zahl der Mitglieder, wenn ein Buero sein Abo erneuert */
+  nutzerVorschlag?: number;
+  laedt?: boolean;
+  fehler?: string | null;
+}) {
+  const id = useId();
+  const [paket, setPaket] = useState<PaketId>(vorauswahl);
+  const [intervall, setIntervall] = useState<Intervall>('monat');
+  const [nutzer, setNutzer] = useState(() => Math.min(MAX_NUTZER, Math.max(1, nutzerVorschlag)));
+  const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
+  const summe = gesamtpreis(paket, intervall, nutzer);
+  const spart = ersparnis(paket, intervall, nutzer);
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
+        <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
+      </div>
+
+      <div role="radiogroup" aria-label="Paket" className="mt-4 grid gap-2 sm:grid-cols-3">
+        {PAKETE.map((p) => {
+          const aktiv = p.id === paket;
+          // Name ist der Paketname; Beschreibung, Preis und "Empfohlen" kommen als Erlaeuterung dazu.
+          const k = `${id}-${p.id}`;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={aktiv}
+              aria-labelledby={`${k}-name`}
+              aria-describedby={`${k}-preis ${k}-kurz${p.empfohlen ? ` ${k}-tipp` : ''}`}
+              onClick={() => setPaket(p.id)}
+              className={`relative flex flex-col rounded-xl border-2 p-3 text-left transition-colors ${
+                aktiv ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              {p.empfohlen && (
+                <span id={`${k}-tipp`} className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  Empfohlen
+                </span>
+              )}
+              <span id={`${k}-name`} className="text-sm font-black text-slate-900">{p.name}</span>
+              <span id={`${k}-kurz`} className="mt-0.5 text-xs leading-snug text-slate-600">{p.kurz}</span>
+              <span id={`${k}-preis`} className="mt-auto flex flex-col pt-2">
+                <span className="text-lg font-black tabular-nums text-slate-900">
+                  {preisText(preisJeNutzer(p.id, intervall, nutzer))}
+                </span>
+                <span className="text-[11px] text-slate-500">je Nutzer und {zeitraum}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <p>
+          {paketVon(paket).name}, {nutzer} Nutzer:{' '}
+          <strong className="tabular-nums text-slate-900">{preisText(summe)}</strong> im {zeitraum}, {UST_HINWEIS}
+        </p>
+        {spart > 0 && (
+          <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+            Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
+          </p>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onBuchen(paket, intervall, nutzer)}
+        disabled={!bereit || laedt}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <CreditCard className="h-4 w-4" aria-hidden />
+        {laedt ? 'Einen Moment …' : 'Weiter zur Zahlung'}
+      </button>
+      {!bereit && <p className="mt-2 text-center text-xs font-semibold text-slate-600">{gesperrtText}</p>}
+      {fehler && <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        Sie bezahlen sicher über unseren Zahlungsdienstleister Stripe; Rechnungsadresse und USt-IdNr. geben Sie
+        dort an. Ein monatliches Abo ist zum Ende des Monats kündbar, ein jährliches zum Ende des Jahres.
+        Weitere Kollegen laden Sie nach der Buchung unter „Abo & Team“ ein.
+      </p>
     </div>
   );
 }

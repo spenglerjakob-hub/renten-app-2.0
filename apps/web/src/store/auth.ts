@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabase, supabaseKonfiguriert, adresseBeimStart } from '../lib/supabase';
 import { zustimmungDaten } from '../lib/nutzungsbedingungen';
+import { offeneEinladung } from '../lib/einladung';
 
 /**
  * Anmeldung mit E-Mail und Passwort.
@@ -351,12 +352,18 @@ export const useAuth = create<AuthStore>((set, get) => ({
   registrieren: async (email, passwort) => {
     if (!supabase) return;
     set({ laedt: true, meldung: null });
+    // Eine offene Einladung reist im Konto mit: So gilt sie auch, wenn die
+    // Bestaetigungsmail auf einem anderen Geraet aufgeht.
+    const einladung = offeneEinladung();
     const { data, error } = await supabase.auth.signUp({
       email,
       password: passwort,
       // Zustimmung zu den Nutzungsbedingungen: Die Maske laesst ohne Haken
       // nicht absenden, festgehalten wird Fassung und Zeitpunkt.
-      options: { emailRedirectTo: window.location.origin, data: zustimmungDaten() },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { ...zustimmungDaten(), ...(einladung ? { einladung } : {}) },
+      },
     });
 
     if (error) {

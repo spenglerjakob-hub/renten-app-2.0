@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -25,6 +25,7 @@ import { Konto } from './features/Konto';
 import { CheckAnfragen } from './features/CheckAnfragen';
 import { useCheckAnfragen } from './store/check-anfragen';
 import { useAuth } from './store/auth';
+import { aboSichtbar, aboZusatz, useZugang, wirksam } from './store/zugang';
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Loesungen } from './features/Loesungen';
@@ -210,6 +211,9 @@ export default function App() {
     der Seitenleiste.
   */
   const checkMoeglich = supabaseKonfiguriert && Boolean(angemeldet);
+  // "Abo & Team" — das Fenster selbst gehoert der Zugangsschranke (fuer alle Seiten).
+  const zugang = useZugang(wirksam);
+  const oeffneAbo = useZugang((s) => s.oeffneFenster);
   const eingangMarke = neueEingaenge > 0 ? `${neueEingaenge} eingegangen` : undefined;
   const schliesseKonto = useCallback(() => setKontoOffen(false), []);
   const schliesseCheck = useCallback(() => setCheckOffen(false), []);
@@ -345,6 +349,12 @@ export default function App() {
       symbol: <Inbox className="h-4 w-4" aria-hidden />,
       marke: eingangMarke,
       onOeffnen: () => setCheckOffen(true),
+    }] : []),
+    ...(zugang && aboSichtbar(zugang) ? [{
+      text: 'Abo & Team',
+      zusatz: aboZusatz(zugang),
+      symbol: <CreditCard className="h-4 w-4" aria-hidden />,
+      onOeffnen: oeffneAbo,
     }] : []),
   ];
 

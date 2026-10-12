@@ -6,7 +6,7 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Zugangsschranke>
+    <Zugangsschranke bereich="rente">
       <App />
     </Zugangsschranke>
   </StrictMode>,

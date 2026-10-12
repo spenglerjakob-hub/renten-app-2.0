@@ -3,6 +3,7 @@ import { LogOut, Save, FolderOpen, Trash2, RefreshCw } from 'lucide-react';
 import { useFernSzenarien, supabaseKonfiguriert } from '../store/szenarien-fern';
 import { useSzenario } from '../store/szenario';
 import { useAuth } from '../store/auth';
+import { KontoLoeschen } from './KontoLoeschen';
 
 /**
  * Gespeicherte Szenarien des angemeldeten Kontos.
@@ -20,11 +21,6 @@ export function Konto() {
 
   const angemeldetAls = useAuth((s) => s.email);
   const abmelden = useAuth((s) => s.abmelden);
-  const kontoLoeschen = useAuth((s) => s.kontoLoeschen);
-  const loeschtKonto = useAuth((s) => s.laedt);
-  const authMeldung = useAuth((s) => s.meldung);
-  const [loeschenOffen, setLoeschenOffen] = useState(false);
-  const [bestaetigung, setBestaetigung] = useState('');
 
   const szenario = useSzenario((s) => s.szenario);
   const setze = useSzenario((s) => s.setze);
@@ -136,48 +132,8 @@ export function Konto() {
           </div>
       </div>
 
-      {/*
-        KONTO LOESCHEN (Art. 17 DSGVO). Endgueltig und ohne Papierkorb —
-        deshalb die Bestaetigung per Eintippen und vorher der Hinweis, die
-        Szenarien als Datei zu sichern (Art. 20).
-      */}
       <div className="border-t border-slate-100 pt-3">
-        {!loeschenOffen ? (
-          <button type="button" onClick={() => setLoeschenOffen(true)}
-            className="text-xs text-slate-500 underline-offset-2 hover:text-rose-700 hover:underline">
-            Konto löschen …
-          </button>
-        ) : (
-          <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-900">
-            <p>
-              <strong>Konto endgültig löschen.</strong> Gelöscht werden Ihr Konto, alle gespeicherten Szenarien
-              und alle Vorsorge-Check-Anfragen samt eingegangener Kundendaten. Das lässt sich nicht rückgängig
-              machen. Sichern Sie Szenarien, die Sie behalten möchten, vorher über „Speichern“ in der Kopfzeile als Datei.
-              Die Eingaben im Rechner auf diesem Gerät bleiben erhalten.
-            </p>
-            <label htmlFor="konto-loeschen-bestaetigung" className="block font-bold">
-              Zur Bestätigung LÖSCHEN eintippen:
-            </label>
-            <input
-              id="konto-loeschen-bestaetigung" type="text" value={bestaetigung} autoComplete="off"
-              onChange={(e) => setBestaetigung(e.target.value)}
-              className="w-full rounded-md border border-rose-300 bg-white p-2 text-sm text-slate-900"
-            />
-            {authMeldung?.art === 'fehler' && <p role="alert">{authMeldung.text}</p>}
-            <div className="flex flex-wrap gap-2">
-              <button type="button"
-                disabled={bestaetigung.trim().toUpperCase() !== 'LÖSCHEN' || loeschtKonto}
-                onClick={() => void kontoLoeschen()}
-                className="flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 font-bold text-white hover:bg-rose-500 disabled:opacity-40">
-                <Trash2 className="h-3.5 w-3.5" aria-hidden /> Konto endgültig löschen
-              </button>
-              <button type="button" onClick={() => { setLoeschenOffen(false); setBestaetigung(''); }}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-50">
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        )}
+        <KontoLoeschen sicherung="Sichern Sie Szenarien, die Sie behalten möchten, vorher über „Speichern“ in der Kopfzeile als Datei. Die Eingaben im Rechner auf diesem Gerät bleiben erhalten." />
       </div>
     </div>
   );

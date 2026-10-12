@@ -16,6 +16,6 @@ const mitLink = CHECK_CODE.test(new URLSearchParams(window.location.search).get(
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {mitLink ? <Seite /> : <Zugangsschranke><Seite /></Zugangsschranke>}
+    {mitLink ? <Seite /> : <Zugangsschranke bereich="rente"><Seite /></Zugangsschranke>}
   </StrictMode>,
 );

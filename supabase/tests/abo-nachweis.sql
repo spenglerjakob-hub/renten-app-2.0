@@ -1,5 +1,6 @@
--- Nachweis des Abo-Modells (Migration …_abo.sql): wer was darf — vor und nach
--- dem Start, mit Freizugang, Testphase, Buero-Abo, Plaetzen und Einladungen.
+-- Nachweis des Abo-Modells (Migrationen …_abo.sql und …_abo_oberflaeche.sql):
+-- wer was darf — vor, waehrend der Ankuendigung und nach dem Start, mit
+-- Freizugang, Testphase, Buero-Abo, Plaetzen und Einladungen.
 --
 -- Laeuft vollstaendig in einer Transaktion und rollt am Ende zurueck. Die
 -- Abo-Pflicht wird NUR in dieser Transaktion eingeschaltet. Ohne `delete` auf
@@ -53,6 +54,31 @@ begin
 exception when others then
   insert into ergebnis values (3, 'Vor dem Start: Kundenlink anlegen', 'angenommen', sqlerrm, false);
 end $$;
+
+-- ---------- Start angekuendigt (in 7 Tagen): noch alles wie bisher ----------
+reset role;
+update privat.einstellungen set abo_pflicht_ab = now() + interval '7 days' where id;
+set local role authenticated;
+
+set local request.jwt.claims = '{"sub":"aa000000-0000-4000-8000-0000000000b1"}';
+insert into ergebnis
+select 45, 'Angekuendigt: Bestandskonto erfaehrt, dass es frei bleibt', 'vorab, freizugang bestand',
+       coalesce(z ->> 'quelle', '—') || ', freizugang ' || coalesce(z ->> 'freizugang', '—'),
+       coalesce(z ->> 'quelle' = 'vorab' and z ->> 'freizugang' = 'bestand', false)
+  from (select public.mein_zugang() z) s;
+
+set local request.jwt.claims = '{"sub":"aa000000-0000-4000-8000-0000000000b2"}';
+insert into ergebnis
+select 46, 'Angekuendigt: neues Konto sieht das Ende seiner Testphase', 'vorab, test_bis Start + 14 Tage',
+       coalesce(z ->> 'quelle', '—') || ', test_bis ' || coalesce(z ->> 'test_bis', '—'),
+       coalesce(z ->> 'quelle' = 'vorab' and (z ->> 'test_bis')::timestamptz = now() + interval '21 days', false)
+  from (select public.mein_zugang() z) s;
+
+insert into ergebnis
+select 47, 'Schalter fuer die Buchung wird mitgeliefert', 'boolean',
+       coalesce(jsonb_typeof(z -> 'zahlung_bereit'), '—'),
+       coalesce(jsonb_typeof(z -> 'zahlung_bereit') = 'boolean', false)
+  from (select public.mein_zugang() z) s;
 
 -- ---------- Start vor 5 Tagen: Testphase ab dem Start ----------
 reset role;

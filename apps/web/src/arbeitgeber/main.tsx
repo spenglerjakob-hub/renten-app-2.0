@@ -8,7 +8,7 @@ import '../index.css';
 // derselben Adresse; wer im Rechner angemeldet ist, kommt direkt durch.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Zugangsschranke>
+    <Zugangsschranke bereich="ag">
       <Seite />
     </Zugangsschranke>
   </StrictMode>,
