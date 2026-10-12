@@ -31,7 +31,8 @@ import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { Reiterleiste } from './components/Reiterleiste';
-import { Seitenleiste, type Abschnitt } from './components/Seitenleiste';
+import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seitenleiste';
+import { Dialog } from './components/Dialog';
 import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
 import { RechtsLinks } from './components/RechtsLinks';
 import { personName, personNameAus } from './features/personen';
@@ -70,6 +71,33 @@ function ladeEtappe(): Schritt {
     if (ETAPPEN.some((e) => e.id === s)) return s as Schritt;
   } catch { /* Speicher gesperrt */ }
   return 'daten';
+}
+
+/** Eine Knopf-Karte am Anfang der ersten Etappe — oeffnet ein Fenster. */
+function StartKarte({ symbol, titel, text, marke, onClick }: {
+  symbol: React.ReactNode; titel: string; text: string; marke?: string; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 sm:px-4 sm:py-3"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">{symbol}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-slate-900">{titel}</span>
+        <span className="block text-xs leading-snug text-slate-500">{text}</span>
+        {/* Auf dem Telefon unter dem Text — rechts daneben bliebe dem Titel zu wenig Breite. */}
+        {marke && (
+          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white sm:hidden">{marke}</span>
+        )}
+      </span>
+      {marke && (
+        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white sm:inline-block">{marke}</span>
+      )}
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+    </button>
+  );
 }
 
 /** Ueberschrift einer Etappe: Nummer, Titel, ein Satz, worum es geht. */
@@ -174,6 +202,16 @@ export default function App() {
     if (supabaseKonfiguriert && angemeldet) void checkLaden();
   }, [angemeldet, checkLaden]);
   const neueEingaenge = checkListe.filter((a) => a.eingang).length;
+  /*
+    KONTO UND VORSORGE-CHECK als Fenster: Beide werden in jeder Etappe
+    gebraucht — gespeichert wird oft erst nach den Angeboten am Ende, ein
+    Kunden-Link geht jederzeit raus. Erreichbar aus der ersten Etappe und aus
+    der Seitenleiste.
+  */
+  const checkMoeglich = supabaseKonfiguriert && Boolean(angemeldet);
+  const eingangMarke = neueEingaenge > 0 ? `${neueEingaenge} eingegangen` : undefined;
+  const schliesseKonto = useCallback(() => setKontoOffen(false), []);
+  const schliesseCheck = useCallback(() => setCheckOffen(false), []);
   const [ehepartnerDialog, setEhepartnerDialog] = useState(false);
   const dateiRef = useRef<HTMLInputElement>(null);
 
@@ -292,9 +330,21 @@ export default function App() {
     { id: 'journey', text: '2. Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('ergebnis') },
     { id: 'journey', text: '3. Sparrechner', symbol: <Target className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('sparen') },
     { id: 'journey', text: '4. Vertrags-TÜV & Lösungen', symbol: <SearchCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('loesungen') },
-    ...(supabaseKonfiguriert && angemeldet
-      ? [{ id: 'check-anfragen', text: 'Vorsorge-Check anfordern', symbol: <Inbox className="h-4 w-4" aria-hidden />, beiSprung: () => { setCheckOffen(true); geheZu('daten'); } }]
-      : []),
+  ];
+  const werkzeuge: Werkzeug[] = [
+    {
+      text: 'Konto',
+      zusatz: angemeldet ? `Angemeldet als ${angemeldet}` : 'Pläne speichern und laden',
+      symbol: <Wallet className="h-4 w-4" aria-hidden />,
+      onOeffnen: () => setKontoOffen(true),
+    },
+    ...(checkMoeglich ? [{
+      text: 'Vorsorge-Check an Kunden senden',
+      zusatz: 'Persönlicher Link für die Angaben vorab',
+      symbol: <Inbox className="h-4 w-4" aria-hidden />,
+      marke: eingangMarke,
+      onOeffnen: () => setCheckOffen(true),
+    }] : []),
   ];
 
   /*
@@ -474,10 +524,21 @@ export default function App() {
                 type="button"
                 onClick={() => setLeisteOffen(true)}
                 aria-expanded={leisteOffen}
-                aria-label="Übersicht aller Seiten öffnen"
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
+                aria-label={neueEingaenge > 0
+                  ? `Übersicht aller Seiten öffnen — ${neueEingaenge} Vorsorge-Check${neueEingaenge > 1 ? 's' : ''} eingegangen`
+                  : 'Übersicht aller Seiten öffnen'}
+                className="relative flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
               >
                 <PanelLeft className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Seiten</span>
+                {/* Ein Kunde hat geantwortet — sichtbar auch bei eingeklappter Kopfzeile. */}
+                {neueEingaenge > 0 && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black leading-none text-white ring-2 ring-slate-900"
+                  >
+                    {neueEingaenge}
+                  </span>
+                )}
               </button>
               <Logo klasse={kopfEingeklappt ? 'h-8 w-8 sm:h-10 sm:w-10' : 'h-10 w-10 sm:h-14 sm:w-14'} />
               <div className="text-left">
@@ -678,6 +739,29 @@ export default function App() {
               in den folgenden Etappen auf weissen Karten.
             */}
             {/*
+              KONTO UND VORSORGE-CHECK am Anfang der Angaben — von dort kommen
+              sie oft: ein gespeicherter Plan oder die Angaben, die ein Kunde
+              ueber seinen Link geschickt hat. In beiden Eingabearten.
+            */}
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 print:hidden">
+              <StartKarte
+                symbol={<Wallet className="h-5 w-5" aria-hidden />}
+                titel="Konto"
+                text="Gespeicherten Plan laden oder diesen sichern"
+                onClick={() => setKontoOffen(true)}
+              />
+              {checkMoeglich && (
+                <StartKarte
+                  symbol={<Inbox className="h-5 w-5" aria-hidden />}
+                  titel="Vorsorge-Check an Kunden senden"
+                  text="Persönlicher Link — die Angaben landen bei Ihnen"
+                  marke={eingangMarke}
+                  onClick={() => setCheckOffen(true)}
+                />
+              )}
+            </div>
+
+            {/*
               ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
               nennt die Unterlage, das Formular zeigt alles auf einen Blick.
               Beide schreiben in denselben Speicher — umschalten verliert nichts.
@@ -725,36 +809,6 @@ export default function App() {
 
               <div className="space-y-4 sm:space-y-6 lg:col-span-6">
                 {schichten}
-
-                <AkkordeonKarte
-                  titel="Konto"
-                  offen={kontoOffen}
-                  onUmschalten={() => setKontoOffen((v) => !v)}
-                  symbol={<Wallet className="h-4 w-4 text-indigo-400" aria-hidden />}
-                  ton="eingabe"
-                >
-                  <Konto />
-                </AkkordeonKarte>
-
-                {supabaseKonfiguriert && angemeldet && (
-                  <div id="check-anfragen" className="scroll-mt-28">
-                  <AkkordeonKarte
-                    titel="Vorsorge-Check anfordern"
-                    offen={checkOffen}
-                    onUmschalten={() => setCheckOffen((v) => !v)}
-                    symbol={<Inbox className="h-4 w-4 text-indigo-400" aria-hidden />}
-                    kopfzeile={neueEingaenge > 0 ? (
-                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                        {neueEingaenge} eingegangen
-                      </span>
-                    ) : undefined}
-                    ton="eingabe"
-                    klasse="print:hidden"
-                  >
-                    <CheckAnfragen />
-                  </AkkordeonKarte>
-                  </div>
-                )}
               </div>
             </div>
             )}
@@ -903,7 +957,26 @@ export default function App() {
 
       <EhepartnerDialog offen={ehepartnerDialog} onSchliessen={() => setEhepartnerDialog(false)} />
 
-      <Seitenleiste offen={leisteOffen} onSchliessen={schliesseLeiste} abschnitte={abschnitte} />
+      <Dialog
+        offen={kontoOffen}
+        titel="Ihr Konto"
+        beschreibung="Pläne speichern und laden — mit allen Etappen, auch den Angeboten."
+        onSchliessen={schliesseKonto}
+      >
+        <Konto />
+      </Dialog>
+
+      {checkMoeglich && (
+        <Dialog offen={checkOffen} titel="Vorsorge-Check an Kunden senden" onSchliessen={schliesseCheck}>
+          <CheckAnfragen
+            /* Die uebernommenen Angaben stehen in der ersten Etappe — dorthin. */
+            onUebernommen={() => geheZu('daten')}
+            onKonto={() => { setCheckOffen(false); setKontoOffen(true); }}
+          />
+        </Dialog>
+      )}
+
+      <Seitenleiste offen={leisteOffen} onSchliessen={schliesseLeiste} abschnitte={abschnitte} werkzeuge={werkzeuge} />
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500 print:hidden">
         <p>

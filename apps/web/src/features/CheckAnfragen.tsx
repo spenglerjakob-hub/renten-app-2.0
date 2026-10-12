@@ -15,7 +15,12 @@ const datum = (iso: string) => new Date(iso).toLocaleDateString('de-DE');
  * einreicht, sieht nur das Konto, das den Link erzeugt hat — das regelt die
  * Datenbank, nicht diese Oberflaeche.
  */
-export function CheckAnfragen() {
+export function CheckAnfragen({ onUebernommen, onKonto }: {
+  /** Nach „In den Rechner uebernehmen" — etwa zur Etappe mit den Angaben */
+  onUebernommen?: () => void;
+  /** Das Konto oeffnen, um die uebernommenen Angaben dort zu sichern */
+  onKonto?: () => void;
+} = {}) {
   const { liste, laedt, meldung, laden, anlegen, uebernehmen, loeschen, meldungLoeschen } = useCheckAnfragen();
   const setze = useSzenario((s) => s.setze);
   const email = useAuth((s) => s.email);
@@ -152,7 +157,7 @@ export function CheckAnfragen() {
                         onClick={async () => {
                           if (!window.confirm('Die aktuellen Eingaben im Rechner werden durch die Angaben des Kunden ersetzt. Fortfahren?')) return;
                           const sz = await uebernehmen(a.code);
-                          if (sz) { setze(() => sz); setUebernommen(a.code); }
+                          if (sz) { setze(() => sz); setUebernommen(a.code); onUebernommen?.(); }
                         }}
                         className="flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-500"
                       >
@@ -189,8 +194,16 @@ export function CheckAnfragen() {
                   */}
                   {uebernommen === a.code && (
                     <p className="mt-1.5 text-xs leading-relaxed text-emerald-800">
-                      Übernommen. Sichern Sie die Angaben oben unter „Als neues speichern“ und
+                      Übernommen. Sichern Sie die Angaben im Konto unter „Als neues speichern“ und
                       löschen Sie danach diesen Eingang — er wird nicht mehr gebraucht.
+                      {onKonto && (
+                        <>
+                          {' '}
+                          <button type="button" onClick={onKonto} className="font-bold underline underline-offset-2 hover:text-emerald-950">
+                            Konto öffnen
+                          </button>
+                        </>
+                      )}
                     </p>
                   )}
                 </li>

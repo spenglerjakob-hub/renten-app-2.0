@@ -5,8 +5,9 @@ import {
 import { RechtsLinks } from './RechtsLinks';
 
 /**
- * Seitenleiste des Rechners: Sprungmarken auf der langen Rechnerseite und
- * die eigenstaendigen Seiten fuer Kunden und Arbeitgeber.
+ * Seitenleiste des Rechners: Konto und Vorsorge-Check (als Fenster), die
+ * Etappen der Beratung und die eigenstaendigen Seiten fuer Kunden und
+ * Arbeitgeber.
  *
  * WARUM AUSKLAPPBAR und nicht als feste Spalte: Die Hauptseite ist ein
  * zentriertes Raster aus Eingaben und Ergebnis. Eine dauerhafte Spalte
@@ -25,6 +26,21 @@ export interface Abschnitt {
   symbol: ReactNode;
   /** Vor dem Scrollen ausfuehren, etwa um eine eingeklappte Karte zu oeffnen */
   beiSprung?: () => void;
+}
+
+/**
+ * Ein Werkzeug, das ein Fenster oeffnet statt zu springen — Konto und
+ * Vorsorge-Check. Beide werden in jeder Etappe gebraucht: gespeichert wird
+ * oft erst am Ende, ein Kunden-Link geht jederzeit raus.
+ */
+export interface Werkzeug {
+  text: string;
+  /** Zweite, kleine Zeile — etwa mit wem man angemeldet ist */
+  zusatz?: string;
+  symbol: ReactNode;
+  /** Kleine gruene Marke rechts, etwa „2 eingegangen" */
+  marke?: string;
+  onOeffnen: () => void;
 }
 
 interface Seite {
@@ -70,6 +86,7 @@ export function Seitenleiste(props: {
   offen: boolean;
   onSchliessen: () => void;
   abschnitte: Abschnitt[];
+  werkzeuge?: Werkzeug[];
 }) {
   const { offen, onSchliessen } = props;
   const schliessenRef = useRef<HTMLButtonElement>(null);
@@ -90,6 +107,17 @@ export function Seitenleiste(props: {
     requestAnimationFrame(() => {
       document.getElementById(a.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  };
+
+  const oeffne = (w: Werkzeug) => {
+    onSchliessen();
+    /*
+      Den Fokus loesen, bevor das Fenster aufgeht: Es merkt sich das zuletzt
+      fokussierte Element und kehrt beim Schliessen dorthin zurueck — das
+      waere sonst ein Knopf in der gerade zugeklappten Leiste.
+    */
+    (document.activeElement as HTMLElement | null)?.blur();
+    w.onOeffnen();
   };
 
   return (
@@ -121,6 +149,35 @@ export function Seitenleiste(props: {
             <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
+
+        {props.werkzeuge && props.werkzeuge.length > 0 && (
+          <Gruppe titel="Konto & Kunden">
+            {props.werkzeuge.map((w) => (
+              <li key={w.text}>
+                <button
+                  type="button"
+                  onClick={() => oeffne(w)}
+                  tabIndex={offen ? 0 : -1}
+                  className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-slate-800"
+                >
+                  <span className="mt-0.5 text-amber-400">{w.symbol}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-white">
+                      {w.text}
+                      {/* Im Textfluss, nicht rechts daneben: sonst bricht der Titel in drei Zeilen um. */}
+                      {w.marke && (
+                        <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 align-middle text-[10px] font-bold leading-none text-white">
+                          {w.marke}
+                        </span>
+                      )}
+                    </span>
+                    {w.zusatz && <span className="block truncate text-[11px] leading-snug text-slate-400">{w.zusatz}</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </Gruppe>
+        )}
 
         <Gruppe titel="Auf dieser Seite">
           {props.abschnitte.map((a) => (

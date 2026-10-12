@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 /**
@@ -28,6 +28,19 @@ export function Dialog({
 }) {
   const kastenRef = useRef<HTMLDivElement>(null);
   const vorherRef = useRef<HTMLElement | null>(null);
+  /*
+    DER SCHLIESSER LIEGT IN EINER REF, nicht in der Abhaengigkeitsliste.
+
+    Aufrufer uebergeben ihn meist als Pfeilfunktion, die bei jedem Rendern
+    neu entsteht. Stand er in der Liste, lief der Effekt bei jedem Rendern
+    des Aufrufers neu: Aufraeumen gab den Fokus an das ausloesende Element
+    zurueck, der Neustart setzte ihn auf den ersten Knopf. Wer im
+    Ehepartner-Dialog ein Einkommen eintippte, verlor so nach der ersten
+    Ziffer das Feld — jede Eingabe aendert das Szenario, und die Seite
+    rendert neu.
+  */
+  const schliessenRef = useRef(onSchliessen);
+  useLayoutEffect(() => { schliessenRef.current = onSchliessen; });
 
   useEffect(() => {
     if (!offen) return;
@@ -39,7 +52,7 @@ export function Dialog({
     )?.focus();
 
     const beiTaste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { if (schliessbar) onSchliessen(); return; }
+      if (e.key === 'Escape') { if (schliessbar) schliessenRef.current(); return; }
       if (e.key !== 'Tab' || !kasten) return;
 
       const ziele = [...kasten.querySelectorAll<HTMLElement>(
@@ -63,7 +76,7 @@ export function Dialog({
       document.body.style.overflow = vorherigesOverflow;
       vorherRef.current?.focus();
     };
-  }, [offen, onSchliessen, schliessbar]);
+  }, [offen, schliessbar]);
 
   if (!offen) return null;
 

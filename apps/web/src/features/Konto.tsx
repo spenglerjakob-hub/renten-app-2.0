@@ -152,7 +152,7 @@ export function Konto() {
             <p>
               <strong>Konto endgültig löschen.</strong> Gelöscht werden Ihr Konto, alle gespeicherten Szenarien
               und alle Vorsorge-Check-Anfragen samt eingegangener Kundendaten. Das lässt sich nicht rückgängig
-              machen. Sichern Sie Szenarien, die Sie behalten möchten, vorher oben über „Speichern“ als Datei.
+              machen. Sichern Sie Szenarien, die Sie behalten möchten, vorher über „Speichern“ in der Kopfzeile als Datei.
               Die Eingaben im Rechner auf diesem Gerät bleiben erhalten.
             </p>
             <label htmlFor="konto-loeschen-bestaetigung" className="block font-bold">
