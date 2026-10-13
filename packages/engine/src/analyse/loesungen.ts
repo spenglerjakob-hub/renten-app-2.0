@@ -29,6 +29,12 @@ import {
  * wie im Fördercheck und im Vertrags-TUEV — `svWirkung`, `zusatzsteuer`,
  * `avdZulagen`, `avdSteuervorteil` —, keine zweite Fassung der Formeln.
  *
+ * ODER BRUTTO VORGEGEBEN (`vorgabe: 'brutto'`): „100 EUR Beitrag — was
+ * kostet das netto?" Dann bekommt jede Loesung denselben Beitrag (bei der
+ * bAV die Umwandlung, beim Depot der Eigenbeitrag), und es wird vorwaerts
+ * gerechnet statt gesucht. Ueber dem Foerderrahmen wird wie bei der
+ * Netto-Vorgabe mit dem Rahmen gerechnet und das gesagt.
+ *
  * DIE AUSZAHLSEITE FEHLT HIER BEWUSST. Was aus dem Vertrag spaeter netto
  * wird, haengt am Angebot: Rente, Kapital, Besteuerung, Kranken-
  * versicherung. Das rechnet der Vertrags-TUEV fuer die erfassten Angebote.
@@ -55,9 +61,9 @@ export interface Loesung {
   /** Vertrag je Euro Netto-Aufwand */
   hebel: number;
   /**
-   * true: Der gewuenschte Netto-Aufwand passt nicht ganz in den
-   * Foerderrahmen. Gerechnet ist dann mit dem Rahmen; `nettoMonat` liegt
-   * unter dem Wunsch.
+   * true: Der Wunsch — Netto-Aufwand oder Beitrag — passt nicht ganz in den
+   * Foerderrahmen. Gerechnet ist dann mit dem Rahmen; `nettoMonat` bzw.
+   * `eigenbeitragMonat` liegt unter dem Wunsch.
    */
   begrenzt: boolean;
   /** Wie die Auszahlung spaeter besteuert wird — ein Satz */
@@ -72,7 +78,32 @@ export interface LoesungsOptionen {
    * ein Zuschussmodell mit 50 % traegt man hier ein.
    */
   agZuschussQuote?: number;
+  /**
+   * Was der Betrag ist: der Netto-Aufwand (Vorgabe) oder der Beitrag
+   * („brutto": bei der bAV die Umwandlung, beim Depot der Eigenbeitrag).
+   */
+  vorgabe?: LoesungsVorgabe;
 }
+
+export type LoesungsVorgabe = 'netto' | 'brutto';
+
+/** Der vorgegebene Betrag im Jahr und was er ist. */
+interface Vorgabe {
+  jahr: number;
+  brutto: boolean;
+}
+
+/**
+ * Der Beitrag einer Loesung: bei Brutto-Vorgabe der Betrag selbst, sonst
+ * der, der genau den Netto-Aufwand kostet — beides hoechstens bis zum Rahmen.
+ */
+function beitragFuer(v: Vorgabe, netto: (beitrag: number) => number, hoechstens: number): number {
+  return v.brutto ? Math.min(v.jahr, Math.max(0, hoechstens)) : suche(netto, v.jahr, hoechstens);
+}
+
+/** Passt der Wunsch nicht ganz in den Rahmen? */
+const ueberRahmen = (v: Vorgabe, beitrag: number, netto: number) =>
+  (v.brutto ? v.jahr > beitrag + 0.5 : netto < v.jahr - 0.5);
 
 /** Den Beitrag suchen, der genau `ziel` netto kostet — Bisektion, `netto` steigt mit dem Beitrag. */
 function suche(netto: (beitrag: number) => number, ziel: number, hoechstens: number): number {
@@ -95,7 +126,7 @@ const leer = (id: LoesungId, titel: string, schicht: 1 | 2 | 3, besteuerung: str
 });
 
 function bavLoesung(
-  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, nettoJahr: number, opt: LoesungsOptionen,
+  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, v: Vorgabe, opt: LoesungsOptionen,
 ): Loesung {
   const titel = 'Betriebsrente (Entgeltumwandlung)';
   const besteuerung = 'Rente voll steuerpflichtig, dazu Kranken- und Pflegeversicherung (Freibetrag in der KVdR).';
@@ -135,14 +166,16 @@ function bavLoesung(
   };
 
   const hoechstens = steuerGrenze;
-  const u = suche((x) => rechne(x).netto, nettoJahr, hoechstens);
+  const u = beitragFuer(v, (x) => rechne(x).netto, hoechstens);
   const r = rechne(u);
-  const begrenzt = r.netto < nettoJahr - 0.5;
+  const begrenzt = ueberRahmen(v, u, r.netto);
   const hinweise: string[] = [];
   if (hoechstens <= 0.5) hinweise.push('Der steuerfreie Rahmen (8 % der Beitragsbemessungsgrenze) ist ausgeschöpft.');
   else if (begrenzt) {
-    hinweise.push(`Mehr als ${euroText(r.netto / 12)} netto im Monat passen nicht in den steuerfreien Rahmen von `
-      + `${euroText(steuerGrenze / 12)}.`);
+    hinweise.push(v.brutto
+      ? `Steuerfrei umwandeln lassen sich höchstens ${euroText(steuerGrenze / 12)} im Monat — gerechnet ist mit diesem Betrag.`
+      : `Mehr als ${euroText(r.netto / 12)} netto im Monat passen nicht in den steuerfreien Rahmen von `
+        + `${euroText(steuerGrenze / 12)}.`);
   }
   if (u > svGrenze + 0.5) {
     hinweise.push(`Über ${euroText(svGrenze / 12)} im Monat ist die Umwandlung nur noch steuerfrei — `
@@ -165,7 +198,7 @@ function bavLoesung(
 }
 
 function basisLoesung(
-  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, nettoJahr: number,
+  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, v: Vorgabe,
 ): Loesung {
   const titel = 'Basisrente (Rürup)';
   const besteuerung = 'Rente steuerpflichtig (Besteuerungsanteil), in der KVdR beitragsfrei; kein Kapital möglich.';
@@ -179,9 +212,9 @@ function basisLoesung(
     Ueber dem freien Hoechstbetrag wirkt ein Beitrag wie eine ungefoerderte
     Rente mit voller Besteuerung — dort wird nicht weiter gerechnet.
   */
-  const b = suche((x) => rechne(x).netto, nettoJahr, Math.max(rahmen, 0));
+  const b = beitragFuer(v, (x) => rechne(x).netto, rahmen);
   const r = rechne(b);
-  const begrenzt = r.netto < nettoJahr - 0.5;
+  const begrenzt = ueberRahmen(v, b, r.netto);
   const hinweise: string[] = [];
   if (rahmen <= 0.5) hinweise.push('Der Höchstbetrag für Altersvorsorgeaufwendungen ist schon ausgeschöpft.');
   else if (begrenzt) hinweise.push(`Der freie Höchstbetrag (${euroText(rahmen / 12)} im Monat) begrenzt den Beitrag.`);
@@ -199,7 +232,7 @@ function basisLoesung(
 }
 
 function avdLoesung(
-  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, nettoJahr: number,
+  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, v: Vorgabe,
 ): Loesung {
   const titel = 'Altersvorsorgedepot';
   const besteuerung = 'Auszahlung voll steuerpflichtig (nachgelagert), in der KVdR beitragsfrei.';
@@ -228,15 +261,15 @@ function avdLoesung(
     };
   };
   const frei = Math.max(0, p.avd.hoechstbetragEigenbeitrag - vorher);
-  const e = suche((x) => rechne(x).netto, nettoJahr, frei);
+  const e = beitragFuer(v, (x) => rechne(x).netto, frei);
   const r = rechne(e);
-  const begrenzt = r.netto < nettoJahr - 0.5;
+  const begrenzt = ueberRahmen(v, e, r.netto);
   const hinweise: string[] = [];
   if (k.jahr < p.avd.abJahr) hinweise.push(`Das Altersvorsorgedepot gibt es ab ${p.avd.abJahr}; gerechnet mit den Zulagen ab dann.`);
   if (frei <= 0.5) hinweise.push('Der geförderte Höchstbetrag ist mit dem bestehenden Depot schon ausgeschöpft.');
   else if (begrenzt) {
     hinweise.push(`Gefördert sind Eigenbeiträge bis ${euroText(p.avd.hoechstbetragEigenbeitrag / 12)} im Monat; `
-      + 'darüber gibt es keine Zulage mehr.');
+      + (v.brutto ? 'gerechnet ist mit diesem Betrag.' : 'darüber gibt es keine Zulage mehr.'));
   }
   const vertrag = e + r.zulage;
   return {
@@ -267,18 +300,22 @@ function privatLoesung(nettoJahr: number): Loesung {
   };
 }
 
+/**
+ * Alle vier Loesungen fuer einen Betrag im Monat — Netto-Aufwand oder, mit
+ * `vorgabe: 'brutto'`, Beitrag. Privat ist beides dasselbe.
+ */
 export function loesungsvergleich(
   k: FoerderKontext,
   steuerOpt: SteuerOptionen,
   p: LegalParameters,
-  nettoMonat: number,
+  betragMonat: number,
   opt: LoesungsOptionen = {},
 ): Loesung[] {
-  const nettoJahr = Math.max(0, nettoMonat) * 12;
+  const v: Vorgabe = { jahr: Math.max(0, betragMonat) * 12, brutto: opt.vorgabe === 'brutto' };
   return [
-    avdLoesung(k, steuerOpt, p, nettoJahr),
-    bavLoesung(k, steuerOpt, p, nettoJahr, opt),
-    basisLoesung(k, steuerOpt, p, nettoJahr),
-    privatLoesung(nettoJahr),
+    avdLoesung(k, steuerOpt, p, v),
+    bavLoesung(k, steuerOpt, p, v, opt),
+    basisLoesung(k, steuerOpt, p, v),
+    privatLoesung(v.jahr),
   ];
 }

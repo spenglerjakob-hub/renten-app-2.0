@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import type { Loesung } from '@renten/engine';
+import type { Loesung, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import type { AngebotPosition } from '../features/tuev-berechnung';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text } from './Bausteine';
@@ -21,14 +21,23 @@ const LOESUNG_KURZ: Record<AngebotPosition['angebot']['loesung'], string> = {
   avd: 'Altersvorsorgedepot', bav: 'Betriebsrente', basis: 'Basisrente', privat: 'Private Rente',
 };
 
+/**
+ * Spaltenkopf mit weichen Trennstellen: "Altersvorsorgedepot" ist laenger als
+ * eine Spalte breit und lief sonst in die Nachbarspalte.
+ */
+const kopfVon = (titel: string) => titel.replace('Altersvorsorgedepot', 'Alters\u00advorsorge\u00addepot');
+
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;
 
-export function Loesungsvergleich({ loesungen, nettoMonat, angebote }: {
+export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }: {
   loesungen: Loesung[];
-  nettoMonat: number;
+  /** Wie am Bildschirm: Netto-Aufwand oder Beitrag vorgegeben */
+  vorgabe: LoesungsVorgabe;
+  betragMonat: number;
   angebote: AngebotPosition[];
 }) {
+  const brutto = vorgabe === 'brutto';
   const sichtbar = loesungen.filter((l) => l.verfuegbar);
   const gerechnet = angebote.filter((a) => a.rente || a.kapital);
   const gruppen: AngebotPosition[][] = [];
@@ -43,25 +52,50 @@ export function Loesungsvergleich({ loesungen, nettoMonat, angebote }: {
   const breite = sichtbar.length > 0 ? 64 / sichtbar.length : 64;
   return (
     <>
-      <Seite titel="Lösungen im Vergleich" nummer={`Was aus ${euro(nettoMonat)} netto im Monat wird`}>
+      <Seite
+        titel="Lösungen im Vergleich"
+        nummer={brutto ? `Was ${euro(betragMonat)} Beitrag im Monat netto kosten` : `Was aus ${euro(betragMonat)} netto im Monat wird`}
+      >
         <Text>
-          Je Lösung der Beitrag, der Sie nach Steuer- und Abgabenersparnis {euro(nettoMonat)} im Monat
-          kostet, und was damit im Vertrag landet — mit Ihrem persönlichen Steuersatz, den Zulagen und dem
-          Arbeitgeberzuschuss. Gerechnet zusätzlich zu dem, was Sie heute schon einzahlen.
+          {brutto
+            ? <>Je Lösung derselbe Beitrag von {euro(betragMonat)} im Monat, was er Sie nach Steuer- und
+              Abgabenersparnis wirklich kostet und was damit im Vertrag landet</>
+            : <>Je Lösung der Beitrag, der Sie nach Steuer- und Abgabenersparnis {euro(betragMonat)} im Monat
+              kostet, und was damit im Vertrag landet</>}
+          {' '}— mit Ihrem persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss. Gerechnet zusätzlich
+          zu dem, was Sie heute schon einzahlen.
         </Text>
 
         <div className="mt-3">
-          <Tabelle kopf={['', ...sichtbar.map((l) => l.titel)]} spalten={[36, ...sichtbar.map(() => breite)]}>
-            <Zeile zellen={['Ihr Netto-Aufwand', ...sichtbar.map((l) => cent(l.nettoMonat))]} />
-            <Zeile zellen={['+ Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
-            <Zeile zellen={['+ Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
-            <Zeile fett zellen={['= Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+          <Tabelle kopf={['', ...sichtbar.map((l) => kopfVon(l.titel))]} spalten={[36, ...sichtbar.map(() => breite)]}>
+            {brutto ? (
+              <>
+                <Zeile fett zellen={['Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+                <Zeile zellen={['− Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
+                <Zeile zellen={['− Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
+                <Zeile fett zellen={['= Kostet Sie netto', ...sichtbar.map((l) => cent(l.nettoMonat))]} />
+                <Gruppenzeile text="Im Vertrag" spalten={sichtbar.length + 1} />
+                <Zeile zellen={['Ihr Beitrag', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+              </>
+            ) : (
+              <>
+                <Zeile zellen={['Ihr Netto-Aufwand', ...sichtbar.map((l) => cent(l.nettoMonat))]} />
+                <Zeile zellen={['+ Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
+                <Zeile zellen={['+ Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
+                <Zeile fett zellen={['= Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+              </>
+            )}
             <Zeile zellen={['+ Zulagen', ...sichtbar.map((l) => posten(l.zulageMonat))]} />
             <Zeile zellen={['+ Arbeitgeberzuschuss', ...sichtbar.map((l) => posten(l.agZuschussMonat))]} />
             <Zeile fett zellen={['= Im Vertrag', ...sichtbar.map((l) => cent(l.vertragMonat))]} />
             <Zeile zellen={['Je Euro Netto-Aufwand', ...sichtbar.map((l) => `${zahl(l.hebel)} ×`)]} />
           </Tabelle>
         </div>
+        {sichtbar.some((l) => l.begrenzt) && (
+          <Text>
+            {sichtbar.filter((l) => l.begrenzt).map((l) => `${l.titel}: ${l.hinweise.join(' ')}`).join(' ')}
+          </Text>
+        )}
 
         <Untertitel>Im Alter</Untertitel>
         <ul className="space-y-0.5 text-[11px] leading-relaxed text-slate-600">

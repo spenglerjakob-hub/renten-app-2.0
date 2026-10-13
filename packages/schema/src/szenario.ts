@@ -502,8 +502,15 @@ export const angebotSchema = z.object({
  * weiter laden.
  */
 export const loesungenSchema = z.object({
+  /**
+   * Was vorgegeben ist: der Netto-Aufwand („was wird aus 100 € netto?")
+   * oder der Beitrag („was kosten 100 € Beitrag netto?").
+   */
+  vorgabe: z.enum(['netto', 'brutto']).default('netto'),
   /** Was der Kunde im Monat netto aufwenden will */
   nettoMonat: z.number().min(0).max(100_000).default(100),
+  /** Der Beitrag im Monat bei Brutto-Vorgabe — je Lösung derselbe */
+  bruttoMonat: z.number().min(0).max(100_000).default(100),
   /** Arbeitgeberzuschuss zur Entgeltumwandlung, Anteil — mindestens der Pflichtzuschuss */
   agZuschussQuote: z.number().min(0).max(1).default(0.15),
   lebenserwartung: z.number().int().min(60).max(120).default(85),

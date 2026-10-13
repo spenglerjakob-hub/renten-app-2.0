@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
-import { FilePlus2, Scale, Trash2, Trophy } from 'lucide-react';
-import { loesungsvergleich, type Jahreszeile, type Loesung, type LoesungId } from '@renten/engine';
+import { BadgeEuro, FilePlus2, Scale, Trash2, Trophy } from 'lucide-react';
+import {
+  loesungsvergleich, type Jahreszeile, type Loesung, type LoesungId, type LoesungsVorgabe,
+} from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt, TON,
@@ -14,6 +16,8 @@ import { personNameAus } from './personen';
  * Oben: Was wird aus einem Netto-Betrag in jeder Schicht? Je Loesung der
  * Beitrag, der nach Steuer- und Abgabenersparnis genau diesen Betrag kostet,
  * und was am Ende im Vertrag landet (`loesungsvergleich` im Rechenkern).
+ * Umgeschaltet auf BRUTTO andersherum: derselbe Beitrag in jeder Schicht,
+ * und was er netto kostet.
  *
  * Unten: die Angebote. Mit den Beitraegen von oben holt man Angebote ein,
  * traegt die Rente ein, die der Anbieter nennt, und sieht, welches netto am
@@ -48,13 +52,23 @@ export function Loesungen({ zeile, szenario, sparrate }: {
   const setzeLoesungen = useSzenario((x) => x.setzeLoesungen);
   const angebotHinzufuegen = useSzenario((x) => x.angebotHinzufuegen);
 
+  const brutto = l.vorgabe === 'brutto';
+  const betrag = brutto ? l.bruttoMonat : l.nettoMonat;
   const loesungen = useMemo(() => {
     const b = foerderBasis(szenario, zeile);
-    return loesungsvergleich(b.kontext, b.steuerOpt, b.p, l.nettoMonat, { agZuschussQuote: l.agZuschussQuote });
-  }, [szenario, zeile, l.nettoMonat, l.agZuschussQuote]);
+    return loesungsvergleich(b.kontext, b.steuerOpt, b.p, betrag, { agZuschussQuote: l.agZuschussQuote, vorgabe: l.vorgabe });
+  }, [szenario, zeile, betrag, l.agZuschussQuote, l.vorgabe]);
 
   const verfuegbar = loesungen.filter((x) => x.verfuegbar && x.nettoMonat > 0);
   const besterHebel = verfuegbar.reduce((m, x) => Math.max(m, x.hebel), 0);
+  /*
+    Bei Brutto-Vorgabe zaehlt zuerst, was der Beitrag netto kostet. Verglichen
+    wird nur, wer den vollen Beitrag bekommt — eine am Rahmen gedeckelte
+    Loesung waere sonst nur scheinbar guenstiger.
+  */
+  const vollerBeitrag = verfuegbar.filter((x) => !x.begrenzt);
+  const guenstigsteNetto = brutto && vollerBeitrag.length > 1
+    ? vollerBeitrag.reduce((m, x) => Math.min(m, x.nettoMonat), Infinity) : null;
   const bavDa = loesungen.some((x) => x.id === 'bav' && x.verfuegbar);
 
   const erfassen = (x: Loesung) => angebotHinzufuegen({
@@ -74,30 +88,36 @@ export function Loesungen({ zeile, szenario, sparrate }: {
         <div className="mb-4 border-b-2 border-indigo-200 px-1 pb-3">
           <h3 id="loesungen-titel" className="flex items-center gap-2 text-base font-bold text-indigo-900 sm:text-xl">
             <Scale className="h-5 w-5 shrink-0 text-indigo-600 sm:h-6 sm:w-6" aria-hidden />
-            Was wird aus {euro(l.nettoMonat)} netto im Monat?
+            {brutto ? `Was kosten ${euro(betrag)} Beitrag im Monat netto?` : `Was wird aus ${euro(betrag)} netto im Monat?`}
           </h3>
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:text-sm">
-            Je Schicht der Beitrag, der Sie nach Steuer- und Abgabenersparnis genau diesen Betrag kostet —
-            und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen
-            Steuersatz, nicht mit einem Durchschnitt.
+            {brutto
+              ? 'Derselbe Beitrag in jeder Schicht — und was er Sie nach Steuer- und Abgabenersparnis wirklich '
+                + 'kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
+                + 'Steuersatz, nicht mit einem Durchschnitt.'
+              : 'Je Schicht der Beitrag, der Sie nach Steuer- und Abgabenersparnis genau diesen Betrag kostet — '
+                + 'und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
+                + 'Steuersatz, nicht mit einem Durchschnitt.'}
           </p>
         </div>
 
         <div className={`mb-4 grid gap-3 rounded-xl border p-3 sm:grid-cols-3 sm:p-4 ${TON.eingabe}`}>
           <div>
+            <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
             <ZahlFeld
-              label="Netto-Aufwand im Monat"
-              wert={l.nettoMonat}
-              onChange={(n) => setzeLoesungen({ nettoMonat: n })}
+              label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
+              wert={betrag}
+              onChange={(n) => setzeLoesungen(brutto ? { bruttoMonat: n } : { nettoMonat: n })}
               einheit="€"
               schritt={25}
               max={10_000}
               gross
+              hilfe={brutto ? 'Bei der Betriebsrente die Bruttoumwandlung, beim Altersvorsorgedepot der Eigenbeitrag.' : undefined}
             />
-            {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - l.nettoMonat) > 0.5 && (
+            {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - betrag) > 0.5 && (
               <button
                 type="button"
-                onClick={() => setzeLoesungen({ nettoMonat: Math.round(sparrate) })}
+                onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
                 className="mt-1 text-xs font-bold text-indigo-700 hover:underline"
               >
                 Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
@@ -130,7 +150,10 @@ export function Loesungen({ zeile, szenario, sparrate }: {
             <LoesungsKarte
               key={x.id}
               x={x}
+              brutto={brutto}
               bester={x.verfuegbar && x.nettoMonat > 0 && Math.abs(x.hebel - besterHebel) < 1e-6}
+              guenstigste={guenstigsteNetto !== null && x.verfuegbar && !x.begrenzt
+                && Math.abs(x.nettoMonat - guenstigsteNetto) < 0.005}
               onErfassen={() => erfassen(x)}
             />
           ))}
@@ -146,20 +169,62 @@ export function Loesungen({ zeile, szenario, sparrate }: {
   );
 }
 
-function LoesungsKarte({ x, bester, onErfassen }: { x: Loesung; bester: boolean; onErfassen: () => void }) {
-  const zeilen: [string, number, string?][] = [
-    ['Ihr Netto-Aufwand', x.nettoMonat],
-    ...(x.steuerErsparnisMonat >= 0.5 ? [['+ Steuerersparnis', x.steuerErsparnisMonat, 'text-emerald-700'] as [string, number, string]] : []),
-    ...(x.svErsparnisMonat >= 0.5 ? [['+ Sozialabgaben gespart', x.svErsparnisMonat, 'text-emerald-700'] as [string, number, string]] : []),
+/** Netto-Aufwand oder Beitrag vorgeben — die beiden Fragen aus dem Gespraech. */
+function VorgabeSchalter({ wert, onWechsel }: { wert: LoesungsVorgabe; onWechsel: (v: LoesungsVorgabe) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Vorgabe" className="mb-2 inline-flex rounded-lg border border-slate-200 bg-white p-0.5 print:hidden">
+      {([['netto', 'Netto-Aufwand'], ['brutto', 'Brutto-Beitrag']] as const).map(([id, text]) => (
+        <button
+          key={id}
+          type="button"
+          role="radio"
+          aria-checked={wert === id}
+          onClick={() => onWechsel(id)}
+          className={`rounded-md px-2.5 py-1 text-xs font-bold ${
+            wert === id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen }: {
+  x: Loesung; brutto: boolean; bester: boolean; guenstigste: boolean; onErfassen: () => void;
+}) {
+  const beitragText = x.id === 'bav' ? 'Bruttoumwandlung' : 'Ihr Beitrag';
+  const ersparnis: [string, number][] = [
+    ...(x.steuerErsparnisMonat >= 0.5 ? [['Steuerersparnis', x.steuerErsparnisMonat] as [string, number]] : []),
+    ...(x.svErsparnisMonat >= 0.5 ? [['Sozialabgaben gespart', x.svErsparnisMonat] as [string, number]] : []),
   ];
   const zusatz: [string, number][] = [
     ...(x.zulageMonat >= 0.5 ? [['+ Zulagen', x.zulageMonat] as [string, number]] : []),
     ...(x.agZuschussMonat >= 0.5 ? [['+ Arbeitgeberzuschuss', x.agZuschussMonat] as [string, number]] : []),
   ];
+  /*
+    Die Rechnung laeuft in Leserichtung: Netto-Vorgabe von unten nach oben
+    (Aufwand plus Ersparnis ist der Beitrag), Brutto-Vorgabe von oben nach
+    unten (Beitrag minus Ersparnis ist der Aufwand).
+  */
+  const zeilen: [string, number, string?][] = brutto
+    ? [
+        [`${beitragText} (brutto)`, x.eigenbeitragMonat, 'font-bold text-slate-900'],
+        ...ersparnis.map(([t, w]) => [`− ${t}`, w, 'text-emerald-700'] as [string, number, string]),
+      ]
+    : [
+        ['Ihr Netto-Aufwand', x.nettoMonat],
+        ...ersparnis.map(([t, w]) => [`+ ${t}`, w, 'text-emerald-700'] as [string, number, string]),
+      ];
+  const summe: [string, number] = brutto
+    ? ['= Kostet Sie netto', x.nettoMonat]
+    : [x.id === 'bav' ? '= Bruttoumwandlung' : '= Ihr Beitrag', x.eigenbeitragMonat];
+  const geld = (n: number) => euroGenau(Math.round(n * 100) / 100);
   return (
     <article
       className={`flex flex-col overflow-hidden rounded-xl border bg-white shadow-sm ${
-        bester ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'
+        guenstigste || bester ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'
       } ${x.verfuegbar ? '' : 'opacity-70'}`}
     >
       <header className="flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5">
@@ -169,40 +234,53 @@ function LoesungsKarte({ x, bester, onErfassen }: { x: Loesung; bester: boolean;
           </span>
           <h4 className="mt-1 text-sm font-bold leading-snug text-slate-800">{x.titel}</h4>
         </div>
-        {bester && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-            <Trophy className="h-3 w-3" aria-hidden /> Meiste
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {guenstigste && (
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+              <BadgeEuro className="h-3 w-3" aria-hidden /> Günstigste
+            </span>
+          )}
+          {bester && (
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+              <Trophy className="h-3 w-3" aria-hidden /> Meiste
+            </span>
+          )}
+        </div>
       </header>
 
       {x.verfuegbar ? (
         <div className="flex flex-1 flex-col p-3">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Im Vertrag</span>
-            <span className="text-2xl font-black tabular-nums text-indigo-800">{euroGenau(Math.round(x.vertragMonat * 100) / 100)}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              {brutto ? 'Kostet Sie netto' : 'Im Vertrag'}
+            </span>
+            <span className="text-2xl font-black tabular-nums text-indigo-800">
+              {geld(brutto ? x.nettoMonat : x.vertragMonat)}
+            </span>
           </div>
           <p className="text-right text-xs font-bold text-emerald-700">
-            {zahl(x.hebel)} × Ihr Netto-Aufwand
+            {brutto && <>Im Vertrag {geld(x.vertragMonat)} · </>}
+            {zahl(x.hebel)} × {brutto ? 'je Netto-Euro' : 'Ihr Netto-Aufwand'}
           </p>
 
           <dl className="mt-3 space-y-1 text-xs">
             {zeilen.map(([t, w, f]) => (
               <div key={t} className="flex justify-between gap-2">
-                <dt className="text-slate-600">{t}</dt>
-                <dd className={`tabular-nums ${f ?? 'text-slate-800'}`}>{euroGenau(Math.round(w * 100) / 100)}</dd>
+                <dt className={f?.includes('font-bold') ? 'font-bold text-slate-700' : 'text-slate-600'}>{t}</dt>
+                <dd className={`tabular-nums ${f ?? 'text-slate-800'}`}>{geld(w)}</dd>
               </div>
             ))}
             <div className="flex justify-between gap-2 border-t border-slate-100 pt-1 font-bold">
-              <dt className="text-slate-700">
-                {x.id === 'bav' ? '= Bruttoumwandlung' : '= Ihr Beitrag'}
-              </dt>
-              <dd className="tabular-nums text-slate-900">{euroGenau(Math.round(x.eigenbeitragMonat * 100) / 100)}</dd>
+              <dt className="text-slate-700">{summe[0]}</dt>
+              <dd className="tabular-nums text-slate-900">{geld(summe[1])}</dd>
             </div>
+            {zusatz.length > 0 && brutto && (
+              <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Zusätzlich im Vertrag</p>
+            )}
             {zusatz.map(([t, w]) => (
               <div key={t} className="flex justify-between gap-2">
                 <dt className="text-slate-600">{t}</dt>
-                <dd className="tabular-nums text-emerald-700">{euroGenau(Math.round(w * 100) / 100)}</dd>
+                <dd className="tabular-nums text-emerald-700">{geld(w)}</dd>
               </div>
             ))}
           </dl>

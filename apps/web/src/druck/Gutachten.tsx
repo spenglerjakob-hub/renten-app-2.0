@@ -115,9 +115,11 @@ export function Gutachten({
   const loesungen = useMemo(() => {
     if (!lang || (luecke <= 0 && szenario.loesungen.angebote.length === 0)) return null;
     const l = szenario.loesungen;
+    const betrag = l.vorgabe === 'brutto' ? l.bruttoMonat : l.nettoMonat;
     return {
-      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, l.nettoMonat,
-        { agZuschussQuote: l.agZuschussQuote }),
+      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, betrag,
+        { agZuschussQuote: l.agZuschussQuote, vorgabe: l.vorgabe }),
+      betrag,
       angebote: angebotPositionen(szenario),
     };
   }, [lang, luecke, szenario, foerderung]);
@@ -292,7 +294,8 @@ export function Gutachten({
         knoten: (
           <Loesungsvergleich
             loesungen={loesungen.liste}
-            nettoMonat={szenario.loesungen.nettoMonat}
+            vorgabe={szenario.loesungen.vorgabe}
+            betragMonat={loesungen.betrag}
             angebote={loesungen.angebote}
           />
         ),

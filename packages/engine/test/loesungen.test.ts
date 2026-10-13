@@ -101,3 +101,60 @@ describe('Lösungsvergleich — was wird aus 100 € netto', () => {
     expect(r('avd').vertragMonat).toBe(0);
   });
 });
+
+const brutto = (k: FoerderKontext, betrag = 100, quote?: number) => {
+  const l = loesungsvergleich(k, steuerOpt, p, betrag, { vorgabe: 'brutto', ...(quote === undefined ? {} : { agZuschussQuote: quote }) });
+  return (id: LoesungId) => l.find((x) => x.id === id)!;
+};
+
+describe('Lösungsvergleich — was kosten 100 € Beitrag netto', () => {
+  it('gibt jeder Lösung denselben Beitrag', () => {
+    const r = brutto(angestellt);
+    for (const id of ['avd', 'bav', 'basis', 'privat'] as const) {
+      expect(r(id).eigenbeitragMonat).toBeCloseTo(100, 6);
+      expect(r(id).begrenzt).toBe(false);
+    }
+  });
+
+  it('privat kostet den vollen Beitrag, die geförderten weniger', () => {
+    const r = brutto(angestellt);
+    expect(r('privat').nettoMonat).toBeCloseTo(100, 6);
+    for (const id of ['avd', 'bav', 'basis'] as const) expect(r(id).nettoMonat).toBeLessThan(100);
+    // bAV: Steuer und Sozialabgaben sinken — am wenigsten Netto-Aufwand.
+    expect(r('bav').nettoMonat).toBeLessThan(r('basis').nettoMonat);
+  });
+
+  it('dieselben Bausteine: Netto = Beitrag − Ersparnis, Vertrag = Beitrag + Zulage + Arbeitgeber', () => {
+    const r = brutto(angestellt, 100, 0.5);
+    const bav = r('bav');
+    expect(bav.eigenbeitragMonat - bav.steuerErsparnisMonat - bav.svErsparnisMonat).toBeCloseTo(bav.nettoMonat, 6);
+    expect(bav.vertragMonat).toBeCloseTo(100 + 0.5 * 100, 6);
+    const avd = r('avd');
+    expect(avd.vertragMonat).toBeCloseTo(100 + avd.zulageMonat, 6);
+    expect(avd.hebel).toBeCloseTo(avd.vertragMonat / avd.nettoMonat, 6);
+  });
+
+  it('ist die Umkehrung der Netto-Vorgabe', () => {
+    const netto = rechne(angestellt, 100);
+    for (const id of ['avd', 'bav', 'basis', 'privat'] as const) {
+      const zurueck = brutto(angestellt, netto(id).eigenbeitragMonat)(id);
+      expect(zurueck.nettoMonat).toBeCloseTo(100, 2);
+      expect(zurueck.vertragMonat).toBeCloseTo(netto(id).vertragMonat, 2);
+    }
+  });
+
+  it('über dem Rahmen: gerechnet mit dem Rahmen, und das wird gesagt', () => {
+    const bav = brutto(angestellt, 2_000)('bav');
+    expect(bav.begrenzt).toBe(true);
+    expect(bav.eigenbeitragMonat).toBeCloseTo(STEUER_FREI_QUOTE * p.bbgRvJahr / 12, 6);
+    expect(bav.hinweise.join(' ')).toMatch(/gerechnet ist mit diesem Betrag/);
+    const avd = brutto(angestellt, 1_000)('avd');
+    expect(avd.begrenzt).toBe(true);
+    expect(avd.eigenbeitragMonat).toBeCloseTo(p.avd.hoechstbetragEigenbeitrag / 12, 6);
+  });
+
+  it('0 € Beitrag: nichts', () => {
+    const r = brutto(angestellt, 0);
+    for (const id of ['avd', 'bav', 'basis', 'privat'] as const) expect(r(id).vertragMonat).toBe(0);
+  });
+});
