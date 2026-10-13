@@ -1,9 +1,39 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const hier = fileURLToPath(new URL('.', import.meta.url));
+
+/**
+ * TESTSEITE (test.js-rentenplaner.de). Baut der Deploy-Lauf fuer die
+ * Testseite (`VITE_UMGEBUNG=test`), bekommt JEDE Seite ein Band
+ * "Testversion", ein noindex und "[Test]" im Titel — so verwechselt niemand
+ * die Tabs, und Suchmaschinen bleiben draussen. Die Live-Seite baut ohne.
+ */
+function testkennzeichen(): Plugin {
+  return {
+    name: 'testkennzeichen',
+    transformIndexHtml: (html) => ({
+      html: html.replace('<title>', '<title>[Test] '),
+      tags: [
+        { tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' }, injectTo: 'head' },
+        { tag: 'style', children: '@media print{#testversion{display:none}}', injectTo: 'head' },
+        {
+          tag: 'div',
+          attrs: {
+            id: 'testversion',
+            role: 'note',
+            style: 'background:#f59e0b;color:#111827;font:600 12px/1.5 system-ui,sans-serif;'
+              + 'text-align:center;padding:3px 12px',
+          },
+          children: 'TESTVERSION — Änderungen hier sind noch nicht live. Die Live-Seite ist js-rentenplaner.de.',
+          injectTo: 'body-prepend',
+        },
+      ],
+    }),
+  };
+}
 
 const URHEBERHINWEIS = `/*! JS-Rentenplaner — (c) ${new Date().getFullYear()} Betreiber laut https://js-rentenplaner.de/impressum.
  * Alle Rechte vorbehalten. Urheberrechtlich geschuetzt (§§ 69a ff. UrhG). Kopieren, Bearbeiten,
@@ -11,7 +41,7 @@ const URHEBERHINWEIS = `/*! JS-Rentenplaner — (c) ${new Date().getFullYear()} 
  * Nutzungsbedingungen: https://js-rentenplaner.de/nutzungsbedingungen */`;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), ...(process.env.VITE_UMGEBUNG === 'test' ? [testkennzeichen()] : [])],
   // Der Web Worker (Projektion im Hintergrund) wird getrennt gebaut — er
   // traegt die ganze Engine und bekommt denselben Hinweis.
   worker: { rollupOptions: { output: { banner: URHEBERHINWEIS } } },

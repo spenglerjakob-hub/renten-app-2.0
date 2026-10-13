@@ -5,21 +5,33 @@ name: Deployment zu Hostinger
 # Das Shared Hosting von Hostinger fuehrt keinen Node-Build aus. Deshalb
 # entsteht das fertige Bundle hier und wird anschliessend per FTP hochgeladen.
 # Hostinger muss dadurch nichts koennen ausser Dateien auszuliefern.
+#
+# ZWEI ZIELE — erst testen, dann freigeben:
+#   - Arbeitszweig  → test.js-rentenplaner.de: jede Aenderung landet zuerst
+#     hier, mit Band "Testversion" und fuer Suchmaschinen gesperrt.
+#   - Branch `live` → js-rentenplaner.de: nur, was auf der Testseite geprueft
+#     und freigegeben ist. Freigeben heisst, `live` auf den gepruften Stand
+#     vorzuziehen; Zurueckrollen, `live` auf einen frueheren Stand zu setzen.
+# Beide Seiten nutzen DIESELBE Datenbank. Datenbank-Aenderungen muessen
+# deshalb abwaertskompatibel sein: Die Live-Seite laeuft mit ihrem Stand weiter.
 
 on:
   push:
-    branches: [main, claude/german-pension-calculator-review-cql8d6]
+    branches: [live, claude/german-pension-calculator-review-cql8d6]
   workflow_dispatch:
 
-# Zwei gleichzeitige Deployments wuerden sich im Zielverzeichnis in die Quere
-# kommen. Das neuere gewinnt, das aeltere wird abgebrochen.
+# Zwei gleichzeitige Deployments auf DASSELBE Ziel wuerden sich in die Quere
+# kommen: Das neuere gewinnt, das aeltere wird abgebrochen. Test und Live
+# laufen unabhaengig voneinander.
 concurrency:
-  group: deployment-hostinger
+  group: deployment-hostinger-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   bauen-und-ausliefern:
     runs-on: ubuntu-latest
+    env:
+      ZIEL: ${{ github.ref_name == 'live' && 'live' || 'test' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +57,8 @@ jobs:
           # Laufzeit. Sie muessen deshalb hier vorliegen, nicht auf dem Server.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # "test": Band "Testversion" und noindex auf jeder Seite (vite.config.ts).
+          VITE_UMGEBUNG: ${{ env.ZIEL }}
         run: pnpm -r build
 
       - name: Typen pruefen
@@ -105,6 +119,25 @@ jobs:
           fi
           echo "Bundle in Ordnung:"; du -sh apps/web/dist
 
+      # Nur die Testseite: Suchmaschinen fernhalten (zusaetzlich zum noindex im
+      # HTML), und wer sie ueber js-rentenplaner.de/test/ aufruft — der Ordner
+      # liegt in der Dokumentwurzel der Live-Seite —, landet auf der Subdomain.
+      - name: Testseite abschirmen
+        if: env.ZIEL == 'test'
+        run: |
+          printf 'User-agent: *\nDisallow: /\n' > apps/web/dist/robots.txt
+          sed -i 's|^  RewriteBase /$|  RewriteBase /\n\n  # Nur Testseite: Aufrufe ueber die Live-Domain auf die Subdomain.\n  RewriteCond %{HTTP_HOST} !^test\\. [NC]\n  RewriteRule ^ https://test.js-rentenplaner.de/ [R=302,L]|' apps/web/dist/.htaccess
+          grep -q 'RewriteRule ^ https://test.js-rentenplaner.de/' apps/web/dist/.htaccess \
+            || { echo "Umleitung fuer die Testseite fehlt — RewriteBase nicht gefunden?"; exit 1; }
+          cat >> apps/web/dist/.htaccess <<'EOF'
+
+          # --- Nur Testseite: nicht in Suchmaschinen -------------------------------
+          <IfModule mod_headers.c>
+            Header always set X-Robots-Tag "noindex, nofollow"
+          </IfModule>
+          EOF
+          grep -q 'TESTVERSION' apps/web/dist/index.html || { echo "Band Testversion fehlt im Build"; exit 1; }
+
       - name: Per FTP zu Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -118,7 +151,10 @@ jobs:
           #   /home/u964247325/domains/js-rentenplaner.de/public_html
           # Landet der FTP-Zugang doch direkt in der Wurzel, die Variable
           # HOSTINGER_ZIELVERZEICHNIS auf ./ setzen.
-          server-dir: ${{ vars.HOSTINGER_ZIELVERZEICHNIS || 'domains/js-rentenplaner.de/public_html/' }}
+          # Die Testseite liegt im Unterordner test/ — so legt hPanel eine
+          # Subdomain als "Teil der Website" an. Anderer Ordner: Variable
+          # HOSTINGER_TESTVERZEICHNIS setzen.
+          server-dir: ${{ env.ZIEL == 'live' && (vars.HOSTINGER_ZIELVERZEICHNIS || 'domains/js-rentenplaner.de/public_html/') || (vars.HOSTINGER_TESTVERZEICHNIS || 'domains/js-rentenplaner.de/public_html/test/') }}
           # Punktdateien muessen mit, sonst fehlt die .htaccess.
           dangerous-clean-slate: false
           exclude: |
