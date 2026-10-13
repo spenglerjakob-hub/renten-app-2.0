@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { paketDeckt, paketVon, type Bereich, type Intervall, type PaketId } from '@renten/schema/preise';
 import { supabase } from '../lib/supabase';
-import { einladungVergessen, istEinladungsToken, offeneEinladung } from '../lib/einladung';
+import {
+  einladungVergessen, fruehstartVergessen, istEinladungsToken, offeneEinladung, offenerFruehstart,
+} from '../lib/einladung';
 
 /**
  * Was das angemeldete Konto nutzen darf: Paket, Testphase, Buero, Abo.
@@ -22,7 +24,7 @@ import { einladungVergessen, istEinladungsToken, offeneEinladung } from '../lib/
  * den Browser-Code ohnehin heran. Speichern geht ohne Paket trotzdem nicht.
  */
 
-export type Quelle = 'vorab' | 'frei' | 'abo' | 'test';
+export type Quelle = 'vorab' | 'frei' | 'fruehstart' | 'abo' | 'test';
 export type Rolle = 'inhaber' | 'mitglied';
 
 export interface AboAngaben {
@@ -56,14 +58,24 @@ export interface Zugang {
   /** Unter den gebuchten Plaetzen des Bueros */
   hatPlatz: boolean;
   abo: AboAngaben | null;
+  /** Early Adopter (Link eingeloest) — auch nach Ablauf der drei Monate */
+  fruehstart: boolean;
+  /** Wann der Link eingeloest wurde */
+  fruehstartSeit: string | null;
+  /** Ende der kostenlosen Zeit, sobald ein Starttermin feststeht */
+  fruehstartBis: string | null;
+  /** Wann zuletzt eine Rueckmeldung kam — fuer die Erinnerung */
+  letzteRueckmeldung: string | null;
 }
 
 export type EinladungsAntwort =
   'ok' | 'ungueltig' | 'abgelaufen' | 'schon_im_buero' | 'anderes_buero' | 'kein_abo' | 'voll';
+export type FruehstartAntwort = 'ok' | 'ungueltig' | 'abgelaufen' | 'schon_dabei' | 'frei';
 
 const PAKET_IDS = ['alles', 'rente', 'ag'] as const;
-const QUELLEN = ['vorab', 'frei', 'abo', 'test'] as const;
+const QUELLEN = ['vorab', 'frei', 'fruehstart', 'abo', 'test'] as const;
 const ANTWORTEN = ['ok', 'ungueltig', 'abgelaufen', 'schon_im_buero', 'anderes_buero', 'kein_abo', 'voll'] as const;
+const FRUEHSTART_ANTWORTEN = ['ok', 'ungueltig', 'abgelaufen', 'schon_dabei', 'frei'] as const;
 
 const aus = <T extends string>(liste: readonly T[], v: unknown): T | null =>
   (liste as readonly unknown[]).includes(v) ? (v as T) : null;
@@ -99,6 +111,10 @@ export function zugangAus(roh: unknown): Zugang | null {
           kuendigungZum: text(a.kuendigung_zum),
         }
       : null,
+    fruehstart: r.fruehstart === true,
+    fruehstartSeit: text(r.fruehstart_seit),
+    fruehstartBis: text(r.fruehstart_bis),
+    letzteRueckmeldung: text(r.letzte_rueckmeldung),
   };
 }
 
@@ -109,8 +125,9 @@ export const aboAktiv = (status: string | null | undefined) =>
 /** Darf dieser Zugang den Bereich jetzt nutzen? */
 export function deckt(z: Zugang, bereich: Bereich, jetzt = Date.now()): boolean {
   if (!paketDeckt(z.paket, bereich)) return false;
-  // Eine Testphase endet zu einem festen Zeitpunkt — auch im Zwischenspeicher.
-  return !(z.quelle === 'test' && z.bis !== null && Date.parse(z.bis) <= jetzt);
+  // Testphase und Early-Adopter-Zeit enden zu einem festen Zeitpunkt — auch im Zwischenspeicher.
+  const befristet = z.quelle === 'test' || z.quelle === 'fruehstart';
+  return !(befristet && z.bis !== null && Date.parse(z.bis) <= jetzt);
 }
 
 /** Ganze Tage bis zu einem Zeitpunkt, aufgerundet — "noch 1 Tag" bis zuletzt. */
@@ -124,15 +141,17 @@ export const datum = (iso: string | null) => (iso ? new Date(iso).toLocaleDateSt
 
 /**
  * Der Eintrag "Abo & Team" in der Seitenleiste. Solange kein Starttermin
- * feststeht, sehen ihn nur der Betreiber und Bueros — fuer alle anderen
- * aendert sich bis dahin nichts.
+ * feststeht, sehen ihn nur der Betreiber, Bueros und Early Adopter — fuer
+ * alle anderen aendert sich bis dahin nichts.
  */
 export const aboSichtbar = (z: Zugang | null) =>
-  !!z && (z.betreiber || z.aboPflichtAb !== null || z.buero !== null);
+  !!z && (z.betreiber || z.aboPflichtAb !== null || z.buero !== null || z.fruehstart);
 
 /** Zweite Zeile des Eintrags. */
 export function aboZusatz(z: Zugang): string {
   if (z.quelle === 'test') return `Testphase: noch ${tage(tageBis(z.bis))}`;
+  if (z.quelle === 'fruehstart') return `Early Adopter: noch ${tage(tageBis(z.bis))}`;
+  if (z.fruehstart && z.quelle === 'vorab') return 'Early Adopter';
   if (z.abo && aboAktiv(z.abo.status)) {
     return `${paketVon(z.abo.paket).name} · ${z.abo.plaetze} ${z.abo.plaetze === 1 ? 'Platz' : 'Plätze'}`;
   }
@@ -141,6 +160,24 @@ export function aboZusatz(z: Zugang): string {
   if (z.freizugang === 'partner') return 'Kostenlos (Partnerzugang)';
   return 'Paket wählen, Kollegen einladen';
 }
+
+/** Alle vier Wochen bitten wir Early Adopter um eine Rueckmeldung. */
+const RUECKMELDUNG_ALLE_MS = 28 * 86_400_000;
+
+/**
+ * Ist eine Rueckmeldung faellig? Nur bei Early Adoptern, solange ihre
+ * kostenlose Zeit laeuft (oder vor dem Start): vier Wochen nach der letzten
+ * Rueckmeldung, die erste vier Wochen nach dem Einloesen.
+ */
+export function rueckmeldungFaellig(z: Zugang, jetzt = Date.now()): boolean {
+  if (!z.fruehstart || !(z.quelle === 'fruehstart' || z.quelle === 'vorab')) return false;
+  const seit = z.letzteRueckmeldung ?? z.fruehstartSeit;
+  return seit !== null && jetzt - Date.parse(seit) > RUECKMELDUNG_ALLE_MS;
+}
+
+/** Early Adopter, dessen kostenlose Zeit vorbei ist — Zeit fuer Dank und Rabatt. */
+export const fruehstartVorbei = (z: Zugang, jetzt = Date.now()) =>
+  z.fruehstart && z.fruehstartBis !== null && Date.parse(z.fruehstartBis) <= jetzt;
 
 // ---------------------------------------------------------------------------
 
@@ -184,16 +221,23 @@ interface ZugangStore {
   fensterOffen: boolean;
   /** Antwort auf die zuletzt eingeloeste Einladung — fuer das Band */
   einladung: EinladungsAntwort | null;
-  /** Solange eine Einladung eingeloest wird, wartet die Schranke. */
+  /** Antwort auf den zuletzt eingeloesten Early-Adopter-Link — fuer das Band */
+  fruehstartAntwort: FruehstartAntwort | null;
+  /** Solange ein Link eingeloest wird, wartet die Schranke. */
   loestEin: boolean;
+  /** Das Fenster "Feedback geben" — von ueberall erreichbar */
+  rueckmeldungOffen: boolean;
 
   laden: (fuer: string, frisch?: boolean) => Promise<void>;
-  einladungEinloesen: () => Promise<void>;
+  linksEinloesen: () => Promise<void>;
   einladungGesehen: () => void;
+  fruehstartGesehen: () => void;
   zuruecksetzen: () => void;
   setzeVorschau: (v: Vorschau | null) => void;
   oeffneFenster: () => void;
   schliesseFenster: () => void;
+  oeffneRueckmeldung: () => void;
+  schliesseRueckmeldung: () => void;
 }
 
 /** Der Zugang, nach dem sich die Oberflaeche richtet — beim Betreiber ggf. die Vorschau. */
@@ -225,7 +269,9 @@ export const useZugang = create<ZugangStore>((set, get) => ({
   vorschau: null,
   fensterOffen: false,
   einladung: null,
+  fruehstartAntwort: null,
   loestEin: false,
+  rueckmeldungOffen: false,
 
   laden: (fuer, frisch = false) => {
     if (!frisch && laufend?.fuer === fuer) return laufend.p;
@@ -234,7 +280,7 @@ export const useZugang = create<ZugangStore>((set, get) => ({
       beobachten();
       if (get().fuer !== fuer) {
         // Anderes Konto: nichts vom vorigen uebernehmen.
-        set({ fuer, zugang: null, stand: 'laedt', vorschau: null, einladung: null });
+        set({ fuer, zugang: null, stand: 'laedt', vorschau: null, einladung: null, fruehstartAntwort: null });
       } else if (get().stand === 'offen') {
         set({ stand: 'laedt' });
       }
@@ -254,7 +300,7 @@ export const useZugang = create<ZugangStore>((set, get) => ({
     return p;
   },
 
-  einladungEinloesen: () => {
+  linksEinloesen: () => {
     // Nur einmal zugleich: Ein zweiter Aufruf bekaeme fuer dasselbe Token
     // "schon_im_buero" — und das Band zeigte die falsche Antwort.
     loesungLaeuft ??= einloesen(set, get).finally(() => { loesungLaeuft = null; });
@@ -262,46 +308,71 @@ export const useZugang = create<ZugangStore>((set, get) => ({
   },
 
   einladungGesehen: () => set({ einladung: null }),
+  fruehstartGesehen: () => set({ fruehstartAntwort: null }),
 
   zuruecksetzen: () => {
     speicherLeeren();
     laufend = null;
     anfrage += 1;
     set({
-      fuer: null, zugang: null, stand: 'offen', geladenAm: 0,
-      vorschau: null, fensterOffen: false, einladung: null, loestEin: false,
+      fuer: null, zugang: null, stand: 'offen', geladenAm: 0, vorschau: null, fensterOffen: false,
+      einladung: null, fruehstartAntwort: null, loestEin: false, rueckmeldungOffen: false,
     });
   },
 
   setzeVorschau: (vorschau) => set({ vorschau, fensterOffen: false }),
   oeffneFenster: () => set({ fensterOffen: true }),
   schliesseFenster: () => set({ fensterOffen: false }),
+  oeffneRueckmeldung: () => set({ rueckmeldungOffen: true, fensterOffen: false }),
+  schliesseRueckmeldung: () => set({ rueckmeldungOffen: false }),
 }));
 
 let loesungLaeuft: Promise<void> | null = null;
 
 type Setzen = (teil: Partial<ZugangStore>) => void;
 
+/**
+ * Gemerkte Links einloesen: Einladung ins Buero und Early-Adopter-Zugang.
+ * Kommt eine klare Antwort, ist das Token verbraucht — ob angenommen oder
+ * nicht; bei einer Stoerung bleibt es fuer den naechsten Versuch.
+ */
 async function einloesen(set: Setzen, get: () => ZugangStore): Promise<void> {
   if (!supabase) return;
   const sb = supabase;
   const { data: sitzung } = await sb.auth.getSession();
-  const ausKonto: unknown = sitzung.session?.user.user_metadata?.einladung;
-  const token = offeneEinladung() ?? (istEinladungsToken(ausKonto) ? ausKonto : null);
-  if (!token) return;
+  const konto = (sitzung.session?.user.user_metadata ?? {}) as Record<string, unknown>;
+  const einladung = offeneEinladung() ?? (istEinladungsToken(konto.einladung) ? konto.einladung : null);
+  const fruehstart = offenerFruehstart() ?? (istEinladungsToken(konto.fruehstart) ? konto.fruehstart : null);
+  if (!einladung && !fruehstart) return;
 
   set({ loestEin: true });
-  const { data, error } = await sb.rpc('einladung_annehmen', { p_token: token });
-  if (error) {
-    // Kein Netz o. ae.: Token behalten, beim naechsten Laden noch einmal.
-    console.warn('Einladung nicht eingeloest', error);
-    set({ loestEin: false });
-    return;
+  const ergebnis: Partial<ZugangStore> = {};
+  /** Was aus den Kontodaten wieder raus kann */
+  const aufraeumen: Record<string, null> = {};
+  let neuLaden = false;
+
+  if (einladung) {
+    const { data, error } = await sb.rpc('einladung_annehmen', { p_token: einladung });
+    if (error) console.warn('Einladung nicht eingeloest', error);
+    else {
+      einladungVergessen();
+      if (konto.einladung != null) aufraeumen.einladung = null;
+      ergebnis.einladung = aus(ANTWORTEN, data) ?? 'ungueltig';
+      neuLaden ||= ergebnis.einladung === 'ok';
+    }
   }
-  einladungVergessen();
-  if (ausKonto !== undefined && ausKonto !== null) void sb.auth.updateUser({ data: { einladung: null } });
-  const antwort = aus(ANTWORTEN, data) ?? 'ungueltig';
+  if (fruehstart) {
+    const { data, error } = await sb.rpc('fruehstart_einloesen', { p_token: fruehstart });
+    if (error) console.warn('Early-Adopter-Link nicht eingeloest', error);
+    else {
+      fruehstartVergessen();
+      if (konto.fruehstart != null) aufraeumen.fruehstart = null;
+      ergebnis.fruehstartAntwort = aus(FRUEHSTART_ANTWORTEN, data) ?? 'ungueltig';
+      neuLaden ||= ergebnis.fruehstartAntwort === 'ok';
+    }
+  }
+  if (Object.keys(aufraeumen).length > 0) void sb.auth.updateUser({ data: aufraeumen });
   const fuer = get().fuer;
-  if (antwort === 'ok' && fuer !== null) await get().laden(fuer, true);
-  set({ einladung: antwort, loestEin: false });
+  if (neuLaden && fuer !== null) await get().laden(fuer, true);
+  set({ ...ergebnis, loestEin: false });
 }

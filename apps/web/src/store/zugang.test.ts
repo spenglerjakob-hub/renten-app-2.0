@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { aboSichtbar, aboZusatz, deckt, tageBis, zugangAus, type Zugang } from './zugang';
+import {
+  aboSichtbar, aboZusatz, deckt, fruehstartVorbei, rueckmeldungFaellig, tageBis, zugangAus, type Zugang,
+} from './zugang';
 
 const TAG = 86_400_000;
 const jetzt = Date.parse('2026-10-12T12:00:00Z');
@@ -8,7 +10,8 @@ const in_ = (tage: number) => new Date(jetzt + tage * TAG).toISOString();
 /** Eine Antwort von `mein_zugang()`, wie sie aus der Datenbank kommt. */
 const roh = (x: Record<string, unknown> = {}) => ({
   paket: 'alles', quelle: 'vorab', bis: null, test_bis: null, abo_pflicht_ab: null, zahlung_bereit: false,
-  freizugang: null, betreiber: false, buero: null, buero_name: null, rolle: null, hat_platz: false, abo: null,
+  freizugang: null, betreiber: false, fruehstart: false, fruehstart_seit: null, fruehstart_bis: null,
+  letzte_rueckmeldung: null, buero: null, buero_name: null, rolle: null, hat_platz: false, abo: null,
   ...x,
 });
 const z = (x: Record<string, unknown> = {}) => zugangAus(roh(x)) as Zugang;
@@ -32,6 +35,19 @@ describe('zugangAus', () => {
     expect(zugangAus('alles')).toBeNull();
   });
 
+  it('liest den Early-Adopter-Stand', () => {
+    const a = z({
+      quelle: 'fruehstart', bis: in_(60), fruehstart: true, fruehstart_seit: in_(-30), fruehstart_bis: in_(60),
+      letzte_rueckmeldung: in_(-2),
+    });
+    expect(a).toMatchObject({
+      quelle: 'fruehstart', fruehstart: true, fruehstartSeit: in_(-30), fruehstartBis: in_(60), letzteRueckmeldung: in_(-2),
+    });
+    // Eine aeltere Antwort ohne die Felder: kein Early Adopter.
+    const alt = zugangAus({ paket: 'alles', quelle: 'vorab' }) as Zugang;
+    expect(alt).toMatchObject({ fruehstart: false, fruehstartSeit: null, fruehstartBis: null, letzteRueckmeldung: null });
+  });
+
   it('schaltet mit unbekannten Werten nichts frei', () => {
     const a = z({ paket: 'premium', quelle: 'geschenkt', betreiber: 'ja', rolle: 'chef' });
     expect(a.paket).toBeNull();
@@ -53,6 +69,50 @@ describe('deckt', () => {
   it('eine Testphase endet zu ihrem Zeitpunkt — auch im Zwischenspeicher', () => {
     expect(deckt(z({ quelle: 'test', bis: in_(1) }), 'rente', jetzt)).toBe(true);
     expect(deckt(z({ quelle: 'test', bis: in_(-0.01) }), 'rente', jetzt)).toBe(false);
+  });
+
+  it('die Early-Adopter-Zeit ebenso', () => {
+    expect(deckt(z({ quelle: 'fruehstart', bis: in_(1) }), 'ag', jetzt)).toBe(true);
+    expect(deckt(z({ quelle: 'fruehstart', bis: in_(-0.01) }), 'ag', jetzt)).toBe(false);
+  });
+});
+
+describe('Early Adopter', () => {
+  const fs = (x: Record<string, unknown> = {}) =>
+    z({ quelle: 'fruehstart', bis: in_(60), fruehstart: true, fruehstart_seit: in_(-10), fruehstart_bis: in_(60), ...x });
+
+  it('bittet erst vier Wochen nach dem Einloesen um Feedback', () => {
+    expect(rueckmeldungFaellig(fs(), jetzt)).toBe(false);
+    expect(rueckmeldungFaellig(fs({ fruehstart_seit: in_(-27) }), jetzt)).toBe(false);
+    expect(rueckmeldungFaellig(fs({ fruehstart_seit: in_(-29) }), jetzt)).toBe(true);
+  });
+
+  it('danach vier Wochen nach der letzten Rueckmeldung', () => {
+    expect(rueckmeldungFaellig(fs({ fruehstart_seit: in_(-60), letzte_rueckmeldung: in_(-5) }), jetzt)).toBe(false);
+    expect(rueckmeldungFaellig(fs({ fruehstart_seit: in_(-60), letzte_rueckmeldung: in_(-29) }), jetzt)).toBe(true);
+  });
+
+  it('vor dem Start ja, nach der kostenlosen Zeit und fuer andere Konten nicht', () => {
+    expect(rueckmeldungFaellig(fs({ quelle: 'vorab', bis: null, fruehstart_bis: null, fruehstart_seit: in_(-40) }), jetzt)).toBe(true);
+    expect(rueckmeldungFaellig(fs({ paket: null, quelle: null, fruehstart_seit: in_(-200), fruehstart_bis: in_(-3) }), jetzt)).toBe(false);
+    expect(rueckmeldungFaellig(z({ quelle: 'test', bis: in_(5) }), jetzt)).toBe(false);
+    // Ohne Beginn (aeltere Antwort): lieber nicht draengeln.
+    expect(rueckmeldungFaellig(fs({ fruehstart_seit: null }), jetzt)).toBe(false);
+  });
+
+  it('erkennt das Ende der kostenlosen Zeit', () => {
+    expect(fruehstartVorbei(fs(), jetzt)).toBe(false);
+    expect(fruehstartVorbei(fs({ paket: null, quelle: null, fruehstart_bis: in_(-3) }), jetzt)).toBe(true);
+    expect(fruehstartVorbei(fs({ quelle: 'vorab', fruehstart_bis: null }), jetzt)).toBe(false);
+    expect(fruehstartVorbei(z({ paket: null, quelle: null, test_bis: in_(-3) }), jetzt)).toBe(false);
+  });
+
+  it('sieht "Abo & Team" schon vor dem Start und liest dort seinen Stand', () => {
+    expect(aboSichtbar(fs({ quelle: 'vorab', bis: null, fruehstart_bis: null }))).toBe(true);
+    expect(aboZusatz(fs({ quelle: 'vorab', bis: null, fruehstart_bis: null }))).toBe('Early Adopter');
+    // aboZusatz rechnet mit der echten Uhr.
+    const bis = new Date(Date.now() + 9 * TAG - 60_000).toISOString();
+    expect(aboZusatz(fs({ bis, fruehstart_bis: bis }))).toBe('Early Adopter: noch 9 Tage');
   });
 });
 

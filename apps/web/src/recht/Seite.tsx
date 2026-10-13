@@ -125,7 +125,8 @@ function Datenschutz() {
       <P>
         Der JS-Rentenplaner rechnet Altersvorsorge durch — Renten, Steuern, Sozialabgaben und Verträge. Die
         Berechnung läuft vollständig in Ihrem Browser. Auf unseren Server gelangen Daten nur, wenn Sie ein
-        Konto nutzen, ein Szenario in Ihrem Konto speichern oder einen Vorsorge-Check an Ihren Berater senden.
+        Konto nutzen, ein Szenario in Ihrem Konto speichern, einen Vorsorge-Check an Ihren Berater senden oder
+        uns eine Rückmeldung schicken.
         Wir setzen keine Analyse-, Tracking- oder Werbedienste ein und laden keine Inhalte von Drittanbietern
         (etwa Schriftarten) nach.
       </P>
@@ -149,11 +150,15 @@ function Datenschutz() {
           (<code>rentenplaner.szenario.v1</code>),</li>
         <li>Zwischenstände des Vorsorge-Checks (<code>rentenplaner.check.v1…</code>),</li>
         <li>bei Anmeldung die Sitzung (<code>sb-…-auth-token</code>) und der Zeitpunkt Ihrer letzten Nutzung
-          (<code>rentenplaner.auth.aktiv</code>) — nach zwei Tagen ohne Nutzung werden Sie abgemeldet.</li>
+          (<code>rentenplaner.auth.aktiv</code>) — nach zwei Tagen ohne Nutzung werden Sie abgemeldet,</li>
+        <li>der zuletzt abgefragte Zugang Ihres Kontos (<code>rentenplaner.zugang.v1</code>) und weggeklickte
+          Hinweise (<code>rentenplaner.band.…</code>),</li>
+        <li>ein persönlicher Einladungs- oder Early-Adopter-Link, bis er nach Ihrer Anmeldung eingelöst ist
+          (<code>rentenplaner.einladung</code>, <code>rentenplaner.fruehstart</code>; höchstens 14 Tage).</li>
       </Liste>
       <P>
-        Diese Daten verlassen Ihr Gerät nicht. Sie können sie jederzeit über die Einstellungen Ihres Browsers
-        löschen.
+        Diese Daten verlassen Ihr Gerät nicht — bis auf den persönlichen Link, der zum Einlösen an unseren
+        Server geht. Sie können sie jederzeit über die Einstellungen Ihres Browsers löschen.
       </P>
 
       <H2>5. Konto und Anmeldung</H2>
@@ -215,14 +220,26 @@ function Datenschutz() {
         Versandt wird über unser Postfach bei [Hostinger].
       </P>
 
-      <H2>9. Weitere Seiten</H2>
+      <H2>9. Rückmeldungen</H2>
+      <P>
+        Über „Feedback geben“ können Sie uns eine Rückmeldung schicken: eine Bewertung mit Sternen, einen Text
+        oder beides. Gespeichert werden Bewertung, Text, die Seite, auf der Sie gerade waren, der Zeitpunkt und
+        Ihr Konto. Wir erhalten die Rückmeldung zusätzlich per E-Mail; haben Sie Rückfragen erlaubt, steht Ihre
+        E-Mail-Adresse als Antwortadresse darin. Wir nutzen Rückmeldungen nur, um den JS-Rentenplaner zu
+        verbessern. Rechtsgrundlage ist unser berechtigtes Interesse an der Weiterentwicklung (Art. 6 Abs. 1
+        lit. f DSGVO); für Early Adopter gehören Rückmeldungen zur Vereinbarung über die kostenlosen Monate
+        (Art. 6 Abs. 1 lit. b DSGVO). Gelöscht werden sie mit Ihrem Konto. Bitte schreiben Sie keine Angaben
+        über Ihre Kunden hinein.
+      </P>
+
+      <H2>10. Weitere Seiten</H2>
       <P>
         Die Seiten zum Altersvorsorgedepot, zum Zuschussmodell und zum Matching-Modell rechnen ausschließlich in
         Ihrem Browser und speichern nichts. „Beratung anfragen“ öffnet Ihr eigenes E-Mail-Programm; was Sie
         dort absenden, entscheiden Sie selbst.
       </P>
 
-      <H2>10. Empfänger und Auftragsverarbeiter</H2>
+      <H2>11. Empfänger und Auftragsverarbeiter</H2>
       <Liste>
         <li>
           <strong>Supabase Inc.</strong> (San Francisco, USA) — Datenbank, Anmeldung und Serverfunktionen.
@@ -237,9 +254,9 @@ function Datenschutz() {
         </li>
       </Liste>
 
-      <H2>11. Speicherdauer im Überblick</H2>
+      <H2>12. Speicherdauer im Überblick</H2>
       <Liste>
-        <li>Konto und gespeicherte Szenarien: bis zur Löschung des Kontos.</li>
+        <li>Konto, gespeicherte Szenarien und Rückmeldungen: bis zur Löschung des Kontos.</li>
         <li>
           Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
           90 Tage; Unterlagen eines nicht abgesendeten Checks bis zum Ablauf des Links.
@@ -248,7 +265,7 @@ function Datenschutz() {
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
 
-      <H2>12. Ihre Rechte</H2>
+      <H2>13. Ihre Rechte</H2>
       <P>
         Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
         der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21 DSGVO). Eine
@@ -260,7 +277,7 @@ function Datenschutz() {
         [zuständige Behörde am Sitz des Verantwortlichen].
       </P>
 
-      <H2>13. Datensicherheit</H2>
+      <H2>14. Datensicherheit</H2>
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen

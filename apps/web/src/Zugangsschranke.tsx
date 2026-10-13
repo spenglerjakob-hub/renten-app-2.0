@@ -5,15 +5,16 @@ import { useAuth } from './store/auth';
 import { deckt, useZugang, wirksam } from './store/zugang';
 import { supabase, supabaseKonfiguriert } from './lib/supabase';
 import { NUTZUNGSBEDINGUNGEN_FASSUNG } from './lib/nutzungsbedingungen';
-import { einladungAusAdresse, offeneEinladung } from './lib/einladung';
+import { einladungAusAdresse, fruehstartAusAdresse, offeneEinladung, offenerFruehstart } from './lib/einladung';
 import { Anmeldung } from './features/Anmeldung';
 import { Zustimmung } from './features/Zustimmung';
-import { EinladungsBand, VorschauBand, ZugangsBand } from './features/ZugangsBand';
+import { EinladungsBand, FruehstartBand, VorschauBand, ZugangsBand } from './features/ZugangsBand';
 import { Dialog } from './components/Dialog';
 
 // Selten gebraucht — erst laden, wenn es so weit ist.
 const Sperrseite = lazy(() => import('./features/Sperrseite').then((m) => ({ default: m.Sperrseite })));
 const AboTeam = lazy(() => import('./features/AboTeam').then((m) => ({ default: m.AboTeam })));
+const Rueckmeldung = lazy(() => import('./features/Rueckmeldung').then((m) => ({ default: m.Rueckmeldung })));
 
 /**
  * Laesst den Rechner nur angemeldeten Nutzern durch.
@@ -43,10 +44,14 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
 
   useEffect(() => { void initialisieren(); }, [initialisieren]);
 
-  // Einladung in ein Buero (`/?einladung=…`): merken, eingeloest wird nach der Anmeldung.
-  const [eingeladen] = useState(() => {
-    if (typeof window !== 'undefined') einladungAusAdresse();
-    return offeneEinladung() !== null;
+  // Persoenliche Links — Einladung ins Buero, Early Adopter: merken,
+  // eingeloest wird nach der Anmeldung.
+  const [links] = useState(() => {
+    if (typeof window !== 'undefined') {
+      einladungAusAdresse();
+      fruehstartAusAdresse();
+    }
+    return { einladung: offeneEinladung() !== null, fruehstart: offenerFruehstart() !== null };
   });
 
   // Abgemeldet: Der Zugang des vorigen Kontos gilt nicht mehr.
@@ -90,7 +95,7 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
   // auf, obwohl man angemeldet ist.
   if (status === 'prueft') return <Moment />;
 
-  if (status !== 'angemeldet') return <Anmeldung einladung={eingeladen} />;
+  if (status !== 'angemeldet') return <Anmeldung einladung={links.einladung} fruehstart={links.fruehstart} />;
 
   if (zugestimmt === null) return <Moment />;
   if (!zugestimmt) return <Zustimmung onFertig={() => setZugestimmt(true)} />;
@@ -116,7 +121,7 @@ function Moment() {
 function PaketPruefung({ bereich, children }: { bereich: Bereich; children: ReactNode }) {
   const konto = useAuth((s) => s.email) ?? '';
   const laden = useZugang((s) => s.laden);
-  const einladungEinloesen = useZugang((s) => s.einladungEinloesen);
+  const linksEinloesen = useZugang((s) => s.linksEinloesen);
   const oeffneFenster = useZugang((s) => s.oeffneFenster);
   const z = useZugang((s) => (s.fuer === konto ? wirksam(s) : null));
   const frisch = useZugang((s) => s.fuer === konto && (s.stand === 'da' || s.stand === 'fehler'));
@@ -124,8 +129,8 @@ function PaketPruefung({ bereich, children }: { bereich: Bereich; children: Reac
 
   useEffect(() => {
     void laden(konto);
-    void einladungEinloesen();
-  }, [konto, laden, einladungEinloesen]);
+    void linksEinloesen();
+  }, [konto, laden, linksEinloesen]);
 
   // `/?abo` oeffnet das Fenster "Abo & Team" — etwa aus einer Mail oder nach der Kasse.
   useEffect(() => {
@@ -145,6 +150,7 @@ function PaketPruefung({ bereich, children }: { bereich: Bereich; children: Reac
     <>
       <VorschauBand />
       <EinladungsBand />
+      <FruehstartBand />
       {offen ? (
         <>
           <ZugangsBand />
@@ -156,7 +162,20 @@ function PaketPruefung({ bereich, children }: { bereich: Bereich; children: Reac
         </Suspense>
       )}
       <AboFenster />
+      <RueckmeldungsFenster />
     </>
+  );
+}
+
+function RueckmeldungsFenster() {
+  const offen = useZugang((s) => s.rueckmeldungOffen);
+  const schliessen = useZugang((s) => s.schliesseRueckmeldung);
+  return (
+    <Dialog offen={offen} titel="Feedback geben" beschreibung="Was hilft Ihnen, was fehlt, was stört? Jede Rückmeldung lesen wir selbst." onSchliessen={schliessen}>
+      <Suspense fallback={<p className="text-sm text-slate-500">Einen Moment …</p>}>
+        <Rueckmeldung />
+      </Suspense>
+    </Dialog>
   );
 }
 

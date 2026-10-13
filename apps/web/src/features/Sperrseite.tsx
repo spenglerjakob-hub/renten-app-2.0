@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Download, LineChart, LogOut, Users } from 'lucide-react';
-import { paketVon, preisJeNutzer, type Bereich } from '@renten/schema/preise';
+import {
+  FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT, paketVon, preisJeNutzer, type Bereich,
+} from '@renten/schema/preise';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { ARBEITGEBER, KUNDEN, type Seite } from '../components/Seitenleiste';
@@ -9,14 +11,15 @@ import { supabase } from '../lib/supabase';
 import { zumPortal, zurKasse, useWeiterleitung } from '../lib/abo';
 import { bueroVerlassen, mitgliederLaden } from '../lib/team';
 import { useAuth } from '../store/auth';
-import { aboAktiv, datum, useZugang, type Zugang } from '../store/zugang';
+import { aboAktiv, datum, fruehstartVorbei, useZugang, type Zugang } from '../store/zugang';
 import { KontoLoeschen } from './KontoLoeschen';
 
 /**
  * Statt der Seite, wenn das Paket diesen Teil nicht abdeckt.
  *
  * DREI FAELLE:
- *  - Kein Paket (Testphase vorbei, Abo beendet): Paket waehlen und buchen.
+ *  - Kein Paket (Testphase oder Early-Adopter-Zeit vorbei, Abo beendet):
+ *    Paket waehlen und buchen — Early Adopter mit Dank und Rabatt.
  *  - Mitglied eines Bueros ohne Platz oder ohne laufendes Abo: an den
  *    Inhaber wenden — oder austreten und selbst buchen.
  *  - Ein Paket fuer den anderen Teil (nur Rente oder nur AG): die
@@ -79,15 +82,21 @@ function Kasten({ children }: { children: ReactNode }) {
   return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">{children}</section>;
 }
 
-/** Kein Paket: Testphase vorbei oder Abo beendet. */
+/** Kein Paket: Testphase oder Early-Adopter-Zeit vorbei, Abo beendet. */
 function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const { laedt, fehler, los } = useWeiterleitung();
   const aboBeendet = z.rolle === 'inhaber' && z.abo !== null;
+  const fruehstarter = !aboBeendet && fruehstartVorbei(z);
   const titel = aboBeendet ? 'Ihr Abo ist beendet'
+    : fruehstarter ? 'Ihre Early-Adopter-Zeit ist vorbei — danke!'
     : z.testBis ? 'Ihre Testphase ist abgelaufen'
     : 'Für Ihr Konto ist kein Paket aktiv';
   const text = aboBeendet
     ? 'Wählen Sie ein Paket, um weiterzuarbeiten. Ihre gespeicherten Szenarien und Ihr Team sind noch da.'
+    : fruehstarter
+      ? `Danke, dass Sie den JS-Rentenplaner von Anfang an begleitet haben! Ihre ${FRUEHSTART_MONATE} kostenlosen `
+        + `Monate endeten am ${datum(z.fruehstartBis)}. Als Dankeschön erhalten Sie ${FRUEHSTART_RABATT_PROZENT} % `
+        + 'Rabatt auf das erste Jahr, wenn Sie jetzt ein Paket wählen — Ihre gespeicherten Szenarien sind noch da.'
     : `${z.testBis ? `Ihre kostenlose Testphase endete am ${datum(z.testBis)}. ` : ''}`
       + 'Wählen Sie ein Paket, um weiterzuarbeiten — Ihre gespeicherten Szenarien sind noch da.';
   return (

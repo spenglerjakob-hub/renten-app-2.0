@@ -1,12 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { Eye, X } from 'lucide-react';
+import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT } from '@renten/schema/preise';
 import {
-  aboAktiv, useZugang, wirksam, tageBis, tage, datum, type EinladungsAntwort, type Zugang,
+  aboAktiv, rueckmeldungFaellig, useZugang, wirksam, tageBis, tage, datum,
+  type EinladungsAntwort, type FruehstartAntwort, type Zugang,
 } from '../store/zugang';
 
 /**
  * Baender ueber der Seite: Testphase, offene Zahlung, Kuendigung, die
- * Ankuendigung des Abos, die Antwort auf eine Einladung und die Vorschau des
+ * Ankuendigung des Abos, Early Adopter (Ende naht, Bitte um Feedback), die
+ * Antworten auf Einladung und Early-Adopter-Link und die Vorschau des
  * Betreibers.
  *
  * Bewusst schmal und wegklickbar (fuer diese Sitzung): Ein Berater mit dem
@@ -71,20 +74,27 @@ function useWeggeklickt() {
   };
 }
 
-/** Das Band zum Zugang: Zahlung, Kuendigung, Testphase, Ankuendigung. */
+/**
+ * Das Band zum Zugang: Zahlung, Kuendigung, Testphase, Early Adopter,
+ * Ankuendigung. Treffen mehrere zu, steht das wichtigste da; wer es
+ * wegklickt, sieht das naechste.
+ */
 export function ZugangsBand() {
   const z = useZugang(wirksam);
   const oeffneFenster = useZugang((s) => s.oeffneFenster);
+  const oeffneRueckmeldung = useZugang((s) => s.oeffneRueckmeldung);
   const { istWeg, wegklicken } = useWeggeklickt();
   if (!z) return null;
 
-  const b = bandFuer(z);
-  if (!b || istWeg(b.schluessel)) return null;
+  const b = baenderFuer(z).find((x) => !istWeg(x.schluessel));
+  if (!b) return null;
   return (
     <Band
       ton={b.ton}
       onWeg={() => wegklicken(b.schluessel, b.dauerhaft)}
-      knopf={b.knopf ? { text: b.knopf, onKlick: oeffneFenster } : undefined}
+      knopf={b.knopf
+        ? { text: b.knopf.text, onKlick: b.knopf.ziel === 'feedback' ? oeffneRueckmeldung : oeffneFenster }
+        : undefined}
     >
       {b.text}
     </Band>
@@ -95,62 +105,96 @@ interface BandInhalt {
   schluessel: string;
   ton: keyof typeof TON;
   text: ReactNode;
-  knopf?: string;
+  /** Oeffnet "Abo & Team" oder "Feedback geben" */
+  knopf?: { text: string; ziel: 'abo' | 'feedback' };
   dauerhaft?: boolean;
 }
 
-function bandFuer(z: Zugang): BandInhalt | null {
+const zumAbo = (text: string) => ({ text, ziel: 'abo' as const });
+
+/** Alle Baender, die gerade zutreffen — das wichtigste zuerst. */
+function baenderFuer(z: Zugang): BandInhalt[] {
+  const liste: BandInhalt[] = [];
   const inhaber = z.rolle === 'inhaber';
   // Zahlung und Kuendigung gehen den Inhaber immer an — auch wenn sein eigener
   // Zugang frei ist (Bestandskonto mit Team-Abo). Mitglieder nur, wenn ihr
   // Zugang am Abo haengt.
   const betrifft = inhaber || z.quelle === 'abo';
   if (betrifft && z.abo?.status === 'past_due') {
-    return inhaber
+    liste.push(inhaber
       ? {
-          schluessel: 'rentenplaner.band.zahlung', ton: 'fehler', knopf: 'Zahlungsdaten prüfen',
+          schluessel: 'rentenplaner.band.zahlung', ton: 'fehler', knopf: zumAbo('Zahlungsdaten prüfen'),
           text: <><strong>Die letzte Zahlung für Ihr Abo ist fehlgeschlagen.</strong> Bitte prüfen Sie Ihre Zahlungsdaten — sonst endet der Zugang für Ihr Büro.</>,
         }
       : {
           schluessel: 'rentenplaner.band.zahlung', ton: 'fehler',
           text: <><strong>Beim Abo Ihres Büros ist eine Zahlung offen.</strong> Bitte sagen Sie der Person Bescheid, die das Abo verwaltet.</>,
-        };
+        });
   }
   if (betrifft && z.abo && aboAktiv(z.abo.status) && z.abo.kuendigungZum) {
     const am = datum(z.abo.kuendigungZum);
-    return inhaber
+    liste.push(inhaber
       ? {
-          schluessel: `rentenplaner.band.kuendigung.${z.abo.kuendigungZum}`, ton: 'neutral', knopf: 'Abo fortsetzen',
+          schluessel: `rentenplaner.band.kuendigung.${z.abo.kuendigungZum}`, ton: 'neutral', knopf: zumAbo('Abo fortsetzen'),
           text: <>Ihr Abo ist gekündigt und endet am <strong>{am}</strong>.</>,
         }
       : {
           schluessel: `rentenplaner.band.kuendigung.${z.abo.kuendigungZum}`, ton: 'neutral',
           text: <>Das Abo Ihres Büros endet am <strong>{am}</strong>.</>,
-        };
+        });
   }
   if (z.quelle === 'test') {
     const n = tageBis(z.bis);
-    return {
-      schluessel: `rentenplaner.band.test.${z.bis}`, ton: n <= 3 ? 'warnung' : 'info', knopf: 'Paket wählen',
+    liste.push({
+      schluessel: `rentenplaner.band.test.${z.bis}`, ton: n <= 3 ? 'warnung' : 'info', knopf: zumAbo('Paket wählen'),
       text: <>Kostenlose Testphase: noch <strong>{tage(n)}</strong> (bis {datum(z.bis)}).</>,
-    };
+    });
   }
-  // Angekuendigt, aber noch nicht gestartet.
-  if (z.quelle === 'vorab' && z.aboPflichtAb && Date.parse(z.aboPflichtAb) > Date.now() && !z.betreiber) {
-    const ab = datum(z.aboPflichtAb);
-    if (z.freizugang) {
-      return {
-        schluessel: `rentenplaner.band.ankuendigung.${z.aboPflichtAb}`, ton: 'gut', dauerhaft: true,
-        text: <>Ab dem {ab} gibt es den JS-Rentenplaner im Abo. <strong>Ihr Konto bleibt kostenlos</strong> — Sie müssen nichts tun.</>,
-      };
-    }
-    if (z.abo) return null;
+  // Early Adopter: die letzten zwei Wochen der kostenlosen Zeit.
+  if (z.quelle === 'fruehstart' && tageBis(z.bis) <= 14) {
+    const n = tageBis(z.bis);
+    liste.push({
+      schluessel: `rentenplaner.band.fruehstart-ende.${z.bis}`, ton: n <= 3 ? 'warnung' : 'info', knopf: zumAbo('Pakete ansehen'),
+      text: <>Ihre Early-Adopter-Zeit endet am <strong>{datum(z.bis)}</strong> (noch {tage(n)}). Als Dankeschön
+        erhalten Sie <strong>{FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr</strong>, wenn Sie danach ein Paket buchen.</>,
+    });
+  }
+  const ankuendigung = ankuendigungFuer(z);
+  if (ankuendigung) liste.push(ankuendigung);
+  if (rueckmeldungFaellig(z)) {
+    liste.push({
+      schluessel: `rentenplaner.band.rueckmeldung.${z.letzteRueckmeldung ?? z.fruehstartSeit}`, ton: 'info',
+      knopf: { text: 'Feedback geben', ziel: 'feedback' },
+      text: <><strong>{z.letzteRueckmeldung ? 'Wie läuft es mit dem JS-Rentenplaner?' : 'Wie gefällt Ihnen der JS-Rentenplaner bisher?'}</strong>{' '}
+        Als Early Adopter helfen Sie uns mit Ihrer Rückmeldung — ein paar Sätze genügen.</>,
+    });
+  }
+  return liste;
+}
+
+/** Angekuendigt, aber noch nicht gestartet. */
+function ankuendigungFuer(z: Zugang): BandInhalt | null {
+  if (!(z.quelle === 'vorab' && z.aboPflichtAb && Date.parse(z.aboPflichtAb) > Date.now() && !z.betreiber)) return null;
+  const schluessel = `rentenplaner.band.ankuendigung.${z.aboPflichtAb}`;
+  const ab = datum(z.aboPflichtAb);
+  if (z.freizugang) {
     return {
-      schluessel: `rentenplaner.band.ankuendigung.${z.aboPflichtAb}`, ton: 'info', knopf: 'Pakete ansehen',
-      text: <>Ab dem <strong>{ab}</strong> braucht der JS-Rentenplaner ein Abo{z.testBis ? <> — bis zum {datum(z.testBis)} testen Sie kostenlos weiter</> : null}.</>,
+      schluessel, ton: 'gut', dauerhaft: true,
+      text: <>Ab dem {ab} gibt es den JS-Rentenplaner im Abo. <strong>Ihr Konto bleibt kostenlos</strong> — Sie müssen nichts tun.</>,
     };
   }
-  return null;
+  if (z.fruehstart) {
+    return {
+      schluessel, ton: 'gut', dauerhaft: true,
+      text: <>Ab dem {ab} gibt es den JS-Rentenplaner im Abo. <strong>Als Early Adopter nutzen Sie ihn danach noch
+        {' '}{FRUEHSTART_MONATE} Monate kostenlos</strong>{z.fruehstartBis ? <> — bis zum {datum(z.fruehstartBis)}</> : null}.</>,
+    };
+  }
+  if (z.abo) return null;
+  return {
+    schluessel, ton: 'info', knopf: zumAbo('Pakete ansehen'),
+    text: <>Ab dem <strong>{ab}</strong> braucht der JS-Rentenplaner ein Abo{z.testBis ? <> — bis zum {datum(z.testBis)} testen Sie kostenlos weiter</> : null}.</>,
+  };
 }
 
 const EINLADUNG: Record<Exclude<EinladungsAntwort, 'ok' | 'anderes_buero'>, string> = {
@@ -185,6 +229,41 @@ export function EinladungsBand() {
       {text}
     </Band>
   );
+}
+
+const FRUEHSTART: Record<Exclude<FruehstartAntwort, 'ok'>, { ton: keyof typeof TON; text: string }> = {
+  schon_dabei: { ton: 'neutral', text: 'Sie sind bereits als Early Adopter dabei — dieser Link wird nicht mehr gebraucht.' },
+  frei: { ton: 'neutral', text: 'Ihr Konto ist ohnehin dauerhaft kostenlos — den Early-Adopter-Link brauchen Sie nicht.' },
+  ungueltig: {
+    ton: 'warnung',
+    text: 'Dieser Early-Adopter-Link gilt nicht — er wurde schon verwendet oder zurückgezogen. Bitte fragen Sie nach einem neuen Link.',
+  },
+  abgelaufen: {
+    ton: 'warnung',
+    text: 'Dieser Early-Adopter-Link ist abgelaufen; die Links gelten 30 Tage. Bitte fragen Sie nach einem neuen Link.',
+  },
+};
+
+/** Die Antwort auf einen eingeloesten Early-Adopter-Link. */
+export function FruehstartBand() {
+  const antwort = useZugang((s) => s.fruehstartAntwort);
+  const gesehen = useZugang((s) => s.fruehstartGesehen);
+  const bis = useZugang((s) => s.zugang?.fruehstartBis ?? null);
+  if (!antwort) return null;
+
+  if (antwort === 'ok') {
+    return (
+      <Band ton="gut" onWeg={gesehen}>
+        <strong>Willkommen als Early Adopter!</strong>{' '}
+        {bis
+          ? <>Sie nutzen alle Funktionen bis zum <strong>{datum(bis)}</strong> kostenlos.</>
+          : <>Sie nutzen alle Funktionen <strong>{FRUEHSTART_MONATE} Monate kostenlos</strong> — gezählt ab dem Start des Abos.</>}
+        {' '}Dafür freuen wir uns über Ihre Rückmeldungen, jederzeit über „Feedback geben“ in der Übersicht.
+      </Band>
+    );
+  }
+  const { ton, text } = FRUEHSTART[antwort];
+  return <Band ton={ton} onWeg={gesehen}>{text}</Band>;
 }
 
 /** Nur fuer den Betreiber: So sieht es ein Kunde. */

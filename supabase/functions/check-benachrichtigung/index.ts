@@ -47,7 +47,7 @@ function adminSchluessel(): string {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
-/** Fuer Protokolle: `spe…@yahoo.de` statt der vollen Adresse. */
+/** Fuer Protokolle: `max…@example.de` statt der vollen Adresse. */
 const maskiert = (adresse: string) => adresse.replace(/^(.{0,3}).*(@.*)$/, '$1…$2');
 
 const escapeHtml = (s: string) =>

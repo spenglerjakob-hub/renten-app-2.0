@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Users } from 'lucide-react';
+import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Sparkles, Users } from 'lucide-react';
+import { FRUEHSTART_MONATE } from '@renten/schema/preise';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { useAuth, type MailLink } from '../store/auth';
@@ -15,11 +16,11 @@ type Maske = 'anmelden' | 'registrieren' | 'vergessen';
  * Maske entscheidet das nicht selbst. Dazu die Seite hinter einem Link aus
  * einer Mail (`status === 'linkEinloesen'`), siehe `LinkEinloesen`.
  *
- * `einladung`: Der Nutzer kam ueber den Einladungslink eines Bueros. Dann
- * steht das oben, und die Maske beginnt mit der Registrierung — die meisten
- * Eingeladenen haben noch kein Konto.
+ * `einladung` / `fruehstart`: Der Nutzer kam ueber den Einladungslink eines
+ * Bueros bzw. einen Early-Adopter-Link. Dann steht das oben, und die Maske
+ * beginnt mit der Registrierung — die meisten haben noch kein Konto.
  */
-export function Anmeldung({ einladung = false }: { einladung?: boolean }) {
+export function Anmeldung({ einladung = false, fruehstart = false }: { einladung?: boolean; fruehstart?: boolean }) {
   const {
     status, laedt, meldung, link, unbestaetigt,
     registrieren, anmelden, passwortVergessen, passwortSetzen, meldungLoeschen,
@@ -28,7 +29,7 @@ export function Anmeldung({ einladung = false }: { einladung?: boolean }) {
 
   // `/?registrieren` (Knopf "Kostenlos testen" der Preisseite) oeffnet gleich die Registrierung.
   const [maske, setMaske] = useState<Maske>(() =>
-    (einladung || new URLSearchParams(window.location.search).has('registrieren') ? 'registrieren' : 'anmelden'));
+    (einladung || fruehstart || new URLSearchParams(window.location.search).has('registrieren') ? 'registrieren' : 'anmelden'));
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [passwort2, setPasswort2] = useState('');
@@ -88,6 +89,17 @@ export function Anmeldung({ einladung = false }: { einladung?: boolean }) {
                 ? 'Mit E-Mail-Adresse und Passwort — mehr brauchen wir nicht.'
                 : 'Wir schicken Ihnen einen Link, mit dem Sie ein neues Passwort vergeben können.'}
         </p>
+
+        {fruehstart && !passwortNeu && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm leading-relaxed text-emerald-950">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+            <span>
+              <strong>Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
+              kostenlos — dafür freuen wir uns über Ihre Rückmeldungen. Legen Sie ein Konto an oder melden Sie sich
+              mit Ihrem bestehenden an.
+            </span>
+          </div>
+        )}
 
         {einladung && !passwortNeu && (
           <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">

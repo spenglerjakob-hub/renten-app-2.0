@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -25,7 +25,7 @@ import { Konto } from './features/Konto';
 import { CheckAnfragen } from './features/CheckAnfragen';
 import { useCheckAnfragen } from './store/check-anfragen';
 import { useAuth } from './store/auth';
-import { aboSichtbar, aboZusatz, useZugang, wirksam } from './store/zugang';
+import { aboSichtbar, aboZusatz, rueckmeldungFaellig, useZugang, wirksam } from './store/zugang';
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Loesungen } from './features/Loesungen';
@@ -211,9 +211,10 @@ export default function App() {
     der Seitenleiste.
   */
   const checkMoeglich = supabaseKonfiguriert && Boolean(angemeldet);
-  // "Abo & Team" — das Fenster selbst gehoert der Zugangsschranke (fuer alle Seiten).
+  // "Abo & Team" und "Feedback geben" — beide Fenster gehoeren der Zugangsschranke (fuer alle Seiten).
   const zugang = useZugang(wirksam);
   const oeffneAbo = useZugang((s) => s.oeffneFenster);
+  const oeffneRueckmeldung = useZugang((s) => s.oeffneRueckmeldung);
   const eingangMarke = neueEingaenge > 0 ? `${neueEingaenge} eingegangen` : undefined;
   const schliesseKonto = useCallback(() => setKontoOffen(false), []);
   const schliesseCheck = useCallback(() => setCheckOffen(false), []);
@@ -355,6 +356,13 @@ export default function App() {
       zusatz: aboZusatz(zugang),
       symbol: <CreditCard className="h-4 w-4" aria-hidden />,
       onOeffnen: oeffneAbo,
+    }] : []),
+    ...(checkMoeglich ? [{
+      text: 'Feedback geben',
+      zusatz: zugang?.fruehstart ? 'Als Early Adopter: Ihre Meinung zählt' : 'Was hilft, was fehlt, was stört?',
+      symbol: <MessageSquare className="h-4 w-4" aria-hidden />,
+      marke: zugang && rueckmeldungFaellig(zugang) ? 'fällig' : undefined,
+      onOeffnen: oeffneRueckmeldung,
     }] : []),
   ];
 

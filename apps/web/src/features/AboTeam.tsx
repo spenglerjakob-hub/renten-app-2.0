@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Copy, Link2 } from 'lucide-react';
-import { paketVon } from '@renten/schema/preise';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Link2, MessageSquare } from 'lucide-react';
+import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT, paketVon } from '@renten/schema/preise';
+import { LinkFeld } from '../components/LinkFeld';
 import { PaketBuchung } from '../components/PaketWahl';
+import { Sicher } from '../components/Sicher';
 import { zumPortal, zurKasse, useWeiterleitung } from '../lib/abo';
 import { einladungsLink } from '../lib/einladung';
 import {
@@ -10,13 +12,17 @@ import {
 } from '../lib/team';
 import { useAuth } from '../store/auth';
 import {
-  aboAktiv, datum, tage, tageBis, useZugang, wirksam, type AboAngaben, type Vorschau, type Zugang,
+  aboAktiv, datum, fruehstartVorbei, tage, tageBis, useZugang, wirksam, type AboAngaben, type Vorschau, type Zugang,
 } from '../store/zugang';
+
+// Nur der Betreiber braucht es — Kunden laden es nicht mit.
+const BetreiberFruehstart = lazy(() => import('./BetreiberFruehstart').then((m) => ({ default: m.BetreiberFruehstart })));
 
 /**
  * Das Fenster "Abo & Team": Stand des Zugangs, das Buero mit Kollegen und
- * Einladungen, das Abo verwalten oder buchen — und fuer den Betreiber eine
- * Vorschau, wie Kunden die Seite sehen.
+ * Einladungen, das Abo verwalten oder buchen, fuer Early Adopter die
+ * Rueckmeldungen — und fuer den Betreiber eine Vorschau, wie Kunden die Seite
+ * sehen, die Early-Adopter-Links und alle Rueckmeldungen.
  *
  * Gebucht und verwaltet wird bei Stripe (Kasse und Kundenportal); hier
  * steht nur, was der Server ueber das Abo weiss.
@@ -44,6 +50,7 @@ export function AboTeam() {
   return (
     <div className="space-y-6">
       <Status z={z} />
+      {z.fruehstart && <IhreRueckmeldungen z={z} />}
       {z.buero !== null && <Buero z={z} vorschau={vorschau} />}
       {z.rolle === 'inhaber' && aboLaeuft && z.abo && <AboVerwalten abo={z.abo} bereit={z.zahlungBereit} vorschau={vorschau} />}
       {z.rolle !== 'mitglied' && !aboLaeuft && <Buchen z={z} vorschau={vorschau} />}
@@ -64,7 +71,14 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
 function Status({ z }: { z: Zugang }) {
   let titel: string;
   let text: string;
-  if (z.quelle === 'vorab') {
+  if (z.quelle === 'vorab' && z.fruehstart && !z.freizugang) {
+    titel = 'Early Adopter';
+    text = z.aboPflichtAb
+      ? `Ab dem ${datum(z.aboPflichtAb)} gibt es den JS-Rentenplaner im Abo — Sie nutzen ihn danach noch `
+        + `${FRUEHSTART_MONATE} Monate kostenlos, bis zum ${datum(z.fruehstartBis)}.`
+      : `Sobald das Abo startet, nutzen Sie alle Funktionen noch ${FRUEHSTART_MONATE} Monate kostenlos. `
+        + 'Bis dahin bleibt alles wie bisher.';
+  } else if (z.quelle === 'vorab') {
     titel = z.aboPflichtAb ? `Abo ab dem ${datum(z.aboPflichtAb)}` : 'Noch ohne Abo-Pflicht';
     text = !z.aboPflichtAb ? 'Alle Konten nutzen den JS-Rentenplaner wie bisher.'
       : z.freizugang ? 'Ihr Konto bleibt kostenlos — Sie müssen nichts tun.'
@@ -78,9 +92,17 @@ function Status({ z }: { z: Zugang }) {
   } else if (z.quelle === 'test') {
     titel = `Testphase: noch ${tage(tageBis(z.bis))}`;
     text = `Bis zum ${datum(z.bis)} nutzen Sie alle Funktionen kostenlos. Danach brauchen Sie ein Paket.`;
+  } else if (z.quelle === 'fruehstart') {
+    titel = `Early Adopter: noch ${tage(tageBis(z.bis))}`;
+    text = `Bis zum ${datum(z.bis)} nutzen Sie alle Funktionen kostenlos. Danach erhalten Sie als Dankeschön `
+      + `${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr.`;
   } else if (z.quelle === 'abo' && z.paket) {
     titel = `Paket „${paketVon(z.paket).name}“`;
     text = z.rolle === 'mitglied' ? 'Über das Abo Ihres Büros.' : 'Über Ihr Abo.';
+  } else if (fruehstartVorbei(z) && z.rolle !== 'mitglied') {
+    titel = 'Ihre Early-Adopter-Zeit ist vorbei';
+    text = `Danke, dass Sie dabei waren! Ihre kostenlose Zeit endete am ${datum(z.fruehstartBis)}. Als Dankeschön `
+      + `erhalten Sie ${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr, wenn Sie ein Paket buchen.`;
   } else {
     titel = 'Kein Paket aktiv';
     text = z.rolle === 'mitglied'
@@ -95,69 +117,29 @@ function Status({ z }: { z: Zugang }) {
   );
 }
 
+/** Early Adopter: die Bitte um Rueckmeldungen und wann zuletzt eine kam. */
+function IhreRueckmeldungen({ z }: { z: Zugang }) {
+  const oeffneRueckmeldung = useZugang((s) => s.oeffneRueckmeldung);
+  return (
+    <Abschnitt titel="Ihre Rückmeldungen">
+      <p className="text-sm leading-relaxed text-slate-600">
+        Als Early Adopter helfen Sie mit Ihren Rückmeldungen, den JS-Rentenplaner besser zu machen — wir bitten
+        etwa alle vier Wochen darum.{' '}
+        {z.letzteRueckmeldung
+          ? <>Ihre letzte kam am <strong className="text-slate-800">{datum(z.letzteRueckmeldung)}</strong>.</>
+          : 'Wir freuen uns auf Ihre erste.'}
+      </p>
+      <button type="button" onClick={oeffneRueckmeldung}
+        className="mt-2 flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        <MessageSquare className="h-4 w-4" aria-hidden /> Feedback geben
+      </button>
+    </Abschnitt>
+  );
+}
+
 function Hinweis({ fehler }: { fehler: string | null }) {
   if (!fehler) return null;
   return <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>;
-}
-
-/** Zwei Klicks fuer alles, was sich nicht rueckgaengig machen laesst. */
-function Sicher({ text, frage, ja, onJa, deaktiviert = false }: {
-  text: string; frage: string; ja: string; onJa: () => Promise<void>; deaktiviert?: boolean;
-}) {
-  const [offen, setOffen] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
-  if (!offen) {
-    return (
-      <button type="button" onClick={() => setOffen(true)} disabled={deaktiviert}
-        className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-        {text}
-      </button>
-    );
-  }
-  return (
-    <span className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs">
-      <span className="font-bold text-slate-700">{frage}</span>
-      <button type="button" disabled={laeuft}
-        onClick={async () => { setLaeuft(true); await onJa(); setLaeuft(false); setOffen(false); }}
-        className="rounded-md bg-slate-800 px-2 py-1 font-bold text-white hover:bg-slate-700 disabled:opacity-50">
-        {ja}
-      </button>
-      <button type="button" onClick={() => setOffen(false)}
-        className="rounded-md border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-50">
-        Abbrechen
-      </button>
-    </span>
-  );
-}
-
-function LinkFeld({ link, neu }: { link: string; neu: boolean }) {
-  const [kopiert, setKopiert] = useState(false);
-  const feld = useRef<HTMLInputElement>(null);
-  const kopieren = async () => {
-    try {
-      await navigator.clipboard.writeText(link);
-      setKopiert(true);
-      window.setTimeout(() => setKopiert(false), 2000);
-    } catch {
-      // Ohne Zugriff auf die Zwischenablage: markieren, dann kopiert man selbst.
-      feld.current?.select();
-    }
-  };
-  return (
-    <div className="flex w-full gap-1.5">
-      <input
-        ref={feld} readOnly value={link} aria-label="Einladungslink" onFocus={(e) => e.currentTarget.select()}
-        className={`min-w-0 flex-1 rounded-md border px-2 py-1.5 font-mono text-xs text-slate-700 ${
-          neu ? 'border-emerald-400 bg-emerald-50' : 'border-slate-300 bg-white'
-        }`}
-      />
-      <button type="button" onClick={() => void kopieren()}
-        className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50">
-        {kopiert ? <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-        {kopiert ? 'Kopiert' : 'Kopieren'}
-      </button>
-    </div>
-  );
 }
 
 const fehlgeschlagen = 'Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.';
@@ -312,9 +294,14 @@ function AboVerwalten({ abo, bereit, vorschau }: { abo: AboAngaben; bereit: bool
 
 function Buchen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const { laedt, fehler, los } = useWeiterleitung();
+  const dank = `Wenn Sie danach buchen, erhalten Sie als Dankeschön ${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr.`;
   const hinweis = z.freizugang
     ? 'Ihr eigenes Konto bleibt kostenlos. Ein Abo brauchen Sie nur, um Kolleginnen und Kollegen in Ihr Büro '
       + 'zu holen — Ihr eigener Platz zählt dabei mit.'
+    : z.quelle === 'fruehstart' || (z.quelle === 'vorab' && z.fruehstart)
+      ? `Als Early Adopter brauchen Sie ${z.fruehstartBis ? `bis zum ${datum(z.fruehstartBis)}` : 'bis zum Ende Ihrer kostenlosen Monate'} kein Paket. ${dank}`
+    : fruehstartVorbei(z)
+      ? `Als Dankeschön für Ihre Zeit als Early Adopter erhalten Sie ${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr.`
     : z.quelle === 'vorab' ? 'Sie können schon jetzt buchen; berechnet wird ab der Buchung.'
     : null;
   return (
@@ -342,7 +329,12 @@ function vorschauen(echt: Zugang): Vorschau[] {
     ...echt,
     paket: null, quelle: null, bis: null, testBis: null, aboPflichtAb: inTagen(-30), freizugang: null,
     betreiber: false, buero: null, bueroName: null, rolle: null, hatPlatz: false, abo: null,
+    fruehstart: false, fruehstartSeit: null, fruehstartBis: null, letzteRueckmeldung: null,
   };
+  const fruehstart = (seit: number, bis: number, letzte: number | null): Partial<Zugang> => ({
+    fruehstart: true, fruehstartSeit: inTagen(seit), fruehstartBis: inTagen(bis),
+    letzteRueckmeldung: letzte === null ? null : inTagen(letzte),
+  });
   const buero = { buero: 'vorschau', bueroName: 'Muster Finanz GmbH' };
   const abo = (x: Partial<AboAngaben> = {}): AboAngaben => ({
     paket: 'alles', intervall: 'monat', plaetze: 3, belegt: 2, status: 'active',
@@ -366,6 +358,18 @@ function vorschauen(echt: Zugang): Vorschau[] {
     {
       titel: 'Abo gekündigt',
       zugang: { ...basis, ...buero, paket: 'alles', quelle: 'abo', rolle: 'inhaber', hatPlatz: true, abo: abo({ kuendigungZum: inTagen(18) }), bis: inTagen(18) },
+    },
+    {
+      titel: 'Early Adopter, Feedback fällig',
+      zugang: { ...basis, paket: 'alles', quelle: 'fruehstart', bis: inTagen(60), ...fruehstart(-30, 60, null) },
+    },
+    {
+      titel: 'Early Adopter, noch 10 Tage',
+      zugang: { ...basis, aboPflichtAb: inTagen(-80), paket: 'alles', quelle: 'fruehstart', bis: inTagen(10), ...fruehstart(-100, 10, -5) },
+    },
+    {
+      titel: 'Early Adopter, Zeit vorbei',
+      zugang: { ...basis, aboPflichtAb: inTagen(-93), testBis: inTagen(-79), ...fruehstart(-120, -3, -20) },
     },
   ];
 }
@@ -407,6 +411,9 @@ function Betreiber({ echt }: { echt: Zugang }) {
           </button>
         )}
       </div>
+      <Suspense fallback={<p className="mt-4 text-xs text-fuchsia-900/70">Einen Moment …</p>}>
+        <BetreiberFruehstart />
+      </Suspense>
     </section>
   );
 }

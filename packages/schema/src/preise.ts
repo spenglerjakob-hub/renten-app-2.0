@@ -63,6 +63,13 @@ export const JAHR_MONATE = 10;
 export const TESTTAGE = 14;
 /** Bis hierhin wird online gebucht, darueber gibt es ein Angebot. */
 export const MAX_NUTZER = 50;
+/**
+ * Early Adopter: Monate kostenlos ab dem Start (muss zu `privat.fruehstarter.monate`
+ * passen) und der Dank danach — Rabatt in Prozent auf das erste Jahr, als Gutschein
+ * bei Stripe (Schritt 4).
+ */
+export const FRUEHSTART_MONATE = 3;
+export const FRUEHSTART_RABATT_PROZENT = 20;
 /** Steuerhinweis zu allen Preisen. Kleinunternehmer: "gem. § 19 UStG ohne USt." */
 export const UST_HINWEIS = 'zzgl. 19 % USt.';
 
