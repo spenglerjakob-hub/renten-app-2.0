@@ -4,6 +4,7 @@ import {
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung, type LoesungsOptionen,
+  type Loesung, type LoesungId,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -437,6 +438,39 @@ export function tuevPositionen(
 
     return [{ vertrag: v, ergebnis, vergleich, istKapital, alterBeiRentenbeginn, rentenbeginnJahr, wege }];
   });
+}
+
+/** Was im Loesungsvergleich hervorgehoben wird — am Bildschirm und im Gutachten. */
+export interface Auszeichnungen {
+  /** Am meisten im Vertrag je Netto-Euro (hoechster Hebel) */
+  meiste: LoesungId[];
+  /** Nur bei Brutto-Vorgabe: derselbe Beitrag kostet hier netto am wenigsten */
+  guenstigste: LoesungId[];
+}
+
+/**
+ * Welche Loesungen ausgezeichnet werden. Hervorgehoben wird nur, was sich
+ * abhebt: bei nur einer Loesung nichts, beim Hebel nur ueber 1 (mehr als ein
+ * privater Euro), und gleichauf liegende Loesungen bekommen die Auszeichnung
+ * gemeinsam. „Guenstigste" vergleicht nur Loesungen mit vollem Beitrag — eine
+ * am Rahmen gedeckelte waere sonst nur scheinbar guenstiger.
+ */
+export function auszeichnungen(loesungen: Loesung[], brutto: boolean): Auszeichnungen {
+  const verfuegbar = loesungen.filter((x) => x.verfuegbar && x.nettoMonat > 0);
+  if (verfuegbar.length < 2) return { meiste: [], guenstigste: [] };
+  const besterHebel = Math.max(...verfuegbar.map((x) => x.hebel));
+  const meiste = besterHebel > 1 + 1e-6
+    ? verfuegbar.filter((x) => Math.abs(x.hebel - besterHebel) < 1e-6).map((x) => x.id)
+    : [];
+  const voll = verfuegbar.filter((x) => !x.begrenzt);
+  if (!brutto || voll.length < 2) return { meiste, guenstigste: [] };
+  const netto = voll.map((x) => x.nettoMonat);
+  const min = Math.min(...netto);
+  // Kosten alle gleich viel, ist keine guenstiger.
+  const guenstigste = Math.max(...netto) - min < 0.005
+    ? []
+    : voll.filter((x) => x.nettoMonat - min < 0.005).map((x) => x.id);
+  return { meiste, guenstigste };
 }
 
 /**

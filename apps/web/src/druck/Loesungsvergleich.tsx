@@ -1,8 +1,8 @@
 import { Fragment } from 'react';
-import type { Loesung, LoesungsVorgabe } from '@renten/engine';
+import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
-import type { AngebotPosition } from '../features/tuev-berechnung';
-import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text } from './Bausteine';
+import { auszeichnungen, type AngebotPosition } from '../features/tuev-berechnung';
+import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 
 /**
  * „Lösungen im Vergleich" — die letzte Etappe der Beratung auf Papier.
@@ -10,6 +10,10 @@ import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text } from './Baustei
  * Oben die Einzahlseite je Loesung, unten die erfassten Angebote mit Rente
  * netto und Rendite. Dieselben Rechnungen wie am Bildschirm
  * (`loesungsvergleich`, `angebotPositionen`); hier wird nichts neu gerechnet.
+ *
+ * DAS ERGEBNIS STEHT VORN: ein gruen umrandeter Satz ueber der Tabelle und
+ * die gruen getoente Spalte darin — dieselbe Auszeichnung wie am Bildschirm
+ * (`auszeichnungen`), damit man es nicht aus den Zahlen herauslesen muss.
  */
 
 const zahl = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -21,11 +25,23 @@ const LOESUNG_KURZ: Record<AngebotPosition['angebot']['loesung'], string> = {
   avd: 'Altersvorsorgedepot', bav: 'Betriebsrente', basis: 'Basisrente', privat: 'Private Rente',
 };
 
+/** Fuer den Ergebnissatz — mit Artikel, damit er sich liest. */
+const MIT_ARTIKEL: Record<LoesungId, string> = {
+  avd: 'das Altersvorsorgedepot',
+  bav: 'die Betriebsrente (Entgeltumwandlung)',
+  basis: 'die Basisrente (Rürup)',
+  privat: 'die private Rente bzw. das Depot',
+};
+const namen = (liste: Loesung[]) => liste.map((l) => MIT_ARTIKEL[l.id]).join(' und ');
+
 /**
- * Spaltenkopf mit weichen Trennstellen: "Altersvorsorgedepot" ist laenger als
- * eine Spalte breit und lief sonst in die Nachbarspalte.
+ * Spaltenkopf mit weichen Trennstellen: "Altersvorsorgedepot" und
+ * "(Entgeltumwandlung)" sind laenger als eine Spalte breit und liefen sonst
+ * in die Nachbarspalte.
  */
-const kopfVon = (titel: string) => titel.replace('Altersvorsorgedepot', 'Alters\u00advorsorge\u00addepot');
+const kopfVon = (titel: string) => titel
+  .replace('Altersvorsorgedepot', 'Alters\u00advorsorge\u00addepot')
+  .replace('Entgeltumwandlung', 'Entgelt\u00adumwandlung');
 
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;
@@ -39,6 +55,11 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }:
 }) {
   const brutto = vorgabe === 'brutto';
   const sichtbar = loesungen.filter((l) => l.verfuegbar);
+  const auszeichnung = auszeichnungen(loesungen, brutto);
+  const meiste = sichtbar.filter((l) => auszeichnung.meiste.includes(l.id));
+  const guenstigste = sichtbar.filter((l) => auszeichnung.guenstigste.includes(l.id));
+  const markiert = sichtbar.flatMap((l, i) => (meiste.includes(l) || guenstigste.includes(l) ? [i + 1] : []));
+  const dieselben = meiste.length === guenstigste.length && meiste.every((l) => guenstigste.includes(l));
   const gerechnet = angebote.filter((a) => a.rente || a.kapital);
   const gruppen: AngebotPosition[][] = [];
   for (let i = 0; i < gerechnet.length; i += JE_TABELLE) gruppen.push(gerechnet.slice(i, i + JE_TABELLE));
@@ -47,6 +68,11 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }:
   const beste = gerechnet.reduce((m, a) => Math.max(m, besteVon(a)), -Infinity);
   const stern = (a: AngebotPosition, rendite: number) =>
     gerechnet.length > 1 && Math.abs(besteVon(a) - beste) < 1e-9 && Math.abs(rendite - beste) < 1e-9 ? ' ★' : '';
+  const besteAngebote = gerechnet.length > 1 ? gerechnet.filter((a) => Math.abs(besteVon(a) - beste) < 1e-9) : [];
+  const angebotName = (a: AngebotPosition) =>
+    `${gerechnet.indexOf(a) + 1}. ${a.angebot.name || LOESUNG_KURZ[a.angebot.loesung]}`;
+  /** Auf welchem Weg das Angebot seine beste Rendite erreicht */
+  const weg = (a: AngebotPosition) => (a.rente && Math.abs(a.rente.rendite - beste) < 1e-9 ? 'als Rente' : 'als Kapital');
   const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
 
   const breite = sichtbar.length > 0 ? 64 / sichtbar.length : 64;
@@ -66,8 +92,43 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }:
           zu dem, was Sie heute schon einzahlen.
         </Text>
 
+        {!brutto && meiste[0] && (
+          <Ergebnis>
+            Am meisten aus Ihrem Netto-Aufwand {meiste.length > 1 ? 'machen' : 'macht'} <strong>{namen(meiste)}</strong>:
+            {' '}aus {cent(meiste[0].nettoMonat)} netto im Monat werden <strong>{cent(meiste[0].vertragMonat)}</strong> im
+            Vertrag — <strong>{zahl(meiste[0].hebel)}-mal</strong> so viel.
+          </Ergebnis>
+        )}
+        {brutto && (guenstigste[0] || meiste[0]) && (
+          <Ergebnis>
+            {guenstigste[0] && (
+              <>
+                Am günstigsten {guenstigste.length > 1 ? 'sind' : 'ist'} <strong>{namen(guenstigste)}</strong>:
+                {' '}{euro(betragMonat)} Beitrag kosten Sie netto nur <strong>{cent(guenstigste[0].nettoMonat)}</strong> im Monat.
+              </>
+            )}
+            {meiste[0] && (guenstigste[0] && dieselben
+              ? <> Dort landet auch je Netto-Euro am meisten im Vertrag: <strong>{zahl(meiste[0].hebel)}-mal</strong> Ihr Netto-Aufwand.</>
+              : <>
+                  {guenstigste[0] ? ' ' : ''}Am meisten je Netto-Euro {meiste.length > 1 ? 'bringen' : 'bringt'}{' '}
+                  <strong>{namen(meiste)}</strong>: {cent(meiste[0].vertragMonat)} im Vertrag,{' '}
+                  <strong>{zahl(meiste[0].hebel)}-mal</strong> Ihr Netto-Aufwand.
+                </>)}
+          </Ergebnis>
+        )}
+
         <div className="mt-3">
-          <Tabelle kopf={['', ...sichtbar.map((l) => kopfVon(l.titel))]} spalten={[36, ...sichtbar.map(() => breite)]}>
+          <Tabelle
+            kopf={['', ...sichtbar.map((l) => (
+              <>
+                {kopfVon(l.titel)}
+                {meiste.includes(l) && <Abzeichen>★ Meiste</Abzeichen>}
+                {guenstigste.includes(l) && <Abzeichen>Günstigste</Abzeichen>}
+              </>
+            ))]}
+            spalten={[36, ...sichtbar.map(() => breite)]}
+            markiert={markiert}
+          >
             {brutto ? (
               <>
                 <Zeile fett zellen={['Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
@@ -125,12 +186,29 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }:
             Kapitalabfindung nach Steuer im Zuflussjahr und Krankenversicherung. Die Nettorendite ist der
             interne Zinsfuß aller Netto-Zahlungen bis zur angenommenen Lebenserwartung.
           </Text>
+          {besteAngebote.length > 0 && (
+            <Ergebnis>
+              Die höchste Nettorendite {besteAngebote.length > 1 ? 'haben' : 'hat'}{' '}
+              {besteAngebote.map((a, i) => (
+                <Fragment key={a.angebot.id}>
+                  {i > 0 && ' und '}<strong>{angebotName(a)}</strong> ({weg(a)})
+                </Fragment>
+              ))}
+              {' '}mit <strong>{prozent(beste, 2)} p. a.</strong>
+            </Ergebnis>
+          )}
           {gruppen.map((g, gi) => (
             <Fragment key={gi}>
               <div className="mt-3">
                 <Tabelle
-                  kopf={['', ...g.map((a, i) => `${gi * JE_TABELLE + i + 1}. ${a.angebot.name || LOESUNG_KURZ[a.angebot.loesung]}`)]}
+                  kopf={['', ...g.map((a) => (
+                    <>
+                      {angebotName(a)}
+                      {besteAngebote.includes(a) && <Abzeichen>★ Höchste Rendite</Abzeichen>}
+                    </>
+                  ))]}
                   spalten={[36, ...g.map(() => 64 / g.length)]}
+                  markiert={g.flatMap((a, i) => (besteAngebote.includes(a) ? [i + 1] : []))}
                 >
                   {(() => {
                     const r = (f: (x: NonNullable<AngebotPosition['rente']>) => string) =>

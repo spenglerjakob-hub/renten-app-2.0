@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 /**
  * Bausteine des gedruckten Gutachtens.
@@ -95,8 +95,24 @@ export function Zweispaltig({ children }: { children: ReactNode }) {
  * `table-header-group` sorgt dafuer, dass die Kopfzeile auf jeder Folgeseite
  * erscheint. Ohne das steht auf Seite zwei eine Zahlenwand ohne Beschriftung.
  */
+/**
+ * Die hervorgehobenen Spalten einer Tabelle — Zeilen und Gruppenzeilen
+ * lesen sie von hier, damit die Toenung ohne Luecke durchlaeuft.
+ */
+const MarkierteSpalten = createContext<readonly number[]>([]);
+
+/** Gruen wie die Auszeichnung am Bildschirm; gedruckt dank `print-color-adjust`. */
+const MARKIERT_KOPF = 'bg-emerald-100 text-emerald-900';
+const MARKIERT_ZELLE = 'bg-emerald-50';
+/**
+ * Innenabstand der markierten Spalte — die Toenung klebt sonst an der Zahl.
+ * Zusammen so breit wie das `pr-3` der anderen Spalten, sonst passt der Kopf
+ * nicht mehr in die Spalte.
+ */
+const MARKIERT_RAND = 'pl-1 pr-2';
+
 export function Tabelle({
-  kopf, spalten, textSpalten, children,
+  kopf, spalten, textSpalten, markiert = [], children,
 }: {
   kopf: ReactNode[];
   /** Feste Spaltenbreiten in Prozent — sonst richtet jede Tabelle anders aus */
@@ -107,32 +123,39 @@ export function Tabelle({
    * rechtsbuendiger Fliesstext klebt am Nachbarn und liest sich schlecht.
    */
   textSpalten?: number[];
+  /**
+   * Spalten, die das Ergebnis tragen (Index wie in `kopf`): gruen getoent von
+   * oben bis unten, wie die Auszeichnung „Meiste" am Bildschirm.
+   */
+  markiert?: readonly number[];
   children: ReactNode;
 }) {
   const links = (i: number) => i === 0 || (textSpalten?.includes(i) ?? false);
   return (
-    <table className={`w-full border-collapse text-[11px] ${spalten ? 'table-fixed' : ''}`}>
-      {spalten && (
-        <colgroup>
-          {spalten.map((b, i) => <col key={i} style={{ width: `${b}%` }} />)}
-        </colgroup>
-      )}
-      <thead className="table-header-group">
-        <tr className="border-b border-slate-400">
-          {kopf.map((k, i) => (
-            <th
-              key={i}
-              className={`py-1 font-bold text-slate-700 ${
-                i < kopf.length - 1 ? 'pr-3' : ''
-              } ${links(i) ? 'text-left' : 'text-right'}`}
-            >
-              {k}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>{children}</tbody>
-    </table>
+    <MarkierteSpalten.Provider value={markiert}>
+      <table className={`w-full border-collapse text-[11px] ${spalten ? 'table-fixed' : ''}`}>
+        {spalten && (
+          <colgroup>
+            {spalten.map((b, i) => <col key={i} style={{ width: `${b}%` }} />)}
+          </colgroup>
+        )}
+        <thead className="table-header-group">
+          <tr className="border-b border-slate-400">
+            {kopf.map((k, i) => (
+              <th
+                key={i}
+                className={`py-1 font-bold ${
+                  markiert.includes(i) ? `${MARKIERT_KOPF} ${MARKIERT_RAND} align-bottom` : 'text-slate-700'
+                } ${i < kopf.length - 1 && !markiert.includes(i) ? 'pr-3' : ''} ${links(i) ? 'text-left' : 'text-right'}`}
+              >
+                {k}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </MarkierteSpalten.Provider>
   );
 }
 
@@ -144,30 +167,47 @@ export function Zeile({
   textSpalten?: number[];
 }) {
   const links = (i: number) => i === 0 || (textSpalten?.includes(i) ?? false);
+  const markiert = useContext(MarkierteSpalten);
   return (
     <tr className={`break-inside-avoid border-b border-slate-100 ${fett ? 'font-bold' : ''}`}>
-      {zellen.map((z, i) => (
-        <td
-          key={i}
-          // pr-3 ausser in der letzten Spalte: ohne Abstand stossen eine
-          // rechtsbuendige und die folgende linksbuendige Spalte aneinander,
-          // und "5 € Beitrag" und "—" lesen sich als ein Wert.
-          className={`py-1 align-top ${i < zellen.length - 1 ? 'pr-3' : ''} ${
-            links(i) ? 'text-left' : 'text-right tabular-nums'
-          } text-slate-800`}
-        >
-          {z}
-        </td>
-      ))}
+      {zellen.map((z, i) => {
+        const hervor = markiert.includes(i);
+        return (
+          <td
+            key={i}
+            // pr-3 ausser in der letzten Spalte: ohne Abstand stossen eine
+            // rechtsbuendige und die folgende linksbuendige Spalte aneinander,
+            // und "5 € Beitrag" und "—" lesen sich als ein Wert.
+            className={`py-1 align-top ${hervor ? `${MARKIERT_ZELLE} ${MARKIERT_RAND}` : i < zellen.length - 1 ? 'pr-3' : ''} ${
+              links(i) ? 'text-left' : 'text-right tabular-nums'
+            } ${hervor && fett ? 'text-emerald-800' : 'text-slate-800'}`}
+          >
+            {z}
+          </td>
+        );
+      })}
     </tr>
   );
 }
 
 /** Zwischenueberschrift innerhalb einer Tabelle — haelt die Spalten in einer Flucht. */
 export function Gruppenzeile({ text, spalten }: { text: string; spalten: number }) {
+  const markiert = useContext(MarkierteSpalten);
+  const klasse = 'pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate-500';
+  // Mit markierter Spalte einzeln statt ueber alle Spalten — sonst risse die Toenung ab.
+  if (markiert.length > 0) {
+    return (
+      <tr className="break-inside-avoid break-after-avoid">
+        <td className={klasse}>{text}</td>
+        {Array.from({ length: spalten - 1 }, (_, j) => (
+          <td key={j} className={markiert.includes(j + 1) ? MARKIERT_ZELLE : ''} />
+        ))}
+      </tr>
+    );
+  }
   return (
     <tr className="break-inside-avoid break-after-avoid">
-      <td colSpan={spalten} className="pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <td colSpan={spalten} className={klasse}>
         {text}
       </td>
     </tr>
@@ -190,6 +230,33 @@ export function Hinweiszeile({ text, spalten }: { text: string; spalten: number 
         </span>
       </td>
     </tr>
+  );
+}
+
+/** Kleines Abzeichen im Spaltenkopf — „★ Meiste", „Günstigste". */
+export function Abzeichen({ children }: { children: ReactNode }) {
+  return (
+    <span className="mt-0.5 block">
+      <span className="inline-block whitespace-nowrap rounded-full bg-emerald-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Das Ergebnis einer Seite auf einen Blick: gruen umrandet, in derselben
+ * Farbe wie die markierte Spalte darunter. Sachlich formuliert — es fasst die
+ * Rechnung zusammen, es empfiehlt kein Produkt.
+ */
+export function Ergebnis({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-3 flex break-inside-avoid items-start gap-2.5 rounded-lg border-2 border-emerald-500 bg-emerald-50 px-3 py-2">
+      <span className="mt-px shrink-0 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
+        Ergebnis
+      </span>
+      <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-emerald-950">{children}</p>
+    </div>
   );
 }
 

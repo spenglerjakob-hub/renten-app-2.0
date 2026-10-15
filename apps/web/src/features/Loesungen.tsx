@@ -8,7 +8,7 @@ import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt, TON,
 } from '../components/Feld';
 import {
-  foerderBasis, loesungsOptionen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
+  foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 
@@ -62,16 +62,8 @@ export function Loesungen({ zeile, szenario, sparrate }: {
     return loesungsvergleich(b.kontext, b.steuerOpt, b.p, betrag, loesungsOptionen(l));
   }, [szenario, zeile, betrag, l]);
 
-  const verfuegbar = loesungen.filter((x) => x.verfuegbar && x.nettoMonat > 0);
-  const besterHebel = verfuegbar.reduce((m, x) => Math.max(m, x.hebel), 0);
-  /*
-    Bei Brutto-Vorgabe zaehlt zuerst, was der Beitrag netto kostet. Verglichen
-    wird nur, wer den vollen Beitrag bekommt — eine am Rahmen gedeckelte
-    Loesung waere sonst nur scheinbar guenstiger.
-  */
-  const vollerBeitrag = verfuegbar.filter((x) => !x.begrenzt);
-  const guenstigsteNetto = brutto && vollerBeitrag.length > 1
-    ? vollerBeitrag.reduce((m, x) => Math.min(m, x.nettoMonat), Infinity) : null;
+  // „Meiste" und „Guenstigste" — dieselbe Regel wie im Gutachten.
+  const auszeichnung = auszeichnungen(loesungen, brutto);
   const bav = loesungen.find((x) => x.id === 'bav' && x.verfuegbar);
 
   /*
@@ -178,9 +170,8 @@ export function Loesungen({ zeile, szenario, sparrate }: {
               key={x.id}
               x={x}
               brutto={brutto}
-              bester={x.verfuegbar && x.nettoMonat > 0 && Math.abs(x.hebel - besterHebel) < 1e-6}
-              guenstigste={guenstigsteNetto !== null && x.verfuegbar && !x.begrenzt
-                && Math.abs(x.nettoMonat - guenstigsteNetto) < 0.005}
+              bester={auszeichnung.meiste.includes(x.id)}
+              guenstigste={auszeichnung.guenstigste.includes(x.id)}
               onErfassen={() => erfassen(x)}
             />
           ))}
