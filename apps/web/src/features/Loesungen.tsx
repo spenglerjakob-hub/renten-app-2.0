@@ -7,7 +7,9 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt, TON,
 } from '../components/Feld';
-import { foerderBasis, angebotPositionen, angebotKenntKapital, type AngebotPosition } from './tuev-berechnung';
+import {
+  foerderBasis, loesungsOptionen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
+} from './tuev-berechnung';
 import { personNameAus } from './personen';
 
 /**
@@ -54,10 +56,11 @@ export function Loesungen({ zeile, szenario, sparrate }: {
 
   const brutto = l.vorgabe === 'brutto';
   const betrag = brutto ? l.bruttoMonat : l.nettoMonat;
+  const festbetrag = l.agZuschussArt === 'festbetrag';
   const loesungen = useMemo(() => {
     const b = foerderBasis(szenario, zeile);
-    return loesungsvergleich(b.kontext, b.steuerOpt, b.p, betrag, { agZuschussQuote: l.agZuschussQuote, vorgabe: l.vorgabe });
-  }, [szenario, zeile, betrag, l.agZuschussQuote, l.vorgabe]);
+    return loesungsvergleich(b.kontext, b.steuerOpt, b.p, betrag, loesungsOptionen(l));
+  }, [szenario, zeile, betrag, l]);
 
   const verfuegbar = loesungen.filter((x) => x.verfuegbar && x.nettoMonat > 0);
   const besterHebel = verfuegbar.reduce((m, x) => Math.max(m, x.hebel), 0);
@@ -69,7 +72,19 @@ export function Loesungen({ zeile, szenario, sparrate }: {
   const vollerBeitrag = verfuegbar.filter((x) => !x.begrenzt);
   const guenstigsteNetto = brutto && vollerBeitrag.length > 1
     ? vollerBeitrag.reduce((m, x) => Math.min(m, x.nettoMonat), Infinity) : null;
-  const bavDa = loesungen.some((x) => x.id === 'bav' && x.verfuegbar);
+  const bav = loesungen.find((x) => x.id === 'bav' && x.verfuegbar);
+
+  /*
+    Prozent oder fester Betrag — beide Werte bleiben gemerkt. Beim ersten
+    Wechsel auf Euro steht der Zuschuss von eben im Feld, gerundet: Die
+    Ergebnisse springen dann nicht.
+  */
+  const zuschussArtWechseln = (art: string) => {
+    if (art !== 'prozent' && art !== 'festbetrag') return;
+    setzeLoesungen(art === 'festbetrag' && l.agZuschussFestMonat === 0 && bav
+      ? { agZuschussArt: art, agZuschussFestMonat: Math.round(bav.agZuschussMonat) }
+      : { agZuschussArt: art });
+  };
 
   const erfassen = (x: Loesung) => angebotHinzufuegen({
     loesung: x.id,
@@ -101,48 +116,60 @@ export function Loesungen({ zeile, szenario, sparrate }: {
           </p>
         </div>
 
-        <div className={`mb-4 grid gap-3 rounded-xl border p-3 sm:grid-cols-3 sm:p-4 ${TON.eingabe}`}>
-          <div>
-            <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
-            <ZahlFeld
-              label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
-              wert={betrag}
-              onChange={(n) => setzeLoesungen(brutto ? { bruttoMonat: n } : { nettoMonat: n })}
-              einheit="€"
-              schritt={25}
-              max={10_000}
-              gross
-              hilfe={brutto ? 'Bei der Betriebsrente die Bruttoumwandlung, beim Altersvorsorgedepot der Eigenbeitrag.' : undefined}
-            />
-            {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - betrag) > 0.5 && (
-              <button
-                type="button"
-                onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
-                className="mt-1 text-xs font-bold text-indigo-700 hover:underline"
-              >
-                Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
-              </button>
+        {/*
+          Der Schalter steht ueber den Feldern, nicht in der ersten Spalte: So
+          beginnen alle Felder auf einer Hoehe. Hilfetexte stehen darunter und
+          verschieben nichts.
+        */}
+        <div className={`mb-4 rounded-xl border p-3 sm:p-4 ${TON.eingabe}`}>
+          <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <ZahlFeld
+                label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
+                wert={betrag}
+                onChange={(n) => setzeLoesungen(brutto ? { bruttoMonat: n } : { nettoMonat: n })}
+                einheit="€"
+                schritt={25}
+                max={10_000}
+                hilfe={brutto ? 'Bei der Betriebsrente die Bruttoumwandlung, beim Altersvorsorgedepot der Eigenbeitrag.' : undefined}
+              />
+              {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - betrag) > 0.5 && (
+                <button
+                  type="button"
+                  onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
+                  className="mt-1 text-xs font-bold text-indigo-700 hover:underline"
+                >
+                  Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
+                </button>
+              )}
+            </div>
+            {bav && (
+              <ZahlFeld
+                label="Arbeitgeberzuschuss zur bAV"
+                wert={festbetrag ? l.agZuschussFestMonat : Math.round(l.agZuschussQuote * 1000) / 10}
+                onChange={(n) => setzeLoesungen(festbetrag
+                  ? { agZuschussFestMonat: n }
+                  : { agZuschussQuote: Math.max(0.15, n / 100) })}
+                min={festbetrag ? 0 : 15}
+                max={festbetrag ? 5_000 : 100}
+                einheitWahl={{ optionen: ZUSCHUSS_EINHEITEN, aktiv: l.agZuschussArt, onWechsel: zuschussArtWechseln }}
+                hilfe={festbetrag
+                  ? 'Fester Betrag im Monat. Mindestens gilt der gesetzliche Zuschuss: 15 % der Umwandlung, '
+                    + 'soweit der Arbeitgeber Abgaben spart.'
+                  : 'Mindestens die gesetzlichen 15 %. Bei einem Zuschussmodell etwa 50 %.'}
+              />
             )}
-          </div>
-          {bavDa && (
-            <ProzentFeld
-              label="Arbeitgeberzuschuss zur bAV"
-              wert={l.agZuschussQuote}
-              onChange={(n) => setzeLoesungen({ agZuschussQuote: Math.max(0.15, n) })}
-              min={15}
-              max={100}
-              hilfe="Mindestens die gesetzlichen 15 %. Bei einem Zuschussmodell etwa 50 %."
+            <ZahlFeld
+              label="Lebenserwartung (für die Angebote)"
+              wert={l.lebenserwartung}
+              onChange={(n) => setzeLoesungen({ lebenserwartung: n })}
+              min={60}
+              max={120}
+              einheit="J."
+              stufen
             />
-          )}
-          <ZahlFeld
-            label="Lebenserwartung (für die Angebote)"
-            wert={l.lebenserwartung}
-            onChange={(n) => setzeLoesungen({ lebenserwartung: n })}
-            min={60}
-            max={120}
-            einheit="J."
-            stufen
-          />
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
@@ -169,10 +196,15 @@ export function Loesungen({ zeile, szenario, sparrate }: {
   );
 }
 
+const ZUSCHUSS_EINHEITEN = [
+  { id: 'prozent', text: '%', titel: 'Zuschuss in Prozent der Umwandlung' },
+  { id: 'festbetrag', text: '€', titel: 'Zuschuss als fester Betrag im Monat' },
+] as const;
+
 /** Netto-Aufwand oder Beitrag vorgeben — die beiden Fragen aus dem Gespraech. */
 function VorgabeSchalter({ wert, onWechsel }: { wert: LoesungsVorgabe; onWechsel: (v: LoesungsVorgabe) => void }) {
   return (
-    <div role="radiogroup" aria-label="Vorgabe" className="mb-2 inline-flex rounded-lg border border-slate-200 bg-white p-0.5 print:hidden">
+    <div role="radiogroup" aria-label="Vorgabe" className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 print:hidden">
       {([['netto', 'Netto-Aufwand'], ['brutto', 'Brutto-Beitrag']] as const).map(([id, text]) => (
         <button
           key={id}

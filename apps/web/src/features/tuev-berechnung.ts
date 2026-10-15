@@ -3,7 +3,7 @@ import {
   versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, SV_FREI_QUOTE, euroText,
   type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
-  type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung,
+  type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung, type LoesungsOptionen,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -437,6 +437,19 @@ export function tuevPositionen(
 
     return [{ vertrag: v, ergebnis, vergleich, istKapital, alterBeiRentenbeginn, rentenbeginnJahr, wege }];
   });
+}
+
+/**
+ * Die Einstellungen des Loesungsvergleichs fuer den Rechenkern: Vorgabe und
+ * Arbeitgeberzuschuss — als Anteil oder, so gewaehlt, als fester Betrag.
+ * Bildschirm und Gutachten rechnen damit gleich.
+ */
+export function loesungsOptionen(l: SzenarioParsed['loesungen']): LoesungsOptionen {
+  return {
+    vorgabe: l.vorgabe,
+    agZuschussQuote: l.agZuschussQuote,
+    ...(l.agZuschussArt === 'festbetrag' ? { agZuschussFestMonat: l.agZuschussFestMonat } : {}),
+  };
 }
 
 /**

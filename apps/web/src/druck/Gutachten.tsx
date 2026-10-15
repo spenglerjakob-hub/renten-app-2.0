@@ -7,7 +7,7 @@ import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
-import { tuevPositionen, foerderBasis, angebotPositionen } from '../features/tuev-berechnung';
+import { tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen } from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -117,8 +117,7 @@ export function Gutachten({
     const l = szenario.loesungen;
     const betrag = l.vorgabe === 'brutto' ? l.bruttoMonat : l.nettoMonat;
     return {
-      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, betrag,
-        { agZuschussQuote: l.agZuschussQuote, vorgabe: l.vorgabe }),
+      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, betrag, loesungsOptionen(l)),
       betrag,
       angebote: angebotPositionen(szenario),
     };

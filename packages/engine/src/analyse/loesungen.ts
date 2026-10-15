@@ -17,7 +17,8 @@ import {
  * kostet, und daneben gestellt, was am Ende im Vertrag landet:
  *
  *   - bAV (Entgeltumwandlung): Brutto wird umgewandelt, Steuer und
- *     Sozialabgaben sinken, der Arbeitgeber legt mindestens 15 % dazu,
+ *     Sozialabgaben sinken, der Arbeitgeber legt mindestens 15 % dazu —
+ *     oder einen festen Betrag, aber nie weniger als den Pflichtzuschuss,
  *   - Basisrente: der Beitrag mindert das zu versteuernde Einkommen,
  *   - Altersvorsorgedepot: Eigenbeitrag plus Grund- und Kinderzulage, dazu
  *     ein Steuervorteil, soweit er ueber die Zulage hinausgeht,
@@ -78,6 +79,12 @@ export interface LoesungsOptionen {
    * ein Zuschussmodell mit 50 % traegt man hier ein.
    */
   agZuschussQuote?: number;
+  /**
+   * Zuschuss des Arbeitgebers als fester Betrag in Euro im Monat — gesetzt
+   * geht er vor der Quote. Er haengt nicht an der Hoehe der Umwandlung; der
+   * gesetzliche Pflichtzuschuss gilt trotzdem mindestens.
+   */
+  agZuschussFestMonat?: number;
   /**
    * Was der Betrag ist: der Netto-Aufwand (Vorgabe) oder der Beitrag
    * („brutto": bei der bAV die Umwandlung, beim Depot der Eigenbeitrag).
@@ -140,6 +147,8 @@ function bavLoesung(
   const svGrenze = Math.max(0, SV_FREI_QUOTE * p.bbgRvJahr - genutzt);
   const steuerGrenze = Math.max(0, STEUER_FREI_QUOTE * p.bbgRvJahr - genutzt);
   const quote = Math.max(0, opt.agZuschussQuote ?? BAV_AG_PFLICHTZUSCHUSS);
+  // Fester Zuschuss im Jahr — null: der Zuschuss richtet sich nach der Quote.
+  const fest = opt.agZuschussFestMonat === undefined ? null : Math.max(0, opt.agZuschussFestMonat) * 12;
 
   /*
     Alle Wirkungen einer Umwandlung von `u` im Jahr. Der Arbeitgeberbeitrag
@@ -148,7 +157,8 @@ function bavLoesung(
     nichts mehr — dort wird nicht weiter gerechnet.
   */
   const rechne = (u: number) => {
-    const zuschussRoh = quote * u;
+    // Ohne Umwandlung kein Zuschuss — auch kein fester.
+    const zuschussRoh = fest === null ? quote * u : u > 0 ? Math.max(fest, BAV_AG_PFLICHTZUSCHUSS * u) : 0;
     const svFrei = Math.min(u, Math.max(0, svGrenze - zuschussRoh));
     const steuerFrei = Math.min(u, Math.max(0, steuerGrenze - zuschussRoh));
     const w = svWirkung(svFrei, k, p);
@@ -158,11 +168,13 @@ function bavLoesung(
     /*
       Der Pflichtzuschuss gilt nur, „soweit" der Arbeitgeber selbst Abgaben
       spart — seine Ersparnis entspricht im Wesentlichen der des Mitarbeiters.
-      Ein hoeherer freiwilliger Zuschuss gilt, wie er zugesagt ist.
+      Ein hoeherer freiwilliger Zuschuss gilt, wie er zugesagt ist; ein fester
+      Betrag wird auf den Pflichtzuschuss angerechnet, mindestens gilt dieser.
     */
     const pflicht = Math.min(BAV_AG_PFLICHTZUSCHUSS * u, Math.max(0, w.ersparnis + w.verlorenerZuschuss));
-    const zuschuss = quote > BAV_AG_PFLICHTZUSCHUSS ? zuschussRoh : Math.min(zuschussRoh, pflicht);
-    return { sv, steuer, zuschuss, netto: u - sv - steuer };
+    const zuschuss = fest !== null ? (u > 0 ? Math.max(fest, pflicht) : 0)
+      : quote > BAV_AG_PFLICHTZUSCHUSS ? zuschussRoh : Math.min(zuschussRoh, pflicht);
+    return { sv, steuer, zuschuss, pflicht, netto: u - sv - steuer };
   };
 
   const hoechstens = steuerGrenze;
@@ -180,6 +192,10 @@ function bavLoesung(
   if (u > svGrenze + 0.5) {
     hinweise.push(`Über ${euroText(svGrenze / 12)} im Monat ist die Umwandlung nur noch steuerfrei — `
       + 'auf diesen Teil fallen volle Sozialabgaben.');
+  }
+  if (fest !== null && u > 0 && r.pflicht > fest + 0.5) {
+    hinweise.push(`Mindestens gilt der gesetzliche Zuschuss — hier ${euroText(r.pflicht / 12)} statt `
+      + `${euroText(fest / 12)} im Monat.`);
   }
   if (k.privatVersichert) hinweise.push('Privat versichert: Kranken- und Pflegeversicherung sparen nichts, der Arbeitgeberzuschuss zur PKV kann sinken.');
   const vertrag = u + r.zuschuss;

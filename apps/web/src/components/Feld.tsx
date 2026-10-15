@@ -34,9 +34,20 @@ export function ZahlFeld(props: {
    * Handy gar nicht. Diese Knoepfe sind immer da und lassen sich tippen.
    */
   stufen?: boolean;
+  /**
+   * Zwei Einheiten zum Umschalten statt einer festen — etwa „%" oder „€"
+   * beim Arbeitgeberzuschuss. Der Schalter sitzt im Feld; so bleibt die
+   * Zeile so hoch wie die Nachbarfelder. Umgerechnet wird nichts: Den Wert
+   * zur gewaehlten Einheit liefert der Aufrufer.
+   */
+  einheitWahl?: {
+    optionen: readonly { id: string; text: string; titel: string }[];
+    aktiv: string;
+    onWechsel: (id: string) => void;
+  };
 }) {
   const {
-    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen,
+    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl,
   } = props;
   const schritt = props.schritt ?? 1;
   /*
@@ -51,7 +62,9 @@ export function ZahlFeld(props: {
   const [text, setText] = useState(String(wert).replace('.', ','));
   const [fehler, setFehler] = useState<string | null>(null);
 
-  useEffect(() => { setText(String(wert).replace('.', ',')); }, [wert]);
+  // Kommt ein neuer Wert von aussen (auch nach einem Wechsel der Einheit),
+  // gilt eine alte Fehlermeldung nicht mehr.
+  useEffect(() => { setText(String(wert).replace('.', ',')); setFehler(null); }, [wert]);
 
   const uebernehmen = (roh: string) => {
     setText(roh);
@@ -102,11 +115,32 @@ export function ZahlFeld(props: {
             gross ? 'p-3 text-xl font-bold' : 'p-2 text-sm'
           } ${
             fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
-          } ${stufen
+          } ${einheitWahl ? 'pr-20' : stufen
             ? (einheit ? 'pr-14' : 'pr-8')
             : einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
         />
-        {einheit && (
+        {einheitWahl && (
+          <span role="radiogroup" aria-label={`${label}: Einheit`}
+            className="absolute inset-y-1 right-1 flex gap-0.5 rounded bg-slate-100 p-0.5">
+            {einheitWahl.optionen.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={einheitWahl.aktiv === o.id}
+                aria-label={o.titel}
+                title={o.titel}
+                onClick={() => einheitWahl.onWechsel(o.id)}
+                className={`min-w-7 rounded px-1.5 text-xs font-bold ${
+                  einheitWahl.aktiv === o.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {o.text}
+              </button>
+            ))}
+          </span>
+        )}
+        {einheit && !einheitWahl && (
           <span className={`pointer-events-none absolute text-slate-400 ${
             gross ? 'right-4 top-3.5 text-lg' : stufen ? 'right-7 top-2 text-sm' : 'right-3 top-2 text-sm'
           } ${stufen ? 'print:right-3' : ''}`}>

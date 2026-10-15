@@ -33,6 +33,19 @@ describe('Abwaertskompatibilitaet', () => {
     expect(r.warnungen).toEqual([]);
   });
 
+  it('liest den Lösungsvergleich früherer Dateien: Zuschuss in Prozent, Festbetrag 0', () => {
+    const r = importiere(JSON.stringify({ ...vollstaendig, loesungen: { nettoMonat: 150, agZuschussQuote: 0.5 } }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.loesungen).toMatchObject({
+      vorgabe: 'netto', nettoMonat: 150, agZuschussArt: 'prozent', agZuschussQuote: 0.5, agZuschussFestMonat: 0,
+    });
+    // Und der Festbetrag bleibt über Export und Import erhalten.
+    const fest = { ...r.szenario, loesungen: { ...r.szenario.loesungen, agZuschussArt: 'festbetrag' as const, agZuschussFestMonat: 40 } };
+    const zurueck = importiere(exportiere(fest));
+    expect(zurueck.ok && zurueck.szenario.loesungen).toMatchObject({ agZuschussArt: 'festbetrag', agZuschussFestMonat: 40 });
+  });
+
   it('liest Dateien ohne rentenbeginnManuell ein und setzt die Marke auf false', () => {
     const r = importiere(JSON.stringify(vollstaendig));
     expect(r.ok).toBe(true);

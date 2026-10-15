@@ -511,8 +511,12 @@ export const loesungenSchema = z.object({
   nettoMonat: z.number().min(0).max(100_000).default(100),
   /** Der Beitrag im Monat bei Brutto-Vorgabe — je Lösung derselbe */
   bruttoMonat: z.number().min(0).max(100_000).default(100),
-  /** Arbeitgeberzuschuss zur Entgeltumwandlung, Anteil — mindestens der Pflichtzuschuss */
+  /** Arbeitgeberzuschuss zur Entgeltumwandlung: als Anteil der Umwandlung oder als fester Betrag */
+  agZuschussArt: z.enum(['prozent', 'festbetrag']).default('prozent'),
+  /** Arbeitgeberzuschuss als Anteil — mindestens der Pflichtzuschuss */
   agZuschussQuote: z.number().min(0).max(1).default(0.15),
+  /** Arbeitgeberzuschuss als fester Betrag im Monat — mindestens gilt der Pflichtzuschuss */
+  agZuschussFestMonat: z.number().min(0).max(10_000).default(0),
   lebenserwartung: z.number().int().min(60).max(120).default(85),
   angebote: z.array(angebotSchema).max(12).default([]),
 });

@@ -158,3 +158,44 @@ describe('Lösungsvergleich — was kosten 100 € Beitrag netto', () => {
     for (const id of ['avd', 'bav', 'basis', 'privat'] as const) expect(r(id).vertragMonat).toBe(0);
   });
 });
+
+describe('Lösungsvergleich — Arbeitgeberzuschuss als fester Betrag', () => {
+  const bav = (betrag: number, fest: number, vorgabe: 'netto' | 'brutto' = 'brutto') =>
+    loesungsvergleich(angestellt, steuerOpt, p, betrag, { vorgabe, agZuschussFestMonat: fest }).find((x) => x.id === 'bav')!;
+
+  it('50 € fest zu 100 € Umwandlung wirkt wie 50 %', () => {
+    const fest = bav(100, 50);
+    const quote = brutto(angestellt, 100, 0.5)('bav');
+    expect(fest.agZuschussMonat).toBeCloseTo(50, 6);
+    expect(fest.vertragMonat).toBeCloseTo(150, 6);
+    expect(fest.nettoMonat).toBeCloseTo(quote.nettoMonat, 6);
+    expect(fest.hinweise.join(' ')).not.toMatch(/gesetzliche Zuschuss/);
+  });
+
+  it('hängt nicht an der Umwandlung', () => {
+    expect(bav(100, 60).agZuschussMonat).toBeCloseTo(60, 6);
+    expect(bav(300, 60).agZuschussMonat).toBeCloseTo(60, 6);
+  });
+
+  it('Netto-Vorgabe: trifft den Netto-Aufwand, der feste Zuschuss kommt obendrauf', () => {
+    const l = bav(100, 60, 'netto');
+    expect(l.nettoMonat).toBeCloseTo(100, 1);
+    expect(l.agZuschussMonat).toBeCloseTo(60, 6);
+    expect(l.vertragMonat).toBeCloseTo(l.eigenbeitragMonat + 60, 6);
+    expect(l.hebel).toBeGreaterThan(rechne(angestellt)('bav').hebel);
+  });
+
+  it('unter dem Pflichtzuschuss gilt der Pflichtzuschuss — mit Hinweis', () => {
+    const l = bav(200, 5);
+    const pflicht = brutto(angestellt, 200)('bav');
+    expect(l.agZuschussMonat).toBeCloseTo(pflicht.agZuschussMonat, 6);
+    expect(l.agZuschussMonat).toBeGreaterThan(5);
+    expect(l.hinweise.join(' ')).toMatch(/Mindestens gilt der gesetzliche Zuschuss/);
+  });
+
+  it('ohne Umwandlung kein Zuschuss', () => {
+    const l = bav(0, 50);
+    expect(l.agZuschussMonat).toBe(0);
+    expect(l.vertragMonat).toBe(0);
+  });
+});
