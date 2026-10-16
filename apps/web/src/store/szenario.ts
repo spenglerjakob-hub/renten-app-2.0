@@ -94,6 +94,8 @@ export interface SzenarioStore {
 
   alsJsonExportieren: () => string;
   ausJsonImportieren: (roh: string) => void;
+  /** Einen ganzen Fall uebernehmen — etwa den Musterfall aus der Schnellrechnung — mit Meldung. */
+  uebernehmen: (s: SzenarioParsed, meldung: string) => void;
   zuruecksetzen: () => void;
 }
 
@@ -378,6 +380,8 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
       set({ importMeldung: { art: 'fehler', texte: r.fehler } });
     }
   },
+
+  uebernehmen: (s, meldung) => { speichere(s); set({ szenario: s, importMeldung: { art: 'ok', texte: [meldung] } }); },
 
   zuruecksetzen: () => { const s = standardSzenario(); speichere(s); set({ szenario: s, importMeldung: null }); },
 }));

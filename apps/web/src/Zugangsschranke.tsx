@@ -30,6 +30,10 @@ const Rueckmeldung = lazy(() => import('./features/Rueckmeldung').then((m) => ({
  *   - /altersvorsorgedepot — Ziel des QR-Codes aus dem Kundenbrief; wer ihn
  *     scannt, hat naturgemaess noch kein Konto,
  *   - /vorsorge-check?a=<Code> — der persoenliche Link des Beraters,
+ *   - /schnellrechnung — ein Fall ohne Konto (Netto-Rente und Luecke), mit
+ *     derselben Rechnung; Speichern, Gutachten und Detailauswertung gibt es
+ *     erst hier im Rechner,
+ *   - /preise,
  *   - Impressum und Datenschutz, die jederzeit erreichbar sein muessen.
  *
  * Nach Anmeldung und Zustimmung kommt das PAKET: Deckt es den `bereich` der

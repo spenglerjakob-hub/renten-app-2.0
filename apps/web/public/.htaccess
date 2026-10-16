@@ -57,6 +57,11 @@ DirectoryIndex index.html
   # und fuer Suchmaschinen gesperrt (Kopfzeile unten, Meta-Tag im HTML).
   RewriteRule ^preise/?$ /preise.html [NC,L]
 
+  # --- Schnellrechnung ----------------------------------------------------
+  # Ein Fall ohne Anmeldung. Oeffentlich, VOR dem Auffangmuster; vorerst
+  # fuer Suchmaschinen gesperrt wie die Preisseite.
+  RewriteRule ^schnellrechnung/?$ /schnellrechnung.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
@@ -79,7 +84,7 @@ DirectoryIndex index.html
 
   # Die Preisseite bis zum Start des Abos nicht in Suchmaschinen — zusaetzlich
   # zum Meta-Tag, denn manche Crawler lesen nur die Kopfzeile.
-  <FilesMatch "^preise\.html$">
+  <FilesMatch "^(preise|schnellrechnung)\.html$">
     Header set X-Robots-Tag "noindex, nofollow"
   </FilesMatch>
 

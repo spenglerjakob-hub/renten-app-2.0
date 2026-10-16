@@ -160,6 +160,11 @@ export function Seite() {
           Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
           allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
         </p>
+        <p className="mt-2 text-sm">
+          <a href="/schnellrechnung" className="font-semibold text-indigo-700 hover:underline">
+            Erst ausprobieren? Schnellrechnung ohne Anmeldung →
+          </a>
+        </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
           <IntervallSchalter wert={intervall} onWechsel={setIntervall} />

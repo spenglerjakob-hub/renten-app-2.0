@@ -25,6 +25,8 @@ import { Kassenbon } from './features/Kassenbon';
 import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
 import { nettoHeuteMonat } from './features/bezug';
+import { musterfallVerwerfen, offenerMusterfall, type Musterfall } from './lib/musterfall';
+import { STANDARD_OFFEN } from './store/standard';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
@@ -218,6 +220,29 @@ export default function App() {
   const assistentZu = useCallback((n: number) => setAssistentSchritt(merkeAssistentSchritt(n)), []);
   const pruefen = useSzenario((s) => s.pruefen);
   const ausgewertet = useSzenario((s) => s.ausgewertet);
+  const uebernehmen = useSzenario((s) => s.uebernehmen);
+
+  /*
+    DER MUSTERFALL aus der Schnellrechnung (`lib/musterfall.ts`). Ist der
+    Fall in diesem Browser noch unberuehrt — alle Beispielwerte offen —, wird
+    er still geladen; sonst fragt ein Band, mit zwei gleichwertigen Knoepfen.
+    Ein eingetragener Fall wird nie ungefragt ersetzt.
+  */
+  const [musterfall, setMusterfall] = useState<Musterfall | null>(() => offenerMusterfall());
+  const musterfallLaden = useCallback((m: Musterfall) => {
+    uebernehmen(m.szenario, 'Ihr Musterfall aus der Schnellrechnung ist geladen.');
+    musterfallVerwerfen();
+    setMusterfall(null);
+    geheZu('ergebnis');
+  }, [uebernehmen, geheZu]);
+  useEffect(() => {
+    if (!musterfall) return;
+    const offen = offenePfade(useSzenario.getState().szenario);
+    const unberuehrt = STANDARD_OFFEN
+      .filter((p) => eintragVon(p)?.art === 'beispiel')
+      .every((p) => offen.includes(p));
+    if (unberuehrt) musterfallLaden(musterfall);
+  }, [musterfall, musterfallLaden]);
   /** Der noetige Startbeitrag aus dem Sparrechner — die Loesungen koennen ihn uebernehmen. */
   const [sparrate, setSparrate] = useState<number | null>(null);
 
@@ -822,6 +847,26 @@ export default function App() {
       )}
 
       <main id="journey" className="mx-auto max-w-6xl scroll-mt-28 space-y-4 p-2 sm:space-y-6 sm:p-6 print:hidden">
+        {musterfall && (
+          <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-950">
+            <p>
+              <strong>Musterfall aus der Schnellrechnung übernehmen?</strong>{' '}
+              {musterfall.kurz && <>({musterfall.kurz}) </>}
+              Ihr aktueller Fall in diesem Browser wird dabei ersetzt — sichern Sie ihn vorher im Konto, wenn Sie
+              ihn behalten möchten.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => musterfallLaden(musterfall)}
+                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                Übernehmen
+              </button>
+              <button type="button" onClick={() => { musterfallVerwerfen(); setMusterfall(null); }}
+                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                Verwerfen
+              </button>
+            </div>
+          </div>
+        )}
         <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} erledigt={etappeErledigt} />
         <FallFortschritt schritte={fallSchritte} onSprung={springeZu} />
 

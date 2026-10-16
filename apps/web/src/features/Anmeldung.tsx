@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Sparkles, Users } from 'lucide-react';
+import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Sparkles, Users, Calculator, Save } from 'lucide-react';
 import { FRUEHSTART_MONATE } from '@renten/schema/preise';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { useAuth, type MailLink } from '../store/auth';
+import { offenerMusterfall } from '../lib/musterfall';
 
 type Maske = 'anmelden' | 'registrieren' | 'vergessen';
 
@@ -34,6 +35,8 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
   const [passwort, setPasswort] = useState('');
   const [passwort2, setPasswort2] = useState('');
   const [zustimmung, setZustimmung] = useState(false);
+  // Ein Fall aus der Schnellrechnung wartet auf das Konto (siehe `lib/musterfall.ts`).
+  const [musterfall] = useState(() => offenerMusterfall());
 
   // Beim Wechsel der Maske stehen gebliebene Meldungen loeschen — sonst
   // erscheint "E-Mail oder Passwort stimmen nicht" ueber dem Registrierformular.
@@ -97,6 +100,24 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
               <strong>Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
               kostenlos — dafür freuen wir uns über Ihre Rückmeldungen. Legen Sie ein Konto an oder melden Sie sich
               mit Ihrem bestehenden an.
+            </span>
+          </div>
+        )}
+
+        {/*
+          DER MUSTERFALL — was hier passiert, steht da: Er liegt in diesem
+          Browser und kommt nach der Anmeldung in den Rechner. Kein Druck,
+          keine Frist im Text.
+        */}
+        {musterfall && !passwortNeu && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">
+            <Save className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span>
+              <strong>Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
+              Anmeldung liegt er im Rechner.
+              {maske === 'registrieren' && (
+                <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt Ihr Musterfall.</>
+              )}
             </span>
           </div>
         )}
@@ -211,7 +232,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
           >
             {passwortNeu ? <><KeyRound className="h-4 w-4" aria-hidden /> Passwort speichern</>
               : maske === 'anmelden' ? <><LogIn className="h-4 w-4" aria-hidden /> Anmelden</>
-              : maske === 'registrieren' ? <><UserPlus className="h-4 w-4" aria-hidden /> Konto anlegen</>
+              : maske === 'registrieren' ? <><UserPlus className="h-4 w-4" aria-hidden /> {musterfall ? 'Konto anlegen und Fall speichern' : 'Konto anlegen'}</>
               : <><KeyRound className="h-4 w-4" aria-hidden /> Link anfordern</>}
           </button>
         </form>
@@ -246,6 +267,15 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
           wird Ihrem Konto zugeordnet — und ist dann ausschließlich für Sie sichtbar.
         </span>
       </p>
+
+      {/* Wert vor Registrierung: erst rechnen, dann entscheiden. */}
+      {!musterfall && !passwortNeu && (
+        <a href="/schnellrechnung"
+          className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/40">
+          <Calculator className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+          <span>Noch kein Konto? <strong className="text-indigo-700">Rechnen Sie zuerst einen Fall durch — ohne Anmeldung →</strong></span>
+        </a>
+      )}
 
       <p className="mt-3 px-2 text-center text-xs text-slate-500">
         Informationen zum{' '}

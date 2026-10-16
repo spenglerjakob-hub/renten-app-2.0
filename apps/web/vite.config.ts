@@ -70,6 +70,8 @@ export default defineConfig({
         nutzungsbedingungen: resolve(hier, 'nutzungsbedingungen.html'),
         // Die Preisseite des Abos — oeffentlich, vorerst unverlinkt und noindex.
         preise: resolve(hier, 'preise.html'),
+        // Die Schnellrechnung ohne Anmeldung — oeffentlich, vorerst noindex.
+        schnellrechnung: resolve(hier, 'schnellrechnung.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },

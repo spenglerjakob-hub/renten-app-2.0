@@ -12,12 +12,14 @@ import { gespraechssatz, kaufkraft } from './kaufkraft';
  * Minus. Der Kaufkraftverlust ist keine Warnung, sondern eine Umrechnung.
  * Kein Countdown, keine Wertung.
  */
-export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = '' }: {
+export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = '', wo = 'oben änderbar' }: {
   zeile: Jahreszeile;
   inflation: number;
   /** Die Inflation ist noch die Vorbelegung */
   standard?: boolean;
   klasse?: string;
+  /** Wo sich die Annahme aendern laesst — in der Schnellrechnung gibt es dafuer kein Feld */
+  wo?: string;
 }) {
   // Eigene Kennung je Einbindung: Die Karte steht zweimal im Dokument (Telefon und PC).
   const titelId = useId();
@@ -58,11 +60,12 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
               <span className="whitespace-nowrap">{euro(k.lueckeHeute)} heute</span>
             </>}
             ton="luecke"
+            umbruch
           />
         )}
       </dl>
       <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-        Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, oben änderbar).
+        Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, {wo}).
         Modellrechnung, keine Zusage.
       </p>
 
@@ -83,12 +86,19 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   );
 }
 
-function Posten({ label, wert, fett, ton }: { label: string; wert: ReactNode; fett?: boolean; ton?: 'luecke' }) {
+function Posten({ label, wert, fett, ton, umbruch = false }: {
+  label: string; wert: ReactNode; fett?: boolean; ton?: 'luecke';
+  /**
+   * Der Wert darf umbrechen — nur fuer die Luecke mit ihren zwei Teilen: Am
+   * Telefon passt „1.706 € (2052) · 1.020 € heute“ nicht in eine Zeile.
+   * Alle anderen Werte bleiben beisammen; dann bricht die Beschriftung um.
+   */
+  umbruch?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-slate-600">{label}</dt>
-      {/* Darf umbrechen — am Telefon passt „1.706 € (2052) · 1.020 € heute“ nicht in eine Zeile. */}
-      <dd className={`min-w-0 text-right tabular-nums ${fett ? 'font-bold' : 'font-semibold'} ${
+      <dd className={`${umbruch ? 'min-w-0' : 'shrink-0 whitespace-nowrap'} text-right tabular-nums ${fett ? 'font-bold' : 'font-semibold'} ${
         ton === 'luecke' ? 'text-rose-600' : 'text-slate-900'
       }`}>
         {wert}

@@ -154,7 +154,9 @@ function Datenschutz() {
         <li>der zuletzt abgefragte Zugang Ihres Kontos (<code>rentenplaner.zugang.v1</code>) und weggeklickte
           Hinweise (<code>rentenplaner.band.…</code>),</li>
         <li>ein persönlicher Einladungs- oder Early-Adopter-Link, bis er nach Ihrer Anmeldung eingelöst ist
-          (<code>rentenplaner.einladung</code>, <code>rentenplaner.fruehstart</code>; höchstens 14 Tage).</li>
+          (<code>rentenplaner.einladung</code>, <code>rentenplaner.fruehstart</code>; höchstens 14 Tage),</li>
+        <li>ein Fall aus der Schnellrechnung, den Sie mit „Fall speichern“ vorgemerkt haben, bis Sie ihn nach der
+          Anmeldung übernehmen oder verwerfen (<code>rentenplaner.musterfall.v1</code>; höchstens 14 Tage).</li>
       </Liste>
       <P>
         Diese Daten verlassen Ihr Gerät nicht — bis auf den persönlichen Link, der zum Einlösen an unseren
