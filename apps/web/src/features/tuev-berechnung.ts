@@ -847,6 +847,15 @@ export interface AngebotPosition {
   /** Ab welchem Alter die Rente das Kapital einholt — nur mit beiden Wegen */
   breakEven: RenteOderKapital | null;
   rentenbeginnJahr: number;
+  /**
+   * Welchen Teil der Luecke die Rente des Angebots schliesst: um wie viel das
+   * Netto des HAUSHALTS im ersten Ruhestandsjahr steigt, geteilt durch die
+   * Luecke im selben Jahr — hoechstens 1. Null ohne Rente oder ohne Luecke.
+   *
+   * Der Zuwachs des Haushalts, nicht das Netto des Angebots: Mit der
+   * zusaetzlichen Rente steigt auch die Steuer auf die uebrigen Einkuenfte.
+   */
+  lueckeAnteil: { anteil: number; jahr: number } | null;
 }
 
 /** Kennt diese Loesung eine volle Kapitalauszahlung? bAV und private Rentenversicherung ja. */
@@ -877,6 +886,9 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
     ? { jahr: jetzt + 1, monat: 1 }
     : { jahr: jetzt, monat: naechsterMonat };
   const avdAb = basis.p.avd.abJahr;
+  // Einmal OHNE Angebot — die Luecke und das Netto, an denen sich jedes Angebot misst.
+  let ohne: ReturnType<typeof projiziere> | null = null;
+  const ohneAngebot = () => (ohne ??= projiziere(szenario));
 
   return szenario.loesungen.angebote.map((a) => {
     const inhaber = a.inhaber === 'B' && szenario.haushalt.verheiratet ? 'B' : 'A';
@@ -884,7 +896,7 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
     const mitRente = a.renteMonat > 0;
     const mitKapital = angebotKenntKapital(a.loesung) && a.kapital > 0;
-    const leer = { angebot: a, rente: null, kapital: null, breakEven: null, rentenbeginnJahr };
+    const leer = { angebot: a, rente: null, kapital: null, breakEven: null, rentenbeginnJahr, lueckeAnteil: null };
     if (a.beitragMonat <= 0 || (!mitRente && !mitKapital)) return leer;
 
     const id = `angebot-${a.id}`;
@@ -940,10 +952,19 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
     );
 
     let rente: TuevErgebnis | null = null;
+    let lueckeAnteil: AngebotPosition['lueckeAnteil'] = null;
     if (mitRente) {
       const { klon, e } = projektion('rente');
       const zeile = e.zeilen.find((z) => z.jahr === e.ruhestandsjahr);
       const posten = zeile?.posten.find((x) => x.id === id);
+      const vorher = ohneAngebot().zeilen.find((z) => z.jahr === e.ruhestandsjahr);
+      const luecke = vorher ? versorgungsluecke(vorher) : 0;
+      if (zeile && vorher && luecke > 0) {
+        lueckeAnteil = {
+          anteil: Math.min(1, Math.max(0, (zeile.nettoMonat - vorher.nettoMonat) / luecke)),
+          jahr: vorher.jahr,
+        };
+      }
       rente = rechne('rente', klon, {
         bruttoRenteMonat: (posten?.bruttoJahr ?? 0) / 12,
         kvPvMonat: (posten?.kvPvJahr ?? 0) / 12,
@@ -969,6 +990,6 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
     const breakEven = rente && kapital && rente.nettoRenteMonat > 0 && kapital.nettoKapital > 0
       ? renteOderKapital(rente.nettoRenteMonat, kapital.nettoKapital, alterBeiRentenbeginn)
       : null;
-    return { angebot: a, rente, kapital, breakEven, rentenbeginnJahr };
+    return { angebot: a, rente, kapital, breakEven, rentenbeginnJahr, lueckeAnteil };
   });
 }

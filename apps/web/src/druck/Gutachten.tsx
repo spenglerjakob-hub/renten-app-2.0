@@ -13,6 +13,7 @@ import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnu
 import { pkvRechnen } from '../features/pkv-berechnung';
 import { personNameAus } from '../features/personen';
 import { kaufkraft } from '../features/kaufkraft';
+import { nettoHeuteMonat } from '../features/bezug';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
@@ -134,6 +135,8 @@ export function Gutachten({
   const heute = (n: number) => n / zeile.kaufkraftfaktor;
   // Dieselbe Umrechnung als Kaufkraftverlust in Euro — wie die Karte am Bildschirm.
   const kk = ergebnis ? kaufkraft(zeile) : null;
+  // Das heutige Haushaltsnetto — Bezugsgroesse fuer Startbeitrag und Aufwand (nicht das Netto im Alter).
+  const haushaltsNetto = nettoHeuteMonat(ergebnis);
   const bedarfHeute = h.zielNettoHeute;
   const nettoHeute = heute(zeile.nettoMonat);
   const lueckeHeute = Math.max(0, bedarfHeute - nettoHeute);
@@ -268,6 +271,7 @@ export function Gutachten({
             eingaben={SPARZIEL_VORGABE}
             rentenjahr={zeile.jahr}
             inflation={szenario.annahmen.inflation}
+            nettoHeute={haushaltsNetto}
           />
         ),
       }] : []),
@@ -299,6 +303,7 @@ export function Gutachten({
             vorgabe={szenario.loesungen.vorgabe}
             betragMonat={loesungen.betrag}
             angebote={loesungen.angebote}
+            nettoHeute={haushaltsNetto}
           />
         ),
       }] : []),

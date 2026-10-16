@@ -4,6 +4,7 @@ import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
+import { anteilAmNetto } from './bezug';
 import {
   sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
@@ -17,8 +18,10 @@ import {
  * Beitragsdynamik, weil ein Vertrag mit 3 % Steigerung heute deutlich
  * weniger kostet als einer ohne.
  */
-export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
+export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHeute = 0 }: {
   zeile: Jahreszeile;
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Startbeitrag */
+  nettoHeute?: number;
   /** Als eigene Etappe der Beratung: ohne Aufklappen, gleich mit Inhalt */
   immerOffen?: boolean;
   /** Meldet den noetigen Startbeitrag — die Loesungen koennen ihn uebernehmen */
@@ -117,6 +120,14 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
                 akzent
               />
             </div>
+            {/* Der Beitrag im Verhaeltnis — was er fuer den Haushalt bedeutet. */}
+            {anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute) && (
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind{' '}
+                <strong className="text-slate-800">{anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute)}</strong> Ihres
+                heutigen Haushaltsnettos von {euro(nettoHeute)} im Monat.
+              </p>
+            )}
 
             {/*
               Die Dynamik ist der eigentliche Punkt: sie senkt den Einstieg

@@ -3,6 +3,7 @@ import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import { auszeichnungen, type AngebotPosition } from '../features/tuev-berechnung';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
+import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
 
 /**
  * „Lösungen im Vergleich" — die letzte Etappe der Beratung auf Papier.
@@ -46,12 +47,14 @@ const kopfVon = (titel: string) => titel
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;
 
-export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }: {
+export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, nettoHeute = 0 }: {
   loesungen: Loesung[];
   /** Wie am Bildschirm: Netto-Aufwand oder Beitrag vorgegeben */
   vorgabe: LoesungsVorgabe;
   betragMonat: number;
   angebote: AngebotPosition[];
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
+  nettoHeute?: number;
 }) {
   const brutto = vorgabe === 'brutto';
   const sichtbar = loesungen.filter((l) => l.verfuegbar);
@@ -223,12 +226,18 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote }:
                     return (
                       <>
                         <Zeile zellen={['Kostet Sie netto im Monat', ...g.map((a) => euro(e(a).echterAufwandMonat))]} />
+                        {nettoHeute > 0 && (
+                          <Zeile zellen={['In % Ihres heutigen Nettos', ...g.map((a) => anteilAmNetto(e(a).echterAufwandMonat, nettoHeute) ?? '—')]} />
+                        )}
                         <Zeile zellen={['Fließt in den Vertrag', ...g.map((a) => euro(e(a).beitragMonat + e(a).zulageMonat))]} />
                         {mitRente && (
                           <>
                             <Gruppenzeile text="Als Rente" spalten={spalten} />
                             <Zeile zellen={['Rente brutto', ...r((x) => euro(x.bruttoRenteMonat))]} />
                             <Zeile fett zellen={['Rente netto', ...r((x) => euro(x.nettoRenteMonat))]} />
+                            {g.some((a) => a.lueckeAnteil) && (
+                              <Zeile zellen={['Schließt von der Lücke', ...g.map((a) => (a.lueckeAnteil ? anteilAnLuecke(a.lueckeAnteil.anteil) : '—'))]} />
+                            )}
                             <Zeile zellen={['Netto-Rente je 100 € Aufwand', ...r((x) => (x.echterAufwandMonat > 0
                               ? cent(x.nettoRenteMonat / x.echterAufwandMonat * 100) : '—'))]} />
                             <Zeile zellen={['Netto-Hebel', ...r((x) => `${zahl(x.nettoHebel)} ×`)]} />

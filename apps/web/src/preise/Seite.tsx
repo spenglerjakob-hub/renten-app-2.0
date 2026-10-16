@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import {
-  PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS,
+  PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS, FAELLE_VORGABE,
   preisJeNutzer, staffelIndex, type Intervall, type PaketId,
 } from '@renten/schema/preise';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
-import { IntervallSchalter, NutzerWahl, PaketPreis, preisText } from '../components/PaketWahl';
+import {
+  EMPFOHLEN_GRUND, FaelleWahl, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
+} from '../components/PaketWahl';
 
 /**
  * Die Preisseite (/preise).
@@ -93,9 +95,53 @@ const FRAGEN: { frage: string; antwort: string }[] = [
   },
 ];
 
+/**
+ * „Mit Ihrer Zeit rechnen“ — aufklappbar und LEER.
+ *
+ * Eine Zeitersparnis nennen wir bewusst nicht: Sie haengt am Buero, an den
+ * Faellen und an dem, womit bisher gerechnet wurde. Wer sie kennt, traegt sie
+ * ein und bekommt den Gegenwert je Fall; vorbelegt ist nichts.
+ */
+function ZeitRechnung() {
+  const id = useId();
+  const [minuten, setMinuten] = useState('');
+  const [stundensatz, setStundensatz] = useState('');
+  const zahl = (s: string) => Number(s.replace(',', '.'));
+  const m = zahl(minuten);
+  const h = zahl(stundensatz);
+  const gegenwert = m > 0 && h > 0 ? Math.round((m / 60) * h * 100) / 100 : null;
+  return (
+    <details className="mt-4 max-w-2xl rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <summary className="cursor-pointer text-sm font-bold text-slate-800">Mit Ihrer Zeit rechnen</summary>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        Eine Zeitersparnis nennen wir bewusst nicht — die kennen nur Sie. Wenn Sie schätzen möchten:
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-4">
+        <div>
+          <label htmlFor={`${id}-min`} className="mb-1 block text-xs font-bold text-slate-700">Gesparte Minuten je Fall</label>
+          <input id={`${id}-min`} inputMode="numeric" value={minuten} onChange={(e) => setMinuten(e.target.value)}
+            className="w-28 rounded-lg border border-slate-300 p-2 text-sm tabular-nums" />
+        </div>
+        <div>
+          <label htmlFor={`${id}-satz`} className="mb-1 block text-xs font-bold text-slate-700">Ihr Stundensatz (€)</label>
+          <input id={`${id}-satz`} inputMode="decimal" value={stundensatz} onChange={(e) => setStundensatz(e.target.value)}
+            className="w-28 rounded-lg border border-slate-300 p-2 text-sm tabular-nums" />
+        </div>
+      </div>
+      {gegenwert !== null && (
+        <p role="status" className="mt-3 text-sm text-slate-800">
+          Gegenwert Ihrer gesparten Zeit: <strong className="tabular-nums">{preisText(gegenwert)}</strong> je Fall —
+          zum Vergleich mit dem Preis je Beratungsfall in den Paketen oben.
+        </p>
+      )}
+    </details>
+  );
+}
+
 export function Seite() {
   const [intervall, setIntervall] = useState<Intervall>('monat');
   const [nutzer, setNutzer] = useState(1);
+  const [faelle, setFaelle] = useState(FAELLE_VORGABE);
   const staffel = staffelIndex(nutzer);
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
 
@@ -120,6 +166,14 @@ export function Seite() {
           <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
           <p className="text-xs text-slate-500">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
         </div>
+        {/*
+          DER PREIS JE FALL — eine Division mit der Zahl des Beraters, nicht
+          mit unserer. Vorbelegt ist eine vorsichtige Schaetzung; je mehr Faelle
+          dort stuenden, desto billiger saehe der Fall aus.
+        */}
+        <div className="mt-3">
+          <FaelleWahl wert={faelle} onWechsel={setFaelle} hinweis="Ihre Schätzung — daraus der Preis je Beratungsfall" />
+        </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
           {PAKETE.map((p) => (
@@ -132,13 +186,13 @@ export function Seite() {
             >
               {p.empfohlen && (
                 <span className="absolute -top-3 left-5 flex items-center gap-1 rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                  <Sparkles className="h-3 w-3" aria-hidden /> Empfohlen
+                  <Sparkles className="h-3 w-3" aria-hidden /> Empfohlen, {EMPFOHLEN_GRUND}
                 </span>
               )}
               <h2 id={`paket-${p.id}`} className="text-lg font-black text-slate-900">{p.name}</h2>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{p.kurz}</p>
               <div className="mt-4">
-                <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} />
+                <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} faelle={faelle} />
               </div>
               <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-700">
                 {LEISTUNGEN[p.id].map((l) => (
@@ -161,6 +215,8 @@ export function Seite() {
           ))}
         </div>
         <p className="mt-3 text-xs text-slate-500">Alle Preise netto, {UST_HINWEIS}</p>
+
+        <ZeitRechnung />
 
         <section aria-labelledby="staffel" className="mt-10">
           <h2 id="staffel" className="text-lg font-black text-slate-900">Mengenrabatt</h2>

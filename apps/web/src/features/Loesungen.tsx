@@ -11,6 +11,7 @@ import {
   foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
+import { anteilAmNetto, anteilAnLuecke } from './bezug';
 
 /**
  * LOESUNGEN — die letzte Etappe der Beratung.
@@ -43,8 +44,10 @@ const LOESUNG_TEXT: Record<LoesungId, string> = {
 const zahl = (n: number, stellen = 2) =>
   n.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
 
-export function Loesungen({ zeile, szenario, sparrate }: {
+export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
   zeile: Jahreszeile | null;
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
+  nettoHeute?: number;
   /** Das Szenario der Ansicht — in der Einzelbetrachtung nur eine Person */
   szenario: SzenarioParsed;
   /** Der Startbeitrag aus dem Sparrechner, falls es eine Luecke gibt */
@@ -173,6 +176,7 @@ export function Loesungen({ zeile, szenario, sparrate }: {
               bester={auszeichnung.meiste.includes(x.id)}
               guenstigste={auszeichnung.guenstigste.includes(x.id)}
               onErfassen={() => erfassen(x)}
+              nettoHeute={nettoHeute}
             />
           ))}
         </div>
@@ -182,7 +186,7 @@ export function Loesungen({ zeile, szenario, sparrate }: {
         </p>
       </section>
 
-      <Angebote szenario={szenario} />
+      <Angebote szenario={szenario} nettoHeute={nettoHeute} />
     </div>
   );
 }
@@ -214,9 +218,11 @@ function VorgabeSchalter({ wert, onWechsel }: { wert: LoesungsVorgabe; onWechsel
   );
 }
 
-function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen }: {
+function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute }: {
   x: Loesung; brutto: boolean; bester: boolean; guenstigste: boolean; onErfassen: () => void;
+  nettoHeute: number;
 }) {
+  const anteil = anteilAmNetto(x.nettoMonat, nettoHeute);
   const beitragText = x.id === 'bav' ? 'Bruttoumwandlung' : 'Ihr Beitrag';
   const ersparnis: [string, number][] = [
     ...(x.steuerErsparnisMonat >= 0.5 ? [['Steuerersparnis', x.steuerErsparnisMonat] as [string, number]] : []),
@@ -308,6 +314,18 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen }: {
             ))}
           </dl>
 
+          {/*
+            DER AUFWAND IM VERHAELTNIS. Bewusst nur der Aufwand: Wie viel der
+            Luecke eine Loesung schliesst, steht erst fest, wenn ein Angebot die
+            Rente nennt — dann rechnet es der Vergleich darunter nach Steuer und
+            Krankenversicherung. Eine Schaetzung hier fiele bei der bAV zu hoch
+            aus, deren Rente spaeter voll steuer- und beitragspflichtig ist.
+          */}
+          {anteil && (
+            <p className="mt-2 text-[11px] text-slate-600">
+              Netto-Aufwand {geld(x.nettoMonat)} = <strong>{anteil}</strong> Ihres heutigen Nettos
+            </p>
+          )}
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
             <strong className="text-slate-600">Im Alter:</strong> {x.besteuerung}
           </p>
@@ -335,7 +353,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen }: {
 
 /* ---------------------------------------------------------------------- */
 
-function Angebote({ szenario }: { szenario: SzenarioParsed }) {
+function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeute: number }) {
   const angebote = szenario.loesungen.angebote;
   const angebotAendern = useSzenario((x) => x.angebotAendern);
   const angebotEntfernen = useSzenario((x) => x.angebotEntfernen);
@@ -477,7 +495,7 @@ function Angebote({ szenario }: { szenario: SzenarioParsed }) {
             })}
           </div>
 
-          <AngebotsTabelle positionen={positionen} />
+          <AngebotsTabelle positionen={positionen} nettoHeute={nettoHeute} />
         </>
       )}
     </section>
@@ -497,7 +515,7 @@ const einzahlung = (p: Position) => p.rente ?? p.kapital;
 /** Die hoechste Nettorendite eines Angebots ueber beide Wege. */
 const besteRenditeVon = (p: Position) => Math.max(p.rente?.rendite ?? -Infinity, p.kapital?.rendite ?? -Infinity);
 
-function AngebotsTabelle({ positionen }: { positionen: Position[] }) {
+function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; nettoHeute: number }) {
   const mitRente = positionen.some((p) => p.rente);
   const mitKapital = positionen.some((p) => p.kapital);
   const mitVergleich = positionen.some((p) => p.breakEven);
@@ -506,6 +524,11 @@ function AngebotsTabelle({ positionen }: { positionen: Position[] }) {
 
   const zeilen: Zeile[] = [
     { text: 'Kostet Sie netto im Monat', wert: (p) => { const e = einzahlung(p); return e ? euro(e.echterAufwandMonat) : null; } },
+    ...(nettoHeute > 0 ? [{
+      text: 'In % Ihres heutigen Nettos',
+      info: `Der Netto-Aufwand im Verhältnis zum heutigen Haushaltsnetto von ${euro(nettoHeute)} im Monat.`,
+      wert: (p: Position) => { const e = einzahlung(p); return e ? anteilAmNetto(e.echterAufwandMonat, nettoHeute) : null; },
+    }] : []),
     { text: 'Fließt in den Vertrag', wert: (p) => { const e = einzahlung(p); return e ? euro(e.beitragMonat + e.zulageMonat) : null; } },
     ...(mitRente ? [
       { gruppe: 'Als Rente' },
@@ -515,6 +538,11 @@ function AngebotsTabelle({ positionen }: { positionen: Position[] }) {
         info: 'Nach Steuer und Kranken-/Pflegeversicherung im ersten Rentenjahr — anteilig an der Steuer des Haushalts, wie im Kassenbon.',
         wert: (p: Position) => (p.rente ? euro(p.rente.nettoRenteMonat) : null),
       },
+      ...(positionen.some((p) => p.lueckeAnteil) ? [{
+        text: 'Schließt von der Lücke',
+        info: 'So viel steigt das Netto des Haushalts im ersten Rentenjahr mit diesem Angebot — geteilt durch die Lücke im selben Jahr. Nach Steuer und Krankenversicherung.',
+        wert: (p: Position) => (p.lueckeAnteil ? anteilAnLuecke(p.lueckeAnteil.anteil) : null),
+      }] : []),
       {
         text: 'Netto-Rente je 100 € Aufwand',
         wert: (p: Position) => (p.rente && p.rente.echterAufwandMonat > 0

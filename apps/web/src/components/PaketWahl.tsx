@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
 import { CreditCard, Minus, Plus } from 'lucide-react';
 import {
-  PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, gesamtpreis, ersparnis,
-  type Intervall, type PaketId,
+  PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, gesamtpreis, ersparnis, preisJeFall,
+  FAELLE_VORGABE, type Intervall, type PaketId,
 } from '@renten/schema/preise';
 
 /**
@@ -21,6 +21,12 @@ const euroCentFormat = new Intl.NumberFormat('de-DE', {
 });
 /** Ganze Euro, wenn es keine Cent gibt — sonst mit Cent. */
 export const preisText = (n: number) => (Number.isInteger(n) ? euroFormat : euroCentFormat).format(n);
+
+/**
+ * WARUM „Empfohlen“ — ein Abzeichen ohne Grund waere nur ein Schubs. Mit
+ * Grund kann der Berater selbst pruefen, ob er auf ihn zutrifft.
+ */
+export const EMPFOHLEN_GRUND = 'wenn Sie Privat- und Firmenkunden beraten';
 
 export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWechsel: (i: Intervall) => void }) {
   const gratis = 12 - JAHR_MONATE;
@@ -90,8 +96,70 @@ export function NutzerWahl({ wert, onWechsel }: { wert: number; onWechsel: (n: n
   );
 }
 
+/** Hoechstens so viele Faelle im Monat — darueber waere es kein Beratungsfall mehr, sondern ein Tippfehler. */
+const MAX_FAELLE = 200;
+
+/**
+ * Faelle im Monat — die Bezugsgroesse fuer den Preis je Fall.
+ *
+ * DIE ZAHL GEHOERT DEM BERATER. Vorbelegt ist eine vorsichtige Schaetzung
+ * (`FAELLE_VORGABE`); je hoeher sie stuende, desto billiger saehe der Fall
+ * aus. Deshalb die kleine Zahl und der Hinweis, dass es seine ist.
+ */
+export function FaelleWahl({ wert, onWechsel, hinweis = 'Ihre Schätzung' }: {
+  wert: number;
+  onWechsel: (n: number) => void;
+  hinweis?: string;
+}) {
+  const id = useId();
+  const setze = (n: number) => onWechsel(Math.min(MAX_FAELLE, Math.max(1, Math.round(n) || 1)));
+  return (
+    <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <label htmlFor={id} className="text-sm font-bold text-slate-700">Fälle im Monat</label>
+      <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white">
+        <button type="button" aria-label="Ein Fall weniger" onClick={() => setze(wert - 1)} disabled={wert <= 1}
+          className="rounded-l-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30">
+          <Minus className="h-4 w-4" aria-hidden />
+        </button>
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={MAX_FAELLE}
+          value={wert}
+          onChange={(e) => setze(Number(e.target.value))}
+          aria-describedby={`${id}-hinweis`}
+          className="w-14 border-x border-slate-200 py-1.5 text-center text-sm font-bold tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <button type="button" aria-label="Ein Fall mehr" onClick={() => setze(wert + 1)} disabled={wert >= MAX_FAELLE}
+          className="rounded-r-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30">
+          <Plus className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      <span id={`${id}-hinweis`} className="text-xs text-slate-500">{hinweis}</span>
+    </div>
+  );
+}
+
+/** „≈ 11,80 € je Beratungsfall bei 5 Fällen im Monat“ — netto, wie alle Preise. */
+export function PreisJeFall({ id, intervall, nutzer, faelle, klasse = 'mt-1.5 text-sm text-slate-700' }: {
+  id: PaketId; intervall: Intervall; nutzer: number; faelle: number; klasse?: string;
+}) {
+  return (
+    <p className={klasse}>
+      ≈ <strong className="tabular-nums">{preisText(preisJeFall(id, intervall, nutzer, faelle))}</strong> je
+      Beratungsfall bei {faelle} {faelle === 1 ? 'Fall' : 'Fällen'} im Monat
+    </p>
+  );
+}
+
 /** Preis je Nutzer, Summe fuer das Buero und was der Mengenrabatt spart. */
-export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: Intervall; nutzer: number }) {
+export function PaketPreis({ id, intervall, nutzer, faelle }: {
+  id: PaketId; intervall: Intervall; nutzer: number;
+  /** Mit Faellen: dazu der Preis je Beratungsfall */
+  faelle?: number;
+}) {
   const je = preisJeNutzer(id, intervall, nutzer);
   const summe = gesamtpreis(id, intervall, nutzer);
   const spart = ersparnis(id, intervall, nutzer);
@@ -115,6 +183,7 @@ export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: 
           Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
         </p>
       )}
+      {faelle !== undefined && <PreisJeFall id={id} intervall={intervall} nutzer={nutzer} faelle={faelle} />}
     </div>
   );
 }
@@ -128,7 +197,7 @@ export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: 
  */
 export function PaketBuchung({
   bereit, onBuchen, vorauswahl = 'alles', nutzerVorschlag = 1, laedt = false, fehler = null,
-  gesperrtText = 'Die Buchung wird gerade eingerichtet und startet in Kürze.',
+  gesperrtText = 'Die Buchung wird gerade eingerichtet und startet in Kürze.', faelleAusKonto,
 }: {
   bereit: boolean;
   onBuchen: (paket: PaketId, intervall: Intervall, nutzer: number) => void;
@@ -139,11 +208,18 @@ export function PaketBuchung({
   nutzerVorschlag?: number;
   laedt?: boolean;
   fehler?: string | null;
+  /**
+   * Gespeicherte Faelle der letzten 30 Tage — eine ECHTE Zahl aus dem Konto
+   * statt einer Annahme. Ohne Faelle gilt die vorsichtige Vorgabe.
+   */
+  faelleAusKonto?: number;
 }) {
   const id = useId();
   const [paket, setPaket] = useState<PaketId>(vorauswahl);
   const [intervall, setIntervall] = useState<Intervall>('monat');
   const [nutzer, setNutzer] = useState(() => Math.min(MAX_NUTZER, Math.max(1, nutzerVorschlag)));
+  const ausKonto = faelleAusKonto !== undefined && faelleAusKonto > 0;
+  const [faelle, setFaelle] = useState(() => (ausKonto ? faelleAusKonto : FAELLE_VORGABE));
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
   const summe = gesamtpreis(paket, intervall, nutzer);
   const spart = ersparnis(paket, intervall, nutzer);
@@ -153,6 +229,13 @@ export function PaketBuchung({
       <div className="flex flex-wrap items-center gap-3">
         <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
         <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
+        <FaelleWahl
+          wert={faelle}
+          onWechsel={setFaelle}
+          hinweis={ausKonto && faelle === faelleAusKonto
+            ? `aus Ihrem Konto: ${faelleAusKonto} gespeicherte ${faelleAusKonto === 1 ? 'Fall' : 'Fälle'} in 30 Tagen`
+            : 'Ihre Schätzung'}
+        />
       </div>
 
       <div role="radiogroup" aria-label="Paket" className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -174,8 +257,9 @@ export function PaketBuchung({
               }`}
             >
               {p.empfohlen && (
-                <span id={`${k}-tipp`} className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                  Empfohlen
+                <span id={`${k}-tipp`} title={EMPFOHLEN_GRUND}
+                  className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  Empfohlen<span className="sr-only">, {EMPFOHLEN_GRUND}</span>
                 </span>
               )}
               <span id={`${k}-name`} className="text-sm font-black text-slate-900">{p.name}</span>
@@ -201,6 +285,7 @@ export function PaketBuchung({
             Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
           </p>
         )}
+        <PreisJeFall id={paket} intervall={intervall} nutzer={nutzer} faelle={faelle} klasse="mt-0.5 text-xs text-slate-600" />
       </div>
 
       <button

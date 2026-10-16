@@ -4,6 +4,7 @@ import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
+import { anteilAmNetto } from './bezug';
 
 /**
  * "Was die Luecke fuer Sie bedeutet" — die Bruecke vom Ergebnis zum Sparrechner.
@@ -18,8 +19,10 @@ import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
  * Schritt 3 und dem Gutachten ueberein, solange dort niemand die Annahmen
  * aendert. Ohne Luecke oder ohne Sparzeit entfaellt die Karte.
  */
-export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }: {
+export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', nettoHeute = 0 }: {
   zeile: Jahreszeile;
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer die Sparrate */
+  nettoHeute?: number;
   /** Steht die Kopfzahl schon in heutigem Geld, nennt die Karte den nominalen Betrag */
   kaufkraftHeute: boolean;
   onSparen: () => void;
@@ -28,6 +31,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
   const szenario = useSzenario((x) => x.szenario);
   const r = useMemo(() => sparzielRechnen(szenario, zeile, SPARZIEL_VORGABE), [szenario, zeile]);
   if (!r) return null;
+  const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
 
   return (
     <section className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
@@ -45,7 +49,13 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
 
       <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
         <Posten label="Nötiges Kapital zum Rentenbeginn" wert={euro(r.zielkapital)} />
-        <Posten label="Sparrate ab heute" wert={`${euro(r.gewaehlt.startbeitrag)} im Monat`} ton="betont" />
+        {/* Mit Bezugsgroesse: was die Rate fuer den Haushalt bedeutet. */}
+        <Posten
+          label="Sparrate ab heute"
+          wert={`${euro(r.gewaehlt.startbeitrag)} im Monat`}
+          ton="betont"
+          zusatz={anteil ? `= ${anteil} Ihres heutigen Haushaltsnettos (${euro(nettoHeute)})` : undefined}
+        />
         {/*
           Die Zahl bleibt — sie ist echt und aus derselben Rechnung. Gesetzt
           ist sie aber sachlich, nicht in Warnrot: Sie soll informieren, nicht
@@ -70,7 +80,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
   );
 }
 
-function Posten({ label, wert, ton }: { label: string; wert: string; ton?: 'betont' }) {
+function Posten({ label, wert, ton, zusatz }: { label: string; wert: string; ton?: 'betont'; zusatz?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-slate-600">{label}</dt>
@@ -78,6 +88,7 @@ function Posten({ label, wert, ton }: { label: string; wert: string; ton?: 'beto
         ton === 'betont' ? 'text-indigo-700' : 'text-slate-900'
       }`}>
         {wert}
+        {zusatz && <span className="block text-[11px] font-normal text-slate-500">{zusatz}</span>}
       </dd>
     </div>
   );

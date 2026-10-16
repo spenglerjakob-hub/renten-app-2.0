@@ -1,6 +1,7 @@
 import { euro, prozent } from '../components/Feld';
 import type { SparzielErgebnis, SparzielEingaben } from '../features/sparziel-berechnung';
 import { Seite, Untertitel, Tabelle, Zeile, GrosseZahl, Text } from './Bausteine';
+import { anteilAmNetto } from '../features/bezug';
 
 /**
  * "Was Sie jetzt tun koennen" — die Luecke als Monatsbetrag.
@@ -11,14 +12,17 @@ import { Seite, Untertitel, Tabelle, Zeile, GrosseZahl, Text } from './Bausteine
  * dem Betrag zu tun ist, gehoert ins Gespraech, nicht in eine Modellrechnung.
  */
 export function Sparziel({
-  ergebnis, eingaben, rentenjahr, inflation,
+  ergebnis, eingaben, rentenjahr, inflation, nettoHeute = 0,
 }: {
   ergebnis: SparzielErgebnis;
   eingaben: SparzielEingaben;
   rentenjahr: number;
   inflation: number;
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Startbeitrag */
+  nettoHeute?: number;
 }) {
   const r = ergebnis;
+  const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
 
   return (
     <Seite
@@ -44,6 +48,12 @@ export function Sparziel({
           hinweis={`im Monat, ${r.jahreBisRente} Jahre lang`}
         />
       </div>
+      {anteil && (
+        <Text>
+          Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind <strong>{anteil}</strong> Ihres heutigen
+          Haushaltsnettos von {euro(nettoHeute)} im Monat.
+        </Text>
+      )}
 
       {/*
         Die Dynamik ist der Kern dieser Seite: derselbe Betrag am Ende, aber

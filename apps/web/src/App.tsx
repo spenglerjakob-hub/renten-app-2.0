@@ -24,6 +24,7 @@ import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
 import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
+import { nettoHeuteMonat } from './features/bezug';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
@@ -414,6 +415,8 @@ export default function App() {
   );
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
+  // Das heutige Haushaltsnetto — die Bezugsgroesse fuer Sparrate und Beitraege.
+  const nettoHeute = nettoHeuteMonat(ergebnis);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
   const hinweise = ergebnis && !echteZeile ? ergebnis.hinweise : [];
 
@@ -982,6 +985,7 @@ export default function App() {
                     kaufkraftHeute={kaufkraftHeute}
                     onSparen={() => geheZu('sparen')}
                     klasse="hidden lg:sticky lg:top-32 lg:block"
+                    nettoHeute={nettoHeute}
                   />
                 </div>
                 <div className="space-y-4 sm:space-y-6 lg:col-span-7">
@@ -1026,6 +1030,7 @@ export default function App() {
                     kaufkraftHeute={kaufkraftHeute}
                     onSparen={() => geheZu('sparen')}
                     klasse="lg:hidden"
+                    nettoHeute={nettoHeute}
                   />
 
                   <Rechtsstand
@@ -1057,7 +1062,7 @@ export default function App() {
             {ergebnis ? (
               <div className="space-y-4 sm:space-y-6">
                 {kopfzahlen}
-                <Sparrechner zeile={zeile} immerOffen onStartbeitrag={setSparrate} />
+                <Sparrechner zeile={zeile} immerOffen onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
               </div>
             ) : rechnetText}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Womit? Lösungen vergleichen" />
@@ -1092,7 +1097,7 @@ export default function App() {
               />
             </div>
             {tuevReiter === 'loesungen' ? (
-              <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} />
+              <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
             ) : (
               <div className="-mx-2 sm:-mx-6">
                 <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />

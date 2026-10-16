@@ -15,6 +15,7 @@ import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
 import { useVorbelegt } from './useVorbelegt';
+import { nettoHeuteMonat as nettoHeute } from './bezug';
 
 /**
  * Faustregel fuer das Ziel: 80 % des heutigen Nettos, auf 50 EUR gerundet.
@@ -83,9 +84,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
     ohne Ergebnis, ohne Einkommen, und wenn der Ruhestand bereits begonnen
     hat — dann ist `zeilen[0]` kein Erwerbsjahr mehr.
   */
-  const heute0 = ergebnis?.zeilen[0];
-  const nettoHeuteMonat =
-    heute0 && !heute0.vollstaendigImRuhestand ? heute0.nettoGesamt / 12 : 0;
+  const nettoHeuteMonat = nettoHeute(ergebnis);
   const zielAnteil =
     nettoHeuteMonat > 0 ? s.haushalt.zielNettoHeute / nettoHeuteMonat : null;
   const zielVorschlag = nettoHeuteMonat > 0

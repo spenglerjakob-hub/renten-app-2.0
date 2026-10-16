@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PAKETE, STAFFEL_AB, JAHR_MONATE,
   staffelIndex, preisJeNutzer, gesamtpreis, ersparnis, jahresvorteil,
-  stripeStaffeln, lookupKey, paketDeckt, paketVon,
+  stripeStaffeln, lookupKey, paketDeckt, paketVon, preisJeFall, FAELLE_VORGABE,
 } from '../src/preise.js';
 
 describe('Preisstaffel', () => {
@@ -84,5 +84,31 @@ describe('Bereiche', () => {
   it('kennt kein unbekanntes Paket', () => {
     // @ts-expect-error: absichtlich falsche Kennung
     expect(() => paketVon('gold')).toThrow();
+  });
+});
+
+describe('Preis je Beratungsfall', () => {
+  it('teilt den Monatspreis durch die Fälle', () => {
+    expect(preisJeFall('alles', 'monat', 1, 5)).toBe(11.8);
+    expect(preisJeFall('alles', 'monat', 1, 6)).toBe(9.83);
+    expect(preisJeFall('rente', 'monat', 1, 5)).toBe(7.8);
+  });
+
+  it('nimmt bei Jahreszahlung ein Zwölftel des Jahrespreises', () => {
+    // 59 € × 10 Monatspreise = 590 € im Jahr, 49,17 € im Monat, bei 5 Fällen 9,83 €.
+    expect(preisJeFall('alles', 'jahr', 1, 5)).toBe(9.83);
+  });
+
+  it('gilt mit dem Staffelpreis des Büros', () => {
+    expect(preisJeFall('alles', 'monat', 3, 5)).toBe(10.6);
+  });
+
+  it('weniger als ein Fall zählt als einer', () => {
+    expect(preisJeFall('alles', 'monat', 1, 0)).toBe(59);
+    expect(preisJeFall('alles', 'monat', 1, 0.4)).toBe(59);
+  });
+
+  it('die Vorgabe ist vorsichtig', () => {
+    expect(FAELLE_VORGABE).toBe(5);
   });
 });

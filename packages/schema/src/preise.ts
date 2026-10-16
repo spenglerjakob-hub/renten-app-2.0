@@ -105,6 +105,21 @@ export function ersparnis(id: PaketId, intervall: Intervall, nutzer: number): nu
   return preisJeNutzer(id, intervall, 1) * ganz(nutzer) - gesamtpreis(id, intervall, nutzer);
 }
 
+/**
+ * Preis je Beratungsfall — der Monatspreis je Nutzer (bei Jahreszahlung ein
+ * Zwoelftel des Jahrespreises) geteilt durch die Faelle im Monat, auf Cent.
+ *
+ * Eine reine Division mit der Zahl des Beraters: Wie viele Faelle er im
+ * Monat rechnet, weiss nur er. Weniger als ein Fall gilt als einer.
+ */
+export function preisJeFall(id: PaketId, intervall: Intervall, nutzer: number, faelleImMonat: number): number {
+  const monat = intervall === 'jahr' ? preisJeNutzer(id, 'jahr', nutzer) / 12 : preisJeNutzer(id, 'monat', nutzer);
+  return Math.round((monat / Math.max(1, Math.floor(faelleImMonat))) * 100) / 100;
+}
+
+/** Vorgabe fuer die Faelle im Monat: vorsichtig — lieber zu wenige als zu viele. */
+export const FAELLE_VORGABE = 5;
+
 /** Was die Jahreszahlung je Nutzer spart — gegenueber zwoelf Monatszahlungen. */
 export function jahresvorteil(id: PaketId, nutzer: number): number {
   return preisJeNutzer(id, 'monat', nutzer) * 12 - preisJeNutzer(id, 'jahr', nutzer);
