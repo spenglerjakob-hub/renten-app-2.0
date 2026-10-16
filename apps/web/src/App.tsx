@@ -23,6 +23,7 @@ import { Sparrechner } from './features/Sparrechner';
 import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
 import { LueckeBedeutung } from './features/LueckeBedeutung';
+import { KaufkraftKarte } from './features/KaufkraftKarte';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
 import { SteuerEngine } from './features/SteuerEngine';
@@ -955,6 +956,12 @@ export default function App() {
               <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
                 <div className="space-y-4 sm:space-y-6 lg:col-span-5">
                   {kopfzahlen}
+                  {/* Luecke und Kaufkraftverlust in Euro — die Zahlen fuer das Gespraech. */}
+                  <KaufkraftKarte
+                    zeile={zeile}
+                    inflation={szenario.annahmen.inflation}
+                    standard={offenePfade(szenario).includes('annahmen.inflation')}
+                  />
                   <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
                     Die Praemie im Ruhestand ist fuer einen privat Versicherten

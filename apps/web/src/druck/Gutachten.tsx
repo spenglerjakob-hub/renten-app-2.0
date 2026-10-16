@@ -12,6 +12,7 @@ import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
 import { personNameAus } from '../features/personen';
+import { kaufkraft } from '../features/kaufkraft';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
@@ -131,6 +132,8 @@ export function Gutachten({
   // Zeile rechnet einen Betrag des Rentenjahres auf das heutige Preisniveau
   // zurueck; gerechnet wird also nichts Neues.
   const heute = (n: number) => n / zeile.kaufkraftfaktor;
+  // Dieselbe Umrechnung als Kaufkraftverlust in Euro — wie die Karte am Bildschirm.
+  const kk = ergebnis ? kaufkraft(zeile) : null;
   const bedarfHeute = h.zielNettoHeute;
   const nettoHeute = heute(zeile.nettoMonat);
   const lueckeHeute = Math.max(0, bedarfHeute - nettoHeute);
@@ -390,6 +393,14 @@ export function Gutachten({
           in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
           Rentenjahres statt im Geld von heute. Die Seite „Ihre Renteneinkünfte“ nennt beide
           Maßstäbe nebeneinander.
+          {/* Der Kaufkraftverlust in Euro — dieselbe Umrechnung wie die Kacheln. */}
+          {kk && kk.verlustMonat > 0 && (
+            <>
+              {' '}Ihr erwartetes Netto von <strong>{euro(kk.nettoNominal)}</strong> im Jahr {kk.jahr} entspricht
+              heute {euro(kk.nettoHeute)} — ein Kaufkraftverlust von{' '}
+              <strong>{euro(kk.verlustMonat)} im Monat ({prozent(kk.verlustQuote, 0)})</strong>.
+            </>
+          )}
         </Text>
 
         <Untertitel>Im Jahr {zeile.jahr} — mit Inflation gerechnet</Untertitel>

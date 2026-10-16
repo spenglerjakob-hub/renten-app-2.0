@@ -32,7 +32,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
   return (
     <section className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
       <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-        <Hourglass className="h-4 w-4 shrink-0 text-rose-500" aria-hidden /> Was die Lücke für Sie bedeutet
+        <Hourglass className="h-4 w-4 shrink-0 text-slate-500" aria-hidden /> Was die Lücke für Sie bedeutet
       </h3>
 
       <dl className="mt-3 space-y-2 text-sm">
@@ -46,7 +46,12 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
       <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
         <Posten label="Nötiges Kapital zum Rentenbeginn" wert={euro(r.zielkapital)} />
         <Posten label="Sparrate ab heute" wert={`${euro(r.gewaehlt.startbeitrag)} im Monat`} ton="betont" />
-        <Posten label="Jedes Jahr Warten" wert={`+ ${euro(r.proJahrWarten.mehrProMonat)} im Monat`} ton="warnend" />
+        {/*
+          Die Zahl bleibt — sie ist echt und aus derselben Rechnung. Gesetzt
+          ist sie aber sachlich, nicht in Warnrot: Sie soll informieren, nicht
+          draengen.
+        */}
+        <Posten label="Ein Jahr später beginnen" wert={`+ ${euro(r.proJahrWarten.mehrProMonat)} Sparrate im Monat`} />
       </dl>
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
@@ -65,12 +70,12 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '' }
   );
 }
 
-function Posten({ label, wert, ton }: { label: string; wert: string; ton?: 'betont' | 'warnend' }) {
+function Posten({ label, wert, ton }: { label: string; wert: string; ton?: 'betont' }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-slate-600">{label}</dt>
       <dd className={`shrink-0 text-right font-bold tabular-nums ${
-        ton === 'betont' ? 'text-indigo-700' : ton === 'warnend' ? 'text-rose-600' : 'text-slate-900'
+        ton === 'betont' ? 'text-indigo-700' : 'text-slate-900'
       }`}>
         {wert}
       </dd>

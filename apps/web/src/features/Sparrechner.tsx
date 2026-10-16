@@ -201,7 +201,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
                           [
                             'Mehr als heute',
                             a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`,
-                            a.wartenJahre === 0 ? undefined : 'text-rose-600',
+                            a.wartenJahre === 0 ? undefined : 'text-slate-700',
                           ],
                         ]}
                       />
@@ -240,7 +240,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
                             {euro(a.summeBeitraege)}
                           </td>
                           <td className={`py-1.5 text-right tabular-nums ${
-                            a.wartenJahre === 0 ? 'text-slate-400' : 'text-rose-600'
+                            a.wartenJahre === 0 ? 'text-slate-400' : 'text-slate-700'
                           }`}>
                             {a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`}
                           </td>
@@ -255,15 +255,18 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag }: {
                   11-px-Fussnote unter einer Tabelle. In Lesegroesse und mit
                   eigenem Rahmen, wie die uebrigen Hinweiskaesten.
                 */}
-                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
-                  <p className="text-sm font-bold leading-snug text-rose-800">
-                    Jedes Jahr Warten kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
-                    — und {euro(r.proJahrWarten.mehrGesamt)} mehr insgesamt.
+                {/*
+                  Sachlich gesetzt, nicht in Warnrot: Die Zahl ist echt und
+                  gehoert ins Gespraech — draengen soll sie nicht.
+                */}
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <p className="text-sm font-bold leading-snug text-slate-800">
+                    Ein Jahr später zu beginnen kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
+                    — und {euro(r.proJahrWarten.mehrGesamt)} mehr Beiträge insgesamt.
                   </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-rose-900">
-                    Und das, obwohl dann über <strong>weniger</strong> Jahre gezahlt wird. Die
-                    frühen Jahre sind die wertvollsten, weil ihre Erträge am längsten
-                    mitarbeiten.
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                    Obwohl dann über weniger Jahre gezahlt wird: Den späteren Beiträgen fehlen die
+                    Erträge der frühen Jahre. Gleiche Rendite und gleiches Ziel unterstellt.
                   </p>
                 </div>
               </div>
