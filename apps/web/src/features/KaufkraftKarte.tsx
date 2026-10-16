@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ClipboardCopy, Check, Coins } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
@@ -19,6 +19,8 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   standard?: boolean;
   klasse?: string;
 }) {
+  // Eigene Kennung je Einbindung: Die Karte steht zweimal im Dokument (Telefon und PC).
+  const titelId = useId();
   const [kopiert, setKopiert] = useState(false);
   useEffect(() => {
     if (!kopiert) return;
@@ -34,8 +36,8 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   };
 
   return (
-    <section aria-labelledby="kaufkraft-titel" className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
-      <h3 id="kaufkraft-titel" className="flex items-center gap-2 text-sm font-bold text-slate-800">
+    <section aria-labelledby={titelId} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
+      <h3 id={titelId} className="flex items-center gap-2 text-sm font-bold text-slate-800">
         <Coins className="h-4 w-4 shrink-0 text-slate-500" aria-hidden /> Kaufkraft bis zum Rentenbeginn
       </h3>
 
@@ -51,7 +53,10 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
         {k.lueckeNominal > 0 && (
           <Posten
             label="Versorgungslücke"
-            wert={`${euro(k.lueckeNominal)} (${k.jahr}) · ${euro(k.lueckeHeute)} heute`}
+            wert={<>
+              <span className="whitespace-nowrap">{euro(k.lueckeNominal)} ({k.jahr})</span>{' · '}
+              <span className="whitespace-nowrap">{euro(k.lueckeHeute)} heute</span>
+            </>}
             ton="luecke"
           />
         )}
@@ -78,11 +83,12 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   );
 }
 
-function Posten({ label, wert, fett, ton }: { label: string; wert: string; fett?: boolean; ton?: 'luecke' }) {
+function Posten({ label, wert, fett, ton }: { label: string; wert: ReactNode; fett?: boolean; ton?: 'luecke' }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-slate-600">{label}</dt>
-      <dd className={`shrink-0 text-right tabular-nums ${fett ? 'font-bold' : 'font-semibold'} ${
+      {/* Darf umbrechen — am Telefon passt „1.706 € (2052) · 1.020 € heute“ nicht in eine Zeile. */}
+      <dd className={`min-w-0 text-right tabular-nums ${fett ? 'font-bold' : 'font-semibold'} ${
         ton === 'luecke' ? 'text-rose-600' : 'text-slate-900'
       }`}>
         {wert}

@@ -54,7 +54,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
           label="Sparrate ab heute"
           wert={`${euro(r.gewaehlt.startbeitrag)} im Monat`}
           ton="betont"
-          zusatz={anteil ? `= ${anteil} Ihres heutigen Haushaltsnettos (${euro(nettoHeute)})` : undefined}
+          zusatz={anteil ? `= ${anteil} Ihres heutigen Nettos von ${euro(nettoHeute)}` : undefined}
         />
         {/*
           Die Zahl bleibt — sie ist echt und aus derselben Rechnung. Gesetzt
@@ -83,8 +83,8 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
 function Posten({ label, wert, ton, zusatz }: { label: string; wert: string; ton?: 'betont'; zusatz?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-slate-600">{label}</dt>
-      <dd className={`shrink-0 text-right font-bold tabular-nums ${
+      <dt className="shrink-0 text-slate-600">{label}</dt>
+      <dd className={`min-w-0 text-right font-bold tabular-nums ${
         ton === 'betont' ? 'text-indigo-700' : 'text-slate-900'
       }`}>
         {wert}

@@ -167,7 +167,8 @@ function KopfAuswahl({
           </option>
         ))}
       </select>
-      {standard && <span aria-hidden className="text-[10px] font-normal opacity-80">Standard</span>}
+      {/* Zwischen md und xl steht die Kopfleiste einzeilig und knapp — dort traegt nur der Tooltip die Marke. */}
+      {standard && <span aria-hidden className="text-[10px] font-normal opacity-80 md:hidden xl:inline">Standard</span>}
     </span>
   );
 }
@@ -959,11 +960,18 @@ export default function App() {
               <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
                 <div className="space-y-4 sm:space-y-6 lg:col-span-5">
                   {kopfzahlen}
-                  {/* Luecke und Kaufkraftverlust in Euro — die Zahlen fuer das Gespraech. */}
+                  {/*
+                    LUECKE UND KAUFKRAFTVERLUST IN EURO — die Zahlen fuer das
+                    Gespraech. Am Telefon direkt unter den Kopfzahlen, am PC
+                    oben rechts (unten): In der linken Spalte machte sie diese
+                    hoeher als die rechte, und die mitlaufende Karte „Was die
+                    Luecke bedeutet“ blieb nicht mehr stehen.
+                  */}
                   <KaufkraftKarte
                     zeile={zeile}
                     inflation={szenario.annahmen.inflation}
                     standard={offenePfade(szenario).includes('annahmen.inflation')}
+                    klasse="lg:hidden"
                   />
                   <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
@@ -989,6 +997,12 @@ export default function App() {
                   />
                 </div>
                 <div className="space-y-4 sm:space-y-6 lg:col-span-7">
+                  <KaufkraftKarte
+                    zeile={zeile}
+                    inflation={szenario.annahmen.inflation}
+                    standard={offenePfade(szenario).includes('annahmen.inflation')}
+                    klasse="hidden lg:block"
+                  />
                   <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                     <button
                       type="button"
