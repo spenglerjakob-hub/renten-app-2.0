@@ -1,7 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { Basisdaten, type BasisTeil } from './Basisdaten';
+import { useSzenario } from '../store/szenario';
+import { eintragVon, offenePfade, relevant } from './vorbelegung';
+import type { FallSchrittId } from './fortschritt';
 
 /**
  * DER ASSISTENT fuer die erste Etappe: dieselben Angaben wie im Formular,
@@ -83,7 +86,9 @@ const SCHRITTE: AssistentSchritt[] = [
 ];
 
 const SPEICHER = 'rentenplaner.assistent.v1';
-function ladeSchritt(): number {
+
+/** Der zuletzt offene Schritt — eine Bequemlichkeit je Geraet. */
+export function ladeAssistentSchritt(): number {
   try {
     const n = Number(localStorage.getItem(SPEICHER));
     if (Number.isInteger(n) && n >= 0 && n < SCHRITTE.length) return n;
@@ -91,26 +96,72 @@ function ladeSchritt(): number {
   return 0;
 }
 
-export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig }: {
+export function merkeAssistentSchritt(n: number): number {
+  const z = Math.max(0, Math.min(SCHRITTE.length - 1, n));
+  try { localStorage.setItem(SPEICHER, String(z)); } catch { /* Speicher gesperrt */ }
+  return z;
+}
+
+/**
+ * Wohin ein offener Schritt des Fortschritts fuehrt. Die Einkuenfte stehen
+ * in zwei Schritten: die gesetzliche Rente bei der Person, das Gehalt
+ * darunter — gesprungen wird dorthin, wo noch ein Beispielwert steht.
+ */
+export function assistentSchrittFuer(id: FallSchrittId, offen: readonly string[]): number | null {
+  switch (id) {
+    case 'mandant': return SCHRITTE.findIndex((x) => x.teil === 'personen');
+    // Nur Beispielwerte zaehlen — Standardwerte wie „12 Gehaelter“ fehlen nicht.
+    case 'einkuenfte': return offen.some((p) => p.startsWith('einkommen') && eintragVon(p)?.art === 'beispiel')
+      ? SCHRITTE.findIndex((x) => x.teil === 'einkommen')
+      : SCHRITTE.findIndex((x) => x.teil === 'personen');
+    case 'vertraege': return SCHRITTE.findIndex((x) => x.teil === 'vertraege');
+    case 'ziel': return SCHRITTE.findIndex((x) => x.teil === 'ziel');
+    default: return null;
+  }
+}
+
+/** Welche offenen Pfade zu einem Schritt des Assistenten gehoeren. */
+const PFADE_JE_TEIL: Record<AssistentSchritt['teil'], (p: string) => boolean> = {
+  haushalt: (p) => p.startsWith('haushalt.') && p !== 'haushalt.zielNettoHeute',
+  personen: (p) => /^personen\.[AB]\.(geburtsdatum|grvBruttoHeute)$/.test(p),
+  einkommen: (p) => p.startsWith('einkommen'),
+  vertraege: () => false,
+  ziel: (p) => p === 'haushalt.zielNettoHeute',
+};
+
+export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, schritt: i, onSchritt }: {
   ergebnis: ProjektionsErgebnis | null;
   onEhepartnerDialog: () => void;
   /** Die Versorgungsschichten — dieselbe Eingabe wie im Formular */
   vertraege: ReactNode;
   /** Nach dem letzten Schritt: weiter zum Ergebnis */
   onFertig: () => void;
+  /**
+   * Der Schritt kommt von aussen: Die Fortschrittsleiste springt an die
+   * Stelle, an der noch etwas fehlt.
+   */
+  schritt: number;
+  onSchritt: (n: number) => void;
 }) {
-  const [i, setI] = useState(ladeSchritt);
-  const geheZu = (n: number) => {
-    const z = Math.max(0, Math.min(SCHRITTE.length - 1, n));
-    setI(z);
-    try { localStorage.setItem(SPEICHER, String(z)); } catch { /* Speicher gesperrt */ }
-  };
-  const s = SCHRITTE[i]!;
+  const szenario = useSzenario((x) => x.szenario);
+  const pruefen = useSzenario((x) => x.pruefen);
+  const offen = offenePfade(szenario).filter((p) => relevant(szenario, p));
+  const vertraegeOffen = offen.includes('vertraege');
+  /*
+    Keine Haken nach Position mehr: Ein Schritt, an dem man vorbeigeklickt
+    hat, ist nicht erledigt. Was erledigt ist, zeigt die Fortschrittsleiste
+    oben; hier markiert ein Punkt, wo noch Beispielwerte stehen.
+  */
+  const beispielOffen = (x: AssistentSchritt) => (x.teil === 'vertraege'
+    ? vertraegeOffen
+    : offen.some((p) => PFADE_JE_TEIL[x.teil](p) && eintragVon(p)?.art === 'beispiel'));
+  const geheZu = (n: number) => onSchritt(Math.max(0, Math.min(SCHRITTE.length - 1, n)));
+  const s = SCHRITTE[i] ?? SCHRITTE[0]!;
   const letzter = i === SCHRITTE.length - 1;
 
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Fortschritt im Kleinen: fuenf Punkte, jeder anklickbar. */}
+      {/* Fuenf Punkte, jeder anklickbar. */}
       <ol className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Schritte des Assistenten">
         {SCHRITTE.map((x, n) => (
           <li key={x.titel}>
@@ -119,13 +170,19 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig }:
               onClick={() => geheZu(n)}
               aria-current={n === i ? 'step' : undefined}
               className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors sm:text-xs ${
-                n === i
-                  ? 'bg-indigo-600 text-white'
-                  : n < i ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                n === i ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
               }`}
             >
-              {n < i ? <Check className="h-3 w-3" aria-hidden /> : <span>{n + 1}.</span>}
+              <span>{n + 1}.</span>
               <span className={n === i ? '' : 'hidden sm:inline'}>{x.titel}</span>
+              {beispielOffen(x) && (
+                <>
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  <span className="sr-only">
+                    {x.teil === 'vertraege' ? ' — noch nicht erfasst' : ' — Beispielwerte offen'}
+                  </span>
+                </>
+              )}
             </button>
           </li>
         ))}
@@ -144,7 +201,27 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig }:
 
         <div className="mt-4">
           {s.teil === 'vertraege'
-            ? vertraege
+            ? (
+              <>
+                {/*
+                  KEINE VERTRAEGE ist auch eine Antwort — aber eine, die man
+                  geben muss. Ohne diesen Knopf bliebe der Schritt offen, nur
+                  weil es nichts zu erfassen gibt.
+                */}
+                {szenario.vertraege.length === 0 && (vertraegeOffen ? (
+                  <button
+                    type="button"
+                    onClick={() => { pruefen('vertraege'); geheZu(i + 1); }}
+                    className="mb-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
+                  >
+                    <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
+                  </button>
+                ) : (
+                  <p className="mb-3 text-xs text-slate-600">Vermerkt: keine bestehenden Verträge.</p>
+                ))}
+                {vertraege}
+              </>
+            )
             : <Basisdaten teil={s.teil} ergebnis={ergebnis} onEhepartnerDialog={onEhepartnerDialog} />}
         </div>
 

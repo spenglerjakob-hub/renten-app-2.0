@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -12,7 +12,11 @@ import { useSzenario, type SzenarioParsed } from './store/szenario';
 import { eintragVon, offeneBeispiele, offenePfade } from './features/vorbelegung';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
-import { Assistent } from './features/Assistent';
+import {
+  Assistent, assistentSchrittFuer, ladeAssistentSchritt, merkeAssistentSchritt,
+} from './features/Assistent';
+import { datenErledigt, fallFortschritt, type FallSchrittId } from './features/fortschritt';
+import { FallFortschritt } from './components/FallFortschritt';
 import { Vertraege } from './features/Vertraege';
 import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
@@ -206,6 +210,11 @@ export default function App() {
     setEingabeArtRoh(a);
     try { localStorage.setItem(SPEICHER_EINGABE, a); } catch { /* Speicher gesperrt */ }
   };
+  // Der Schritt des Assistenten liegt hier, damit die Fortschrittsleiste ihn setzen kann.
+  const [assistentSchritt, setAssistentSchritt] = useState(ladeAssistentSchritt);
+  const assistentZu = useCallback((n: number) => setAssistentSchritt(merkeAssistentSchritt(n)), []);
+  const pruefen = useSzenario((s) => s.pruefen);
+  const ausgewertet = useSzenario((s) => s.ausgewertet);
   /** Der noetige Startbeitrag aus dem Sparrechner — die Loesungen koennen ihn uebernehmen. */
   const [sparrate, setSparrate] = useState<number | null>(null);
 
@@ -269,6 +278,39 @@ export default function App() {
   );
 
   const { ergebnis, rechnet, fehler, dauerMs } = useProjektion(ansichtSzenario);
+
+  /*
+    DER FORTSCHRITT DES FALLS — aus echten Schritten (`features/fortschritt.ts`).
+    Am ganzen Fall, nicht an der Einzelbetrachtung: Er beschreibt, was
+    erfasst ist, nicht was gerade angezeigt wird. Ausgewertet ist der Fall,
+    sobald das Ergebnis einmal mit Zahlen zu sehen war.
+  */
+  const nameVon = useCallback((id: PersonId) => personNameAus(szenario.personen, id), [szenario.personen]);
+  const fallSchritte = useMemo(
+    () => fallFortschritt(szenario, { konto: Boolean(angemeldet), nameVon }),
+    [szenario, angemeldet, nameVon],
+  );
+  useEffect(() => {
+    if (schritt === 'ergebnis' && ergebnis) ausgewertet();
+  }, [schritt, ergebnis, ausgewertet]);
+  const etappeErledigt = (id: Schritt) => (id === 'daten'
+    ? datenErledigt(fallSchritte)
+    : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
+  /** Ein offener Schritt der Leiste fuehrt an die Stelle, an der etwas fehlt. */
+  const springeZu = (id: FallSchrittId) => {
+    if (id === 'auswertung') { geheZu('ergebnis'); return; }
+    if (id === 'konto') { setKontoOffen(true); return; }
+    setBasisOffen(true);
+    geheZu('daten');
+    if (eingabeArt === 'assistent') {
+      const n = assistentSchrittFuer(id, offenePfade(szenario));
+      if (n !== null && n >= 0) assistentZu(n);
+    } else {
+      // Nach dem Zeichnen: `geheZu` springt erst nach oben.
+      window.setTimeout(() => document.getElementById(id === 'vertraege' ? 'vertraege' : 'eingaben')
+        ?.scrollIntoView({ block: 'start' }), 0);
+    }
+  };
 
   const exportieren = () => {
     const blob = new Blob([alsJsonExportieren()], { type: 'application/json' });
@@ -353,6 +395,22 @@ export default function App() {
     else druckeJetzt(umfang);
   };
   const schliesseDruckFrage = useCallback(() => setDruckFrage(null), []);
+
+  /*
+    Solange Beispielwerte im Fall stehen, sagt es jede rechnende Etappe —
+    sonst wirkte ein Ergebnis aus dem Beispiel wie eines aus dem Mandanten.
+  */
+  const beispielHinweis = offeneBeispielTexte.length > 0 && (
+    <div role="status" className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 print:hidden sm:text-sm">
+      <span>
+        Das Ergebnis rechnet noch mit {offeneBeispielTexte.length === 1 ? 'einem Beispielwert' : `${offeneBeispielTexte.length} Beispielwerten`}:{' '}
+        {offeneBeispielTexte.join(', ')}.
+      </span>
+      <button type="button" onClick={() => { setBasisOffen(true); geheZu('daten'); }} className="font-bold underline">
+        Zu den Angaben
+      </button>
+    </div>
+  );
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
@@ -759,7 +817,8 @@ export default function App() {
       )}
 
       <main id="journey" className="mx-auto max-w-6xl scroll-mt-28 space-y-4 p-2 sm:space-y-6 sm:p-6 print:hidden">
-        <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
+        <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} erledigt={etappeErledigt} />
+        <FallFortschritt schritte={fallSchritte} onSprung={springeZu} />
 
         {fehler && (
           <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
@@ -839,6 +898,8 @@ export default function App() {
                 onEhepartnerDialog={() => setEhepartnerDialog(true)}
                 vertraege={schichten}
                 onFertig={() => geheZu('ergebnis')}
+                schritt={assistentSchritt}
+                onSchritt={assistentZu}
               />
             ) : (
             <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
@@ -859,6 +920,16 @@ export default function App() {
               </div>
 
               <div className="space-y-4 sm:space-y-6 lg:col-span-6">
+                {/* Wie im Assistenten: „keine Vertraege“ ist eine Antwort, die man geben muss. */}
+                {szenario.vertraege.length === 0 && offenePfade(szenario).includes('vertraege') && (
+                  <button
+                    type="button"
+                    onClick={() => pruefen('vertraege')}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
+                  >
+                    <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
+                  </button>
+                )}
                 {schichten}
               </div>
             </div>
@@ -879,6 +950,7 @@ export default function App() {
               text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
             />
             {paarUmschalter}
+            {beispielHinweis}
             {ergebnis ? (
               <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
                 <div className="space-y-4 sm:space-y-6 lg:col-span-5">
@@ -974,6 +1046,7 @@ export default function App() {
               text="Wie viel Sie ab heute monatlich zurücklegen müssten, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten."
             />
             {paarUmschalter}
+            {beispielHinweis}
             {ergebnis ? (
               <div className="space-y-4 sm:space-y-6">
                 {kopfzahlen}
@@ -993,6 +1066,7 @@ export default function App() {
               text="Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den Sie neu in die Altersvorsorge stecken."
             />
             {paarUmschalter}
+            {beispielHinweis}
             {/*
               ZWEI FRAGEN in dieser Etappe: Womit schliesse ich die Luecke
               (neue Loesungen und Angebote) — und taugt, was ich schon habe

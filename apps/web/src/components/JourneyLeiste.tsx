@@ -20,10 +20,18 @@ export interface Etappe<T extends string> {
   kurz: string;
 }
 
-export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel }: {
+export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel, erledigt }: {
   etappen: readonly Etappe<T>[];
   aktiv: T;
   onWechsel: (id: T) => void;
+  /**
+   * Ist eine Etappe WIRKLICH erledigt? Nur dann steht ein Haken.
+   *
+   * Frueher hing der Haken an der Position: Wer direkt auf die letzte Etappe
+   * sprang, sah alle davor abgehakt, obwohl dort nichts eingetragen war —
+   * Fortschritt, den es nicht gab.
+   */
+  erledigt?: (id: T) => boolean;
 }) {
   const index = etappen.findIndex((e) => e.id === aktiv);
   return (
@@ -31,7 +39,7 @@ export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel }: {
       <ol className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:gap-2 sm:p-2">
         {etappen.map((e, i) => {
           const ist = i === index;
-          const fertig = i < index;
+          const fertig = !ist && (erledigt?.(e.id) ?? false);
           return (
             <li key={e.id} className="min-w-0 flex-1">
               <button
@@ -52,6 +60,7 @@ export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel }: {
                 <span className="min-w-0 text-[10px] font-bold leading-tight sm:text-sm">
                   <span className="sm:hidden">{e.kurz}</span>
                   <span className="hidden sm:inline">{e.text}</span>
+                  {fertig && <span className="sr-only"> — erledigt</span>}
                 </span>
               </button>
             </li>
