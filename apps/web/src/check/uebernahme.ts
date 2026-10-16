@@ -237,6 +237,25 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
       beginnDatum: `01.01.${v.typ === 'avd' ? Math.max(v.beginnJahr, 2027) : v.beginnJahr}`,
     }));
 
+  /*
+    WAS DER KUNDE OFFEN GELASSEN HAT, bleibt im Rechner als Beispielwert
+    markiert (siehe `features/vorbelegung.ts`). Bisher wurden 01.01.1985 und
+    2.000 EUR still eingesetzt und sahen im Rechner aus wie eine Auskunft.
+    Die Annahmen fragt der Check nicht — sie bleiben Standardwerte.
+  */
+  const offen: string[] = ['annahmen.inflation', 'annahmen.rentendynamik', 'auswertung'];
+  const antwortenJePerson: ['A' | 'B', PersonAntwort][] = paar ? [['A', x.a], ['B', x.b]] : [['A', x.a]];
+  for (const [id, p] of antwortenJePerson) {
+    if (!parseDatum(p.geburtsdatum)) offen.push(`personen.${id}.geburtsdatum`);
+    if (!parseDatum(p.rentenbeginn)) offen.push(`personen.${id}.rentenbeginn`);
+    const ohneGrv = p.einkommen.modus === 'besoldung'
+      || (p.einkommen.modus === 'selbststaendig' && !p.einkommen.grvPflicht);
+    if (!ohneGrv && p.grvRente <= 0) offen.push(`personen.${id}.grvBruttoHeute`);
+  }
+  if (x.a.einkommen.modus !== 'besoldung' && x.a.einkommen.betrag <= 0) offen.push('einkommenHeute.betrag');
+  if (paar && x.b.einkommen.modus !== 'besoldung' && x.b.einkommen.betrag <= 0) offen.push('einkommenPartner.betrag');
+  if (x.zielNettoHeute <= 0) offen.push('haushalt.zielNettoHeute');
+
   const privat = x.kv === 'privat';
   const eingabe: SzenarioInput = {
     schemaVersion: 1,
@@ -267,6 +286,7 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
     vertraege,
     planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
     tuev,
+    offen,
   };
   return szenarioSchema.parse(eingabe);
 }

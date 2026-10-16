@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import {
-  szenarioSchema, importiere, exportiere, annahmenKoppeln, type SzenarioParsed,
+  importiere, exportiere, annahmenKoppeln, einkommenHeuteSchema, type SzenarioParsed,
 } from '@renten/schema';
 import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze } from '@renten/engine';
 import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
+import { standardSzenario } from './standard';
+import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
 
 const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
 
@@ -15,31 +17,6 @@ export type Angebot = SzenarioParsed['loesungen']['angebote'][number];
  * mit dem Parameter aus dem Rechtsstand.
  */
 const AVD_AB_JAHR = 2027;
-
-function standardSzenario(): SzenarioParsed {
-  const jahr = new Date().getFullYear();
-  return szenarioSchema.parse({
-    schemaVersion: 1,
-    haushalt: {
-      verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 600,
-      zielNettoHeute: 2000,
-    },
-    annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
-    einkommenHeute: {
-      modus: 'brutto', betrag: 4000, auszahlungen: 12,
-      besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
-    },
-    personen: [{
-      id: 'A', name: '', geburtsdatum: '01.01.1985', rentenbeginn: `01.01.${1985 + 67}`,
-      art: 'grv', grvBruttoHeute: 1500,
-      besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
-      dienstbeginn: `01.01.${jahr - 5}`, teilzeitphasen: [],
-    }],
-    vertraege: [],
-    planer: { startkapital: 0, dauerJahre: 25, rendite: 0.02, dynamik: 0, insNettoEinrechnen: false },
-  });
-}
 
 function ladeGespeichert(): SzenarioParsed {
   if (typeof localStorage === 'undefined') return standardSzenario();
@@ -106,6 +83,15 @@ export interface SzenarioStore {
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
   vertragEntfernen: (id: string) => void;
 
+  /**
+   * Eine vorbelegte Angabe als geprueft markieren, ohne sie zu aendern —
+   * „Stimmt so“ am Feld, „Keine bestehenden Vertraege“ im Assistenten.
+   * Siehe `features/vorbelegung.ts`.
+   */
+  pruefen: (pfad: string) => void;
+  /** Das Ergebnis wurde angesehen — der letzte Schritt des Fortschritts. */
+  ausgewertet: () => void;
+
   alsJsonExportieren: () => string;
   ausJsonImportieren: (roh: string) => void;
   zuruecksetzen: () => void;
@@ -144,7 +130,15 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
 
   setze: (fn) => set((st) => { const s = fn(st.szenario); speichere(s); return { szenario: s }; }),
 
-  setzeHaushalt: (p) => get().setze((s) => ({ ...s, haushalt: { ...s.haushalt, ...p } })),
+  /*
+    JEDER SETTER STREICHT, WAS ER BERUEHRT, aus `offen` (siehe
+    `features/vorbelegung.ts`): Wer ein Feld anfasst, hat es geprueft — auch
+    wenn er denselben Wert eintippt. Die Marke am Feld verschwindet damit.
+  */
+  setzeHaushalt: (p) => get().setze((s) => geprueft(
+    { ...s, haushalt: { ...s.haushalt, ...p } },
+    pfadeAus('haushalt', p),
+  )),
 
   setzeKinderAnzahl: (n) => get().setze((s) => {
     const anzahl = Math.max(0, Math.min(15, Math.round(n)));
@@ -154,10 +148,10 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
       { length: anzahl },
       (_, i) => s.haushalt.kinder[i] ?? { geburtsjahr: new Date().getFullYear() - 5 },
     );
-    return {
+    return geprueft({
       ...s,
       haushalt: { ...s.haushalt, kinder, kinderUnter25: anzahl, hatKinder: anzahl > 0 },
-    };
+    }, ['haushalt.kinderUnter25']);
   }),
 
   setzeZielAnteil: (id, betrag) => get().setze((s) => {
@@ -173,11 +167,11 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     */
     const gerechnet = s.personen.filter((x) => x.id === 'A' || s.haushalt.verheiratet);
     const summe = gerechnet.reduce((sum, x) => sum + (anteile.get(x.id) ?? 0), 0);
-    return {
+    return geprueft({
       ...s,
       haushalt: { ...s.haushalt, zielNettoHeute: summe },
       personen: s.personen.map((x) => ({ ...x, zielAnteilHeute: anteile.get(x.id) })),
-    };
+    }, ['haushalt.zielNettoHeute']);
   }),
 
   setzeKind: (index, p) => get().setze((s) => ({
@@ -190,18 +184,31 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   // Die Oberflaeche kennt nur Inflation und Rentendynamik; Gehaltsdynamik und
   // Steuertarif-Index folgen ihnen. Wird der Tarif-Index ausdruecklich gesetzt
   // (Regler in der Rechtsstand-Karte), bleibt er davon unberuehrt.
-  setzeAnnahmen: (p) => get().setze((s) => annahmenKoppeln(
+  setzeAnnahmen: (p) => get().setze((s) => geprueft(annahmenKoppeln(
     { ...s, annahmen: { ...s.annahmen, ...p } },
     { tarifIndexBehalten: p.tarifIndex !== undefined },
+  ), pfadeAus('annahmen', p))),
+  setzeEinkommen: (p) => get().setze((s) => geprueft(
+    { ...s, einkommenHeute: { ...s.einkommenHeute, ...p } },
+    pfadeAus('einkommenHeute', p),
   )),
-  setzeEinkommen: (p) => get().setze((s) => ({ ...s, einkommenHeute: { ...s.einkommenHeute, ...p } })),
-  setzeEinkommenPartner: (p) => get().setze((s) => ({
-    ...s, einkommenPartner: { ...s.einkommenPartner, ...p },
-  })),
-  setzeEinkommenGetrennt: (b) => get().setze((s) => ({ ...s, einkommenGetrennt: b })),
+  setzeEinkommenPartner: (p) => get().setze((s) => geprueft(
+    { ...s, einkommenPartner: { ...s.einkommenPartner, ...p } },
+    pfadeAus('einkommenPartner', p),
+  )),
+  setzeEinkommenGetrennt: (b) => get().setze((s) => {
+    const neu = { ...s, einkommenGetrennt: b };
+    /*
+      Das Einkommen des Partners steht beim ersten Einschalten noch auf der
+      Vorgabe des Schemas — ein Beispielwert wie jeder andere. Wer es schon
+      einmal eingetragen hat, behaelt es ohne Marke.
+    */
+    const unberuehrt = JSON.stringify(s.einkommenPartner) === JSON.stringify(einkommenHeuteSchema.parse({}));
+    return b && unberuehrt ? wiederOffen(neu, ['einkommenPartner.betrag']) : neu;
+  }),
   setzePlaner: (p) => get().setze((s) => ({ ...s, planer: { ...s.planer, ...p } })),
 
-  setzePerson: (id, p) => get().setze((s) => ({
+  setzePerson: (id, p) => get().setze((s) => geprueft({
     ...s,
     personen: s.personen.map((x) => {
       if (x.id !== id) return x;
@@ -220,24 +227,34 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
       }
       return neu;
     }),
-  })),
+    // Der automatisch nachgezogene Rentenbeginn bleibt ein Standardwert —
+    // gestrichen wird nur, was im Aufruf steht.
+  }, pfadeAus(`personen.${id}`, p))),
 
-  rentenbeginnZuruecksetzen: (id) => get().setze((s) => ({
+  // Zurueck auf die Regelaltersgrenze heisst: wieder der Standardwert.
+  rentenbeginnZuruecksetzen: (id) => get().setze((s) => wiederOffen({
     ...s,
     personen: s.personen.map((x) => {
       if (x.id !== id) return x;
       const auto = automatischerRentenbeginn(x.geburtsdatum);
       return auto ? { ...x, rentenbeginn: auto, rentenbeginnManuell: false } : x;
     }),
-  })),
+  }, [`personen.${id}.rentenbeginn`])),
 
   partnerHinzufuegen: () => get().setze((s) => {
     if (s.personen.some((p) => p.id === 'B')) return s;
     const a = s.personen[0]!;
-    return {
+    /*
+      Person B beginnt als Kopie von A. Ihre Angaben sind damit Beispiele —
+      niemand hat sie fuer B geprueft.
+    */
+    return wiederOffen({
       ...s,
       personen: [...s.personen, { ...a, id: 'B' as const, name: '', geburtsdatum: a.geburtsdatum, rentenbeginn: a.rentenbeginn }],
-    };
+    }, [
+      'personen.B.geburtsdatum', 'personen.B.grvBruttoHeute',
+      ...(a.rentenbeginnManuell ? [] : ['personen.B.rentenbeginn']),
+    ]);
   }),
 
   tuevHinzufuegen: (vertragId) => get().setze((s) => {
@@ -321,7 +338,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
       inhaber: 'A', schicht, typ, name: '', brutto: 0,
       strategie: 'rente', altvertrag: false,
     };
-    return { ...s, vertraege: [...s.vertraege, neu] };
+    return geprueft({ ...s, vertraege: [...s.vertraege, neu] }, ['vertraege']);
   }),
 
   vertragAendern: (id, p) => get().setze((s) => ({
@@ -334,6 +351,14 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     // Sonst bliebe im TUEV eine Position ohne Vertrag zurueck.
     tuev: s.tuev.filter((x) => x.vertragId !== id),
   })),
+
+  pruefen: (pfad) => get().setze((s) => geprueft(s, [pfad])),
+
+  // Nur wenn es noch offen ist: Der Aufruf kommt aus einem Effekt, und ein
+  // neues Szenario-Objekt bei jedem Zeichnen liesse die Projektion kreisen.
+  ausgewertet: () => {
+    if (offenePfade(get().szenario).includes('auswertung')) get().pruefen('auswertung');
+  },
 
   alsJsonExportieren: () => exportiere(get().szenario),
 

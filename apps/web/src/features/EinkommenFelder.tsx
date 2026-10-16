@@ -3,7 +3,7 @@ import {
   grvVollerBeitragJahr, parameterFuer,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
-import { ZahlFeld, AuswahlFeld, Schalter, euro } from '../components/Feld';
+import { ZahlFeld, AuswahlFeld, Schalter, euro, type Vorbelegt } from '../components/Feld';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -29,11 +29,13 @@ type Einkommen = SzenarioParsed['einkommenHeute'];
  * beim Umschalten auf "Verheiratet" erscheint.
  */
 export function EinkommenFelder({
-  wert, onChange, spalten = 3,
+  wert, onChange, spalten = 3, marke,
 }: {
   wert: Einkommen;
   onChange: (p: Partial<Einkommen>) => void;
   spalten?: 2 | 3;
+  /** Vorbelegung je Feld — nur im Rechner, siehe `features/vorbelegung.ts` */
+  marke?: (feld: 'modus' | 'betrag' | 'auszahlungen') => Vorbelegt | undefined;
 }) {
   const belegt = besoldungstabelle(wert.besoldungsland, new Date().getFullYear()).belegt;
 
@@ -56,6 +58,7 @@ export function EinkommenFelder({
             { wert: 'besoldung', text: 'Beamter (Besoldung)' },
             { wert: 'selbststaendig', text: 'Selbstständig (Gewinn)' },
           ]}
+          vorbelegt={marke?.('modus')}
         />
         {wert.modus === 'selbststaendig' ? (
           <ZahlFeld
@@ -64,15 +67,27 @@ export function EinkommenFelder({
             onChange={(n) => onChange({ betrag: n })}
             einheit="€"
             hilfe="Gewinn vor Steuern und Sozialabgaben — Betriebsausgaben sind bereits ab."
+            vorbelegt={marke?.('betrag')}
           />
         ) : wert.modus !== 'besoldung' ? (
           <>
+            {/*
+              Im Netto-Modus rechnet der Rechner das Netto ueber die
+              Jahressteuer auf das Brutto zurueck. Das Netto der
+              Gehaltsabrechnung haengt aber an der Steuerklasse — bei III/V
+              liegt der Monatsabzug neben der Jahressteuer.
+            */}
             <ZahlFeld label="Betrag monatlich" wert={wert.betrag}
-              onChange={(n) => onChange({ betrag: n })} einheit="€" />
+              onChange={(n) => onChange({ betrag: n })} einheit="€"
+              vorbelegt={marke?.('betrag')}
+              hilfe={wert.modus === 'netto'
+                ? 'Das Netto der Gehaltsabrechnung hängt von der Steuerklasse ab. Bei III/V oder Faktorverfahren tragen Sie besser das Brutto ein.'
+                : undefined} />
             <AuswahlFeld
               label="Auszahlungen pro Jahr"
               wert={String(wert.auszahlungen)}
               onChange={(v) => onChange({ auszahlungen: Number(v) })}
+              vorbelegt={marke?.('auszahlungen')}
               optionen={[
                 { wert: '12', text: '12 Gehälter' },
                 { wert: '12.5', text: '12,5 (halbes 13.)' },

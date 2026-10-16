@@ -7,7 +7,7 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
  * sich das Ergebnis nicht zurueck in den Speicher schreiben.
  */
 export type PkvFelderWert = SzenarioParsed['haushalt']['pkv'];
-import { ZahlFeld, ProzentFeld, Schalter } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, Schalter, type Vorbelegt } from '../components/Feld';
 
 /**
  * Die Eingaben zur privaten Krankenversicherung.
@@ -31,10 +31,12 @@ import { ZahlFeld, ProzentFeld, Schalter } from '../components/Feld';
  * griff die Komponente selbst auf `haushalt.pkv` zu und liess sich deshalb
  * nur an einer Stelle einsetzen.
  */
-export function PkvFelder({ wert, onChange, titel, einfach = false }: {
+export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }: {
   wert?: PkvFelderWert;
   onChange?: (p: PkvFelderWert) => void;
   titel?: string;
+  /** Der Beitrag ist noch die Vorbelegung des Rechners — Marke am Feld */
+  vorbelegt?: Vorbelegt;
   /**
    * Ohne die beiden Steigerungssaetze und ohne den Schalter zum
    * gesetzlichen Zuschlag — fuer den Vorsorge-Check. Ein Endkunde soll dort
@@ -72,6 +74,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false }: {
           wert={pkv.praemieMonat}
           onChange={(n) => setze({ praemieMonat: n })}
           einheit="€"
+          vorbelegt={vorbelegt}
           hilfe={pkv.bet.aktiv
             ? 'Alles zusammen, wie auf Ihrer Rechnung — Kranken-, Pflege- und Entlastungstarif.'
             : 'Kranken- und Pflegeversicherung zusammen, wie Sie ihn heute zahlen.'}

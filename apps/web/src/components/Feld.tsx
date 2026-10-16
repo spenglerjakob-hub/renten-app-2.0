@@ -6,6 +6,59 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
 
 /**
+ * VORBELEGT — der Wert im Feld stammt nicht vom Berater, sondern aus der
+ * Vorbelegung eines neuen Falls (siehe `features/vorbelegung.ts`).
+ *
+ * Die Marke steht UNTER dem Feld, nicht neben der Beschriftung: Dort braeche
+ * sie lange Beschriftungen um, und die Felder einer Zeile staenden nicht
+ * mehr auf einer Hoehe.
+ */
+export interface Vorbelegt {
+  art: 'beispiel' | 'standard';
+  /** Woher der Standardwert kommt — steht im Tooltip */
+  hinweis?: string;
+  /** „Stimmt so“: bestaetigt einen Beispielwert, ohne ihn zu aendern */
+  onPruefen?: () => void;
+}
+
+const VORBELEGT_TEXT = {
+  standard: 'Vorbelegt mit einem üblichen Wert. Ändern Sie ihn, wenn er für Ihren Mandanten nicht passt.',
+  beispiel: 'Ein Beispiel, keine Angabe Ihres Mandanten. Im Gutachten steht es als Beispielwert, bis Sie es ersetzen oder bestätigen.',
+} as const;
+
+export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: string; klasse?: string }) {
+  const titel = v.hinweis ? `${v.hinweis} ${VORBELEGT_TEXT[v.art]}` : VORBELEGT_TEXT[v.art];
+  if (v.art === 'standard') {
+    return (
+      <span id={id} title={titel}
+        className={`inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 print:hidden ${klasse}`}>
+        Standardwert · anpassbar
+      </span>
+    );
+  }
+  /*
+    Kurz, weil die Marke auch in schmalen Spalten (drei Felder je Zeile)
+    in eine Zeile passen soll. Dass zu pruefen ist, sagen der Rahmen des
+    Felds, der Knopf daneben und der Tooltip.
+  */
+  return (
+    <span id={id} title={titel}
+      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 print:hidden ${klasse}`}>
+      Beispielwert
+      {v.onPruefen && (
+        <button type="button" onClick={v.onPruefen}
+          className="rounded px-1 font-bold text-amber-800 underline decoration-amber-400 underline-offset-2 hover:bg-amber-200">
+          Stimmt so
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Rahmen eines Felds mit Beispielwert — sichtbar am Feld selbst, ohne dass es die Hoehe aendert. */
+const beispielRahmen = (v?: Vorbelegt) => (v?.art === 'beispiel' ? 'border-amber-300 bg-amber-50/60' : 'border-slate-300 bg-white');
+
+/**
  * Zahleneingabe mit deutscher Notation.
  *
  * Der Prototyp nutzte <input type="number">; `Number("2,5")` ergibt NaN, und
@@ -45,9 +98,11 @@ export function ZahlFeld(props: {
     aktiv: string;
     onWechsel: (id: string) => void;
   };
+  /** Der Wert ist noch die Vorbelegung — Marke unter dem Feld */
+  vorbelegt?: Vorbelegt;
 }) {
   const {
-    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl,
+    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl, vorbelegt,
   } = props;
   const schritt = props.schritt ?? 1;
   /*
@@ -110,11 +165,14 @@ export function ZahlFeld(props: {
             if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
           } : undefined}
           aria-invalid={fehler ? true : undefined}
-          aria-describedby={fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : undefined}
+          aria-describedby={[
+            vorbelegt ? `${id}-vorbelegt` : '',
+            fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : '',
+          ].filter(Boolean).join(' ') || undefined}
           className={`w-full rounded-md border font-medium tabular-nums ${
             gross ? 'p-3 text-xl font-bold' : 'p-2 text-sm'
           } ${
-            fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
+            fehler ? 'border-rose-400 bg-rose-50' : beispielRahmen(vorbelegt)
           } ${einheitWahl ? 'pr-20' : stufen
             ? (einheit ? 'pr-14' : 'pr-8')
             : einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
@@ -178,6 +236,7 @@ export function ZahlFeld(props: {
           </span>
         )}
       </div>
+      {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
       {fehler && <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>}
       {!fehler && hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-slate-500">{hilfe}</p>}
     </div>
@@ -188,6 +247,7 @@ export function ZahlFeld(props: {
 export function ProzentFeld(props: {
   label: string; wert: number; onChange: (n: number) => void;
   min?: number; max?: number; hilfe?: string;
+  vorbelegt?: Vorbelegt;
   /**
    * Nachkommastellen der ANZEIGE.
    *
@@ -209,6 +269,7 @@ export function ProzentFeld(props: {
       max={props.max ?? 20}
       einheit="%"
       hilfe={props.hilfe}
+      vorbelegt={props.vorbelegt}
     />
   );
 }
@@ -264,9 +325,10 @@ export function DatumFeld(props: {
    * stehen, nur ein 29.02. wird im Gemeinjahr zum 28.02.
    */
   stufen?: boolean;
+  vorbelegt?: Vorbelegt;
 }) {
   const id = `d${useId()}`;
-  const { stufen } = props;
+  const { stufen, vorbelegt } = props;
 
   const anzeige = (roh: string) => {
     const d = parseDatum(roh);
@@ -341,9 +403,10 @@ export function DatumFeld(props: {
             if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
           } : undefined}
           aria-invalid={fehler ? true : undefined}
-          aria-describedby={fehler ? `${id}-fehler` : undefined}
+          aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', fehler ? `${id}-fehler` : '']
+            .filter(Boolean).join(' ') || undefined}
           className={`w-full rounded-md border p-2 text-sm tabular-nums ${
-            fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
+            fehler ? 'border-rose-400 bg-rose-50' : beispielRahmen(vorbelegt)
           } ${stufen ? 'pr-8' : ''}`}
         />
         {stufen && (
@@ -371,6 +434,7 @@ export function DatumFeld(props: {
           </span>
         )}
       </div>
+      {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
       {fehler
         ? <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>
         : props.hilfe && <p className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
@@ -383,8 +447,10 @@ export function AuswahlFeld<T extends string>(props: {
   label: string; wert: T; onChange: (v: T) => void;
   optionen: readonly { wert: T; text: string }[];
   hilfe?: string;
+  vorbelegt?: Vorbelegt;
 }) {
   const id = `s${useId()}`;
+  const { vorbelegt } = props;
   return (
     <div>
       <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
@@ -392,27 +458,38 @@ export function AuswahlFeld<T extends string>(props: {
         id={id}
         value={props.wert}
         onChange={(e) => props.onChange(e.target.value as T)}
-        aria-describedby={props.hilfe ? `${id}-hilfe` : undefined}
-        className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm"
+        aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', props.hilfe ? `${id}-hilfe` : '']
+          .filter(Boolean).join(' ') || undefined}
+        className={`w-full rounded-md border p-2 text-sm ${beispielRahmen(vorbelegt)}`}
       >
         {props.optionen.map((o) => <option key={o.wert} value={o.wert}>{o.text}</option>)}
       </select>
+      {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
       {props.hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
     </div>
   );
 }
 
-export function Schalter(props: { label: string; wert: boolean; onChange: (b: boolean) => void }) {
+export function Schalter(props: { label: string; wert: boolean; onChange: (b: boolean) => void; vorbelegt?: Vorbelegt }) {
   const id = `c${useId()}`;
-  return (
+  const schalter = (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
       <input
         id={id} type="checkbox" checked={props.wert}
         onChange={(e) => props.onChange(e.target.checked)}
+        aria-describedby={props.vorbelegt ? `${id}-vorbelegt` : undefined}
         className="h-4 w-4 rounded border-slate-300 text-indigo-600"
       />
       {props.label}
     </label>
+  );
+  if (!props.vorbelegt) return schalter;
+  // Die Marke NEBEN dem Label: Ein Knopf darin schaltete sonst den Haken um.
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {schalter}
+      <VorbelegtMarke v={props.vorbelegt} id={`${id}-vorbelegt`} klasse="" />
+    </span>
   );
 }
 

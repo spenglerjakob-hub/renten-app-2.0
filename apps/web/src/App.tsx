@@ -8,7 +8,8 @@ import {
   versorgungsluecke, parseDatum, nurPerson,
   type Jahreszeile, type PersonId,
 } from '@renten/engine';
-import { useSzenario } from './store/szenario';
+import { useSzenario, type SzenarioParsed } from './store/szenario';
+import { eintragVon, offeneBeispiele, offenePfade } from './features/vorbelegung';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
 import { Assistent } from './features/Assistent';
@@ -133,17 +134,25 @@ const LEERE_ZEILE: Jahreszeile = {
   posten: [], parameterFortgeschrieben: false,
 };
 
-/** Kleine Auswahl in der dunklen Kopfleiste. */
+/**
+ * Kleine Auswahl in der dunklen Kopfleiste.
+ *
+ * `standard`: Der Wert ist noch die Vorbelegung — dann steht „Standard“
+ * dabei, mit der Begruendung im Tooltip (siehe `features/vorbelegung.ts`).
+ */
 function KopfAuswahl({
-  titel, wert, onChange, farbe,
-}: { titel: string; wert: number; onChange: (n: number) => void; farbe: string }) {
+  titel, wert, onChange, farbe, standard,
+}: { titel: string; wert: number; onChange: (n: number) => void; farbe: string; standard?: string }) {
   return (
-    <span className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-white shadow sm:text-xs ${farbe}`}>
+    <span
+      title={standard}
+      className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-white shadow sm:text-xs ${farbe}`}
+    >
       <span>{titel}</span>
       <select
         value={wert}
         onChange={(e) => onChange(Number(e.target.value))}
-        aria-label={titel}
+        aria-label={standard ? `${titel} (Standardwert, anpassbar)` : titel}
         className="cursor-pointer bg-transparent font-bold outline-none"
       >
         {QUOTEN.map((q) => (
@@ -152,8 +161,16 @@ function KopfAuswahl({
           </option>
         ))}
       </select>
+      {standard && <span aria-hidden className="text-[10px] font-normal opacity-80">Standard</span>}
     </span>
   );
+}
+
+/** Der Tooltip zur Kopfauswahl, solange der Wert noch der Standard ist. */
+function standardHinweis(s: SzenarioParsed, pfad: string): string | undefined {
+  if (!offenePfade(s).includes(pfad)) return undefined;
+  const e = eintragVon(pfad);
+  return e ? `Standardwert, anpassbar. ${e.hinweis ?? ''}`.trim() : undefined;
 }
 
 export default function App() {
@@ -319,10 +336,23 @@ export default function App() {
     setDruckAngefordert(false);
     window.print();
   }, [druckAngefordert, druckUmfang]);
-  const drucke = (umfang: 'kurz' | 'ausfuehrlich') => {
+  const druckeJetzt = (umfang: 'kurz' | 'ausfuehrlich') => {
     setDruckUmfang(umfang);
     setDruckAngefordert(true);
   };
+  /*
+    NOCH BEISPIELWERTE IM FALL? Dann eine Rueckfrage vor dem Druck — ein
+    Gutachten geht an den Kunden, und danach ist es zu spaet. Beide Knoepfe
+    sind gleichwertig; gedruckt werden darf trotzdem, die Werte stehen im
+    Gutachten dann als Beispielwert gekennzeichnet.
+  */
+  const [druckFrage, setDruckFrage] = useState<'kurz' | 'ausfuehrlich' | null>(null);
+  const offeneBeispielTexte = offeneBeispiele(ansichtSzenario, (id) => personNameAus(szenario.personen, id));
+  const drucke = (umfang: 'kurz' | 'ausfuehrlich') => {
+    if (offeneBeispielTexte.length > 0) setDruckFrage(umfang);
+    else druckeJetzt(umfang);
+  };
+  const schliesseDruckFrage = useCallback(() => setDruckFrage(null), []);
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
@@ -613,12 +643,14 @@ export default function App() {
                   wert={szenario.annahmen.inflation}
                   onChange={(n) => setzeAnnahmen({ inflation: n })}
                   farbe="bg-emerald-600"
+                  standard={standardHinweis(szenario, 'annahmen.inflation')}
                 />
                 <KopfAuswahl
                   titel="Rente:"
                   wert={szenario.annahmen.rentendynamik}
                   onChange={(n) => setzeAnnahmen({ rentendynamik: n })}
                   farbe="bg-indigo-600"
+                  standard={standardHinweis(szenario, 'annahmen.rentendynamik')}
                 />
                 <span className="my-1 h-px w-full bg-slate-700 sm:mx-0.5 sm:my-0 sm:h-5 sm:w-px" />
                 <button
@@ -1003,6 +1035,29 @@ export default function App() {
         onSchliessen={schliesseKonto}
       >
         <Konto />
+      </Dialog>
+
+      <Dialog offen={druckFrage !== null} titel="Noch Beispielwerte im Fall" onSchliessen={schliesseDruckFrage}>
+        <p className="text-sm leading-relaxed text-slate-700">
+          Diese Angaben sind noch Beispielwerte: <strong>{offeneBeispielTexte.join(', ')}</strong>. Im
+          Gutachten stehen sie gekennzeichnet.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => { setDruckFrage(null); setBasisOffen(true); geheZu('daten'); }}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          >
+            Angaben prüfen
+          </button>
+          <button
+            type="button"
+            onClick={() => { const u = druckFrage; setDruckFrage(null); if (u) druckeJetzt(u); }}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+          >
+            Trotzdem drucken
+          </button>
+        </div>
       </Dialog>
 
       {checkMoeglich && (

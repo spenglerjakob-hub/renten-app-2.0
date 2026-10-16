@@ -4,6 +4,7 @@ import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Untertitel, Angabe, Zweispaltig, Text } from './Bausteine';
 import { personName, personNameAus } from '../features/personen';
+import { eintragVon, offeneBeispiele, offenePfade, relevant } from '../features/vorbelegung';
 
 const KV_TEXT = {
   kvdr: 'Pflichtversichert (KVdR)',
@@ -53,12 +54,24 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
   /* Wer ueberhaupt gerechnet wird — Person B nur bei Verheirateten. */
   const gerechnete = szenario.personen.filter((p) => p.id === 'A' || h.verheiratet);
 
-  const einkommen = (e: SzenarioParsed['einkommenHeute']) =>
+  /*
+    BEISPIELWERTE SIND KEINE ANGABEN DES MANDANTEN. Wer druckt, ohne sie zu
+    ersetzen, bekommt sie hier gekennzeichnet — ein Gutachten, das ein
+    Geburtsdatum aus der Vorbelegung als Auskunft fuehrt, waere fuer eine
+    Beratungsdokumentation nicht vertretbar. Standardannahmen stehen
+    darunter ohnehin als „Annahmen“.
+  */
+  const beispiele = new Set(offenePfade(szenario)
+    .filter((p) => eintragVon(p)?.art === 'beispiel' && relevant(szenario, p)));
+  const bsp = (pfad: string, wert: string) => (beispiele.has(pfad) ? `${wert} — Beispielwert` : wert);
+  const offeneTexte = offeneBeispiele(szenario, (id) => personNameAus(szenario.personen, id));
+
+  const einkommen = (e: SzenarioParsed['einkommenHeute'], pfad: string) => bsp(pfad,
     e.modus === 'besoldung'
       ? `${e.besoldungsgruppe}, Stufe ${e.besoldungsstufe} (${e.besoldungsland})`
       : e.modus === 'selbststaendig'
         ? `${euro(e.betrag)} Gewinn im Monat (selbstständig)`
-        : `${euro(e.betrag)} ${EINKOMMEN_TEXT[e.modus]} im Monat, ${e.auszahlungen} Zahlungen`;
+        : `${euro(e.betrag)} ${EINKOMMEN_TEXT[e.modus]} im Monat, ${e.auszahlungen} Zahlungen`);
 
   /* Der GRV-Beitrag entscheidet ueber den Hoechstbetrag einer Basisrente —
      er gehoert deshalb in die Angaben, nicht nur in die Rechnung. */
@@ -71,6 +84,11 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
 
   return (
     <>
+      {offeneTexte.length > 0 && (
+        <div className="mb-2 break-inside-avoid rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] leading-snug text-amber-900">
+          <strong>Noch nicht anhand von Unterlagen geprüft (Beispielwerte):</strong> {offeneTexte.join(', ')}.
+        </div>
+      )}
       <Untertitel>Haushalt</Untertitel>
       <Zweispaltig>
         <Angabe feld="Familienstand" wert={h.verheiratet ? 'Verheiratet (Splitting)' : 'Alleinstehend'} />
@@ -101,7 +119,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         )}
         {(h.kvStatus === 'pkv' || h.kvErwerb === 'pkv') && (
           <>
-            <Angabe feld="PKV-Beitrag heute" wert={`${euro(h.pkv.praemieMonat)} im Monat`} />
+            <Angabe feld="PKV-Beitrag heute" wert={bsp('haushalt.pkv', `${euro(h.pkv.praemieMonat)} im Monat`)} />
             <Angabe feld="Angenommene Steigerung" wert={`${prozent(h.pkv.steigerung)} p. a.`} />
             {h.pkv.bet.aktiv && (
               <Angabe
@@ -113,7 +131,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
         )}
         {grvZeile && <Angabe feld="Gesetzliche Rentenversicherung" wert={grvZeile} />}
         {/* Nur die Summe; die beiden Anteile stehen bei den Personen. */}
-        <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={euro(h.zielNettoHeute)} />
+        <Angabe feld="Gewünschtes Netto im Monat (heute)" wert={bsp('haushalt.zielNettoHeute', euro(h.zielNettoHeute))} />
       </Zweispaltig>
 
       {h.kinder.length > 0 && (
@@ -163,7 +181,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
                 {personName(p)}
               </div>
               <Spalte>
-              <Angabe feld="Geburtsdatum" wert={p.geburtsdatum || '—'} />
+              <Angabe feld="Geburtsdatum" wert={bsp(`personen.${p.id}.geburtsdatum`, p.geburtsdatum || '—')} />
               <Angabe feld="Rentenbeginn" wert={p.rentenbeginn || '—'} />
               {/*
                 Der Zielanteil stand bisher im Haushaltsblock, wo er beide
@@ -195,7 +213,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
               )}
               <Angabe feld="Versorgung" wert={ART_TEXT[p.art]} />
               {p.art === 'grv' ? (
-                <Angabe feld="Rentenanspruch heute" wert={`${euro(p.grvBruttoHeute)} im Monat`} />
+                <Angabe feld="Rentenanspruch heute" wert={bsp(`personen.${p.id}.grvBruttoHeute`, `${euro(p.grvBruttoHeute)} im Monat`)} />
               ) : (
                 <Angabe
                   feld="Besoldung / Ruhegehalt"
@@ -221,7 +239,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
             {szenario.einkommenGetrennt ? personNameAus(szenario.personen, 'A') : 'Haushalt'}
           </div>
           <div className="text-[12px] font-semibold tabular-nums text-slate-900">
-            {einkommen(szenario.einkommenHeute)}
+            {einkommen(szenario.einkommenHeute, 'einkommenHeute.betrag')}
           </div>
         </div>
         {h.verheiratet && szenario.einkommenGetrennt && (
@@ -230,7 +248,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
               {personNameAus(szenario.personen, 'B')}
             </div>
             <div className="text-[12px] font-semibold tabular-nums text-slate-900">
-              {einkommen(szenario.einkommenPartner)}
+              {einkommen(szenario.einkommenPartner, 'einkommenPartner.betrag')}
             </div>
           </div>
         )}

@@ -540,6 +540,18 @@ export const szenarioSchema = z.object({
   planer: planerSchema,
   tuev: z.array(tuevPositionSchema).max(20).default([]),
   loesungen: loesungenSchema.default({}),
+
+  /**
+   * Was am Fall noch OFFEN ist: vorbelegte Angaben, die niemand geprueft hat
+   * ('personen.A.geburtsdatum', 'haushalt.zielNettoHeute'), und Schritte,
+   * die noch fehlen ('vertraege', 'auswertung').
+   *
+   * Absichtlich OHNE Vorgabe: Fehlt das Feld, stammt der Fall aus einer
+   * frueheren Fassung — dann weiss niemand, was davon Beispiel war, und die
+   * Anwendung leitet es aus dem Vergleich mit den Standardwerten ab. Eine
+   * leere Liste dagegen heisst: alles geprueft.
+   */
+  offen: z.array(z.string().max(80)).max(80).optional(),
 });
 
 export type SzenarioInput = z.input<typeof szenarioSchema>;

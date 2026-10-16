@@ -46,6 +46,24 @@ describe('Abwaertskompatibilitaet', () => {
     expect(zurueck.ok && zurueck.szenario.loesungen).toMatchObject({ agZuschussArt: 'festbetrag', agZuschussFestMonat: 40 });
   });
 
+  it('liest Dateien ohne die Liste der offenen Angaben ein — sie bleibt undefiniert', () => {
+    // Undefiniert heisst "unbekannt": Die Anwendung leitet die Marken dann ab.
+    // Eine leere Liste hiesse "alles geprueft" — das waere eine Behauptung.
+    const r = importiere(JSON.stringify(vollstaendig));
+    expect(r.ok && r.szenario.offen).toBeUndefined();
+  });
+
+  it('erhaelt die offenen Angaben ueber Export und Import, auch eine leere Liste', () => {
+    const offen = ['personen.A.geburtsdatum', 'vertraege', 'auswertung'];
+    const r = importiere(JSON.stringify({ ...vollstaendig, offen }));
+    expect(r.ok && r.szenario.offen).toEqual(offen);
+    if (!r.ok) return;
+    const zurueck = importiere(exportiere(r.szenario));
+    expect(zurueck.ok && zurueck.szenario.offen).toEqual(offen);
+    const leer = importiere(exportiere({ ...r.szenario, offen: [] }));
+    expect(leer.ok && leer.szenario.offen).toEqual([]);
+  });
+
   it('liest Dateien ohne rentenbeginnManuell ein und setzt die Marke auf false', () => {
     const r = importiere(JSON.stringify(vollstaendig));
     expect(r.ok).toBe(true);
