@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Info } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, Info } from 'lucide-react';
 import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
 } from '@renten/engine';
@@ -11,6 +11,42 @@ import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '..
  * Zuschussmodell). Gemeinsam, damit beide dieselbe Rechnung gleich zeigen —
  * zwei Fassungen desselben Vergleichs liefen auseinander.
  */
+
+/**
+ * NACHSCHLAGEN — Wissen zur Umsetzung (Arbeitgeberwechsel,
+ * Versorgungsordnung), das der Berater braucht, aber nicht bei jeder
+ * Rechnung liest. Am Bildschirm eingeklappt, damit Rechnung und Ergebnis die
+ * Seite tragen und nicht drei Spalten Paragraphen; im DRUCK immer offen —
+ * es ist Seite 2 fuer den Arbeitgeber. Der Kopf traegt `druck-kopf`, sonst
+ * blendete das Druck-CSS mit allen Knoepfen auch die Ueberschrift aus.
+ */
+export function Nachschlagen({ titel, kurz, klasse = 'print:p-2', children }: {
+  titel: ReactNode;
+  /** Ein Satz, der auch eingeklappt stehen bleibt */
+  kurz?: ReactNode;
+  klasse?: string;
+  children: ReactNode;
+}) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:shadow-none ${klasse}`}>
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        className="druck-kopf -m-1 flex w-[calc(100%+0.5rem)] items-center justify-between gap-3 rounded-lg p-1 text-left hover:bg-slate-50"
+      >
+        <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">{titel}</h2>
+        <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-500 print:hidden">
+          {offen ? 'Einklappen' : 'Anzeigen'}
+          <ChevronDown className={`h-4 w-4 transition-transform ${offen ? 'rotate-180' : ''}`} aria-hidden />
+        </span>
+      </button>
+      {kurz && <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-xs">{kurz}</p>}
+      <div className={offen ? 'block' : 'hidden print:block'}>{children}</div>
+    </section>
+  );
+}
 
 export function Kasten({ titel, children }: { titel: string; children: ReactNode }) {
   return (

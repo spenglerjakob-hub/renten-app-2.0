@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
-  betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, type BisherigeAngaben,
+  betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from './bausteine';
 
 /**
@@ -298,14 +298,14 @@ export function Seite() {
                 Umsetzung und Arbeitgeberwechsel
               </p>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-3 print:shadow-none">
-                <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                  <ArrowRightLeft className="h-4 w-4 text-indigo-600" aria-hidden /> Wenn ein Mitarbeiter wechselt
-                </h2>
-                <p className="mt-1 text-[13px] print:text-xs leading-relaxed text-slate-600">
+              <Nachschlagen
+                klasse="print:p-3"
+                titel={<><ArrowRightLeft className="h-4 w-4 text-indigo-600" aria-hidden /> Wenn ein Mitarbeiter wechselt</>}
+                kurz={<>
                   Das Modell trennt die beiden Töpfe: Das Geld des Mitarbeiters liegt in der Direktversicherung und
                   geht mit ihm, das Matching liegt in der Unterstützungskasse und bleibt hier.
-                </p>
+                </>}
+              >
                 <div className="mt-3 grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
                   <WechselSpalte titel="Direktversicherung — nimmt er mit" farbe="border-sky-200 bg-sky-50">
                     <li>Umwandlung und Pflichtzuschuss sind <strong>sofort unverfallbar</strong> (§ 1b Abs. 5 BetrAVG).</li>
@@ -332,12 +332,11 @@ export function Seite() {
                     <li>Ausscheidende auf die Jahresfrist für die Mitnahme der Direktversicherung hinweisen.</li>
                   </WechselSpalte>
                 </div>
-              </section>
+              </Nachschlagen>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
-                <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
-                </h2>
+              <Nachschlagen
+                titel={<><ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung</>}
+              >
                 <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-[13px] leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
                   <li>• Matching-Regel für alle Beschäftigten gleich (Gleichbehandlung)</li>
                   <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
@@ -346,7 +345,7 @@ export function Seite() {
                   <li>• Unverfallbarkeit des Matchings: gesetzlich 3 Jahre, kürzer möglich, länger nicht (§ 17 Abs. 3 BetrAVG)</li>
                   <li>• Was mit verfallenen Anteilen geschieht (Satzung der Unterstützungskasse)</li>
                 </ul>
-              </section>
+              </Nachschlagen>
 
               {hatBisherige(bisher) && (
                 <UmstiegVergleich betrieb={betrieb} vlVertrag={bisher.vlVertrag} steuersatz={steuersatz} mitUmlagen={umlagen > 0} druck="nurDruck" kopfImDruck={false} />

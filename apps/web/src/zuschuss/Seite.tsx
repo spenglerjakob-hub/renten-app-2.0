@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
-  betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, type BisherigeAngaben,
+  betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
 
 /**
@@ -309,10 +309,9 @@ export function Seite() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
-                <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung
-                </h2>
+              <Nachschlagen
+                titel={<><ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung</>}
+              >
                 <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-[13px] leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
                   <li>• Zuschuss {prozent(quote, 0)} der Umwandlung, höchstens {euro(deckel)} im Monat</li>
                   <li>• Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
@@ -321,7 +320,7 @@ export function Seite() {
                   <li>• Unverfallbarkeit des freiwilligen Teils: gesetzlich 3 Jahre, kürzer möglich</li>
                   <li>• Ein Anbieter, ein Tarif — neue Mitarbeiter können mitgebrachte Verträge übertragen</li>
                 </ul>
-              </section>
+              </Nachschlagen>
 
               <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Nicht enthalten: die

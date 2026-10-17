@@ -22,9 +22,17 @@ import {
 
 /** Was jedes Paket enthaelt — in der Sprache der Berater, nicht der Technik. */
 const LEISTUNGEN: Record<PaketId, string[]> = {
+  /*
+    Konkret statt „Alles aus …“: Mit drei abstrakten Zeilen sah das
+    empfohlene, teuerste Paket aus, als biete es am wenigsten. Hier stehen
+    die Hoehepunkte beider Pakete; vollstaendig sind sie in den Nachbarkarten.
+  */
   alles: [
-    'Alles aus der Rentenplanung',
-    'Alles aus den AG-Verkaufshilfen',
+    'Netto-Rente, Versorgungslücke und Sparrechner',
+    'Vertrags-TÜV und Lösungsvergleich mit Ihren Angeboten',
+    'Gutachten als PDF und Vorsorge-Check per Kundenlink',
+    'Matching-, Zuschuss- und Festbetrag-Modell',
+    'Betriebliche Krankenversicherung als Sachbezug',
     'Ein Zugang für die ganze Beratung — privat und Firmenkunden',
   ],
   rente: [
@@ -43,6 +51,22 @@ const LEISTUNGEN: Record<PaketId, string[]> = {
     'Betriebliche Krankenversicherung als steuerfreier Sachbezug',
   ],
 };
+
+/**
+ * Was das Buendel gegenueber beiden Paketen einzeln spart — aus denselben
+ * Preisen wie die Karten, in der gewaehlten Staffel und Zahlweise.
+ */
+function BuendelVorteil({ intervall, nutzer }: { intervall: Intervall; nutzer: number }) {
+  const einzeln = preisJeNutzer('rente', intervall, nutzer) + preisJeNutzer('ag', intervall, nutzer);
+  const spart = einzeln - preisJeNutzer('alles', intervall, nutzer);
+  if (spart <= 0) return null;
+  return (
+    <p className="mt-4 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+      Beide Pakete in einem — <strong className="tabular-nums">{preisText(spart)}</strong> günstiger
+      als einzeln ({preisText(einzeln)})
+    </p>
+  );
+}
 
 /**
  * Spaltenkoepfe der Staffeltabelle am Telefon. "RENTENPLANUNG" bricht nicht
@@ -204,6 +228,7 @@ export function Seite() {
               <div className="mt-4">
                 <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} faelle={faelle} />
               </div>
+              {p.id === 'alles' && <BuendelVorteil intervall={intervall} nutzer={nutzer} />}
               <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-700">
                 {LEISTUNGEN[p.id].map((l) => (
                   <li key={l} className="flex items-start gap-2">
