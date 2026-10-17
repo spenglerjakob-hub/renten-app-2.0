@@ -54,8 +54,9 @@ export function KontoLoeschen({ sicherung }: { sicherung: string }) {
   return (
     <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-900">
       <p>
-        <strong>Konto endgültig löschen.</strong> Gelöscht werden Ihr Konto, alle gespeicherten Szenarien
-        und alle Vorsorge-Check-Anfragen samt eingegangener Kundendaten. Das lässt sich nicht rückgängig
+        <strong>Konto endgültig löschen.</strong> Gelöscht werden Ihr Konto, alle gespeicherten Szenarien,
+        Ihr Auftritt im Gutachten (Logo und Angaben) und alle Vorsorge-Check-Anfragen samt eingegangener
+        Kundendaten. Das lässt sich nicht rückgängig
         machen. {sicherung}
         {zugang?.rolle === 'inhaber' && ' Mit Ihrem Konto endet auch Ihr Büro — für alle Mitglieder.'}
       </p>

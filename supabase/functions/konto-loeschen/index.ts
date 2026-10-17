@@ -10,6 +10,10 @@
  * keine Anfrage mehr und werden hier gleich mit entfernt, nicht erst beim
  * naechtlichen Aufraeumen (Edge Function `check-dokumente`).
  *
+ * DAS LOGO FUERS GUTACHTEN (Bucket `branding`) ebenso: Die Zeile in
+ * `berater_profil` geht per Kaskade, die Datei nicht. Sie liegt im Ordner
+ * mit der ID des Nutzers und wird hier mit entfernt.
+ *
  * WER DARF: nur der Inhaber selbst. Das Zugriffstoken aus dem
  * Authorization-Kopf wird beim Auth-Server geprueft (`auth.getUser`); geloescht
  * wird genau der Nutzer, dem es gehoert — eine ID aus dem Anfragekoerper
@@ -98,6 +102,30 @@ Deno.serve(async (req) => {
     console.error('Unterlagen nicht aufgeraeumt', e instanceof Error ? e.message : e);
   }
 
-  console.log('Konto geloescht', nutzer.id, unterlagen > 0 ? `(${unterlagen} Unterlagen)` : '');
+  /*
+    Das Logo fuers Gutachten: der Ordner <nutzer.id> im Bucket `branding`.
+    Hoechstens drei Dateien (Policy); ein Fehler laesst das Loeschen ebenso
+    wenig scheitern wie bei den Unterlagen.
+  */
+  let logos = 0;
+  try {
+    const { data: dateien, error: fehlerListe } = await zweiVersuche(
+      () => db.storage.from('branding').list(nutzer.id, { limit: 100 }),
+    );
+    if (fehlerListe) throw fehlerListe;
+    const namen = (dateien ?? [])
+      .map((d) => d.name)
+      .filter((n) => typeof n === 'string' && n !== '')
+      .map((n) => `${nutzer.id}/${n}`);
+    if (namen.length > 0) {
+      const { error: fehlerDateien } = await zweiVersuche(() => db.storage.from('branding').remove(namen));
+      if (fehlerDateien) throw fehlerDateien;
+      logos = namen.length;
+    }
+  } catch (e) {
+    console.error('Logo nicht entfernt', e instanceof Error ? e.message : e);
+  }
+
+  console.log('Konto geloescht', nutzer.id, unterlagen > 0 ? `(${unterlagen} Unterlagen)` : '', logos > 0 ? `(${logos} Logo-Dateien)` : '');
   return antwort(200, { status: 'geloescht' });
 });
