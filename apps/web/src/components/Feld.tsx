@@ -28,11 +28,17 @@ const VORBELEGT_TEXT = {
 
 export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: string; klasse?: string }) {
   const titel = v.hinweis ? `${v.hinweis} ${VORBELEGT_TEXT[v.art]}` : VORBELEGT_TEXT[v.art];
+  /*
+    Standardwerte leise: ein Wort, kein Kaestchen. Dass ein Eingabefeld
+    anpassbar ist, sieht man ihm an; unter jedem zweiten Feld ein grauer
+    Kasten machte das Formular unruhig, ohne mehr zu sagen. Woher der Wert
+    stammt, traegt weiter der Tooltip (gepunktete Linie).
+  */
   if (v.art === 'standard') {
     return (
       <span id={id} title={titel}
-        className={`inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 print:hidden ${klasse}`}>
-        Standardwert · anpassbar
+        className={`inline-flex cursor-help items-center text-[11px] text-slate-400 underline decoration-slate-300 decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
+        Standardwert
       </span>
     );
   }
@@ -43,11 +49,11 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   */
   return (
     <span id={id} title={titel}
-      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 print:hidden ${klasse}`}>
+      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800 print:hidden ${klasse}`}>
       Beispielwert
       {v.onPruefen && (
         <button type="button" onClick={v.onPruefen}
-          className="rounded px-1 font-bold text-amber-800 underline decoration-amber-400 underline-offset-2 hover:bg-amber-200">
+          className="rounded px-1 font-bold text-amber-900 underline decoration-amber-400 underline-offset-2 hover:bg-amber-100">
           Stimmt so
         </button>
       )}
@@ -55,8 +61,13 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   );
 }
 
-/** Rahmen eines Felds mit Beispielwert — sichtbar am Feld selbst, ohne dass es die Hoehe aendert. */
-const beispielRahmen = (v?: Vorbelegt) => (v?.art === 'beispiel' ? 'border-amber-300 bg-amber-50/60' : 'border-slate-300 bg-white');
+/**
+ * Rahmen eines Felds mit Beispielwert — sichtbar am Feld selbst, ohne dass es
+ * die Hoehe aendert. Nur der Rahmen, keine gelbe Flaeche: Stehen alle Felder
+ * einer Spalte auf Beispielwerten, sah die ganze Spalte sonst wie ein
+ * Fehlerzustand aus.
+ */
+const beispielRahmen = (v?: Vorbelegt) => (v?.art === 'beispiel' ? 'border-amber-300 bg-white' : 'border-slate-300 bg-white');
 
 /**
  * Zahleneingabe mit deutscher Notation.

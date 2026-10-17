@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
-  List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
+  List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
   PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
 } from 'lucide-react';
 import {
@@ -153,20 +153,25 @@ const LEERE_ZEILE: Jahreszeile = {
  * `standard`: Der Wert ist noch die Vorbelegung — dann steht „Standard“
  * dabei, mit der Begruendung im Tooltip (siehe `features/vorbelegung.ts`).
  */
+/*
+  Die Annahmen im Kopf sind Einstellungen, keine Ergebnisse — deshalb
+  neutral. Gruen und Indigo als Flaechen zogen den Blick staerker an als die
+  Versorgungsluecke selbst.
+*/
 function KopfAuswahl({
-  titel, wert, onChange, farbe, standard,
-}: { titel: string; wert: number; onChange: (n: number) => void; farbe: string; standard?: string }) {
+  titel, wert, onChange, standard,
+}: { titel: string; wert: number; onChange: (n: number) => void; standard?: string }) {
   return (
     <span
       title={standard}
-      className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-white shadow sm:text-xs ${farbe}`}
+      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-slate-400 sm:text-xs"
     >
       <span>{titel}</span>
       <select
         value={wert}
         onChange={(e) => onChange(Number(e.target.value))}
-        aria-label={standard ? `${titel} (Standardwert, anpassbar)` : titel}
-        className="cursor-pointer bg-transparent font-bold outline-none"
+        aria-label={`${titel} pro Jahr${standard ? ' (Standardwert, anpassbar)' : ''}`}
+        className="cursor-pointer rounded bg-slate-700 px-1 font-bold text-white outline-none hover:bg-slate-600"
       >
         {QUOTEN.map((q) => (
           <option key={q} value={q} className="text-slate-900">
@@ -175,8 +180,71 @@ function KopfAuswahl({
         ))}
       </select>
       {/* Zwischen md und xl steht die Kopfleiste einzeilig und knapp — dort traegt nur der Tooltip die Marke. */}
-      {standard && <span aria-hidden className="text-[10px] font-normal opacity-80 md:hidden xl:inline">Standard</span>}
+      {standard && <span aria-hidden className="text-[10px] font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
     </span>
+  );
+}
+
+/**
+ * EIN Druckknopf mit Auswahl statt zweier roter Knoepfe. Rot ist auf dieser
+ * Seite der Versorgungsluecke vorbehalten; zwei rote Druckknoepfe waren das
+ * Lauteste im ganzen Kopf.
+ */
+function DruckMenue({ onDrucke }: { onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void }) {
+  const [offen, setOffen] = useState(false);
+  const huelle = useRef<HTMLDivElement>(null);
+  const menueId = useId();
+
+  useEffect(() => {
+    if (!offen) return;
+    const weg = (e: MouseEvent) => { if (!huelle.current?.contains(e.target as Node)) setOffen(false); };
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    document.addEventListener('mousedown', weg);
+    document.addEventListener('keydown', taste);
+    return () => {
+      document.removeEventListener('mousedown', weg);
+      document.removeEventListener('keydown', taste);
+    };
+  }, [offen]);
+
+  const wahl = (umfang: 'kurz' | 'ausfuehrlich') => { setOffen(false); onDrucke(umfang); };
+  const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 focus-visible:bg-slate-100';
+
+  return (
+    <div ref={huelle} className="relative flex flex-1 sm:flex-none">
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        aria-controls={menueId}
+        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-indigo-500 sm:flex-none sm:text-xs"
+      >
+        <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
+        <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
+      </button>
+      {offen && (
+        <div
+          id={menueId}
+          className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-lg border border-slate-200 bg-white p-1 text-sm text-slate-800 shadow-lg"
+        >
+          {/*
+            Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
+            Angaben, Renteneinkuenfte, Vorbehalt), die ausfuehrliche zum
+            Mitgeben. Ein Dokument mit Namen darauf fuehrt den Vorbehalt
+            in beiden Faellen mit.
+          */}
+          <button type="button" className={eintrag} onClick={() => wahl('kurz')}>
+            <span className="block font-semibold">Kurzfassung</span>
+            <span className="block text-xs text-slate-500">Für das Gespräch: Angaben und Renteneinkünfte</span>
+          </button>
+          <button type="button" className={eintrag} onClick={() => wahl('ausfuehrlich')}>
+            <span className="block font-semibold">Ausführlich</span>
+            <span className="block text-xs text-slate-500">Zum Mitgeben: alle Abschnitte des Gutachtens</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -204,8 +272,6 @@ export default function App() {
   const ausJsonImportieren = useSzenario((s) => s.ausJsonImportieren);
   const zuruecksetzen = useSzenario((s) => s.zuruecksetzen);
   const setzeAnnahmen = useSzenario((s) => s.setzeAnnahmen);
-  const setzeHaushalt = useSzenario((s) => s.setzeHaushalt);
-  const partnerHinzufuegen = useSzenario((s) => s.partnerHinzufuegen);
 
   const [reiter, setReiter] = useState<Reiter>('s1');
   const [ansicht, setAnsicht] = useState<Ansicht>('kassenbon');
@@ -522,8 +588,6 @@ export default function App() {
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
   const hinweise = ergebnis && !echteZeile ? ergebnis.hinweise : [];
 
-  const verheiratet = szenario.haushalt.verheiratet;
-
   const schliesseLeiste = useCallback(() => setLeisteOffen(false), []);
   const abschnitte: Abschnitt[] = [
     { id: 'journey', text: '1. Daten & Ziel', symbol: <User className="h-4 w-4" aria-hidden />, beiSprung: () => { setBasisOffen(true); geheZu('daten'); } },
@@ -803,50 +867,28 @@ export default function App() {
                   onClick={() => setKaufkraftHeute((v) => !v)}
                   aria-pressed={kaufkraftHeute}
                   className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-medium transition-all sm:flex-none sm:text-xs ${
-                    kaufkraftHeute ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                    kaufkraftHeute ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Coins className="h-3 w-3 shrink-0" aria-hidden /> Kaufkraft heute
                 </button>
                 <KopfAuswahl
-                  titel="Infl.:"
+                  titel="Inflation"
                   wert={szenario.annahmen.inflation}
                   onChange={(n) => setzeAnnahmen({ inflation: n })}
-                  farbe="bg-emerald-600"
                   standard={standardHinweis(szenario, 'annahmen.inflation')}
                 />
                 <KopfAuswahl
-                  titel="Rente:"
+                  titel="Rente"
                   wert={szenario.annahmen.rentendynamik}
                   onChange={(n) => setzeAnnahmen({ rentendynamik: n })}
-                  farbe="bg-indigo-600"
                   standard={standardHinweis(szenario, 'annahmen.rentendynamik')}
                 />
-                <span className="my-1 h-px w-full bg-slate-700 sm:mx-0.5 sm:my-0 sm:h-5 sm:w-px" />
-                <button
-                  type="button"
-                  onClick={() => setzeHaushalt({ verheiratet: false })}
-                  aria-pressed={!verheiratet}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-all sm:flex-none sm:text-xs ${
-                    !verheiratet ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <User className="h-3 w-3 shrink-0" aria-hidden /> Single
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setzeHaushalt({ verheiratet: true });
-                    partnerHinzufuegen();
-                    setEhepartnerDialog(true);
-                  }}
-                  aria-pressed={verheiratet}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-all sm:flex-none sm:text-xs ${
-                    verheiratet ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Users className="h-3 w-3 shrink-0" aria-hidden /> Verheiratet
-                </button>
+                {/*
+                  Single/Verheiratet stand hier doppelt — es ist eine Angabe
+                  zum Fall und steht in den Basisdaten (Schritt 1), mit
+                  demselben Ehepartner-Dialog.
+                */}
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
@@ -865,26 +907,7 @@ export default function App() {
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
-                {/*
-                  Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
-                  Angaben, Renteneinkuenfte, Vorbehalt), die ausfuehrliche zum
-                  Mitgeben. Ein Dokument mit Namen darauf fuehrt den Vorbehalt
-                  in beiden Faellen mit.
-                */}
-                <button
-                  type="button"
-                  onClick={() => drucke('kurz')}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-500 px-3 py-1.5 text-[11px] font-bold text-rose-300 transition-colors hover:bg-rose-600 hover:text-white sm:flex-none sm:text-xs"
-                >
-                  <Printer className="h-3 w-3 shrink-0" aria-hidden /> Kurz
-                </button>
-                <button
-                  type="button"
-                  onClick={() => drucke('ausfuehrlich')}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-rose-500 sm:flex-none sm:text-xs"
-                >
-                  <Printer className="h-3 w-3 shrink-0" aria-hidden /> Ausführlich
-                </button>
+                <DruckMenue onDrucke={drucke} />
                 <button
                   type="button"
                   onClick={zuruecksetzen}
