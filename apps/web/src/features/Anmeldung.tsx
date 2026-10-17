@@ -5,6 +5,7 @@ import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { useAuth, type MailLink } from '../store/auth';
 import { offenerMusterfall } from '../lib/musterfall';
+import { offenerAuftrittLokal } from '../lib/auftritt-lokal';
 
 type Maske = 'anmelden' | 'registrieren' | 'vergessen';
 
@@ -37,6 +38,10 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
   const [zustimmung, setZustimmung] = useState(false);
   // Ein Fall aus der Schnellrechnung wartet auf das Konto (siehe `lib/musterfall.ts`).
   const [musterfall] = useState(() => offenerMusterfall());
+  // Ebenso Logo, Firmenname und Farbe aus der Schnellrechnung (`lib/auftritt-lokal.ts`).
+  const [auftrittEntwurf] = useState(() => offenerAuftrittLokal());
+  const auftrittWas = !auftrittEntwurf ? null
+    : auftrittEntwurf.logo ? 'Ihr Logo' : auftrittEntwurf.firma.trim() ? 'Ihr Firmenname' : 'Ihre Akzentfarbe';
 
   // Beim Wechsel der Maske stehen gebliebene Meldungen loeschen — sonst
   // erscheint "E-Mail oder Passwort stimmen nicht" ueber dem Registrierformular.
@@ -115,8 +120,20 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
             <span>
               <strong>Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
               Anmeldung liegt er im Rechner.
+              {auftrittWas && <> {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.</>}
               {maske === 'registrieren' && (
                 <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt Ihr Musterfall.</>
+              )}
+            </span>
+          </div>
+        )}
+        {!musterfall && auftrittWas && !passwortNeu && (
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">
+            <Save className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span>
+              {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.
+              {maske === 'registrieren' && (
+                <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt der Entwurf.</>
               )}
             </span>
           </div>

@@ -156,11 +156,16 @@ function Datenschutz() {
         <li>ein persönlicher Einladungs- oder Early-Adopter-Link, bis er nach Ihrer Anmeldung eingelöst ist
           (<code>rentenplaner.einladung</code>, <code>rentenplaner.fruehstart</code>; höchstens 14 Tage),</li>
         <li>ein Fall aus der Schnellrechnung, den Sie mit „Fall speichern“ vorgemerkt haben, bis Sie ihn nach der
-          Anmeldung übernehmen oder verwerfen (<code>rentenplaner.musterfall.v1</code>; höchstens 14 Tage).</li>
+          Anmeldung übernehmen oder verwerfen (<code>rentenplaner.musterfall.v1</code>; höchstens 14 Tage),</li>
+        <li>Logo, Firmenname und Farbe, die Sie in der Schnellrechnung für das Gutachten eingetragen haben, bis
+          sie nach der Anmeldung in Ihr Konto übernommen sind oder Sie sie entfernen
+          (<code>rentenplaner.auftritt.v1</code>; höchstens 14 Tage).</li>
       </Liste>
       <P>
         Diese Daten verlassen Ihr Gerät nicht — bis auf den persönlichen Link, der zum Einlösen an unseren
-        Server geht. Sie können sie jederzeit über die Einstellungen Ihres Browsers löschen.
+        Server geht, und Logo, Firmenname und Farbe aus der Schnellrechnung, die nach Ihrer Anmeldung in Ihr
+        Konto übernommen werden (Abschnitt 5). Sie können sie jederzeit über die Einstellungen Ihres Browsers
+        löschen.
       </P>
 
       <H2>5. Konto und Anmeldung</H2>
@@ -171,6 +176,14 @@ function Datenschutz() {
         welcher Fassung der Nutzungsbedingungen Sie wann zugestimmt haben. Rechtsgrundlage ist der
         Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Daten bleiben gespeichert, bis Sie Ihr Konto löschen —
         das können Sie jederzeit selbst unter „Konto“ im Rechner.
+      </P>
+      <P>
+        <strong>Ihr Auftritt im Gutachten.</strong> Richten Sie ihn ein, speichern wir in Ihrem Konto das Logo und
+        die Angaben, die Sie dafür eintragen: Firmenname, Ihren Namen, Telefon, E-Mail-Adresse, Website, eine
+        Zusatzzeile und eine Farbe. Sie erscheinen auf den Gutachten, die Sie drucken. Das Logo liegt in einem
+        nicht öffentlichen Speicher bei Supabase in der EU; abrufen können Logo und Angaben nur Sie mit Ihrem
+        Konto. Sie können den Auftritt jederzeit ändern oder entfernen; mit dem Konto wird er gelöscht.
+        Rechtsgrundlage ist der Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO).
       </P>
 
       <H2>6. Gespeicherte Szenarien</H2>
@@ -258,7 +271,7 @@ function Datenschutz() {
 
       <H2>12. Speicherdauer im Überblick</H2>
       <Liste>
-        <li>Konto, gespeicherte Szenarien und Rückmeldungen: bis zur Löschung des Kontos.</li>
+        <li>Konto, gespeicherte Szenarien, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos.</li>
         <li>
           Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
           90 Tage; Unterlagen eines nicht abgesendeten Checks bis zum Ablauf des Links.
@@ -285,7 +298,8 @@ function Datenschutz() {
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
         Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
-        gültige, signierte Verweise.
+        gültige, signierte Verweise. Ebenso liegt das Logo für Ihr Gutachten in einem nicht öffentlichen
+        Speicher, den nur Ihr Konto lesen kann.
       </P>
     </>
   );

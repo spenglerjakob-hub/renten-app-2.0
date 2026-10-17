@@ -1,11 +1,17 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, Save } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Save } from 'lucide-react';
 import { BUNDESLAENDER } from '@renten/engine';
 import { Logo } from '../components/Logo';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { AuswahlFeld, DatumFeld, Schalter, ZahlFeld, euro, prozent } from '../components/Feld';
 import { KaufkraftKarte } from '../features/KaufkraftKarte';
 import { musterfallMerken } from '../lib/musterfall';
+import { AUFTRITT_LEER, auftrittLeer } from '../features/auftritt';
+import { AuftrittFormular } from '../features/AuftrittFormular';
+import { DeckblattVorschau } from '../features/DeckblattVorschau';
+import {
+  auftrittLokalMerken, auftrittLokalVerwerfen, offenerAuftrittLokal, type AuftrittEntwurf,
+} from '../lib/auftritt-lokal';
 import {
   SCHNELL_BEISPIEL, ZIEL_FAUSTREGEL, schnellRechnen, type SchnellEingaben, type SchnellFeld,
 } from './eingaben';
@@ -18,7 +24,7 @@ const laender = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
  */
 const MIT_KONTO = [
   'Fall speichern und Mandanten verwalten',
-  'Gutachten als PDF für Ihren Mandanten',
+  'Gutachten als PDF für Ihren Mandanten — mit Ihrem Logo und Ihren Kontaktdaten',
   'Detailauswertung: Besteuerungsanteil, Kranken- und Pflegeversicherung (KVdR), Versorgungsfreibetrag',
   'Sparrechner, Vertrags-TÜV und Lösungsvergleich mit Ihren Angeboten',
   'Paare, Beamte, Selbstständige und privat Versicherte',
@@ -45,6 +51,36 @@ export function Seite() {
   };
   const r = useMemo(() => schnellRechnen(e, angefasst), [e, angefasst]);
   const istBeispiel = angefasst.size === 0;
+
+  /*
+    IHR LOGO AUFS GUTACHTEN — Investition vor dem Konto, aber ehrlich: Die
+    Vorschau ist das echte Deckblatt (`DeckblattVorschau`), alles bleibt in
+    diesem Browser (`lib/auftritt-lokal.ts`) und laesst sich entfernen. Nach
+    der Anmeldung uebernimmt der Rechner es ins Konto.
+  */
+  const [auftritt, setAuftritt] = useState<AuftrittEntwurf>(
+    () => offenerAuftrittLokal() ?? { firma: '', farbe: null, logo: null },
+  );
+  const [auftrittOffen, setAuftrittOffen] = useState(() => offenerAuftrittLokal() !== null);
+  const [speicherHinweis, setSpeicherHinweis] = useState<string | null>(null);
+  const auftrittAendern = (teil: Partial<AuftrittEntwurf>) => {
+    const neu = { ...auftritt, ...teil };
+    setAuftritt(neu);
+    const ergebnis = auftrittLokalMerken(neu);
+    setSpeicherHinweis(
+      ergebnis === 'voll' ? 'Das Logo ist zu groß für den Speicher dieses Browsers — es bleibt nur, bis Sie die Seite neu laden.'
+        : ergebnis === 'gesperrt' ? 'Dieser Browser lässt keinen Speicher zu — Ihre Angaben bleiben nur, bis Sie die Seite neu laden.'
+          : null,
+    );
+  };
+  const auftrittEntfernen = () => {
+    auftrittLokalVerwerfen();
+    setAuftritt({ firma: '', farbe: null, logo: null });
+    setSpeicherHinweis(null);
+  };
+  const auftrittVoll = { ...AUFTRITT_LEER, ...auftritt };
+  const bleibtImBrowser = auftritt.logo ? 'bleiben Fall und Logo'
+    : auftritt.firma.trim() ? 'bleiben Fall und Firmenname' : 'bleibt der Fall';
 
   const z = r?.zeile;
   const f = z?.kaufkraftfaktor ?? 1;
@@ -80,7 +116,7 @@ export function Seite() {
           Kranken- und Pflegeversicherung nach aktuellem Rechtsstand.
         </p>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-12">
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
           {/* ---------- Eingaben ---------- */}
           <section aria-labelledby="schnell-eingaben" className="rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-5 lg:col-span-5">
             <h2 id="schnell-eingaben" className="text-sm font-bold text-slate-800">Ihr Mandant</h2>
@@ -194,6 +230,56 @@ export function Seite() {
               </p>
             </section>
 
+            {/* ---------- Ihr Logo aufs Gutachten ---------- */}
+            <section aria-labelledby="schnell-auftritt" className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <h2 id="schnell-auftritt" className="m-0">
+                <button
+                  type="button"
+                  onClick={() => setAuftrittOffen((v) => !v)}
+                  aria-expanded={auftrittOffen}
+                  aria-controls="schnell-auftritt-inhalt"
+                  className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
+                >
+                  <span>
+                    <span className="block text-sm font-bold text-slate-800">Ihr Logo aufs Gutachten</span>
+                    <span className="block text-xs font-normal text-slate-500">So sieht das Deckblatt für Ihren Mandanten aus</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${auftrittOffen ? 'rotate-180' : ''}`} aria-hidden />
+                </button>
+              </h2>
+              {auftrittOffen && (
+                <div id="schnell-auftritt-inhalt" className="space-y-4 border-t border-slate-100 px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
+                  <AuftrittFormular
+                    wert={auftrittVoll}
+                    onAendern={(t) => auftrittAendern({
+                      ...(t.firma !== undefined ? { firma: t.firma } : {}),
+                      ...(t.farbe !== undefined ? { farbe: t.farbe } : {}),
+                    })}
+                    onLogo={(l) => auftrittAendern({ logo: l ? l.dataUrl : null })}
+                  />
+                  <DeckblattVorschau
+                    auftritt={auftrittVoll}
+                    zahlen={r && z ? { bedarf: r.zielHeute, netto: z.nettoMonat / f } : null}
+                  />
+                  <p className="text-xs leading-relaxed text-slate-600">
+                    Logo, Firmenname und Farbe bleiben in diesem Browser, bis Sie ein Konto anlegen — danach liegen
+                    sie in Ihrem Konto und stehen auf jedem Gutachten. Ihren Namen und Ihre Kontaktdaten ergänzen Sie
+                    dort.
+                  </p>
+                  {speicherHinweis && <p role="status" className="text-xs font-semibold text-amber-800">{speicherHinweis}</p>}
+                  {!auftrittLeer(auftrittVoll) && (
+                    <button
+                      type="button"
+                      onClick={auftrittEntfernen}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Entfernen
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+
             {/* ---------- Mit Konto ---------- */}
             <section aria-labelledby="schnell-konto" className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-5">
               <h2 id="schnell-konto" className="text-sm font-bold text-slate-800">Mit Konto zusätzlich</h2>
@@ -214,7 +300,7 @@ export function Seite() {
               </button>
               <p className="mt-2 text-xs leading-relaxed text-slate-600">
                 Zum Speichern brauchen Sie ein Konto — kostenlos, 14 Tage alle Funktionen, ohne
-                Zahlungsdaten. Bis dahin bleibt der Fall nur in diesem Browser.
+                Zahlungsdaten. Bis dahin {bleibtImBrowser} nur in diesem Browser.
               </p>
               <button
                 type="button"
