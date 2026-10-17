@@ -782,7 +782,7 @@ export default function App() {
       Ergebniskarten rechts UND der getoente Eingabegrund links ab. Auf
       `slate-50` verschwammen beide mit der Seite.
     */
-    <div className="min-h-screen bg-slate-100 pb-28 text-slate-800 sm:pb-36 print:pb-0">
+    <div className="min-h-screen bg-slate-100 pb-24 text-slate-800 sm:pb-36 print:pb-0">
       {/* KOPFZEILE */}
       <header
         className={`sticky top-0 z-50 bg-slate-900 text-white shadow-md transition-all print:hidden ${
@@ -835,6 +835,17 @@ export default function App() {
             </div>
 
             <div className={`flex items-center gap-2 ${kopfEingeklappt ? 'absolute right-1 sm:right-0' : ''}`}>
+              {!kopfEingeklappt && (
+                <button
+                  type="button"
+                  onClick={() => setKontoOffen(true)}
+                  aria-label={angemeldet ? `Konto — angemeldet als ${angemeldet}` : 'Konto — Pläne speichern und laden'}
+                  className="relative rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 md:hidden"
+                >
+                  <Wallet className="h-4 w-4" aria-hidden />
+                  {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900" />}
+                </button>
+              )}
               {!kopfEingeklappt && (
                 <button
                   type="button"
@@ -893,6 +904,15 @@ export default function App() {
 
               <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
                 <input ref={dateiRef} type="file" accept=".json" onChange={importieren} className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => setKontoOffen(true)}
+                  title={angemeldet ? `Angemeldet als ${angemeldet}` : 'Pläne speichern und laden'}
+                  className="hidden items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:flex"
+                >
+                  <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden /> Konto
+                  {angemeldet && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                </button>
                 <button
                   type="button"
                   onClick={() => dateiRef.current?.click()}
@@ -1051,18 +1071,14 @@ export default function App() {
               in den folgenden Etappen auf weissen Karten.
             */}
             {/*
-              KONTO UND VORSORGE-CHECK am Anfang der Angaben — von dort kommen
-              sie oft: ein gespeicherter Plan oder die Angaben, die ein Kunde
-              ueber seinen Link geschickt hat. In beiden Eingabearten.
+              VORSORGE-CHECK am Anfang der Angaben — von dort kommen Faelle
+              oft: die Angaben, die ein Kunde ueber seinen Link geschickt hat.
+              In beiden Eingabearten. Das Konto steht im Kopf (oben rechts,
+              wo man es sucht) — als Karte hier war es eine Ebene mehr vor
+              dem ersten Eingabefeld.
             */}
-            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 print:hidden">
-              <StartKarte
-                symbol={<Wallet className="h-5 w-5" aria-hidden />}
-                titel="Konto"
-                text="Gespeicherten Plan laden oder diesen sichern"
-                onClick={() => setKontoOffen(true)}
-              />
-              {checkMoeglich && (
+            {checkMoeglich && (
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 print:hidden">
                 <StartKarte
                   symbol={<Inbox className="h-5 w-5" aria-hidden />}
                   titel="Vorsorge-Check an Kunden senden"
@@ -1070,8 +1086,8 @@ export default function App() {
                   marke={eingangMarke}
                   onClick={() => setCheckOffen(true)}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             {/*
               ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
@@ -1388,8 +1404,15 @@ export default function App() {
         <RechtsLinks klasse="mt-2" />
       </footer>
 
-      {/* FESTE FUSSLEISTE */}
-      {zeile && (
+      {/*
+        FESTE FUSSLEISTE — in Schritt 1 erst, wenn keine Beispielwerte mehr
+        offen sind. Vorher rechnete sie mit dem Musterfall und zeigte schon
+        beim ersten Feld eine rote Luecke, die mit dem Mandanten nichts zu
+        tun hat; am Telefon lag sie dazu ueber den Feldern. In den
+        rechnenden Etappen bleibt sie, dort sagt `beispielHinweis`, womit
+        gerechnet wird.
+      */}
+      {zeile && !(schritt === 'daten' && offeneBeispielTexte.length > 0) && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-800 bg-slate-900 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.3)] print:hidden">
           {/*
             Die Rechenzeichen "−" und "=" entfallen auf dem Telefon. Sie
@@ -1397,9 +1420,9 @@ export default function App() {
             rechts ohnehin erzaehlen, und kosten dort Breite, die den
             Beschriftungen fehlt.
           */}
-          <div className="mx-auto max-w-6xl px-2 py-2 sm:px-4 sm:py-3">
+          <div className="mx-auto max-w-6xl px-2 py-1.5 sm:px-4 sm:py-3">
             <div className="flex items-center justify-between gap-1.5 sm:gap-4">
-              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-center sm:p-2.5">
+              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
                 <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
                   Zielbedarf
                 </div>
@@ -1410,7 +1433,7 @@ export default function App() {
 
               <div className="hidden font-black text-slate-500 sm:block sm:text-sm">−</div>
 
-              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-center sm:p-2.5">
+              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
                 <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
                   Gesamt-Netto
                 </div>
@@ -1422,7 +1445,7 @@ export default function App() {
               <div className="hidden font-black text-slate-500 sm:block sm:text-sm">=</div>
 
               <div
-                className={`flex-1 rounded-lg border p-1.5 text-center shadow-inner sm:p-2.5 ${
+                className={`flex-1 rounded-lg border px-1.5 py-1 text-center shadow-inner sm:p-2.5 ${
                   luecke > 0
                     ? 'border-rose-700/50 bg-rose-900/30 text-rose-400'
                     : 'border-emerald-700/50 bg-emerald-900/30 text-emerald-400'
