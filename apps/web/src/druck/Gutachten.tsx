@@ -1,12 +1,12 @@
-import { Fragment, useMemo, type ReactNode } from 'react';
+import { Fragment, useMemo, type CSSProperties, type ReactNode } from 'react';
 import {
   parameterFuer, versorgungsluecke, foerdercheck, loesungsvergleich,
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
-import { Logo } from '../components/Logo';
 import { Rechtsstand } from '../features/Rechtsstand';
+import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import { tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen } from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
@@ -15,6 +15,7 @@ import { personNameAus } from '../features/personen';
 import { kaufkraft } from '../features/kaufkraft';
 import { nettoHeuteMonat } from '../features/bezug';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
+import { DeckblattHeute, DeckblattKopf, DeckblattTitel } from './DeckblattKopf';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
@@ -45,7 +46,7 @@ import { Loesungsvergleich } from './Loesungsvergleich';
  * nicht mehr versehentlich zerlegen.
  */
 export function Gutachten({
-  szenario, ergebnis, zeile, umfang = 'ausfuehrlich', einzelperson,
+  szenario, ergebnis, zeile, umfang = 'ausfuehrlich', einzelperson, auftritt = null,
 }: {
   szenario: SzenarioParsed;
   ergebnis: ProjektionsErgebnis | null;
@@ -67,6 +68,12 @@ export function Gutachten({
    * ueber einen Haushalt aus, den es so nicht gibt.
    */
   einzelperson?: string;
+  /**
+   * „Ihr Auftritt im Gutachten“: Logo, Firma und Kontakt auf dem Deckblatt,
+   * eine Fusszeile auf jeder Seite, die Akzentfarbe an Linien und
+   * Ueberschriften. Ohne Auftritt bleibt der Ausdruck wie bisher.
+   */
+  auftritt?: Auftritt | null;
 }) {
   const lang = umfang === 'ausfuehrlich';
   const jetzt = new Date().getFullYear();
@@ -139,7 +146,6 @@ export function Gutachten({
   const haushaltsNetto = nettoHeuteMonat(ergebnis);
   const bedarfHeute = h.zielNettoHeute;
   const nettoHeute = heute(zeile.nettoMonat);
-  const lueckeHeute = Math.max(0, bedarfHeute - nettoHeute);
 
   // Nur bei Ehepaaren: sonst stuende auf der Seite alles bei einer Person.
   const beidePartner = h.verheiratet && szenario.personen.length > 1;
@@ -339,58 +345,33 @@ export function Gutachten({
   ];
 
   const abschnitte = seiten.flatMap((s) => s.titel);
+  // Die Fusszeile jeder Seite (`@page`-Randfelder) — nur mit Auftritt.
+  const fussCss = fusszeileCss(auftritt);
 
   return (
-    <div className="hidden bg-white text-slate-800 print:block">
-      {/* DECKBLATT */}
+    <div
+      id="gutachten"
+      className="hidden bg-white text-slate-800 print:block"
+      style={akzentVariablen(auftritt) as CSSProperties}
+    >
+      {fussCss && <style>{fussCss}</style>}
+
+      {/* DECKBLATT — Kopf, Titel und Kaufkraft-Kacheln teilt es mit den Vorschauen (DeckblattKopf.tsx). */}
       <Seite erste>
-        <div className="flex items-center gap-5 border-b-4 border-emerald-500 pb-5">
-          <Logo klasse="h-20 w-20" />
-          <div>
-            <div className="text-2xl font-black tracking-tight text-slate-900">JS-Rentenplaner</div>
-            <div className="text-sm font-medium text-slate-500">Ihre Zukunft. Heute smart geplant.</div>
-          </div>
-        </div>
+        <DeckblattKopf auftritt={auftritt} />
 
-        <h1 className="mt-6 text-3xl font-black tracking-tight text-slate-900">
-          {einzelperson ? 'Altersvorsorge-Analyse — Einzelbetrachtung' : 'Altersvorsorge-Analyse'}
-        </h1>
-        <p className="mt-2 text-lg text-slate-700">für {name}</p>
-        {einzelperson && (
-          <p className="mt-1 text-xs font-semibold text-slate-600">
-            Nur die eigenen Verträge und Einkünfte von {einzelperson} — allein veranlagt.
-          </p>
-        )}
-        <p className="mt-1 text-xs text-slate-500">
-          Erstellt am {new Date().toLocaleDateString('de-DE')}
-        </p>
+        <DeckblattTitel
+          titel={einzelperson ? 'Altersvorsorge-Analyse — Einzelbetrachtung' : 'Altersvorsorge-Analyse'}
+          fuer={name}
+        >
+          {einzelperson && (
+            <p className="mt-1 text-xs font-semibold text-slate-600">
+              Nur die eigenen Verträge und Einkünfte von {einzelperson} — allein veranlagt.
+            </p>
+          )}
+        </DeckblattTitel>
 
-        {/*
-          ZUERST ohne, dann mit Inflation.
-          Wer nur die hochgerechneten Betraege sieht, hat keinen Bezugspunkt:
-          4.594 EUR Bedarf im Jahr 2068 wirken willkuerlich hoch, solange
-          daneben nicht stehen, dass es dieselben 2.000 EUR von heute sind.
-        */}
-        <Untertitel>Heute — in der Kaufkraft, die Sie kennen</Untertitel>
-        <div className="grid grid-cols-3 gap-4 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
-          {[
-            { titel: 'Gewünschtes Netto', wert: bedarfHeute },
-            { titel: 'Erwartetes Netto', wert: nettoHeute },
-            {
-              titel: lueckeHeute > 0 ? 'Es fehlen' : 'Darüber hinaus',
-              wert: lueckeHeute > 0 ? lueckeHeute : nettoHeute - bedarfHeute,
-            },
-          ].map((x) => (
-            <div key={x.titel}>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {x.titel}
-              </div>
-              <div className="text-base font-black tabular-nums text-slate-900">
-                {euro(Math.abs(x.wert))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <DeckblattHeute bedarf={bedarfHeute} netto={nettoHeute} />
 
         <Text>
           Bis zu Ihrem Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}

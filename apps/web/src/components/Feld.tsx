@@ -277,6 +277,10 @@ export function ProzentFeld(props: {
 export function TextFeld(props: {
   label: string; wert: string; onChange: (s: string) => void;
   platzhalter?: string; fehler?: string | null;
+  /** Fuer Telefon und E-Mail die passende Tastatur am Telefon */
+  typ?: 'text' | 'tel' | 'email';
+  maxLaenge?: number;
+  autoComplete?: string;
 }) {
   const id = `t${useId()}`;
   return (
@@ -284,9 +288,11 @@ export function TextFeld(props: {
       <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
       <input
         id={id}
-        type="text"
+        type={props.typ ?? 'text'}
         value={props.wert}
         placeholder={props.platzhalter}
+        maxLength={props.maxLaenge}
+        autoComplete={props.autoComplete}
         onChange={(e) => props.onChange(e.target.value)}
         aria-invalid={props.fehler ? true : undefined}
         className={`w-full rounded-md border p-2 text-sm ${

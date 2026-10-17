@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Users, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -26,6 +26,11 @@ import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
 import { nettoHeuteMonat } from './features/bezug';
 import { musterfallVerwerfen, offenerMusterfall, type Musterfall } from './lib/musterfall';
+import { auftrittLokalVerwerfen, offenerAuftrittLokal, type AuftrittEntwurf } from './lib/auftritt-lokal';
+import { dataUrlZuBlob } from './lib/bild';
+import { AUFTRITT_LEER } from './features/auftritt';
+import { useAuftritt } from './store/auftritt';
+import { AuftrittFenster } from './features/AuftrittDialog';
 import { STANDARD_OFFEN } from './store/standard';
 import { Verlauf } from './features/Verlauf';
 import { Rechtsstand } from './features/Rechtsstand';
@@ -182,6 +187,16 @@ function standardHinweis(s: SzenarioParsed, pfad: string): string | undefined {
   return e ? `Standardwert, anpassbar. ${e.hinweis ?? ''}`.trim() : undefined;
 }
 
+/** Was ein Entwurf aus der Schnellrechnung mitbringt: „Logo“, „Firmenname“, „Akzentfarbe“. */
+function entwurfTeile(e: AuftrittEntwurf): string[] {
+  return [e.logo ? 'Logo' : '', e.firma.trim() ? 'Firmenname' : '', e.farbe ? 'Akzentfarbe' : ''].filter(Boolean);
+}
+
+/** „A“, „A und B“, „A, B und C“ */
+function aufzaehlen(teile: string[]): string {
+  return teile.length <= 1 ? (teile[0] ?? '') : `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`;
+}
+
 export default function App() {
   const szenario = useSzenario((s) => s.szenario);
   const importMeldung = useSzenario((s) => s.importMeldung);
@@ -257,6 +272,58 @@ export default function App() {
   useEffect(() => {
     if (supabaseKonfiguriert && angemeldet) void checkLaden();
   }, [angemeldet, checkLaden]);
+
+  /*
+    „IHR AUFTRITT IM GUTACHTEN“ (`store/auftritt.ts`): geladen, sobald jemand
+    angemeldet ist, damit das Logo beim Drucken schon bereitsteht.
+  */
+  const auftritt = useAuftritt((s) => s.auftritt);
+  const auftrittStatus = useAuftritt((s) => s.status);
+  const auftrittLaden = useAuftritt((s) => s.laden);
+  const auftrittLeeren = useAuftritt((s) => s.zuruecksetzen);
+  const [auftrittOffen, setAuftrittOffen] = useState(false);
+  const schliesseAuftritt = useCallback(() => setAuftrittOffen(false), []);
+  useEffect(() => {
+    if (!supabaseKonfiguriert) return;
+    if (angemeldet) void auftrittLaden();
+    else auftrittLeeren();
+  }, [angemeldet, auftrittLaden, auftrittLeeren]);
+
+  /*
+    DER AUFTRITT AUS DER SCHNELLRECHNUNG (`lib/auftritt-lokal.ts`). Ist im
+    Konto noch keiner eingerichtet, wird er still uebernommen — angekuendigt
+    war das dort. Sonst fragt ein Band, mit zwei gleichwertigen Knoepfen.
+    Ersetzt wird nur, was in der Schnellrechnung eingetragen wurde (Logo,
+    Firma, Farbe); Name und Kontakt bleiben.
+  */
+  const [auftrittLokal, setAuftrittLokal] = useState<AuftrittEntwurf | null>(() => offenerAuftrittLokal());
+  const [auftrittBand, setAuftrittBand] = useState<'frage' | 'uebernommen' | 'fehler' | null>(null);
+  // Was uebernommen wurde — das Band nennt genau das, nicht pauschal „Logo und Firmenname“.
+  const [auftrittWas, setAuftrittWas] = useState<string[]>([]);
+  const auftrittUebernahme = useRef(false);
+  const auftrittUebernehmen = useCallback(async (e: AuftrittEntwurf): Promise<boolean> => {
+    const basis = useAuftritt.getState().auftritt ?? AUFTRITT_LEER;
+    const logo = e.logo ? dataUrlZuBlob(e.logo) : null;
+    const r = await useAuftritt.getState().speichern({
+      firma: e.firma.trim() || basis.firma,
+      berater: basis.berater, telefon: basis.telefon, email: basis.email, web: basis.web, zusatz: basis.zusatz,
+      farbe: e.farbe ?? basis.farbe,
+    }, logo ?? undefined);
+    if (r !== 'ok') return false;
+    setAuftrittWas(entwurfTeile(e));
+    auftrittLokalVerwerfen();
+    setAuftrittLokal(null);
+    return true;
+  }, []);
+  useEffect(() => {
+    if (!auftrittLokal || auftrittStatus !== 'bereit' || auftrittBand || auftrittUebernahme.current) return;
+    if (useAuftritt.getState().auftritt) { setAuftrittBand('frage'); return; }
+    auftrittUebernahme.current = true;
+    void auftrittUebernehmen(auftrittLokal).then((ok) => {
+      auftrittUebernahme.current = false;
+      setAuftrittBand(ok ? 'uebernommen' : 'fehler');
+    });
+  }, [auftrittLokal, auftrittStatus, auftrittBand, auftrittUebernehmen]);
   const neueEingaenge = checkListe.filter((a) => a.eingang).length;
   /*
     KONTO UND VORSORGE-CHECK als Fenster: Beide werden in jeder Etappe
@@ -404,7 +471,16 @@ export default function App() {
   useEffect(() => {
     if (!druckAngefordert) return;
     setDruckAngefordert(false);
-    window.print();
+    /*
+      Mit Logo wird erst gedruckt, wenn es dekodiert ist — sonst fehlte es
+      beim ersten Druck. Hoechstens 1,5 s; ohne Bild sofort wie bisher.
+    */
+    const bilder = [...document.querySelectorAll<HTMLImageElement>('#gutachten img')];
+    if (bilder.length === 0) { window.print(); return; }
+    void Promise.race([
+      Promise.all(bilder.map((b) => b.decode().catch(() => undefined))),
+      new Promise((fertig) => window.setTimeout(fertig, 1500)),
+    ]).then(() => window.print());
   }, [druckAngefordert, druckUmfang]);
   const druckeJetzt = (umfang: 'kurz' | 'ausfuehrlich') => {
     setDruckUmfang(umfang);
@@ -462,6 +538,12 @@ export default function App() {
       symbol: <Wallet className="h-4 w-4" aria-hidden />,
       onOeffnen: () => setKontoOffen(true),
     },
+    ...(checkMoeglich ? [{
+      text: 'Ihr Auftritt im Gutachten',
+      zusatz: auftritt?.firma.trim() || 'Logo, Name und Kontakt',
+      symbol: <Palette className="h-4 w-4" aria-hidden />,
+      onOeffnen: () => setAuftrittOffen(true),
+    }] : []),
     ...(checkMoeglich ? [{
       text: 'Vorsorge-Check an Kunden senden',
       zusatz: 'Persönlicher Link für die Angaben vorab',
@@ -830,6 +912,7 @@ export default function App() {
         zeile={zeile}
         umfang={druckUmfang}
         einzelperson={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+        auftritt={auftritt}
       />
 
       {importMeldung && (
@@ -864,6 +947,52 @@ export default function App() {
                 className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
                 Verwerfen
               </button>
+            </div>
+          </div>
+        )}
+        {auftrittBand && (auftrittBand === 'uebernommen' || auftrittLokal) && (
+          <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-950">
+            {auftrittBand === 'uebernommen' ? (
+              <p>
+                <strong>
+                  {aufzaehlen(auftrittWas.map((t) => `Ihr${t === 'Akzentfarbe' ? 'e' : ''} ${t}`))} aus der Schnellrechnung{' '}
+                  {auftrittWas.length > 1 ? 'sind' : 'ist'} jetzt in Ihrem Konto.
+                </strong>{' '}
+                Name und Kontakt ergänzen Sie unter „Ihr Auftritt im Gutachten“.
+              </p>
+            ) : (
+              <p>
+                <strong>{aufzaehlen(auftrittLokal ? entwurfTeile(auftrittLokal) : [])} aus der Schnellrechnung übernehmen?</strong>{' '}
+                {auftrittBand === 'fehler'
+                  ? 'Das Speichern hat gerade nicht geklappt — versuchen Sie es noch einmal.'
+                  : 'Was Sie dort eingetragen haben, ersetzt das Gespeicherte; Name und Kontakt bleiben.'}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {auftrittBand === 'uebernommen' ? (
+                <>
+                  <button type="button" onClick={() => { setAuftrittBand(null); setAuftrittOffen(true); }}
+                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                    Auftritt ansehen
+                  </button>
+                  <button type="button" onClick={() => setAuftrittBand(null)}
+                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                    Schließen
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button"
+                    onClick={() => { if (auftrittLokal) void auftrittUebernehmen(auftrittLokal).then((ok) => setAuftrittBand(ok ? 'uebernommen' : 'fehler')); }}
+                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                    Übernehmen
+                  </button>
+                  <button type="button" onClick={() => { auftrittLokalVerwerfen(); setAuftrittLokal(null); setAuftrittBand(null); }}
+                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+                    Verwerfen
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1181,6 +1310,17 @@ export default function App() {
       >
         <Konto />
       </Dialog>
+
+      {checkMoeglich && (
+        <Dialog
+          offen={auftrittOffen}
+          titel="Ihr Auftritt im Gutachten"
+          beschreibung="Logo, Name und Kontakt auf dem Deckblatt und in der Fußzeile jeder Seite."
+          onSchliessen={schliesseAuftritt}
+        >
+          <AuftrittFenster anmeldeAdresse={angemeldet} />
+        </Dialog>
+      )}
 
       <Dialog offen={druckFrage !== null} titel="Noch Beispielwerte im Fall" onSchliessen={schliesseDruckFrage}>
         <p className="text-sm leading-relaxed text-slate-700">

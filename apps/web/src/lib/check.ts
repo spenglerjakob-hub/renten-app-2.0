@@ -164,8 +164,11 @@ export function dokumentTyp(datei: { type: string; name: string }): string | nul
   return TYP_AUS_ENDUNG[datei.name.toLowerCase().split('.').pop() ?? ''] ?? null;
 }
 
-/** Zufaelliger Dateiname: Der Originalname kann Persoenliches enthalten und steht nur in den Metadaten. */
-function zufallsname(): string {
+/**
+ * Zufaelliger Dateiname: Der Originalname kann Persoenliches enthalten und steht nur in den Metadaten.
+ * 24 Hexadezimalzeichen — so erwartet es auch die Policy des Logo-Speichers (`lib/auftritt-konto.ts`).
+ */
+export function zufallsname(): string {
   const b = new Uint8Array(12);
   crypto.getRandomValues(b);
   return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');

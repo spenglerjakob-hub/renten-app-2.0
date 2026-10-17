@@ -28,6 +28,15 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 
 /**
+ * DIE AKZENTFARBE aus „Ihr Auftritt im Gutachten“ wirkt an genau drei
+ * Stellen: am Balken des Deckblatts (`DeckblattKopf.tsx`), an der Linie unter
+ * dem Seitentitel und an den Untertiteln. Gesetzt wird sie als CSS-Variable am
+ * Gutachten (`akzentVariablen`); die Vorgaben hier sind die Farben von
+ * bisher. Alles, was etwas bedeutet — Ergebnis, markierte Spalten, Luecke —,
+ * behaelt seine feste Farbe.
+ */
+
+/**
  * Eine Seite des Gutachtens.
  *
  * `break-before: page` steht auf jeder Seite ausser der ersten. Frueher gab
@@ -46,7 +55,7 @@ export function Seite({
   return (
     <section className={erste ? '' : 'break-before-page'}>
       {titel && (
-        <header className="mb-4 flex items-baseline justify-between gap-4 border-b-2 border-slate-800 pb-1">
+        <header className="mb-4 flex items-baseline justify-between gap-4 border-b-2 border-[color:var(--akzent-linie,#1e293b)] pb-1">
           <h2 className="text-base font-black tracking-tight text-slate-900">{titel}</h2>
           {nummer && <span className="text-[11px] font-medium text-slate-500">{nummer}</span>}
         </header>
@@ -65,7 +74,7 @@ export function Seite({
  */
 export function Untertitel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 mt-4 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-slate-500 first:mt-0">
+    <h3 className="mb-2 mt-4 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-[color:var(--akzent-titel,#64748b)] first:mt-0">
       {children}
     </h3>
   );
