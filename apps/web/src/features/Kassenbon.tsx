@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import {
   versorgungsluecke, jePerson,
   type ProjektionsErgebnis, type Jahreszeile, type Szenario,
@@ -8,85 +7,80 @@ import { euro, prozent, Schalter } from '../components/Feld';
 import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
 import { personNameAus } from './personen';
 
-/** Farbgebung der drei Schichten, wie im urspruenglichen Entwurf. */
+/**
+ * Die drei Schichten. Farben aus der Palette der Oberflaeche: Indigo wie
+ * Knoepfe und Logo, Gruen wie „gedeckt“, dazwischen ein helles Violett.
+ * Vorher Blau, Lila und Gruen mit farbigen Ueberschriften je Block — der
+ * Kassenbon sah aus wie aus einer anderen Anwendung.
+ */
 const SCHICHT = {
-  1: { titel: 'Schicht 1 (Basis / Pension)', rahmen: 'border-blue-100', text: 'text-blue-900', balken: 'bg-blue-500', punkt: 'bg-blue-500' },
-  2: { titel: 'Schicht 2 (Zusatz)', rahmen: 'border-purple-100', text: 'text-purple-900', balken: 'bg-purple-500', punkt: 'bg-purple-500' },
-  3: { titel: 'Schicht 3 (Privat)', rahmen: 'border-emerald-100', text: 'text-emerald-900', balken: 'bg-emerald-500', punkt: 'bg-emerald-500' },
+  1: { titel: 'Schicht 1', zusatz: 'Basis / Pension', punkt: 'bg-indigo-600' },
+  2: { titel: 'Schicht 2', zusatz: 'Zusatz', punkt: 'bg-violet-400' },
+  3: { titel: 'Schicht 3', zusatz: 'Privat', punkt: 'bg-emerald-500' },
 } as const;
 
 /** Die beiden Personen und der Haushalt — dieselbe Machart wie die Schichten. */
-const PERSON_FARBE = [
-  { rahmen: 'border-sky-100', text: 'text-sky-900' },
-  { rahmen: 'border-amber-100', text: 'text-amber-900' },
-  { rahmen: 'border-slate-200', text: 'text-slate-700' },
-] as const;
+const PERSON_PUNKT = ['bg-sky-500', 'bg-amber-500', 'bg-slate-400'] as const;
+
+/** Spalten, die am Telefon in die Zeile unter dem Namen wandern. */
+const NEBEN = 'hidden px-2 text-right sm:table-cell';
 
 /**
- * Ein aufklappbarer Block mit Postenzeilen.
- *
- * Titel und Farbe kommen von aussen, seit es ihn zweimal gibt: einmal je
- * Schicht und einmal je Person. Klappmechanik, Kaufkraftformatierung und
- * Zeilenlayout bleiben dabei EINE Sache.
+ * Eine Gruppe von Postenzeilen — je Schicht oder je Person. Kopfzeile mit
+ * Farbpunkt und Zwischensumme, darunter die Posten. Keine Karten in Karten:
+ * Brutto, Abzuege und Netto stehen in Spalten, damit man sie vergleichen kann.
  */
-function PostenBlock({
-  titel, farbe, netto, kinder, w, leerText,
+function Gruppe({
+  titel, zusatz, punkt, netto, posten, w, leerText,
 }: {
   titel: string;
-  farbe: { rahmen: string; text: string };
+  zusatz?: string;
+  punkt: string;
   netto: number;
-  kinder: Jahreszeile['posten'];
+  posten: Jahreszeile['posten'];
   w: (n: number) => string;
-  /** Was dastehen soll, wenn der Block keine Zeile ueber null enthaelt. */
+  /** Was dastehen soll, wenn die Gruppe keine Zeile ueber null enthaelt. */
   leerText?: string;
 }) {
-  const [offen, setOffen] = useState(true);
-  const f = farbe;
-
   return (
-    <div className={`overflow-hidden rounded-lg border ${f.rahmen} print:border-slate-300`}>
-      <button
-        type="button"
-        onClick={() => setOffen((v) => !v)}
-        aria-expanded={offen}
-        className="druck-kopf flex w-full items-center justify-between gap-3 border-b border-slate-50 bg-white p-2.5 text-left sm:p-4"
-      >
-        <span className={`text-[11px] font-bold sm:text-base ${f.text}`}>{titel}</span>
-        <span className="flex items-center gap-2">
-          <span className="text-[11px] font-bold tabular-nums sm:text-base">{w(netto)}</span>
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${offen ? 'rotate-180' : ''}`}
-            aria-hidden
-          />
-        </span>
-      </button>
-
-      <div className={`space-y-2 bg-white p-2.5 text-xs sm:p-3 ${offen ? 'block' : 'hidden'} druck-inhalt`}>
-        {kinder.length === 0 && leerText && (
-          <p className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-500 sm:p-3">
-            {leerText}
-          </p>
-        )}
-        {kinder.map((p) => (
-          <div key={p.id} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5 sm:p-3">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className={`truncate text-[11px] font-semibold sm:text-sm ${f.text}`}>
-                {p.bezeichnung}
-              </span>
-              <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
-                {w(p.nettoJahr)}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1 text-[11px] text-slate-500 sm:flex-row sm:items-end sm:justify-between sm:gap-0 sm:text-[10px]">
-              <span>Brutto: {w(p.bruttoJahr)}</span>
-              <span className="leading-tight text-rose-500 sm:text-right">
-                KV/PV: {w(p.kvPvJahr)} | Steuer: {w(p.steuerJahr)}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <tbody className="break-inside-avoid">
+      <tr className="border-t border-slate-200">
+        {/* Keine colSpan ueber die Nebenspalten: Am Telefon sind die
+            ausgeblendet, und eine Zelle ueber vier Spalten legte dort
+            Phantomspalten an — Netto rutschte in die Mitte. */}
+        <th scope="rowgroup" className="pb-1 pt-3 text-left font-bold text-slate-900">
+          <span className="flex items-center gap-2">
+            <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${punkt}`} />
+            {titel}
+            {zusatz && <span className="font-normal text-slate-500">{zusatz}</span>}
+          </span>
+        </th>
+        <td colSpan={3} className="hidden sm:table-cell" />
+        <td className="pb-1 pt-3 text-right font-bold tabular-nums text-slate-900">{w(netto)}</td>
+      </tr>
+      {posten.length === 0 && leerText && (
+        <tr>
+          <td className="pb-2 pl-[1.125rem] text-xs text-slate-500">{leerText}</td>
+          <td colSpan={3} className="hidden sm:table-cell" />
+          <td />
+        </tr>
+      )}
+      {posten.map((p) => (
+        <tr key={p.id} className="align-top text-slate-700">
+          <td className="py-1 pl-[1.125rem] pr-2">
+            {p.bezeichnung}
+            {/* Am Telefon fehlen die Spalten — die Zahlen stehen dann hier. */}
+            <span className="block text-xs tabular-nums text-slate-500 sm:hidden">
+              Brutto {w(p.bruttoJahr)} · KV/PV {w(p.kvPvJahr)} · Steuer {w(p.steuerJahr)}
+            </span>
+          </td>
+          <td className={`${NEBEN} py-1 tabular-nums text-slate-600`}>{w(p.bruttoJahr)}</td>
+          <td className={`${NEBEN} py-1 tabular-nums text-slate-500`}>{w(p.kvPvJahr)}</td>
+          <td className={`${NEBEN} py-1 tabular-nums text-slate-500`}>{w(p.steuerJahr)}</td>
+          <td className="py-1 pl-2 text-right tabular-nums text-slate-900">{w(p.nettoJahr)}</td>
+        </tr>
+      ))}
+    </tbody>
   );
 }
 
@@ -148,7 +142,7 @@ export function Kassenbon({
   const nachPerson = jePerson(zeile).map((b) => ({
     ...b,
     titel: b.person === null ? 'Haushalt' : personNameAus(szenario.personen, b.person),
-    farbe: PERSON_FARBE[b.person === 'A' ? 0 : b.person === 'B' ? 1 : 2],
+    punkt: PERSON_PUNKT[b.person === 'A' ? 0 : b.person === 'B' ? 1 : 2],
     sichtbar: b.posten.filter((p) => p.nettoJahr !== 0),
   }));
   const getrennt = paar && jePersonAnsicht;
@@ -161,49 +155,55 @@ export function Kassenbon({
   const skala = Math.max(zeile.zielNettoMonat, zeile.nettoMonat, 1);
   const anteil = (n: number) => `${Math.max(0, (n / 12 / skala) * 100)}%`;
 
+  const deckung = Math.round(Math.min(1, zeile.nettoMonat / Math.max(1, zeile.zielNettoMonat)) * 100);
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
-      <h2 className="mb-3 text-xs font-bold sm:mb-4 sm:text-sm">
-        {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
-        <span className="ml-2 font-normal text-slate-500">
-          {kaufkraftHeute ? '(Kaufkraft heute)' : '(nominal)'}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-sm font-bold text-slate-900">
+          {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
+        </h2>
+        <span className="text-xs text-slate-500">
+          Monatsbeträge, {kaufkraftHeute ? 'in heutiger Kaufkraft' : 'nominal'}
         </span>
-      </h2>
+      </div>
 
-      {/* Gestapelter Fortschrittsbalken */}
-      <div className="mb-5 sm:mb-6">
-        <div className="mb-1 flex justify-between text-[11px] font-bold uppercase text-slate-500 sm:text-[10px]">
-          <span>Ziel-Erreichung</span>
+      {/*
+        Wie viel des Ziels gedeckt ist — gestapelt nach Schicht. Gleiche
+        Machart wie in der Schnellrechnung: Satz, schmaler Balken, Legende.
+      */}
+      <div className="mt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-slate-700">
           <span>
             {luecke > 0
-              ? `${prozent(zeile.nettoMonat / Math.max(1, zeile.zielNettoMonat), 1)} erreicht`
-              : 'Ziel erreicht / übertroffen'}
+              ? <>Das Netto deckt <strong className="tabular-nums">{deckung} %</strong> des Ziels</>
+              : <strong className="text-emerald-700">Ziel erreicht</strong>}
           </span>
+          {luecke > 0 && (
+            <span className="text-rose-700">es fehlen <strong className="tabular-nums">{100 - deckung} %</strong></span>
+          )}
         </div>
-        <div className="flex h-3 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner sm:h-4">
+        <div className={`mt-1.5 flex h-2 w-full overflow-hidden rounded-full ${luecke > 0 ? 'bg-rose-100' : 'bg-slate-100'}`}>
           {nachSchicht.map(({ schicht, netto }) =>
             netto <= 0 ? null : (
               <div
                 key={schicht}
                 style={{ width: anteil(netto) }}
-                className={`${SCHICHT[schicht].balken} transition-all duration-500`}
+                className={`${SCHICHT[schicht].punkt} transition-all duration-500`}
               />
             ),
           )}
-          {luecke > 0 && (
-            <div style={{ width: `${(luecke / skala) * 100}%` }} className="bg-white transition-all duration-500" />
-          )}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500 sm:mt-2 sm:gap-3">
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
           {nachSchicht.map(({ schicht }) => (
-            <span key={schicht} className="flex items-center gap-1">
-              <span className={`h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2 ${SCHICHT[schicht].punkt}`} />
-              Schicht {schicht}
+            <span key={schicht} className="flex items-center gap-1.5">
+              <span aria-hidden className={`h-2 w-2 rounded-full ${SCHICHT[schicht].punkt}`} />
+              {SCHICHT[schicht].titel}
             </span>
           ))}
           {luecke > 0 && (
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full border border-slate-300 bg-white sm:h-2 sm:w-2" />
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-rose-100 ring-1 ring-rose-200" />
               Lücke
             </span>
           )}
@@ -216,7 +216,7 @@ export function Kassenbon({
         Haushalts, nicht einer Person.
       */}
       {paar && (
-        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
           <Schalter
             label="Je Person aufschlüsseln"
             wert={jePersonAnsicht}
@@ -230,38 +230,60 @@ export function Kassenbon({
         </div>
       )}
 
-      <div className="space-y-2 sm:space-y-3">
+      <table className="mt-4 w-full border-collapse text-sm">
+        <caption className="sr-only">Einkünfte im Monat, nach {getrennt ? 'Person' : 'Schicht'}</caption>
+        <thead>
+          <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <th scope="col" className="pb-2 text-left font-semibold">Posten</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>Brutto</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>KV/PV</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>Steuer</th>
+            <th scope="col" className="pb-2 pl-2 text-right font-semibold">Netto</th>
+          </tr>
+        </thead>
         {getrennt
           /*
-            Hier wird der Block AUCH gezeigt, wenn keine Zeile ueber null
+            Hier wird die Gruppe AUCH gezeigt, wenn keine Zeile ueber null
             liegt — anders als bei den Schichten. Wer gerade auf "je Person"
             umgeschaltet hat, sucht genau diese Person; verschwindet sie
             stillschweigend, bleibt die Frage offen, die er gestellt hat.
           */
           ? nachPerson.map((b) => (
-            <PostenBlock
+            <Gruppe
               key={b.person ?? 'haushalt'}
               titel={b.titel}
-              farbe={b.farbe}
+              punkt={b.punkt}
               netto={b.nettoJahr}
-              kinder={b.sichtbar}
+              posten={b.sichtbar}
               w={w}
               leerText="Keine eigenen Einkünfte in diesem Jahr."
             />
           ))
           : nachSchicht.map(({ schicht, posten, netto }) =>
             posten.length === 0 ? null : (
-              <PostenBlock
+              <Gruppe
                 key={schicht}
                 titel={SCHICHT[schicht].titel}
-                farbe={SCHICHT[schicht]}
+                zusatz={SCHICHT[schicht].zusatz}
+                punkt={SCHICHT[schicht].punkt}
                 netto={netto}
-                kinder={posten}
+                posten={posten}
                 w={w}
               />
             ),
           )}
+        <tfoot>
+          <tr className="border-t-2 border-slate-900 text-slate-900">
+            <th scope="row" className="pt-3 text-left text-base font-black">Gesamt-Netto</th>
+            <td className={`${NEBEN} pt-3 tabular-nums text-slate-600`}>{w(zeile.bruttoGesamt)}</td>
+            <td className={`${NEBEN} pt-3 tabular-nums text-slate-500`}>{w(zeile.kvPvGesamt)}</td>
+            <td className={`${NEBEN} pt-3 tabular-nums text-slate-500`}>{w(zeile.steuerGesamt)}</td>
+            <td className="pl-2 pt-3 text-right text-lg font-black tabular-nums">{w(zeile.nettoGesamt)}</td>
+          </tr>
+        </tfoot>
+      </table>
 
+      <div className="mt-4 space-y-2 empty:hidden">
         {/*
           Der Satz, ohne den die Aufteilung mehr verspricht, als sie haelt.
           Er steht nur in der getrennten Ansicht — dort, wo die Zahl steht,
@@ -310,10 +332,6 @@ export function Kassenbon({
           </p>
         )}
 
-        <div className="flex items-baseline justify-between rounded-lg bg-slate-900 px-4 py-3 text-white">
-          <span className="font-bold">Gesamt-Netto</span>
-          <span className="text-xl font-bold tabular-nums">{w(zeile.nettoGesamt)}</span>
-        </div>
       </div>
 
       {/*
@@ -337,7 +355,7 @@ export function Kassenbon({
                     {euro(a.nettoKapital * kaufkraft(a.jahr))}
                   </span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500 sm:text-[10px]">
+                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500">
                   <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
                   {/*
                     NICHT "Abgeltungsteuer": beim Depot stimmt das, bei einer
@@ -356,7 +374,7 @@ export function Kassenbon({
                   eine Rechengroesse, kein Zahlungsweg.
                 */}
                 {a.kvPvGesamt > 0 && (
-                  <div className="mt-0.5 text-right text-[11px] text-rose-500 sm:text-[10px]">
+                  <div className="mt-0.5 text-right text-[11px] text-rose-500">
                     Kranken- und Pflegeversicherung: {euro(a.kvPvGesamt * kaufkraft(a.jahr))}
                   </div>
                 )}
@@ -367,7 +385,7 @@ export function Kassenbon({
                   dazwischen geblieben sind.
                 */}
                 {a.wachstumJahre > 0 && (
-                  <div className="mt-1 border-t border-indigo-100 pt-1 text-[11px] leading-relaxed text-indigo-900 sm:text-[10px]">
+                  <div className="mt-1 border-t border-indigo-100 pt-1 text-[11px] leading-relaxed text-indigo-900">
                     Bis zum Rentenbeginn in {a.wachstumJahre} Jahren daraus:{' '}
                     <strong>{euro(a.wertBeiRentenbeginn * kaufkraft(a.jahr + a.wachstumJahre))}</strong>
                     {a.steuerWachstum > 0 && (

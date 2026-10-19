@@ -1173,19 +1173,6 @@ export default function App() {
               <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
                 <div className="space-y-4 sm:space-y-6 lg:col-span-5">
                   {kopfzahlen}
-                  {/*
-                    LUECKE UND KAUFKRAFTVERLUST IN EURO — die Zahlen fuer das
-                    Gespraech. Am Telefon direkt unter den Kopfzahlen, am PC
-                    oben rechts (unten): In der linken Spalte machte sie diese
-                    hoeher als die rechte, und die mitlaufende Karte „Was die
-                    Luecke bedeutet“ blieb nicht mehr stehen.
-                  */}
-                  <KaufkraftKarte
-                    zeile={zeile}
-                    inflation={szenario.annahmen.inflation}
-                    standard={offenePfade(szenario).includes('annahmen.inflation')}
-                    klasse="lg:hidden"
-                  />
                   <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
                     Die Praemie im Ruhestand ist fuer einen privat Versicherten
@@ -1195,27 +1182,26 @@ export default function App() {
                   <PkvRechner zeile={zeile} />
                   {jahrRegler}
                   {/*
-                    WAS DIE LUECKE BEDEUTET. Am PC unten in der linken Spalte,
-                    die sonst nach der Steuer-Engine endet. Sie bleibt beim
-                    Scrollen stehen, solange rechts Kassenbon und Annahmen
-                    folgen; die linke Spalte ist dafuer so hoch wie die rechte.
-                    Am Telefon steht sie erst nach dem Kassenbon (unten).
+                    DIE ZAHLEN FUER DAS GESPRAECH, links untereinander: was die
+                    Luecke bedeutet, darunter Luecke und Kaufkraftverlust in
+                    Euro. Rechts steht die Aufstellung (Kassenbon oder
+                    Verlauf). Am Telefon kommen beide vor dem Kassenbon.
+                    Nicht mehr mitlaufend (sticky): Zusammen sind beide Karten
+                    hoeher als der Bildschirm.
                   */}
                   <LueckeBedeutung
                     zeile={zeile}
                     kaufkraftHeute={kaufkraftHeute}
                     onSparen={() => geheZu('sparen')}
-                    klasse="hidden lg:sticky lg:top-32 lg:block"
                     nettoHeute={nettoHeute}
                   />
-                </div>
-                <div className="space-y-4 sm:space-y-6 lg:col-span-7">
                   <KaufkraftKarte
                     zeile={zeile}
                     inflation={szenario.annahmen.inflation}
                     standard={offenePfade(szenario).includes('annahmen.inflation')}
-                    klasse="hidden lg:block"
                   />
+                </div>
+                <div className="space-y-4 sm:space-y-6 lg:col-span-7">
                   <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                     <button
                       type="button"
@@ -1251,14 +1237,6 @@ export default function App() {
                   <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                     <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
                   </div>
-
-                  <LueckeBedeutung
-                    zeile={zeile}
-                    kaufkraftHeute={kaufkraftHeute}
-                    onSparen={() => geheZu('sparen')}
-                    klasse="lg:hidden"
-                    nettoHeute={nettoHeute}
-                  />
 
                   <Rechtsstand
                     ergebnis={ergebnis}
