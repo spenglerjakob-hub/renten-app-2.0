@@ -4,6 +4,7 @@ import {
   type ProjektionsErgebnis, type Jahreszeile, type Szenario,
 } from '@renten/engine';
 import { euro, prozent, Schalter } from '../components/Feld';
+import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
 import { personNameAus } from './personen';
 
@@ -90,12 +91,14 @@ function Gruppe({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, szenario, kaufkraftHeute, person,
+  ergebnis, zeile, szenario, kaufkraftHeute, onKaufkraftHeute, person,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
   szenario: Szenario;
   kaufkraftHeute: boolean;
+  /** Mit Umschalter „Nominal | Kaufkraft heute“ im Kopf der Tabelle */
+  onKaufkraftHeute?: (b: boolean) => void;
   /**
    * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.
    *
@@ -163,9 +166,13 @@ export function Kassenbon({
         <h2 className="text-sm font-bold text-slate-900">
           {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
         </h2>
-        <span className="text-xs text-slate-500">
-          Monatsbeträge, {kaufkraftHeute ? 'in heutiger Kaufkraft' : 'nominal'}
-        </span>
+        {onKaufkraftHeute ? (
+          <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} klasse="print:hidden" />
+        ) : (
+          <span className="text-xs text-slate-500">
+            Monatsbeträge, {kaufkraftHeute ? 'in heutiger Kaufkraft' : 'nominal'}
+          </span>
+        )}
       </div>
 
       {/*

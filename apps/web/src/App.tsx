@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Coins, Download, FolderOpen,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
   PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
 } from 'lucide-react';
@@ -46,6 +46,7 @@ import { Loesungen } from './features/Loesungen';
 import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
+import { KaufkraftSchalter } from './components/KaufkraftSchalter';
 import { Reiterleiste } from './components/Reiterleiste';
 import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seitenleiste';
 import { Dialog } from './components/Dialog';
@@ -190,7 +191,11 @@ function KopfAuswahl({
  * Seite der Versorgungsluecke vorbehalten; zwei rote Druckknoepfe waren das
  * Lauteste im ganzen Kopf.
  */
-function DruckMenue({ onDrucke }: { onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void }) {
+function DruckMenue({ onDrucke, kompakt = false }: {
+  onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void;
+  /** Nur das Symbol — fuer die eingeklappte Kopfleiste */
+  kompakt?: boolean;
+}) {
   const [offen, setOffen] = useState(false);
   const huelle = useRef<HTMLDivElement>(null);
   const menueId = useId();
@@ -211,7 +216,20 @@ function DruckMenue({ onDrucke }: { onDrucke: (umfang: 'kurz' | 'ausfuehrlich') 
   const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 focus-visible:bg-slate-100';
 
   return (
-    <div ref={huelle} className="relative flex flex-1 sm:flex-none">
+    <div ref={huelle} className={`relative flex ${kompakt ? '' : 'flex-1 sm:flex-none'}`}>
+      {kompakt ? (
+        <button
+          type="button"
+          onClick={() => setOffen((v) => !v)}
+          aria-expanded={offen}
+          aria-controls={menueId}
+          aria-label="Gutachten drucken"
+          title="Gutachten drucken"
+          className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700"
+        >
+          <Printer className="h-4 w-4" aria-hidden />
+        </button>
+      ) : (
       <button
         type="button"
         onClick={() => setOffen((v) => !v)}
@@ -223,6 +241,7 @@ function DruckMenue({ onDrucke }: { onDrucke: (umfang: 'kurz' | 'ausfuehrlich') 
         <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
         <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
       </button>
+      )}
       {offen && (
         <div
           id={menueId}
@@ -276,7 +295,13 @@ export default function App() {
   const [reiter, setReiter] = useState<Reiter>('s1');
   const [ansicht, setAnsicht] = useState<Ansicht>('kassenbon');
   const [kaufkraftHeute, setKaufkraftHeute] = useState(false);
-  const [kopfEingeklappt, setKopfEingeklappt] = useState(false);
+  /*
+    Die Kopfleiste startet EINGEKLAPPT: Annahmen und Laden/Speichern braucht
+    man selten, und eingeklappt bleibt mehr Platz fuer den Fall. Konto und
+    Drucken stehen auch eingeklappt rechts als Symbole; „Kaufkraft heute“
+    sitzt im Kassenbon und in der Fussleiste.
+  */
+  const [kopfEingeklappt, setKopfEingeklappt] = useState(true);
   const [menueOffen, setMenueOffen] = useState(false);
   const [basisOffen, setBasisOffen] = useState(true);
   const [kontoOffen, setKontoOffen] = useState(false);
@@ -791,7 +816,7 @@ export default function App() {
       >
         <div
           className={`relative mx-auto flex min-h-[40px] max-w-6xl px-1 sm:px-0 ${
-            kopfEingeklappt ? 'items-center justify-center' : 'flex-col justify-between md:flex-row md:items-center'
+            kopfEingeklappt ? 'items-center' : 'flex-col justify-between md:flex-row md:items-center'
           }`}
         >
           {/*
@@ -800,7 +825,9 @@ export default function App() {
             Einklapp-Knopf rutscht unter die Leiste — er waere sichtbar,
             aber nicht mehr anklickbar.
           */}
-          <div className={`flex items-center md:shrink-0 ${kopfEingeklappt ? 'w-full justify-center' : 'w-full justify-between md:w-auto md:gap-3'}`}>
+          {/* Eingeklappt links buendig statt mittig: rechts stehen jetzt Konto,
+              Drucken und der Pfeil — mittig lag der Name am Telefon darunter. */}
+          <div className={`flex items-center md:shrink-0 ${kopfEingeklappt ? 'w-full justify-between gap-2' : 'w-full justify-between md:w-auto md:gap-3'}`}>
             <div className="flex shrink-0 items-center gap-2 sm:gap-4">
               {/* Uebersicht ueber alle Seiten — auch bei eingeklappter Kopfleiste da. */}
               <button
@@ -828,24 +855,24 @@ export default function App() {
                 <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
                   JS-Rentenplaner
                 </h1>
-                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'text-[11px] sm:text-[10px]' : 'text-[11px] sm:text-xs'}`}>
+                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'hidden text-[11px] sm:block' : 'text-[11px] sm:text-xs'}`}>
                   Ihre Zukunft. Smart geplant.
                 </p>
               </div>
             </div>
 
-            <div className={`flex items-center gap-2 ${kopfEingeklappt ? 'absolute right-1 sm:right-0' : ''}`}>
-              {!kopfEingeklappt && (
-                <button
-                  type="button"
-                  onClick={() => setKontoOffen(true)}
-                  aria-label={angemeldet ? `Konto — angemeldet als ${angemeldet}` : 'Konto — Pläne speichern und laden'}
-                  className="relative rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 md:hidden"
-                >
-                  <Wallet className="h-4 w-4" aria-hidden />
-                  {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900" />}
-                </button>
-              )}
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setKontoOffen(true)}
+                aria-label={angemeldet ? `Konto — angemeldet als ${angemeldet}` : 'Konto — Pläne speichern und laden'}
+                title={angemeldet ? `Angemeldet als ${angemeldet}` : 'Konto'}
+                className={`relative rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 ${kopfEingeklappt ? '' : 'md:hidden'}`}
+              >
+                <Wallet className="h-4 w-4" aria-hidden />
+                {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900" />}
+              </button>
+              {kopfEingeklappt && <DruckMenue onDrucke={drucke} kompakt />}
               {!kopfEingeklappt && (
                 <button
                   type="button"
@@ -873,16 +900,6 @@ export default function App() {
           {!kopfEingeklappt && (
             <div className={`${menueOffen ? 'flex' : 'hidden'} mt-3 w-full flex-col items-stretch gap-2 md:mt-0 md:flex md:w-auto md:flex-row md:items-center`}>
               <div className="flex flex-wrap justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
-                <button
-                  type="button"
-                  onClick={() => setKaufkraftHeute((v) => !v)}
-                  aria-pressed={kaufkraftHeute}
-                  className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-medium transition-all sm:flex-none sm:text-xs ${
-                    kaufkraftHeute ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Coins className="h-3 w-3 shrink-0" aria-hidden /> Kaufkraft heute
-                </button>
                 <KopfAuswahl
                   titel="Inflation"
                   wert={szenario.annahmen.inflation}
@@ -1171,8 +1188,12 @@ export default function App() {
             {beispielHinweis}
             {ergebnis ? (
               <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
-                <div className="space-y-4 sm:space-y-6 lg:col-span-5">
-                  {kopfzahlen}
+                {/* flex + gap statt space-y: Ein ausgeblendetes Kind bekaeme
+                    sonst trotzdem seinen Abstand, und die Spalten begannen
+                    nicht auf einer Hoehe. */}
+                <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-5">
+                  {/* Am Telefon zuerst, am PC oben rechts (siehe dort). */}
+                  <div className="lg:hidden">{kopfzahlen}</div>
                   <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
                     Die Praemie im Ruhestand ist fuer einen privat Versicherten
@@ -1201,7 +1222,14 @@ export default function App() {
                     standard={offenePfade(szenario).includes('annahmen.inflation')}
                   />
                 </div>
-                <div className="space-y-4 sm:space-y-6 lg:col-span-7">
+                <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-7">
+                  {/*
+                    Die Kopfzahlen am PC oben RECHTS: Links stehen schon
+                    Steuer-Engine, Luecke und Kaufkraft — mit den Kennzahlen
+                    dort war die linke Spalte fast doppelt so hoch wie die
+                    rechte.
+                  */}
+                  <div className="hidden lg:block">{kopfzahlen}</div>
                   <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
                     <button
                       type="button"
@@ -1231,6 +1259,7 @@ export default function App() {
                       zeile={zeile}
                       szenario={ansichtSzenario}
                       kaufkraftHeute={kaufkraftHeute}
+                      onKaufkraftHeute={setKaufkraftHeute}
                       person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
                     />
                   </div>
@@ -1432,12 +1461,22 @@ export default function App() {
                 }`}
               >
                 <div className={`mb-0.5 text-[10px] font-bold uppercase tracking-wider sm:mb-1 sm:text-xs ${luecke > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  Versorgungslücke
+                  {/* Am Telefon kuerzer: Neben dem Kaufkraft-Symbol passt
+                      „Versorgungsluecke“ nicht mehr in eine Zeile. */}
+                  <span className="sm:hidden">Lücke</span><span className="hidden sm:inline">Versorgungslücke</span>
                 </div>
                 <div className="text-base font-black tabular-nums sm:text-xl">
                   {luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
                 </div>
               </div>
+
+              {/* In derselben Zeile wie die Kacheln, damit die Leiste nicht
+                  hoeher wird: am PC mit Worten, am Telefon nur das Symbol. */}
+              <KaufkraftSchalter wert={kaufkraftHeute} onChange={setKaufkraftHeute} kompakt klasse="sm:hidden" />
+              <KaufkraftSchalter
+                wert={kaufkraftHeute} onChange={setKaufkraftHeute} ton="dunkel"
+                klasse="hidden sm:inline-flex sm:flex-col sm:items-stretch"
+              />
             </div>
           </div>
         </div>
