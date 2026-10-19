@@ -194,7 +194,7 @@ export function Kassenbon({
             <div style={{ width: `${(luecke / skala) * 100}%` }} className="bg-white transition-all duration-500" />
           )}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500 sm:mt-2 sm:gap-3 sm:text-[9px]">
+        <div className="mt-1.5 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500 sm:mt-2 sm:gap-3">
           {nachSchicht.map(({ schicht }) => (
             <span key={schicht} className="flex items-center gap-1">
               <span className={`h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2 ${SCHICHT[schicht].punkt}`} />
@@ -380,7 +380,7 @@ export function Kassenbon({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
             Einmalbeträge — im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
           </p>
         </div>

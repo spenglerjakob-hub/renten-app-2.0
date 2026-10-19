@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Sparkles, Users, Calculator, Save } from 'lucide-react';
 import { FRUEHSTART_MONATE } from '@renten/schema/preise';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { useAuth, type MailLink } from '../store/auth';
 import { offenerMusterfall } from '../lib/musterfall';
@@ -319,15 +319,7 @@ function Feld({ label, id, children }: { label: string; id: string; children: Re
 export function Rahmen({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-slate-100">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Logo klasse="h-9 w-9" />
-          <div>
-            <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
-            <p className="text-[11px] text-slate-400">Ihre Zukunft. Smart geplant.</p>
-          </div>
-        </div>
-      </header>
+      <SeitenKopf />
 
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
         {children}

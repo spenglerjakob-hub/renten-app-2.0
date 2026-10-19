@@ -59,7 +59,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
             <span className="block text-xs font-bold text-slate-800 sm:text-sm">
               Sparrechner
             </span>
-            <span className="block text-[10px] text-slate-500 sm:text-xs">
+            <span className="block text-[11px] text-slate-500 sm:text-xs">
               Was kostet es, die Versorgungslücke zu schließen?
             </span>
           </span>
@@ -346,7 +346,7 @@ function Kachel({ titel, wert, hinweis, akzent }: {
       <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-indigo-900' : 'text-slate-900'}`}>
         {wert}
       </div>
-      <div className="mt-0.5 text-[10px] leading-tight text-slate-500">{hinweis}</div>
+      <div className="mt-0.5 text-[11px] leading-tight text-slate-500">{hinweis}</div>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
             <span className="block text-xs font-bold text-slate-800 sm:text-sm">
               Ihre private Krankenversicherung
             </span>
-            <span className="block text-[10px] text-slate-500 sm:text-xs">
+            <span className="block text-[11px] text-slate-500 sm:text-xs">
               Heute {euro(r.heute.gesamtMonat)} — im Jahr {r.rentenjahr} {euro(r.beiRente.praemieMonat)}
             </span>
           </span>
@@ -280,7 +280,7 @@ function Kachel({ titel, wert, hinweis, akzent }: {
       <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-rose-900' : 'text-slate-900'}`}>
         {wert}
       </div>
-      <div className="mt-0.5 text-[10px] leading-tight text-slate-500">{hinweis}</div>
+      <div className="mt-0.5 text-[11px] leading-tight text-slate-500">{hinweis}</div>
     </div>
   );
 }

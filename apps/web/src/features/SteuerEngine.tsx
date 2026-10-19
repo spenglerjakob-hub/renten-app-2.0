@@ -15,7 +15,7 @@ function Kachel({
       {akzent && <div className="absolute right-0 top-0 h-full w-1 bg-emerald-500" />}
       <div className="mb-0.5 text-[11px] uppercase text-slate-400 sm:mb-1 sm:text-[10px]">{titel}</div>
       <div className={`text-sm font-bold tabular-nums sm:text-lg ${farbe ?? 'text-white'}`}>{wert}</div>
-      <div className="mt-1 text-[11px] leading-tight text-slate-500 sm:text-[9px]">{erklaerung}</div>
+      <div className="mt-1 text-[11px] leading-tight text-slate-500">{erklaerung}</div>
     </div>
   );
 }
@@ -117,7 +117,7 @@ export function SteuerEngine({
             />
           </div>
 
-          <p className="text-[10px] leading-relaxed text-slate-400">
+          <p className="text-[11px] leading-relaxed text-slate-400">
             Für die Frage, ob sich eine zusätzliche Einzahlung lohnt, ist allein der{' '}
             <strong className="text-slate-200">Grenzsteuersatz</strong> maßgeblich — er gilt für
             den nächsten verdienten Euro. Der Durchschnittssatz beschreibt nur die
@@ -127,7 +127,7 @@ export function SteuerEngine({
           {ergebnis.freibetraege.length > 0 && (
             <div className="space-y-2 border-t border-slate-700 pt-3">
               {ergebnis.freibetraege.map((fb) => (
-                <p key={fb.personId} className="text-[10px] leading-relaxed text-slate-400">
+                <p key={fb.personId} className="text-[11px] leading-relaxed text-slate-400">
                   <strong className="text-slate-200">{personNameAus(personen, fb.personId)}:</strong>{' '}
                   {fb.art === 'rente'
                     ? `Rentenfreibetrag ${euro(fb.wert.jahresbetrag)} pro Jahr (Besteuerungsanteil ${prozent(fb.wert.besteuerungsanteil ?? 0, 1)}, Kohorte ${fb.wert.kohortenjahr}).`

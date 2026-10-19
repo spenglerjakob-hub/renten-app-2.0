@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown, Save } from 'lucide-react';
 import { BUNDESLAENDER } from '@renten/engine';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { AuswahlFeld, DatumFeld, Schalter, ZahlFeld, euro, prozent } from '../components/Feld';
 import { KaufkraftKarte } from '../features/KaufkraftKarte';
@@ -97,15 +97,10 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Logo klasse="h-9 w-9" />
-            <a href="/" className="text-sm font-black tracking-tight hover:underline">JS-Rentenplaner</a>
-          </div>
-          <a href="/" className="text-xs font-semibold text-slate-300 hover:text-white hover:underline">Anmelden</a>
-        </div>
-      </header>
+      <SeitenKopf
+        verlinkt
+        rechts={<a href="/" className="text-xs font-semibold text-slate-300 hover:text-white hover:underline">Anmelden</a>}
+      />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-4xl">
@@ -207,6 +202,9 @@ export function Seite() {
                     ton={luecke > 0 ? 'luecke' : 'gut'}
                   />
                 </div>
+                {/* Die Luecke in Euro allein sagt nicht, ob sie gross ist —
+                    der Anteil am Ziel ordnet sie ein. */}
+                {z.zielNettoMonat > 0 && <Deckung netto={z.nettoMonat} ziel={z.zielNettoMonat} />}
                 <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
                   Monatsbeträge nach Steuer und Kranken- und Pflegeversicherung, im Geld des Jahres {z.jahr};
                   „heute“ in heutiger Kaufkraft.
@@ -323,6 +321,26 @@ export function Seite() {
       <footer className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
         <RechtsLinks />
       </footer>
+    </div>
+  );
+}
+
+function Deckung({ netto, ziel }: { netto: number; ziel: number }) {
+  const anteil = Math.min(1, Math.max(0, netto / ziel));
+  const prozent = Math.round(anteil * 100);
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-slate-700">
+        <span>Das Netto deckt <strong className="tabular-nums">{prozent} %</strong> des Ziels</span>
+        {prozent < 100 && <span className="text-rose-700">es fehlen <strong className="tabular-nums">{100 - prozent} %</strong></span>}
+      </div>
+      <div
+        role="img"
+        aria-label={`Das Netto deckt ${prozent} % des Ziels`}
+        className={`mt-1.5 h-2 overflow-hidden rounded-full ${prozent < 100 ? 'bg-rose-100' : 'bg-emerald-100'}`}
+      >
+        <div className="h-full rounded-full bg-emerald-600" style={{ width: `${prozent}%` }} />
+      </div>
     </div>
   );
 }

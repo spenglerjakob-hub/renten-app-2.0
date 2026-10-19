@@ -3,7 +3,7 @@ import { ChevronDown, Info } from 'lucide-react';
 import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
 } from '@renten/engine';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 
 /**
@@ -276,15 +276,7 @@ export function GehaltVergleich(props: {
 /** Kopf mit Logo — beide Arbeitgeber-Seiten. */
 export function Kopf() {
   return (
-    <header className="bg-slate-900 text-white print:bg-white print:text-slate-900">
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4 sm:px-6 print:px-0 print:py-1">
-        <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
-        <div>
-          <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
-          <p className="text-xs print:text-[11px] text-slate-400 print:hidden">Ihre Zukunft. Smart geplant.</p>
-        </div>
-      </div>
-    </header>
+    <SeitenKopf klasse="print:bg-white print:text-slate-900" innen="print:max-w-none print:px-0 print:py-1" />
   );
 }
 

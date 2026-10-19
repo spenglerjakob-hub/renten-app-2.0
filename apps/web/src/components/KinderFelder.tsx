@@ -47,7 +47,7 @@ export function KinderZeilen({
                 onChange={(e) => onKind(i, { geburtsjahr: Number(e.target.value) })}
                 className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
               />
-              <span className="w-24 shrink-0 text-right text-[10px] text-slate-500">
+              <span className="w-24 shrink-0 text-right text-[11px] text-slate-500">
                 {jahre <= 0 ? 'kein Anspruch' : jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`}
               </span>
             </div>
@@ -83,7 +83,7 @@ export function KinderZeilen({
                   onChange={(e) => onKind(i, { ausbildungBisJahr: Number(e.target.value) })}
                   className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
                 />
-                <span className="w-24 shrink-0 text-right text-[10px] text-slate-500">
+                <span className="w-24 shrink-0 text-right text-[11px] text-slate-500">
                   dann {(kind.ausbildungBisJahr ?? 0) - kind.geburtsjahr} J. alt
                 </span>
               </div>
@@ -101,7 +101,7 @@ export function KinderZeilen({
  */
 export function KinderHinweis({ a }: { a: AvdParameter }) {
   return (
-    <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
       Die Kinderzulage läuft, solange Kindergeld fließt: bis {a.kinderzulageBisAlter} —
       und bei Ausbildung oder Studium so lange, wie diese dauert, längstens bis{' '}
       {a.kinderzulageBisAlterAusbildung}.

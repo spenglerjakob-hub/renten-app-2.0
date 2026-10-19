@@ -4,7 +4,7 @@ import {
   PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS, FAELLE_VORGABE,
   preisJeNutzer, staffelIndex, type Intervall, type PaketId,
 } from '@renten/schema/preise';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   EMPFOHLEN_GRUND, FaelleWahl, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
@@ -171,12 +171,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Logo klasse="h-9 w-9" />
-          <a href="/" className="text-sm font-black tracking-tight hover:underline">JS-Rentenplaner</a>
-        </div>
-      </header>
+      <SeitenKopf verlinkt />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Preise</h1>

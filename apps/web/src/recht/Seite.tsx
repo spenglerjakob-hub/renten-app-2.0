@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 
 /**
@@ -24,12 +24,7 @@ export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Logo klasse="h-9 w-9" />
-          <a href="/" className="text-sm font-black tracking-tight hover:underline">JS-Rentenplaner</a>
-        </div>
-      </header>
+      <SeitenKopf breite="max-w-3xl" verlinkt />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {ENTWURF && (

@@ -13,7 +13,7 @@ import {
 } from '../lib/check';
 import { supabaseKonfiguriert } from '../lib/supabase';
 import { DokumentHochladen } from './Dokumente';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, TextFeld, AuswahlFeld, Schalter, euro,
@@ -231,15 +231,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Logo klasse="h-9 w-9" />
-          <div>
-            <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
-            <p className="text-[11px] text-slate-400">Ihre Zukunft. Smart geplant.</p>
-          </div>
-        </div>
-      </header>
+      <SeitenKopf breite="max-w-4xl" />
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
@@ -310,7 +302,7 @@ export function Seite() {
                     <span className={`h-1.5 w-full rounded-full ${
                       aktiv ? 'bg-indigo-600' : fertig ? 'bg-emerald-500' : 'bg-slate-300'
                     }`} />
-                    <span className={`hidden text-[10px] font-semibold leading-tight sm:block ${
+                    <span className={`hidden text-[11px] font-semibold leading-tight sm:block ${
                       aktiv ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-700'
                     }`}>
                       {t}

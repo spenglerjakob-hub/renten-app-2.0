@@ -209,7 +209,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
                   Kinder — für die Kinderzulage
                 </span>
-                <span className="text-[10px] text-indigo-700">Aus Ihren Basisdaten</span>
+                <span className="text-[11px] text-indigo-700">Aus Ihren Basisdaten</span>
               </div>
               <ZahlFeld
                 label="Kinder mit Kindergeldanspruch"
@@ -225,7 +225,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 jetzt={jetzt}
               />
               <KinderHinweis a={avdParam} />
-              <p className="mt-1 text-[10px] leading-relaxed text-indigo-800">
+              <p className="mt-1 text-[11px] leading-relaxed text-indigo-800">
                 Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch
                 in den Basisdaten und im Vertrags-TÜV.
               </p>
@@ -306,7 +306,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           <div className="text-sm font-black tabular-nums text-emerald-800">
             {euro(verrentung.bruttoMonat)} <span className="text-xs font-normal">brutto / Monat</span>
           </div>
-          <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
             Kapital {euro(verrentung.bruttoKapital)} − Steuer im Auszahlungsjahr{' '}
             {euro(verrentung.steuerEinmal)} = {euro(verrentung.nettoKapital)}, verteilt auf{' '}
             {verrentung.dauerJahre} Jahre.
@@ -327,7 +327,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           <div className="text-sm font-black tabular-nums text-indigo-900">
             {euro(auszahlung.nettoKapital)} netto
           </div>
-          <div className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+          <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
             Brutto {euro(auszahlung.bruttoKapital)} − Steuer {euro(auszahlung.steuer)}
             {auszahlung.kvPvGesamt > 0
               && ` − ${euro(auszahlung.kvPvGesamt)} Kranken- und Pflegeversicherung`}.
@@ -344,7 +344,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           <div className="text-sm font-black tabular-nums text-indigo-900">
             {euro(auszahlung.nettoKapital)} netto
           </div>
-          <div className="mt-0.5 text-[10px] text-slate-500">
+          <div className="mt-0.5 text-[11px] text-slate-500">
             Brutto {euro(auszahlung.bruttoKapital)} − Abgeltungsteuer {euro(auszahlung.steuer)}.
             Zählt nicht zum monatlichen Netto.
           </div>
@@ -396,13 +396,13 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
             Eigenbeitrag {euro(avd.eigenbeitraege)} über die Laufzeit, dazu {euro(avd.zulagenGesamt)} Zulagen
             vom Staat. Die Auszahlung ist voll mit Ihrem persönlichen Steuersatz zu versteuern —
             nicht mit der Abgeltungsteuer.
           </p>
           {avd.hinweise.map((h) => (
-            <p key={h} className="mt-2 rounded bg-amber-50 px-2 py-1 text-[10px] text-amber-900">{h}</p>
+            <p key={h} className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-900">{h}</p>
           ))}
         </div>
       )}

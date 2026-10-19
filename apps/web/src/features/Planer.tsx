@@ -70,7 +70,7 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
                 {euro(ergebnis.gesamtkapital)}
               </dd>
               {ergebnis.uebertragen > 0 && (
-                <p className="mt-0.5 text-[10px] font-medium text-indigo-600">
+                <p className="mt-0.5 text-[11px] font-medium text-indigo-600">
                   inkl. {euro(ergebnis.uebertragen)} aus Verträgen
                 </p>
               )}
@@ -82,7 +82,7 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
               <dd className="text-sm font-black text-emerald-700 tabular-nums">
                 {euro(ergebnis.nettoMonat)} <span className="text-xs font-normal">/ Monat</span>
               </dd>
-              <p className="mt-0.5 text-[10px] text-slate-500">
+              <p className="mt-0.5 text-[11px] text-slate-500">
                 brutto {euro(ergebnis.bruttoMonat)}
               </p>
             </div>

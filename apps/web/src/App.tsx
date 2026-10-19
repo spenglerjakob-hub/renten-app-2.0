@@ -105,11 +105,11 @@ function StartKarte({ symbol, titel, text, marke, onClick }: {
         <span className="block text-xs leading-snug text-slate-500">{text}</span>
         {/* Auf dem Telefon unter dem Text — rechts daneben bliebe dem Titel zu wenig Breite. */}
         {marke && (
-          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white sm:hidden">{marke}</span>
+          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white sm:hidden">{marke}</span>
         )}
       </span>
       {marke && (
-        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white sm:inline-block">{marke}</span>
+        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white sm:inline-block">{marke}</span>
       )}
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
     </button>
@@ -180,7 +180,7 @@ function KopfAuswahl({
         ))}
       </select>
       {/* Zwischen md und xl steht die Kopfleiste einzeilig und knapp — dort traegt nur der Tooltip die Marke. */}
-      {standard && <span aria-hidden className="text-[10px] font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
+      {standard && <span aria-hidden className="text-[11px] font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
     </span>
   );
 }
@@ -438,7 +438,7 @@ export default function App() {
     [szenario, einzeln, wer],
   );
 
-  const { ergebnis, rechnet, fehler, dauerMs } = useProjektion(ansichtSzenario);
+  const { ergebnis, rechnet, fehler } = useProjektion(ansichtSzenario);
 
   /*
     DER FORTSCHRITT DES FALLS — aus echten Schritten (`features/fortschritt.ts`).
@@ -668,7 +668,7 @@ export default function App() {
   const kopfzahlen = (
     <div className="grid grid-cols-2 gap-3 sm:gap-4">
       <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
-        <h3 className="mb-0.5 text-[10px] font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
+        <h3 className="mb-0.5 text-[11px] font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
           Bedarf im Jahr {zeile.jahr}
         </h3>
         <p className="text-lg font-bold tabular-nums sm:text-3xl">
@@ -680,7 +680,7 @@ export default function App() {
           luecke > 0 ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
         }`}
       >
-        <h3 className="mb-0.5 text-[10px] font-semibold leading-tight sm:mb-1 sm:text-sm">
+        <h3 className="mb-0.5 text-[11px] font-semibold leading-tight sm:mb-1 sm:text-sm">
           Versorgungslücke
         </h3>
         <p className="text-lg font-bold tabular-nums sm:text-3xl">
@@ -828,7 +828,7 @@ export default function App() {
                 <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
                   JS-Rentenplaner
                 </h1>
-                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'text-[10px] sm:text-[10px]' : 'text-[10px] sm:text-xs'}`}>
+                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'text-[11px] sm:text-[10px]' : 'text-[11px] sm:text-xs'}`}>
                   Ihre Zukunft. Smart geplant.
                 </p>
               </div>
@@ -1334,8 +1334,10 @@ export default function App() {
           </>
         )}
 
-        <p className="text-right text-[11px] text-slate-400 print:hidden" aria-live="polite">
-          {rechnet ? 'rechnet …' : `berechnet in ${dauerMs.toFixed(0)} ms im Hintergrund`}
+        {/* Nur waehrend gerechnet wird. „berechnet in 6 ms“ war ein Hinweis
+            fuer Entwickler — fuer Berater Rauschen unter jeder Seite. */}
+        <p className="min-h-[1rem] text-right text-[11px] text-slate-400 print:hidden" aria-live="polite">
+          {rechnet ? 'rechnet …' : ''}
         </p>
       </main>
 

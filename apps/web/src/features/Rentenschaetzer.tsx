@@ -82,7 +82,7 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
           type="button"
           onClick={() => setOffen((v) => !v)}
           aria-expanded={offen}
-          className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-700 transition-colors hover:bg-blue-200 print:hidden"
+          className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-200 print:hidden"
         >
           <Calculator className="h-3 w-3" aria-hidden /> {offen ? 'Schließen' : 'Schätzen'}
         </button>
@@ -136,7 +136,7 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
             <CheckCircle className="h-3.5 w-3.5" aria-hidden /> ca. {euro(betrag)} übernehmen
           </button>
 
-          <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
             {schaetzung.hinweis}
           </p>
         </div>

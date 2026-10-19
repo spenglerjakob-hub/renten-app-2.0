@@ -671,7 +671,7 @@ export function Kennzahl(props: {
       <div className={`text-base font-black tabular-nums sm:text-lg ${props.farbe ?? 'text-slate-800'}`}>
         {props.wert}
       </div>
-      {props.fussnote && <div className="mt-0.5 text-[10px] text-slate-500">{props.fussnote}</div>}
+      {props.fussnote && <div className="mt-0.5 text-[11px] text-slate-500">{props.fussnote}</div>}
     </div>
   );
 }

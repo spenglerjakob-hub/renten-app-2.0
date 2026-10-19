@@ -265,12 +265,12 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {guenstigste && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
               <BadgeEuro className="h-3 w-3" aria-hidden /> Günstigste
             </span>
           )}
           {bester && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
               <Trophy className="h-3 w-3" aria-hidden /> Meiste
             </span>
           )}
@@ -608,7 +608,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
                   <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Angebot {i + 1}</span>
                   <span className="block font-bold leading-tight text-slate-800">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
                   {gerechnet.length > 1 && (p.rente || p.kapital) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
                   )}

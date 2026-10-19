@@ -124,7 +124,7 @@ function FruehereBeitraege({ t, aendern }: {
         <button
           type="button"
           onClick={() => aendern({ fruehereBeitraege: [...stufen, neueStufe()] })}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
         >
           <Plus className="h-3 w-3" aria-hidden /> Noch eine frühere Änderung
         </button>
@@ -461,13 +461,13 @@ export function VertragsTuev({
                           <button
                             type="button"
                             onClick={() => tuevKindHinzufuegen(t.id)}
-                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
                           >
                             <Plus className="h-3 w-3" aria-hidden /> Kind
                           </button>
                         </div>
                         {t.kinder.length === 0 ? (
-                          <p className="text-[10px] text-slate-500">Keine Kinderzulage.</p>
+                          <p className="text-[11px] text-slate-500">Keine Kinderzulage.</p>
                         ) : (
                           <ul className="space-y-1.5">
                             {t.kinder.map((kind) => (
@@ -482,7 +482,7 @@ export function VertragsTuev({
                                   onChange={(e) => tuevKindAendern(t.id, kind.id, Number(e.target.value))}
                                   className="w-full rounded border border-slate-300 p-1 text-xs tabular-nums"
                                 />
-                                <span className="shrink-0 text-[10px] text-slate-500">
+                                <span className="shrink-0 text-[11px] text-slate-500">
                                   {kind.geburtsjahr >= 2008 ? '300 €' : '185 €'}
                                 </span>
                                 <button
@@ -530,7 +530,7 @@ export function VertragsTuev({
                           jetzt={jetzt}
                         />
                         <KinderHinweis a={avdParam} />
-                        <p className="mt-1 text-[10px] leading-relaxed text-indigo-800">
+                        <p className="mt-1 text-[11px] leading-relaxed text-indigo-800">
                           Gilt für den ganzen Haushalt: Änderungen wirken auch in den Basisdaten,
                           auf der Zeitachse und im Vertragsblatt.
                         </p>
@@ -645,7 +645,7 @@ export function VertragsTuev({
                                 Jahr gibt.
                               */}
                               {r.zulageDetail.bonusEinmalig > 0 && (
-                                <p className="mt-1 text-[10px] leading-relaxed text-emerald-800">
+                                <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
                                   Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
                                   {euro(r.zulageDetail.bonusEinmalig)}.
                                 </p>
@@ -655,7 +655,7 @@ export function VertragsTuev({
                             <GegenueberZeile text="Zulage" wert={euro(r.zulageMonat)} />
                           )}
                         </div>
-                        <p className="mt-2 text-[10px] leading-relaxed text-emerald-800">
+                        <p className="mt-2 text-[11px] leading-relaxed text-emerald-800">
                           Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
                           fließen zusätzlich in den Vertrag und senken Ihren eigenen Beitrag
                           nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als

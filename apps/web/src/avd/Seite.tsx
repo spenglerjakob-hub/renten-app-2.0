@@ -7,7 +7,7 @@ import {
   parameterFuer, regelaltersrentenbeginn, parseDatum, toDe, bruttoZuNetto,
   type AvdKind,
 } from '@renten/engine';
-import { Logo } from '../components/Logo';
+import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile,
@@ -191,15 +191,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Logo klasse="h-9 w-9" />
-          <div>
-            <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>
-            <p className="text-[11px] text-slate-400">Ihre Zukunft. Smart geplant.</p>
-          </div>
-        </div>
-      </header>
+      <SeitenKopf />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
@@ -241,7 +233,7 @@ export function Seite() {
         <section className="mt-4 hidden break-inside-avoid rounded-lg border border-slate-300 p-3 print:block">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-[11px] text-slate-500">
               {istBeispiel ? 'Beispielwerte · ' : ''}Erstellt am {new Date().toLocaleDateString('de-DE')}
             </span>
           </div>
@@ -394,7 +386,7 @@ export function Seite() {
                 <span className="text-xs font-medium text-slate-500">Effektivkosten p. a.</span>
                 <span className="text-sm font-bold tabular-nums text-slate-500">{prozent(KOSTEN)}</span>
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
                 Fest angesetzt: Fondskosten, Depotführung und Produktkosten zusammen.
               </p>
             </div>
@@ -469,7 +461,7 @@ export function Seite() {
                     {euro(profit.eigenaufwandNettoGesamt)}
                   </span>
                 </div>
-                <p className="mt-1 text-[10px] text-slate-500">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {profit.steuerersparnisGesamt > 0 && (
                     <>
                       Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
@@ -810,7 +802,7 @@ function SchnellWahl({ betragJahr, text, aktiv, onWaehlen }: {
       <span className="block text-sm font-bold tabular-nums text-slate-800">
         {euro(betragJahr / 12)}
       </span>
-      <span className="block text-[10px] leading-tight text-slate-500">
+      <span className="block text-[11px] leading-tight text-slate-500">
         {text} · {euro(betragJahr)} im Jahr
       </span>
     </button>

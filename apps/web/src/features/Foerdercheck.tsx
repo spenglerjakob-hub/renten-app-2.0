@@ -120,7 +120,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
               {/* Die Einschraenkung steht kleiner darunter — im Ausdruck
                   entfaellt sie ganz, dort zaehlt der Befund. */}
               {b.hinweis && (
-                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 sm:text-[11px]">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 sm:text-[11px]">
                   {b.hinweis}
                 </p>
               )}
@@ -200,7 +200,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 </InfoPunkt>
               </p>
 
-              <p className="mt-1.5 text-[10px] text-slate-400">{b.paragraf}</p>
+              <p className="mt-1.5 text-[11px] text-slate-400">{b.paragraf}</p>
             </div>
           </article>
         ))}
@@ -212,7 +212,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
           verbraucht Foerderrahmen, den der Check nicht sehen kann. Ohne
           diesen Satz waere der ausgewiesene freie Rahmen zu gross.
         */
-        <p className="mx-2 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] leading-relaxed text-slate-500 sm:text-[11px]">
+        <p className="mx-2 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500 sm:text-[11px]">
           Zu {ohneBeitrag === 1 ? 'einem geförderten Vertrag' : `${ohneBeitrag} geförderten Verträgen`}{' '}
           ist kein laufender Beitrag erfasst. Tragen Sie ihn oben in der Prüfung ein — sonst
           erscheint hier mehr freier Rahmen, als Sie tatsächlich haben.
