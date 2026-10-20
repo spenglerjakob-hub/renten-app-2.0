@@ -179,7 +179,10 @@ async function portalSichern(produkte: { produkt: string; preise: string[] }[], 
           prices: p.preise,
           adjustable_quantity: { enabled: true, minimum: 1, maximum: maxPlaetze },
         })),
-        proration_behavior: 'create_prorations',
+        // Mehr Plaetze oder ein groesseres Paket: die Differenz fuer den laufenden
+        // Zeitraum sofort abrechnen. Sonst landet sie auf der naechsten Rechnung,
+        // und deren Summe sieht aus, als fehle der Mengenrabatt.
+        proration_behavior: 'always_invoice',
         // Weniger Plaetze, ein kleineres Paket oder monatlich statt jaehrlich:
         // erst zum Ende des bezahlten Zeitraums.
         schedule_at_period_end: { conditions: [{ type: 'decreasing_item_amount' }, { type: 'shortening_interval' }] },
