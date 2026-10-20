@@ -13,8 +13,10 @@ import { RechtsLinks } from '../components/RechtsLinks';
  * Anwalts oder eines Generators mit Abmahnschutz. Der gelbe Vermerk oben
  * bleibt, bis `ENTWURF` auf false steht.
  *
- * Aendert sich die Verarbeitung (neuer Dienst, neue Daten, Stripe fuer das
- * Abo), muss die Datenschutzerklaerung mitgezogen werden.
+ * Aendert sich die Verarbeitung (neuer Dienst, neue Daten), muss die
+ * Datenschutzerklaerung mitgezogen werden. Aendern sich die
+ * Nutzungsbedingungen, auch NUTZUNGSBEDINGUNGEN_FASSUNG in
+ * lib/nutzungsbedingungen.ts hochsetzen, damit jedes Konto neu zustimmt.
  */
 const ENTWURF = true;
 const STAND = '[Datum eintragen]';
@@ -120,8 +122,8 @@ function Datenschutz() {
       <P>
         Der JS-Rentenplaner rechnet Altersvorsorge durch — Renten, Steuern, Sozialabgaben und Verträge. Die
         Berechnung läuft vollständig in Ihrem Browser. Auf unseren Server gelangen Daten nur, wenn Sie ein
-        Konto nutzen, ein Szenario in Ihrem Konto speichern, einen Vorsorge-Check an Ihren Berater senden oder
-        uns eine Rückmeldung schicken.
+        Konto nutzen, ein Szenario in Ihrem Konto speichern, einen Vorsorge-Check an Ihren Berater senden,
+        uns eine Rückmeldung schicken oder ein Abo buchen.
         Wir setzen keine Analyse-, Tracking- oder Werbedienste ein und laden keine Inhalte von Drittanbietern
         (etwa Schriftarten) nach.
       </P>
@@ -250,14 +252,48 @@ function Datenschutz() {
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
-      <H2>10. Weitere Seiten</H2>
+      <H2>10. Abo, Büro und Zahlung</H2>
+      <P>
+        <strong>Büro und Team.</strong> Buchen Sie ein Abo, legen wir für Ihr Konto ein Büro an. Dazu speichern wir
+        den Namen des Büros, wer ihm angehört und seit wann, wer es verwaltet, die Einladungslinks (wer sie wann
+        erstellt und wer sie wann eingelöst hat) sowie den Stand des Abos: Paket, Zahlweise, Zahl der Plätze,
+        Status, Laufzeit und gegebenenfalls das Kündigungsdatum. Die Mitglieder eines Büros sehen die
+        E-Mail-Adressen der anderen Mitglieder; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
+        Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Angaben werden mit dem Konto der Person gelöscht, die das
+        Büro verwaltet.
+      </P>
+      <P>
+        <strong>Zahlung über Stripe.</strong> Bezahlt wird über den Zahlungsdienstleister Stripe Payments Europe,
+        Ltd., 1 Grand Canal Street Lower, Grand Canal Dock, Dublin, D02 H210, Irland. Bei der Buchung und im
+        Kundenportal sind Sie auf Seiten von Stripe. Dort geben Sie Ihre Zahlungsdaten (etwa Kartennummer oder
+        IBAN), Ihren Namen bzw. Ihre Firma, die Rechnungsanschrift und gegebenenfalls Ihre
+        Umsatzsteuer-Identifikationsnummer ein. Ihre Zahlungsdaten erhalten wir nicht. Wir übermitteln Stripe
+        Ihre E-Mail-Adresse und eine interne Kennung Ihres Büros. Von Stripe erhalten wir eine Kundennummer
+        und den Stand des Abos (siehe oben). Rechnungen erstellt und verschickt Stripe in unserem Auftrag.
+        Stripe erhebt auf seinen Seiten zur Betrugsvorbeugung zusätzlich technische Daten Ihres Geräts und
+        verantwortet diese Verarbeitung selbst. Rechtsgrundlage ist der Vertrag über das Abo (Art. 6 Abs. 1
+        lit. b DSGVO), für die Aufbewahrung von Rechnungen unsere gesetzliche Pflicht (Art. 6 Abs. 1 lit. c
+        DSGVO). Stripe kann Daten an die Stripe, Inc. in den USA übermitteln. Grundlage dafür ist das
+        EU-US Data Privacy Framework, ergänzend gelten EU-Standardvertragsklauseln. Mehr dazu in der
+        Datenschutzerklärung von Stripe:{' '}
+        <a href="https://stripe.com/de/privacy" className="text-indigo-700 underline" target="_blank" rel="noopener">stripe.com/de/privacy</a>.
+        [Rolle von Stripe — Auftragsverarbeiter bzw. eigener Verantwortlicher — und Angaben zur Übermittlung
+        anhand des aktuellen Stripe-DPA prüfen.]
+      </P>
+      <P>
+        Löschen Sie Ihr Konto, bleiben Kundendatensatz und Rechnungen bei Stripe sowie unsere
+        Buchhaltungsunterlagen erhalten, solange wir sie aufbewahren müssen. Bei Rechnungen sind das in der Regel
+        acht Jahre (§ 147 AO, § 257 HGB) [Fristen prüfen lassen].
+      </P>
+
+      <H2>11. Weitere Seiten</H2>
       <P>
         Die Seiten zum Altersvorsorgedepot, zum Zuschussmodell und zum Matching-Modell rechnen ausschließlich in
         Ihrem Browser und speichern nichts. „Beratung anfragen“ öffnet Ihr eigenes E-Mail-Programm; was Sie
         dort absenden, entscheiden Sie selbst.
       </P>
 
-      <H2>11. Empfänger und Auftragsverarbeiter</H2>
+      <H2>12. Empfänger und Auftragsverarbeiter</H2>
       <Liste>
         <li>
           <strong>Supabase Inc.</strong> (San Francisco, USA) — Datenbank, Anmeldung und Serverfunktionen.
@@ -270,11 +306,17 @@ function Datenschutz() {
           <strong>[Hostinger — Vertragspartner eintragen]</strong> — Webhosting und E-Mail-Versand, auf
           Grundlage eines Auftragsverarbeitungsvertrags.
         </li>
+        <li>
+          <strong>Stripe Payments Europe, Ltd.</strong> (Dublin, Irland) — Zahlungsabwicklung, Rechnungen und
+          Kundenportal für das Abo, siehe Abschnitt 10.
+        </li>
       </Liste>
 
-      <H2>12. Speicherdauer im Überblick</H2>
+      <H2>13. Speicherdauer im Überblick</H2>
       <Liste>
         <li>Konto, gespeicherte Szenarien, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos.</li>
+        <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
+        <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
         <li>Anfragen als Early Adopter: 180 Tage nach Eingang.</li>
         <li>
           Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
@@ -284,7 +326,7 @@ function Datenschutz() {
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
 
-      <H2>13. Ihre Rechte</H2>
+      <H2>14. Ihre Rechte</H2>
       <P>
         Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
         der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21 DSGVO). Eine
@@ -296,14 +338,15 @@ function Datenschutz() {
         [zuständige Behörde am Sitz des Verantwortlichen].
       </P>
 
-      <H2>14. Datensicherheit</H2>
+      <H2>15. Datensicherheit</H2>
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
         Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegt das Logo für Ihr Gutachten in einem nicht öffentlichen
-        Speicher, den nur Ihr Konto lesen kann.
+        Speicher, den nur Ihr Konto lesen kann. Zahlungsdaten gibt es bei uns nicht; Meldungen von Stripe über
+        Ihr Abo nehmen wir nur mit gültiger Signatur an.
       </P>
     </>
   );
@@ -321,7 +364,7 @@ function Nutzungsbedingungen() {
   return (
     <>
       <H1>Nutzungsbedingungen</H1>
-      <p className="mt-1 text-xs text-slate-500">Fassung vom 1. Oktober 2026</p>
+      <p className="mt-1 text-xs text-slate-500">Fassung vom 20. Oktober 2026</p>
 
       <H2>1. Geltungsbereich</H2>
       <P>
@@ -345,10 +388,76 @@ function Nutzungsbedingungen() {
         <li>Ein Konto ist persönlich. Zugangsdaten dürfen nicht an Dritte weitergegeben werden; jede Person
           braucht ein eigenes Konto.</li>
         <li>Sie halten Ihr Passwort geheim und informieren den Anbieter, wenn Sie einen Missbrauch vermuten.</li>
-        <li>Sie können Ihr Konto jederzeit selbst löschen (im Rechner unter „Konto“).</li>
+        <li>Sie können Ihr Konto jederzeit selbst löschen (im Rechner unter „Konto“). Läuft für Ihr Büro ein Abo,
+          kündigen Sie es zuerst (Abschnitt 4).</li>
       </Liste>
 
-      <H2>4. Rechte am JS-Rentenplaner</H2>
+      <H2>4. Abo, Preise und Zahlung</H2>
+      <P>
+        <strong>Nur für Unternehmer.</strong> Das kostenpflichtige Angebot richtet sich ausschließlich an
+        Unternehmer im Sinne des § 14 BGB, etwa Versicherungs- und Finanzberater. Mit der Buchung bestätigen Sie,
+        als Unternehmer zu handeln. [Prüfen lassen, insbesondere Widerrufsrecht und Angaben im Bestellablauf.]
+      </P>
+      <Liste>
+        <li>
+          <strong>Testphase.</strong> Neue Konten nutzen alle Funktionen ab dem Start des Abos 14 Tage kostenlos.
+          Die Testphase endet von selbst; es entstehen keine Kosten, und Zahlungsdaten sind dafür nicht nötig.
+        </li>
+        <li>
+          <strong>Pakete und Preise.</strong> Es gelten die Pakete und Preise, die bei der Buchung auf der{' '}
+          <a href="/preise" className="text-indigo-700 underline">Preisseite</a> und auf der Bestellseite genannt
+          sind. Alle Preise verstehen sich je Nutzer und zuzüglich der gesetzlichen Umsatzsteuer. Der Preis je
+          Nutzer richtet sich nach der Zahl der gebuchten Plätze; der Preis der erreichten Staffel gilt für alle
+          Plätze des Büros.
+        </li>
+        <li>
+          <strong>Büro und Plätze.</strong> Gebucht wird für ein Büro. Wer bucht, verwaltet das Abo und kann
+          Kolleginnen und Kollegen bis zur Zahl der gebuchten Plätze einladen. Ein Platz gilt für eine Person und
+          darf nicht von mehreren Personen genutzt werden.
+        </li>
+        <li>
+          <strong>Laufzeit und Verlängerung.</strong> Das Abo läuft je nach Wahl einen Monat oder ein Jahr und
+          verlängert sich jeweils um denselben Zeitraum, wenn es nicht gekündigt wird.
+        </li>
+        <li>
+          <strong>Kündigung.</strong> Sie können jederzeit zum Ende des laufenden Zeitraums kündigen, unter
+          „Abo &amp; Team“ → „Abo verwalten“. Bis dahin bleibt der volle Zugang erhalten. Bereits bezahlte
+          Zeiträume werden nicht anteilig erstattet. Das Recht zur außerordentlichen Kündigung aus wichtigem
+          Grund bleibt unberührt.
+        </li>
+        <li>
+          <strong>Änderungen am Abo.</strong> Mehr Plätze oder ein umfangreicheres Paket gelten sofort; den
+          Unterschied für den laufenden Zeitraum berechnen wir anteilig. Weniger Plätze, ein kleineres Paket oder
+          der Wechsel von jährlicher zu monatlicher Zahlung gelten ab dem nächsten Zeitraum.
+        </li>
+        <li>
+          <strong>Zahlung.</strong> Der Preis ist jeweils zu Beginn des Zeitraums im Voraus fällig. Bezahlt wird
+          über unseren Zahlungsdienstleister Stripe mit einer der dort angebotenen Zahlarten. Rechnungen erhalten
+          Sie per E-Mail; sie stehen außerdem im Kundenportal bereit.
+        </li>
+        <li>
+          <strong>Zahlungsverzug.</strong> Schlägt eine Zahlung fehl, versucht Stripe den Einzug erneut; so lange
+          bleibt der Zugang erhalten. Bleibt die Zahlung aus, endet der Zugang zu den kostenpflichtigen
+          Funktionen. Ihre gespeicherten Szenarien bleiben erhalten; Sie können sie weiterhin als Datei sichern
+          und Ihr Konto löschen.
+        </li>
+        <li>
+          <strong>Preisänderungen.</strong> Für laufende Abos kann der Anbieter die Preise mit Wirkung zum
+          nächsten Zeitraum ändern. Er kündigt dies mindestens sechs Wochen vorher in Textform an. Sie können
+          dann bis zum Wirksamwerden zum Ende des laufenden Zeitraums kündigen. [Prüfen lassen.]
+        </li>
+        <li>
+          <strong>Early Adopter.</strong> Wer über einen persönlichen Early-Adopter-Link teilnimmt, nutzt alle
+          Funktionen ab dem Start des Abos drei Monate kostenlos und erhält auf das erste Abo seines Büros 20 %
+          Rabatt für die ersten zwölf Monate. Der Rabatt wird bei der Buchung automatisch abgezogen.
+        </li>
+        <li>
+          <strong>Bestandskonten.</strong> Konten, die vor der Einführung des Abos bestanden, nutzen den
+          JS-Rentenplaner weiterhin kostenlos. Ein Abo brauchen sie nur, um weitere Personen in ihr Büro zu holen.
+        </li>
+      </Liste>
+
+      <H2>5. Rechte am JS-Rentenplaner</H2>
       <P>
         Software, Rechenlogik, Texte, Gestaltung und Grafiken des JS-Rentenplaners sind urheberrechtlich
         geschützt (insbesondere §§ 2, 69a ff. UrhG). Alle Rechte liegen beim Anbieter, soweit nicht anders
@@ -360,7 +469,7 @@ function Nutzungsbedingungen() {
         Ergebnisse dürfen Sie an Ihre Kunden und deren Arbeitgeber weitergeben.
       </P>
 
-      <H2>5. Nicht erlaubt</H2>
+      <H2>6. Nicht erlaubt</H2>
       <P>Ohne vorherige schriftliche Zustimmung des Anbieters ist es nicht erlaubt,</P>
       <Liste>
         <li>den Programmcode oder die Rechenlogik ganz oder teilweise zu kopieren, zu speichern, zu verbreiten
@@ -371,39 +480,40 @@ function Nutzungsbedingungen() {
           übernehmen,</li>
         <li>Inhalte automatisiert abzurufen (etwa durch Skripte oder Crawler) oder den Dienst übermäßig zu
           belasten,</li>
-        <li>die Zugangsbeschränkung zu umgehen oder Dritten Zugang zu verschaffen.</li>
+        <li>die Zugangsbeschränkung zu umgehen, Dritten Zugang zu verschaffen oder einen Platz mit mehreren
+          Personen zu teilen.</li>
       </Liste>
 
-      <H2>6. Verfügbarkeit und Änderungen</H2>
+      <H2>7. Verfügbarkeit und Änderungen</H2>
       <P>
         Der Anbieter bemüht sich um einen störungsfreien Betrieb, schuldet aber keine bestimmte Verfügbarkeit.
         Funktionen und Rechenregeln können angepasst werden, etwa an einen neuen Rechtsstand.
       </P>
 
-      <H2>7. Haftung</H2>
+      <H2>8. Haftung</H2>
       <P>
         Der Anbieter haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie für Schäden aus der
         Verletzung von Leben, Körper oder Gesundheit. Bei leichter Fahrlässigkeit haftet er nur für die
         Verletzung wesentlicher Pflichten und begrenzt auf den vorhersehbaren, typischen Schaden. Für
         Entscheidungen, die auf Grundlage der Modellrechnungen getroffen werden, übernimmt der Anbieter keine
-        Haftung. [Haftungsregelung anwaltlich prüfen lassen — insbesondere, falls die Nutzung kostenpflichtig
-        wird.]
+        Haftung. [Haftungsregelung anwaltlich prüfen lassen, insbesondere für das kostenpflichtige Abo.]
       </P>
 
-      <H2>8. Sperrung und Kündigung</H2>
+      <H2>9. Sperrung und Kündigung</H2>
       <P>
-        Sie können die Nutzung jederzeit beenden, indem Sie Ihr Konto löschen. Bei Verstößen gegen diese
-        Bedingungen kann der Anbieter das Konto sperren oder löschen; weitergehende Ansprüche, insbesondere auf
+        Sie können die Nutzung jederzeit beenden, indem Sie Ihr Konto löschen; ein laufendes Abo kündigen Sie
+        vorher wie in Abschnitt 4 beschrieben. Bei Verstößen gegen diese Bedingungen kann der Anbieter das Konto
+        sperren oder löschen und ein Abo aus wichtigem Grund kündigen; weitergehende Ansprüche, insbesondere auf
         Unterlassung und Schadensersatz, bleiben vorbehalten.
       </P>
 
-      <H2>9. Änderungen dieser Bedingungen</H2>
+      <H2>10. Änderungen dieser Bedingungen</H2>
       <P>
         Der Anbieter kann diese Bedingungen mit Wirkung für die Zukunft ändern. Eine neue Fassung wird Ihnen
         beim nächsten Besuch angezeigt; die weitere Nutzung setzt Ihre Zustimmung voraus.
       </P>
 
-      <H2>10. Schlussbestimmungen</H2>
+      <H2>11. Schlussbestimmungen</H2>
       <P>
         Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts. Ist eine
         Bestimmung unwirksam, bleiben die übrigen wirksam. [Gerichtsstand für Kaufleute: Sitz des Anbieters —

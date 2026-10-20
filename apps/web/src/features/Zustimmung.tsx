@@ -32,8 +32,8 @@ export function Zustimmung({ onFertig }: { onFertig: () => void }) {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h1 className="text-lg font-black tracking-tight text-slate-900">Nutzungsbedingungen</h1>
         <p className="mt-1 text-sm leading-relaxed text-slate-600">
-          Für den JS-Rentenplaner gelten Nutzungsbedingungen. Bitte lesen Sie sie und stimmen Sie einmalig zu —
-          danach geht es direkt weiter.
+          Für den JS-Rentenplaner gelten Nutzungsbedingungen. Bitte lesen Sie sie und stimmen Sie zu — danach
+          geht es direkt weiter. Gibt es eine neue Fassung, fragen wir einmal erneut.
         </p>
         <a
           href="/nutzungsbedingungen" target="_blank" rel="noopener"
