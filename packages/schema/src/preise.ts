@@ -36,7 +36,7 @@ export const PAKETE: readonly Paket[] = [
   {
     id: 'alles',
     name: 'All inklusive',
-    kurz: 'Rentenplanung und AG-Verkaufshilfen in einem Paket.',
+    kurz: 'Rentenplanung und Arbeitgeber-Vorsorgemodelle in einem Paket.',
     bereiche: ['rente', 'ag'],
     monat: [59, 53, 50, 47],
     empfohlen: true,
@@ -50,7 +50,7 @@ export const PAKETE: readonly Paket[] = [
   },
   {
     id: 'ag',
-    name: 'AG-Verkaufshilfen',
+    name: 'Arbeitgeber-Vorsorgemodelle',
     kurz: 'Matching-, Zuschuss- und Festbetrag-Modell sowie bKV für Arbeitgeber.',
     bereiche: ['ag'],
     monat: [29, 26, 25, 23],

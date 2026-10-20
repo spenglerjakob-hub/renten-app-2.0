@@ -344,7 +344,7 @@ function vorschauen(echt: Zugang): Vorschau[] {
     { titel: 'Testphase, noch 9 Tage', zugang: { ...basis, paket: 'alles', quelle: 'test', bis: inTagen(9), testBis: inTagen(9) } },
     { titel: 'Testphase abgelaufen', zugang: { ...basis, testBis: inTagen(-2) } },
     {
-      titel: 'Paket nur AG-Verkaufshilfen',
+      titel: 'Paket nur Arbeitgeber-Vorsorgemodelle',
       zugang: { ...basis, ...buero, paket: 'ag', quelle: 'abo', rolle: 'inhaber', hatPlatz: true, abo: abo({ paket: 'ag' }), bis: inTagen(18) },
     },
     {

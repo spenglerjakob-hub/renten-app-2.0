@@ -214,7 +214,7 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
     <Kasten>
       <p className="text-xs font-bold uppercase tracking-wide text-indigo-700">Ihr Paket: {paket.name}</p>
       <h1 className="mt-1 text-xl font-black tracking-tight text-slate-900">
-        {bereich === 'rente' ? 'Die Rentenplanung gehört nicht zu Ihrem Paket' : 'Die AG-Verkaufshilfen gehören nicht zu Ihrem Paket'}
+        {bereich === 'rente' ? 'Die Rentenplanung gehört nicht zu Ihrem Paket' : 'Die Arbeitgeber-Vorsorgemodelle gehören nicht zu Ihrem Paket'}
       </h1>
       <p className="mt-1 text-sm leading-relaxed text-slate-600">Enthalten sind diese Seiten:</p>
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
