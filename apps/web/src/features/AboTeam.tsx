@@ -4,7 +4,7 @@ import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT, paketVon } from '@renten/
 import { LinkFeld } from '../components/LinkFeld';
 import { PaketBuchung } from '../components/PaketWahl';
 import { Sicher } from '../components/Sicher';
-import { zumPortal, zurKasse, useWeiterleitung } from '../lib/abo';
+import { preiseAbgleichen, zumPortal, zurKasse, useWeiterleitung, type Abgleich } from '../lib/abo';
 import { einladungsLink } from '../lib/einladung';
 import {
   bueroVerlassen, einladungErstellen, einladungenLaden, einladungZurueckziehen, mitgliedEntfernen,
@@ -411,9 +411,54 @@ function Betreiber({ echt }: { echt: Zugang }) {
           </button>
         )}
       </div>
+      <PreiseAbgleichen />
       <Suspense fallback={<p className="mt-4 text-xs text-fuchsia-900/70">Einen Moment …</p>}>
         <BetreiberFruehstart />
       </Suspense>
     </section>
+  );
+}
+
+const ABGLEICH_STAND: Record<string, string> = {
+  neu: 'neu angelegt', ersetzt: 'neuer Preis, alter archiviert', aktualisiert: 'aktualisiert',
+  unveraendert: 'unverändert', entfernt: 'entfernt', stripe_tax: 'über Stripe Tax',
+};
+
+/**
+ * Stripe auf den Stand der Preisliste bringen. Nach jeder Preisaenderung in
+ * `packages/schema/src/preise.ts` einmal ausfuehren; was schon stimmt, bleibt.
+ */
+function PreiseAbgleichen() {
+  const [laedt, setLaedt] = useState(false);
+  const [ergebnis, setErgebnis] = useState<Abgleich | null>(null);
+  const los = async () => {
+    setLaedt(true);
+    setErgebnis(await preiseAbgleichen());
+    setLaedt(false);
+  };
+  return (
+    <div className="mt-4 border-t border-fuchsia-200 pt-3">
+      <p className="text-sm text-fuchsia-950">
+        <strong>Stripe:</strong> Produkte, Staffelpreise, Early-Adopter-Gutschein, Steuersatz und Kundenportal
+        aus der Preisliste anlegen bzw. nachziehen.
+      </p>
+      <button type="button" onClick={() => void los()} disabled={laedt}
+        className="mt-2 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-bold text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50">
+        {laedt ? 'Gleiche ab …' : 'Preise in Stripe abgleichen'}
+      </button>
+      {ergebnis && 'fehler' in ergebnis && <Hinweis fehler={ergebnis.fehler} />}
+      {ergebnis && 'bericht' in ergebnis && (
+        <div className="mt-2 rounded-lg bg-white p-2 text-xs text-slate-700">
+          <p className="font-bold">
+            Abgeglichen im {ergebnis.modus === 'live' ? 'Live-Modus (echte Zahlungen)' : 'Testmodus'}:
+          </p>
+          <ul className="mt-1 grid grid-cols-[auto_1fr] gap-x-3">
+            {Object.entries(ergebnis.bericht).map(([k, v]) => (
+              <li key={k} className="contents"><span>{k}</span><span>{ABGLEICH_STAND[v] ?? v}</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

@@ -19,6 +19,9 @@
  * wird genau der Nutzer, dem es gehoert — eine ID aus dem Anfragekoerper
  * gibt es nicht, also kann niemand ein fremdes Konto angeben.
  *
+ * EIN LAUFENDES ABO (Inhaber, nicht gekuendigt) verhindert das Loeschen
+ * mit 409 — erst im Kundenportal kuendigen, dann loeschen.
+ *
  * verify_jwt ist aus, weil das Gateway nur die alten JWT-Schluessel kennt;
  * die Pruefung uebernimmt `getUser` hier selbst.
  */
@@ -74,6 +77,21 @@ Deno.serve(async (req) => {
   const { data, error } = await db.auth.getUser(token);
   const nutzer = data?.user;
   if (error || !nutzer) return antwort(401, { fehler: 'Anmeldung ungueltig' });
+
+  /*
+    Ein laufendes, nicht gekuendigtes Abo des eigenen Bueros: erst kuendigen.
+    Sonst liefe die Abrechnung bei Stripe weiter, waehrend Konto und Buero
+    weg sind. Ein gekuendigtes Abo endet von selbst zum Laufzeitende.
+  */
+  const { data: kontext, error: fehlerKontext } = await zweiVersuche(() => db.rpc('abo_kontext', { p_nutzer: nutzer.id }));
+  if (fehlerKontext) {
+    console.error('Abo nicht geprueft', fehlerKontext.message);
+    return antwort(500, { fehler: 'Loeschen fehlgeschlagen' });
+  }
+  const k = (kontext ?? {}) as { rolle?: string; abo_aktiv?: boolean; kuendigung_zum?: string | null };
+  if (k.rolle === 'inhaber' && k.abo_aktiv && !k.kuendigung_zum) {
+    return antwort(409, { fehler: 'abo_laeuft' });
+  }
 
   const { error: fehlerLoeschen } = await db.auth.admin.deleteUser(nutzer.id);
   if (fehlerLoeschen) {

@@ -447,7 +447,17 @@ export const useAuth = create<AuthStore>((set, get) => ({
     // genau den Nutzer, dem es gehoert.
     const { error } = await supabase.functions.invoke('konto-loeschen', { method: 'POST' });
     if (error) {
-      set({ laedt: false, meldung: { art: 'fehler', text: 'Das Konto konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.' } });
+      // 409: Das Abo des Bueros laeuft noch und ist nicht gekuendigt.
+      const aboLaeuft = (error as { context?: { status?: unknown } }).context?.status === 409;
+      set({
+        laedt: false,
+        meldung: {
+          art: 'fehler',
+          text: aboLaeuft
+            ? 'Ihr Abo läuft noch. Kündigen Sie es zuerst unter „Abo & Team“ → „Abo verwalten“, dann lässt sich das Konto löschen.'
+            : 'Das Konto konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.',
+        },
+      });
       return false;
     }
     // Die Sitzung gibt es serverseitig nicht mehr — nur noch lokal aufraeumen.

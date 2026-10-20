@@ -181,6 +181,37 @@ ist bei jedem Deployment dabei. Sie leitet unbekannte Adressen auf
 setzt die Zwischenspeicherung passend zu Vites gehashten Dateinamen und
 ergaenzt einige Sicherheitskopfzeilen.
 
+## Abo und Zahlung (Stripe)
+
+Gebucht und verwaltet wird bei Stripe; die App spricht nur ueber vier Edge
+Functions mit Stripe (`supabase/functions/abo-*`, ohne SDK, API-Version fest):
+
+| Funktion | Aufgabe |
+|---|---|
+| `abo-kasse` | Checkout-Sitzung fuer Paket, Zahlweise und Plaetze; Early Adopter bekommen den Gutschein |
+| `abo-portal` | Kundenportal: Plaetze, Paketwechsel, Zahlungsdaten, Rechnungen, Kuendigung |
+| `abo-webhook` | schreibt jede Aenderung ins Buero (`privat.abos`), Signatur geprueft |
+| `abo-preise` | "Preise in Stripe abgleichen" (nur Betreiber, unter "Abo & Team") |
+
+Preise stehen nur in `packages/schema/src/preise.ts`. Nach einer Aenderung dort
+in "Abo & Team" die Preise abgleichen; laufende Abos behalten ihren Preis.
+
+Secrets unter Supabase → Edge Functions → Secrets:
+
+| Secret | Woher |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe → Entwickler → API-Schluessel (`sk_test_…` bzw. `sk_live_…`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe → Entwickler → Webhooks → Endpunkt `…/functions/v1/abo-webhook` → Signing Secret |
+| `STRIPE_STEUER` | optional: `automatisch` rechnet mit Stripe Tax statt festen 19 % USt. |
+
+Webhook-Ereignisse: `checkout.session.completed`, `customer.subscription.created`,
+`.updated`, `.deleted`, `.paused`, `.resumed`.
+
+Die Buchung schalten zwei Felder in `privat.einstellungen` frei:
+`zahlung_bereit` und `zahlung_nur_betreiber` (Standard: an). Solange Letzteres
+gilt, kann nur das Betreiberkonto buchen — Test- und Live-Seite teilen sich
+den Schluessel. Nachweis: `supabase/tests/stripe-nachweis.sql`.
+
 ## Rechtlicher Hinweis
 
 Modellrechnung ohne Gewaehr. Keine Steuer-, Renten- oder Anlageberatung.

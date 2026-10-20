@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import type { Intervall, PaketId } from '@renten/schema/preise';
+import {
+  FRUEHSTART_RABATT_PROZENT, MAX_NUTZER, PAKETE, stripeStaffeln, type Intervall, type PaketId,
+} from '@renten/schema/preise';
 import { supabase } from './supabase';
 
 /**
@@ -56,4 +58,32 @@ export function useWeiterleitung() {
     setFehler(r.fehler);
   };
   return { laedt, fehler, los };
+}
+
+export type Abgleich = { modus: 'test' | 'live'; bericht: Record<string, string> } | { fehler: string };
+
+/**
+ * "Preise in Stripe abgleichen" — nur fuer den Betreiber. Schickt die
+ * Staffeln aus `@renten/schema` an `abo-preise`; die Funktion legt Produkte,
+ * Preise, Gutschein, Steuersatz und Kundenportal an oder zieht sie nach.
+ */
+export async function preiseAbgleichen(): Promise<Abgleich> {
+  if (!supabase) return { fehler: 'Die Anmeldung ist nicht eingerichtet.' };
+  const { data, error } = await supabase.functions.invoke('abo-preise', {
+    body: {
+      pakete: PAKETE.map((p) => ({
+        id: p.id, name: p.name, kurz: p.kurz,
+        staffeln: { monat: stripeStaffeln(p.id, 'monat'), jahr: stripeStaffeln(p.id, 'jahr') },
+      })),
+      rabattProzent: FRUEHSTART_RABATT_PROZENT,
+      maxPlaetze: MAX_NUTZER,
+    },
+  });
+  const r = data as { modus?: unknown; bericht?: unknown } | null;
+  if (error || (r?.modus !== 'test' && r?.modus !== 'live') || !r.bericht || typeof r.bericht !== 'object') {
+    let meldung = '';
+    try { meldung = String(((await (error as { context?: Response })?.context?.json()) as { meldung?: unknown })?.meldung ?? ''); } catch { /* ohne Text */ }
+    return { fehler: `Der Abgleich hat nicht geklappt.${meldung ? ` Stripe meldet: ${meldung}` : ''}` };
+  }
+  return { modus: r.modus, bericht: r.bericht as Record<string, string> };
 }

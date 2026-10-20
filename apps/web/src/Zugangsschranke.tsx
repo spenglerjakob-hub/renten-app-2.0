@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { Bereich } from '@renten/schema/preise';
 import { useAuth } from './store/auth';
-import { deckt, useZugang, wirksam } from './store/zugang';
+import { aboAktiv, deckt, useZugang, wirksam } from './store/zugang';
 import { supabase, supabaseKonfiguriert } from './lib/supabase';
 import { NUTZUNGSBEDINGUNGEN_FASSUNG } from './lib/nutzungsbedingungen';
 import { einladungAusAdresse, fruehstartAusAdresse, offeneEinladung, offenerFruehstart } from './lib/einladung';
@@ -137,14 +137,30 @@ function PaketPruefung({ bereich, children }: { bereich: Bereich; children: Reac
   }, [konto, laden, linksEinloesen]);
 
   // `/?abo` oeffnet das Fenster "Abo & Team" — etwa aus einer Mail oder nach der Kasse.
+  // Nach der Kasse (`/?abo=gebucht`) schreibt der Webhook das Abo meist erst
+  // ein paar Sekunden spaeter: so lange neu fragen, bis es da ist.
   useEffect(() => {
+    let gebucht = false;
     try {
       const u = new URL(window.location.href);
       if (!u.searchParams.has('abo')) return;
+      gebucht = u.searchParams.get('abo') === 'gebucht';
       u.searchParams.delete('abo');
       window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
       oeffneFenster();
     } catch { /* nur Komfort */ }
+    if (!gebucht) return;
+    let versuche = 0;
+    const takt = window.setInterval(() => {
+      const s = useZugang.getState();
+      versuche += 1;
+      if ((s.zugang?.abo && aboAktiv(s.zugang.abo.status)) || versuche > 10) {
+        window.clearInterval(takt);
+        return;
+      }
+      if (s.fuer !== null) void s.laden(s.fuer, true);
+    }, 2000);
+    return () => window.clearInterval(takt);
   }, [oeffneFenster]);
 
   if (loestEin || (!frisch && (!z || !deckt(z, bereich)))) return <Moment />;
