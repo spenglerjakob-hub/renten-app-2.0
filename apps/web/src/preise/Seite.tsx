@@ -1,14 +1,14 @@
 import { useId, useState } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import {
-  PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS, FAELLE_VORGABE,
+  PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS,
   preisJeNutzer, staffelIndex, type Intervall, type PaketId,
 } from '@renten/schema/preise';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { FruehstartAnfrage } from './FruehstartAnfrage';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  EMPFOHLEN_GRUND, FaelleWahl, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
+  EMPFOHLEN_GRUND, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
 } from '../components/PaketWahl';
 
 /**
@@ -155,8 +155,7 @@ function ZeitRechnung() {
       </div>
       {gegenwert !== null && (
         <p role="status" className="mt-3 text-sm text-slate-800">
-          Gegenwert Ihrer gesparten Zeit: <strong className="tabular-nums">{preisText(gegenwert)}</strong> je Fall —
-          zum Vergleich mit dem Preis je Beratungsfall in den Paketen oben.
+          Gegenwert Ihrer gesparten Zeit: <strong className="tabular-nums">{preisText(gegenwert)}</strong> je Fall.
         </p>
       )}
     </details>
@@ -164,9 +163,9 @@ function ZeitRechnung() {
 }
 
 export function Seite() {
-  const [intervall, setIntervall] = useState<Intervall>('monat');
-  const [nutzer, setNutzer] = useState(1);
-  const [faelle, setFaelle] = useState(FAELLE_VORGABE);
+  // Vorauswahl jaehrlich und 3 Nutzer: So zeigt die Seite gleich den Jahrespreis und die erste Rabattstaffel.
+  const [intervall, setIntervall] = useState<Intervall>('jahr');
+  const [nutzer, setNutzer] = useState(3);
   const staffel = staffelIndex(nutzer);
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
 
@@ -194,14 +193,6 @@ export function Seite() {
           <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
           <p className="text-xs text-slate-500">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
         </div>
-        {/*
-          DER PREIS JE FALL — eine Division mit der Zahl des Beraters, nicht
-          mit unserer. Vorbelegt ist eine vorsichtige Schaetzung; je mehr Faelle
-          dort stuenden, desto billiger saehe der Fall aus.
-        */}
-        <div className="mt-3">
-          <FaelleWahl wert={faelle} onWechsel={setFaelle} hinweis="Ihre Schätzung — daraus der Preis je Beratungsfall" />
-        </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
           {PAKETE.map((p) => (
@@ -225,7 +216,7 @@ export function Seite() {
               <h2 id={`paket-${p.id}`} className="text-lg font-black text-slate-900">{p.name}</h2>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{p.kurz}</p>
               <div className="mt-4">
-                <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} faelle={faelle} />
+                <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} />
               </div>
               {p.id === 'alles' && <BuendelVorteil intervall={intervall} nutzer={nutzer} />}
               <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-700">

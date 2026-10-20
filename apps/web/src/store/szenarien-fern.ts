@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { szenarioSchema, type SzenarioParsed } from '@renten/schema';
 import { supabase, supabaseKonfiguriert, type SzenarioZeile } from '../lib/supabase';
@@ -176,28 +175,5 @@ export const useFernSzenarien = create<FernStore>((set, get) => ({
     set({ meldung: { art: 'ok', text: 'Gelöscht.' } });
   },
 }));
-
-/** Wie viele Faelle seit `tage` Tagen gespeichert oder geaendert wurden. */
-export function faelleSeit(liste: readonly GespeichertesSzenario[], tage: number, jetzt = Date.now()): number {
-  const grenze = jetzt - tage * 86_400_000;
-  return liste.filter((z) => Date.parse(z.geaendertAm) >= grenze).length;
-}
-
-/**
- * Die gespeicherten Faelle der letzten 30 Tage — eine ECHTE Zahl fuer den
- * Preis je Fall beim Buchen, statt einer Annahme. Undefiniert, solange die
- * Liste laedt oder nicht zu haben ist.
- */
-export function useFaelleLetzte30Tage(): number | undefined {
-  const liste = useFernSzenarien((s) => s.liste);
-  const listeLaden = useFernSzenarien((s) => s.listeLaden);
-  const [geladen, setGeladen] = useState(false);
-  useEffect(() => {
-    let aktiv = true;
-    void listeLaden().then(() => { if (aktiv) setGeladen(true); });
-    return () => { aktiv = false; };
-  }, [listeLaden]);
-  return geladen ? faelleSeit(liste, 30) : undefined;
-}
 
 export { supabaseKonfiguriert };

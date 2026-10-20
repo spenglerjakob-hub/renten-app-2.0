@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { szenarioSchema } from '@renten/schema';
 import { standardSzenario } from '../store/standard';
-import { faelleSeit } from '../store/szenarien-fern';
 import { anteilAmNetto, anteilAnLuecke, nettoHeuteMonat } from './bezug';
 import { angebotPositionen } from './tuev-berechnung';
 
@@ -27,16 +26,6 @@ describe('Bezugsgroessen', () => {
     expect(anteilAnLuecke(0.21).replace(/\s/g, ' ')).toBe('21 %');
     expect(anteilAnLuecke(1)).toBe('ganz');
     expect(anteilAnLuecke(0.996)).toBe('ganz');
-  });
-
-  it('Faelle der letzten 30 Tage', () => {
-    const jetzt = Date.parse('2026-10-16T12:00:00Z');
-    const liste = [
-      { id: '1', name: 'a', geaendertAm: '2026-10-15T09:00:00Z' },
-      { id: '2', name: 'b', geaendertAm: '2026-09-20T09:00:00Z' },
-      { id: '3', name: 'c', geaendertAm: '2026-09-01T09:00:00Z' },
-    ];
-    expect(faelleSeit(liste, 30, jetzt)).toBe(2);
   });
 });
 

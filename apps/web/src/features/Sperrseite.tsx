@@ -11,7 +11,6 @@ import { supabase } from '../lib/supabase';
 import { zumPortal, zurKasse, useWeiterleitung } from '../lib/abo';
 import { bueroVerlassen, mitgliederLaden } from '../lib/team';
 import { useAuth } from '../store/auth';
-import { useFaelleLetzte30Tage } from '../store/szenarien-fern';
 import { aboAktiv, datum, fruehstartVorbei, useZugang, type Zugang } from '../store/zugang';
 import { KontoLoeschen } from './KontoLoeschen';
 
@@ -86,8 +85,6 @@ function Kasten({ children }: { children: ReactNode }) {
 /** Kein Paket: Testphase oder Early-Adopter-Zeit vorbei, Abo beendet. */
 function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const { laedt, fehler, los } = useWeiterleitung();
-  // Echte Faelle aus dem Konto fuer den Preis je Fall — ohne sie die vorsichtige Vorgabe.
-  const faelle = useFaelleLetzte30Tage();
   const aboBeendet = z.rolle === 'inhaber' && z.abo !== null;
   const fruehstarter = !aboBeendet && fruehstartVorbei(z);
   const titel = aboBeendet ? 'Ihr Abo ist beendet'
@@ -108,8 +105,6 @@ function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
       <p className="mt-1 text-sm leading-relaxed text-slate-600">{text}</p>
       <div className="mt-5">
         <PaketBuchung
-          key={faelle ?? 'ohne'}
-          faelleAusKonto={faelle}
           bereit={z.zahlungBereit && !vorschau}
           gesperrtText={vorschau ? 'In der Vorschau wird nichts gebucht.' : undefined}
           vorauswahl={z.abo?.paket ?? 'alles'}

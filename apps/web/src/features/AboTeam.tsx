@@ -11,7 +11,6 @@ import {
   mitgliederLaden, type Mitglied, type OffeneEinladung,
 } from '../lib/team';
 import { useAuth } from '../store/auth';
-import { useFaelleLetzte30Tage } from '../store/szenarien-fern';
 import {
   aboAktiv, datum, fruehstartVorbei, tage, tageBis, useZugang, wirksam, type AboAngaben, type Vorschau, type Zugang,
 } from '../store/zugang';
@@ -295,7 +294,6 @@ function AboVerwalten({ abo, bereit, vorschau }: { abo: AboAngaben; bereit: bool
 
 function Buchen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const { laedt, fehler, los } = useWeiterleitung();
-  const faelle = useFaelleLetzte30Tage();
   const dank = `Wenn Sie danach buchen, erhalten Sie als Dankeschön ${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr.`;
   const hinweis = z.freizugang
     ? 'Ihr eigenes Konto bleibt kostenlos. Ein Abo brauchen Sie nur, um Kolleginnen und Kollegen in Ihr Büro '
@@ -310,8 +308,6 @@ function Buchen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
     <Abschnitt titel={z.abo ? 'Abo erneuern' : 'Paket buchen'}>
       {hinweis && <p className="mb-3 text-sm leading-relaxed text-slate-600">{hinweis}</p>}
       <PaketBuchung
-        key={faelle ?? 'ohne'}
-        faelleAusKonto={faelle}
         bereit={z.zahlungBereit && !vorschau}
         gesperrtText={vorschau ? 'In der Vorschau wird nichts gebucht.' : undefined}
         vorauswahl={z.abo?.paket ?? 'alles'}
