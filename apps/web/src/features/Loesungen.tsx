@@ -100,7 +100,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
             <Scale className="h-5 w-5 shrink-0 text-indigo-600 sm:h-6 sm:w-6" aria-hidden />
             {brutto ? `Was kosten ${euro(betrag)} Beitrag im Monat netto?` : `Was wird aus ${euro(betrag)} netto im Monat?`}
           </h3>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:text-sm">
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
             {brutto
               ? 'Derselbe Beitrag in jeder Schicht — und was er Sie nach Steuer- und Abgabenersparnis wirklich '
                 + 'kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
@@ -180,7 +180,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
             />
           ))}
         </div>
-        <p className="mt-3 px-1 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 px-1 text-xs leading-relaxed text-slate-500">
           Das ist die Einzahlseite. Was im Alter davon netto ankommt, hängt am Angebot — an der Rente,
           die der Anbieter nennt, und an Steuer und Krankenversicherung. Das rechnet der Vergleich darunter.
         </p>
@@ -258,19 +258,19 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
     >
       <header className="flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5">
         <div className="min-w-0">
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${FARBE[x.schicht]}`}>
+          <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${FARBE[x.schicht]}`}>
             Schicht {x.schicht}
           </span>
           <h4 className="mt-1 text-sm font-bold leading-snug text-slate-800">{x.titel}</h4>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {guenstigste && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
               <BadgeEuro className="h-3 w-3" aria-hidden /> Günstigste
             </span>
           )}
           {bester && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
               <Trophy className="h-3 w-3" aria-hidden /> Meiste
             </span>
           )}
@@ -280,7 +280,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
       {x.verfuegbar ? (
         <div className="flex flex-1 flex-col p-3">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
               {brutto ? 'Kostet Sie netto' : 'Im Vertrag'}
             </span>
             <span className="text-2xl font-black tabular-nums text-indigo-800">
@@ -304,7 +304,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
               <dd className="tabular-nums text-slate-900">{geld(summe[1])}</dd>
             </div>
             {zusatz.length > 0 && brutto && (
-              <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Zusätzlich im Vertrag</p>
+              <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Zusätzlich im Vertrag</p>
             )}
             {zusatz.map(([t, w]) => (
               <div key={t} className="flex justify-between gap-2">
@@ -322,15 +322,15 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
             aus, deren Rente spaeter voll steuer- und beitragspflichtig ist.
           */}
           {anteil && (
-            <p className="mt-2 text-[11px] text-slate-600">
+            <p className="mt-2 text-xs text-slate-600">
               Netto-Aufwand {geld(x.nettoMonat)} = <strong>{anteil}</strong> Ihres heutigen Nettos
             </p>
           )}
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">
             <strong className="text-slate-600">Im Alter:</strong> {x.besteuerung}
           </p>
           {x.hinweise.map((h) => (
-            <p key={h} className={`mt-1.5 text-[11px] leading-relaxed ${x.begrenzt ? 'text-amber-800' : 'text-slate-500'}`}>{h}</p>
+            <p key={h} className={`mt-1.5 text-xs leading-relaxed ${x.begrenzt ? 'text-amber-800' : 'text-slate-500'}`}>{h}</p>
           ))}
 
           <div className="flex-1" />
@@ -367,7 +367,7 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
       <div className="mb-4 flex flex-col items-start justify-between gap-3 border-b-2 border-indigo-200 px-1 pb-3 sm:flex-row sm:items-end">
         <div>
           <h3 id="angebote-titel" className="text-base font-bold text-indigo-900 sm:text-xl">Angebote vergleichen</h3>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:text-sm">
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
             Holen Sie mit den Beiträgen oben Angebote ein und tragen Sie die Rente ein, die der Anbieter
             zum Rentenbeginn nennt — und, wo es sie gibt, die Kapitalabfindung. Gerechnet wird wie im
             Vertrags-TÜV: was das Angebot Sie netto kostet, gegen das, was im Alter nach Steuer und
@@ -484,7 +484,7 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
                         hilfe="Statt der Rente — die Abfindung zum Rentenbeginn."
                       />
                     ) : (
-                      <p className="text-[11px] leading-relaxed text-slate-500">
+                      <p className="text-xs leading-relaxed text-slate-500">
                         Eine volle Kapitalauszahlung ist {a.loesung === 'basis' ? 'bei der Basisrente' : 'beim Altersvorsorgedepot'} nicht
                         vorgesehen — gerechnet wird die Rente.
                       </p>
@@ -602,13 +602,13 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
         <table className="w-full min-w-[480px] text-xs sm:text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left">
-              <th className="sticky left-0 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Vergleich</th>
+              <th className="sticky left-0 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Vergleich</th>
               {positionen.map((p, i) => (
                 <th key={p.angebot.id} className="px-3 py-2 text-right align-bottom">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Angebot {i + 1}</span>
+                  <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">Angebot {i + 1}</span>
                   <span className="block font-bold leading-tight text-slate-800">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
                   {gerechnet.length > 1 && (p.rente || p.kapital) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
                   )}
@@ -619,7 +619,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
           <tbody>
             {zeilen.map((z) => ('gruppe' in z ? (
               <tr key={z.gruppe} className="border-b border-slate-200 bg-slate-50">
-                <td colSpan={spalten} className="sticky left-0 px-3 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <td colSpan={spalten} className="sticky left-0 px-3 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   {z.gruppe}
                 </td>
               </tr>
@@ -642,7 +642,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
         </table>
       </div>
       {positionen.some((p) => !p.rente && !p.kapital) && (
-        <p className="border-t border-slate-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+        <p className="border-t border-slate-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           Bei Angeboten ohne Beitrag oder ohne Rente bzw. Kapital fehlt die Rechnung — tragen Sie beides ein.
         </p>
       )}

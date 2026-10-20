@@ -64,7 +64,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
         <Posten label="Ein Jahr später beginnen" wert={`+ ${euro(r.proJahrWarten.mehrProMonat)} Sparrate im Monat`} />
       </dl>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">
         Bei {prozent(SPARZIEL_VORGABE.rendite)} Rendite nach Kosten, gleichbleibendem Beitrag und{' '}
         {SPARZIEL_VORGABE.auszahldauer} Jahren Auszahlung. Anpassen können Sie das im Sparrechner.
       </p>
@@ -88,7 +88,7 @@ function Posten({ label, wert, ton, zusatz }: { label: string; wert: string; ton
         ton === 'betont' ? 'text-indigo-700' : 'text-slate-900'
       }`}>
         {wert}
-        {zusatz && <span className="block text-[11px] font-normal text-slate-500">{zusatz}</span>}
+        {zusatz && <span className="block text-xs font-normal text-slate-500">{zusatz}</span>}
       </dd>
     </div>
   );

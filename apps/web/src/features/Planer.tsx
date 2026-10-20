@@ -63,26 +63,26 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
           <dl className="grid grid-cols-2 gap-3">
             <div>
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Wirksames Kapital
               </dt>
               <dd className="text-sm font-black text-indigo-900 tabular-nums">
                 {euro(ergebnis.gesamtkapital)}
               </dd>
               {ergebnis.uebertragen > 0 && (
-                <p className="mt-0.5 text-[11px] font-medium text-indigo-600">
+                <p className="mt-0.5 text-xs font-medium text-indigo-600">
                   inkl. {euro(ergebnis.uebertragen)} aus Verträgen
                 </p>
               )}
             </div>
             <div>
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Entnahme netto
               </dt>
               <dd className="text-sm font-black text-emerald-700 tabular-nums">
                 {euro(ergebnis.nettoMonat)} <span className="text-xs font-normal">/ Monat</span>
               </dd>
-              <p className="mt-0.5 text-[11px] text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 brutto {euro(ergebnis.bruttoMonat)}
               </p>
             </div>

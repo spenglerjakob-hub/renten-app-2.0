@@ -57,7 +57,7 @@ export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel, erl
                 >
                   {fertig ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
                 </span>
-                <span className="min-w-0 text-[11px] font-bold leading-tight sm:text-sm">
+                <span className="min-w-0 text-xs font-bold leading-tight sm:text-sm">
                   <span className="sm:hidden">{e.kurz}</span>
                   <span className="hidden sm:inline">{e.text}</span>
                   {fertig && <span className="sr-only"> — erledigt</span>}

@@ -61,7 +61,7 @@ function Kopf({ mitBuero }: { mitBuero: boolean }) {
         <Logo klasse="h-9 w-9 shrink-0" />
         <div className="min-w-0 flex-1">
           <span className="block truncate text-sm font-black tracking-tight">JS-Rentenplaner</span>
-          <p className="hidden text-[11px] text-slate-400 sm:block">Ihre Zukunft. Smart geplant.</p>
+          <p className="hidden text-xs text-slate-400 sm:block">Ihre Zukunft. Smart geplant.</p>
         </div>
         {mitBuero && (
           <button type="button" onClick={oeffneFenster} aria-label="Abo & Team" title="Abo & Team"

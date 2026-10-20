@@ -297,7 +297,7 @@ export function Kassenbon({
           die er einordnet.
         */}
         {getrennt && (
-          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
             <strong>Die Steuer je Person ist ein Anteil, keine eigene Rechnung.</strong>{' '}
             Verheiratete werden zusammen veranlagt; die gemeinsame Steuer wird hier nach dem
             Beitrag zum zu versteuernden Einkommen aufgeteilt. Allein veranlagt zahlte jeder
@@ -314,7 +314,7 @@ export function Kassenbon({
           weil die beiden Naeherungen sonst nirgends benannt waeren.
         */}
         {person && (
-          <p className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-[11px] leading-relaxed text-sky-900">
+          <p className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-relaxed text-sky-900">
             <strong>Allein gerechnet, nicht anteilig.</strong> Hier stehen nur die eigenen
             Verträge und Einkünfte von {person} — mit dem <strong>Grundtarif</strong> statt des
             Splittings, mit einfachen Pauschbeträgen, und ohne die beitragsfreie Mitversicherung
@@ -329,7 +329,7 @@ export function Kassenbon({
         )}
 
         {geteilt && (
-          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
             <strong>Mehrere Betriebsrenten zählen zusammen.</strong> Der Freibetrag von{' '}
             <strong>{freibetragText(geteilt.betragMonat)}</strong> im Monat steht{' '}
             {geteilt.personen.length > 1 ? 'jeder Person' : geteilt.personen[0]} nur{' '}
@@ -348,21 +348,21 @@ export function Kassenbon({
       */}
       {ergebnis.kapitalauszahlungen.length > 0 && (
         <div className="mt-5 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 sm:mt-6 sm:p-4">
-          <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-900 sm:text-xs">
+          <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-indigo-900 sm:text-xs">
             Einmalige Kapitalauszahlungen
           </h3>
           <div className="space-y-2">
             {ergebnis.kapitalauszahlungen.map((a) => (
               <div key={a.vertragId} className="rounded-md bg-white px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[11px] font-semibold text-indigo-900 sm:text-sm">
+                  <span className="truncate text-xs font-semibold text-indigo-900 sm:text-sm">
                     {a.bezeichnung} <span className="font-normal text-slate-500">({a.jahr})</span>
                   </span>
-                  <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-slate-800 sm:text-base">
+                  <span className="whitespace-nowrap text-xs font-bold tabular-nums text-slate-800 sm:text-base">
                     {euro(a.nettoKapital * kaufkraft(a.jahr))}
                   </span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-[11px] text-slate-500">
+                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-xs text-slate-500">
                   <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
                   {/*
                     NICHT "Abgeltungsteuer": beim Depot stimmt das, bei einer
@@ -381,7 +381,7 @@ export function Kassenbon({
                   eine Rechengroesse, kein Zahlungsweg.
                 */}
                 {a.kvPvGesamt > 0 && (
-                  <div className="mt-0.5 text-right text-[11px] text-rose-500">
+                  <div className="mt-0.5 text-right text-xs text-rose-500">
                     Kranken- und Pflegeversicherung: {euro(a.kvPvGesamt * kaufkraft(a.jahr))}
                   </div>
                 )}
@@ -392,7 +392,7 @@ export function Kassenbon({
                   dazwischen geblieben sind.
                 */}
                 {a.wachstumJahre > 0 && (
-                  <div className="mt-1 border-t border-indigo-100 pt-1 text-[11px] leading-relaxed text-indigo-900">
+                  <div className="mt-1 border-t border-indigo-100 pt-1 text-xs leading-relaxed text-indigo-900">
                     Bis zum Rentenbeginn in {a.wachstumJahre} Jahren daraus:{' '}
                     <strong>{euro(a.wertBeiRentenbeginn * kaufkraft(a.jahr + a.wachstumJahre))}</strong>
                     {a.steuerWachstum > 0 && (
@@ -405,7 +405,7 @@ export function Kassenbon({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
             Einmalbeträge — im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
           </p>
         </div>

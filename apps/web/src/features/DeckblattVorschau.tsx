@@ -53,7 +53,7 @@ export function DeckblattVorschau({ auftritt, fuer = 'Ihren Mandanten', zahlen =
           {zahlen && <DeckblattHeute bedarf={zahlen.bedarf} netto={zahlen.netto} />}
         </div>
       </div>
-      <figcaption className="mt-1 text-[11px] text-slate-500">
+      <figcaption className="mt-1 text-xs text-slate-500">
         Vorschau des Deckblatts — so steht es im Gutachten.
       </figcaption>
     </figure>

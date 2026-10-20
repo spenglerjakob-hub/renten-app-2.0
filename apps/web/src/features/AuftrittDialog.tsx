@@ -93,7 +93,7 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
 
       <DeckblattVorschau auftritt={entwurf} />
 
-      <p className="rounded-md bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+      <p className="rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
         <strong>Tipp:</strong> Schalten Sie im Druckdialog unter „Weitere Einstellungen“ die „Kopf- und
         Fußzeilen“ aus. Die Fußzeile mit Ihrem Namen und der Seitenzahl setzt das Gutachten selbst (Chrome
         und Edge).

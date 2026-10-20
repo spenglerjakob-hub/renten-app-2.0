@@ -65,7 +65,7 @@ export function FallFortschritt({ schritte, onSprung }: {
           {schritte.map((x) => (
             <li key={x.id}>
               {x.erledigt ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 sm:text-xs">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                   <Check className="h-3 w-3" aria-hidden />
                   <span>{x.text}{x.mitStandard && <span className="font-normal text-emerald-700"> · mit Standardwerten</span>}</span>
                   <span className="sr-only"> — erledigt</span>
@@ -74,7 +74,7 @@ export function FallFortschritt({ schritte, onSprung }: {
                 <button
                   type="button"
                   onClick={() => onSprung(x.id)}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-left text-[11px] font-semibold text-amber-900 hover:bg-amber-100 sm:text-xs"
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-left text-xs font-semibold text-amber-900 hover:bg-amber-100"
                 >
                   <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-amber-500" />
                   <span>{x.text}{x.offen.length > 0 && <span className="font-normal"> — {x.offen.join(', ')}</span>}</span>

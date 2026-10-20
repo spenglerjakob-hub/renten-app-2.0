@@ -95,10 +95,10 @@ export function Verlauf({
             schon ueber die Farbe erzaehlt, und sie kostete hier ein Fuenftel
             der Breite.
           */}
-          <table className="w-full text-[11px] sm:text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <caption className="sr-only">Haushaltsnetto und Bedarf je Kalenderjahr</caption>
             <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-slate-200 text-left text-[10px] uppercase text-slate-500 sm:text-xs">
+              <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-500 sm:text-xs">
                 <th scope="col" className="py-2 pr-2">Jahr</th>
                 <th scope="col" className="pr-2">Alter</th>
                 <th scope="col" className="hidden pr-2 sm:table-cell">Phase</th>

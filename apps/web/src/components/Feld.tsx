@@ -37,7 +37,7 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   if (v.art === 'standard') {
     return (
       <span id={id} title={titel}
-        className={`inline-flex cursor-help items-center text-[11px] text-slate-400 underline decoration-slate-300 decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
+        className={`inline-flex cursor-help items-center text-xs text-slate-400 underline decoration-slate-300 decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
         Standardwert
       </span>
     );
@@ -49,7 +49,7 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   */
   return (
     <span id={id} title={titel}
-      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800 print:hidden ${klasse}`}>
+      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-800 print:hidden ${klasse}`}>
       Beispielwert
       {v.onPruefen && (
         <button type="button" onClick={v.onPruefen}
@@ -664,14 +664,14 @@ export function Kennzahl(props: {
 }) {
   return (
     <div>
-      <div className="mb-0.5 flex items-center text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
+      <div className="mb-0.5 flex items-center text-[11px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
         {props.titel}
         {props.info && <InfoPunkt titel={props.titel}>{props.info}</InfoPunkt>}
       </div>
       <div className={`text-base font-black tabular-nums sm:text-lg ${props.farbe ?? 'text-slate-800'}`}>
         {props.wert}
       </div>
-      {props.fussnote && <div className="mt-0.5 text-[11px] text-slate-500">{props.fussnote}</div>}
+      {props.fussnote && <div className="mt-0.5 text-xs text-slate-500">{props.fussnote}</div>}
     </div>
   );
 }
@@ -852,7 +852,7 @@ export function InfoPunkt(props: {
         onMouseLeave={() => setOffen(false)}
         onFocus={() => setOffen(true)}
         onBlur={() => setOffen(false)}
-        className="ml-1 inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[9px] font-bold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700"
+        className="ml-1 inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700"
       >
         ?
       </button>
@@ -873,9 +873,9 @@ export function InfoPunkt(props: {
           id={id}
           role="tooltip"
           style={{ top: lage?.top ?? 0, left: lage?.left ?? 0, visibility: lage ? 'visible' : 'hidden' }}
-          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-[11px] font-normal leading-relaxed text-slate-700 shadow-lg print:hidden sm:w-72"
+          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-xs font-normal leading-relaxed text-slate-700 shadow-lg print:hidden sm:w-72"
         >
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
             {props.titel}
           </span>
           {props.children}

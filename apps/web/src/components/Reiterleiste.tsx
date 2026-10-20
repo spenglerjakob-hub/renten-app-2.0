@@ -18,6 +18,8 @@ export function Reiterleiste<T extends string>({
       aria-label={beschriftung}
       className="hide-scrollbar flex overflow-x-auto border-b border-indigo-200 bg-indigo-100/50 print:hidden"
     >
+      {/* Am Telefon duerfen die Reiter umbrechen: Einzeilig wurde
+          „Bestehende Vertraege pruefen“ rechts abgeschnitten. */}
       {reiter.map((r) => (
         <button
           key={r.id}
@@ -25,7 +27,7 @@ export function Reiterleiste<T extends string>({
           role="tab"
           aria-selected={aktiv === r.id}
           onClick={() => onWechsel(r.id)}
-          className={`min-w-[80px] shrink-0 flex-1 whitespace-nowrap py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors sm:py-3 sm:text-[11px] ${
+          className={`min-w-[80px] flex-1 px-2 py-2.5 text-[11px] font-bold uppercase leading-tight tracking-wider transition-colors sm:shrink-0 sm:whitespace-nowrap sm:py-3 ${
             aktiv === r.id
               ? 'border-b-2 border-indigo-700 bg-white text-indigo-700'
               : 'text-slate-500 hover:bg-slate-100/60 hover:text-slate-700'

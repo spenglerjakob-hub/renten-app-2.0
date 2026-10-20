@@ -46,7 +46,7 @@ export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWech
         >
           {text}
           {id === 'jahr' && gratis > 0 && (
-            <span className="whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-bold text-emerald-700">
+            <span className="whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
               {gratis} Monate gratis
             </span>
           )}
@@ -258,7 +258,7 @@ export function PaketBuchung({
             >
               {p.empfohlen && (
                 <span id={`${k}-tipp`} title={EMPFOHLEN_GRUND}
-                  className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                  className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
                   Empfohlen<span className="sr-only">, {EMPFOHLEN_GRUND}</span>
                 </span>
               )}
@@ -268,7 +268,7 @@ export function PaketBuchung({
                 <span className="text-lg font-black tabular-nums text-slate-900">
                   {preisText(preisJeNutzer(p.id, intervall, nutzer))}
                 </span>
-                <span className="text-[11px] text-slate-500">je Nutzer und {zeitraum}</span>
+                <span className="text-xs text-slate-500">je Nutzer und {zeitraum}</span>
               </span>
             </button>
           );

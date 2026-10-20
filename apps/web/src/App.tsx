@@ -106,11 +106,11 @@ function StartKarte({ symbol, titel, text, marke, onClick }: {
         <span className="block text-xs leading-snug text-slate-500">{text}</span>
         {/* Auf dem Telefon unter dem Text — rechts daneben bliebe dem Titel zu wenig Breite. */}
         {marke && (
-          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white sm:hidden">{marke}</span>
+          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white sm:hidden">{marke}</span>
         )}
       </span>
       {marke && (
-        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white sm:inline-block">{marke}</span>
+        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white sm:inline-block">{marke}</span>
       )}
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
     </button>
@@ -165,7 +165,7 @@ function KopfAuswahl({
   return (
     <span
       title={standard}
-      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium text-slate-400 sm:text-xs"
+      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400"
     >
       <span>{titel}</span>
       <select
@@ -181,7 +181,7 @@ function KopfAuswahl({
         ))}
       </select>
       {/* Zwischen md und xl steht die Kopfleiste einzeilig und knapp — dort traegt nur der Tooltip die Marke. */}
-      {standard && <span aria-hidden className="text-[11px] font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
+      {standard && <span aria-hidden className="text-xs font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
     </span>
   );
 }
@@ -235,7 +235,7 @@ function DruckMenue({ onDrucke, kompakt = false }: {
         onClick={() => setOffen((v) => !v)}
         aria-expanded={offen}
         aria-controls={menueId}
-        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-indigo-500 sm:flex-none sm:text-xs"
+        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-500 sm:flex-none"
       >
         <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
@@ -693,7 +693,7 @@ export default function App() {
   const kopfzahlen = (
     <div className="grid grid-cols-2 gap-3 sm:gap-4">
       <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
-        <h3 className="mb-0.5 text-[11px] font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
+        <h3 className="mb-0.5 text-xs font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
           Bedarf im Jahr {zeile.jahr}
         </h3>
         <p className="text-lg font-bold tabular-nums sm:text-3xl">
@@ -705,7 +705,7 @@ export default function App() {
           luecke > 0 ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
         }`}
       >
-        <h3 className="mb-0.5 text-[11px] font-semibold leading-tight sm:mb-1 sm:text-sm">
+        <h3 className="mb-0.5 text-xs font-semibold leading-tight sm:mb-1 sm:text-sm">
           Versorgungslücke
         </h3>
         <p className="text-lg font-bold tabular-nums sm:text-3xl">
@@ -723,7 +723,7 @@ export default function App() {
   const jahrRegler = paar && !einzeln && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
     <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Angezeigtes Jahr
         </span>
         <div className="flex items-center gap-1">
@@ -766,7 +766,7 @@ export default function App() {
       />
       {/* Ohne diesen Satz wirkt das hohe Netto einer gemischten Phase wie
           ein Rechenfehler: Da laeuft noch ein Gehalt. */}
-      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-1 text-xs leading-relaxed text-slate-500">
         {zeile.gemischtePhase
           ? 'Ein Partner arbeitet noch — im Netto steckt daher weiter ein Gehalt.'
           : 'Beide im Ruhestand.'}
@@ -855,7 +855,7 @@ export default function App() {
                 <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
                   JS-Rentenplaner
                 </h1>
-                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'hidden text-[11px] sm:block' : 'text-[11px] sm:text-xs'}`}>
+                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'hidden text-xs sm:block' : 'text-xs'}`}>
                   Ihre Zukunft. Smart geplant.
                 </p>
               </div>
@@ -933,14 +933,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => dateiRef.current?.click()}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none sm:text-xs"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none"
                 >
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" aria-hidden /> Laden
                 </button>
                 <button
                   type="button"
                   onClick={exportieren}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none sm:text-xs"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none"
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
@@ -1118,7 +1118,7 @@ export default function App() {
                   type="button"
                   onClick={() => setEingabeArt(id)}
                   aria-pressed={eingabeArt === id}
-                  className={`flex-1 rounded-md py-1.5 text-[11px] font-bold sm:py-2 sm:text-xs ${
+                  className={`flex-1 rounded-md py-1.5 text-xs font-bold sm:py-2 ${
                     eingabeArt === id ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
@@ -1235,7 +1235,7 @@ export default function App() {
                       type="button"
                       onClick={() => setAnsicht('kassenbon')}
                       aria-pressed={ansicht === 'kassenbon'}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-bold sm:gap-2 sm:py-2 ${
                         ansicht === 'kassenbon' ? 'bg-white shadow' : 'text-slate-500'
                       }`}
                     >
@@ -1245,7 +1245,7 @@ export default function App() {
                       type="button"
                       onClick={() => setAnsicht('verlauf')}
                       aria-pressed={ansicht === 'verlauf'}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-[11px] font-bold sm:gap-2 sm:py-2 sm:text-xs ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-bold sm:gap-2 sm:py-2 ${
                         ansicht === 'verlauf' ? 'bg-white shadow' : 'text-slate-500'
                       }`}
                     >
@@ -1343,7 +1343,7 @@ export default function App() {
 
         {/* Nur waehrend gerechnet wird. „berechnet in 6 ms“ war ein Hinweis
             fuer Entwickler — fuer Berater Rauschen unter jeder Seite. */}
-        <p className="min-h-[1rem] text-right text-[11px] text-slate-400 print:hidden" aria-live="polite">
+        <p className="min-h-[1rem] text-right text-xs text-slate-400 print:hidden" aria-live="polite">
           {rechnet ? 'rechnet …' : ''}
         </p>
       </main>
@@ -1432,7 +1432,7 @@ export default function App() {
           <div className="mx-auto max-w-6xl px-2 py-1.5 sm:px-4 sm:py-3">
             <div className="flex items-center justify-between gap-1.5 sm:gap-4">
               <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
-                <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
+                <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
                   Zielbedarf
                 </div>
                 <div className="text-base font-bold tabular-nums text-white sm:text-xl">
@@ -1443,8 +1443,9 @@ export default function App() {
               <div className="hidden font-black text-slate-500 sm:block sm:text-sm">−</div>
 
               <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
-                <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
-                  Gesamt-Netto
+                <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
+                  {/* Am Telefon kurz, sonst bricht die Kachel um und die Leiste wird hoeher. */}
+                  <span className="sm:hidden">Netto</span><span className="hidden sm:inline">Gesamt-Netto</span>
                 </div>
                 <div className="text-base font-bold tabular-nums text-indigo-400 sm:text-xl">
                   {euro(zeile.nettoMonat * faktor)}
@@ -1460,7 +1461,7 @@ export default function App() {
                     : 'border-emerald-700/50 bg-emerald-900/30 text-emerald-400'
                 }`}
               >
-                <div className={`mb-0.5 text-[10px] font-bold uppercase tracking-wider sm:mb-1 sm:text-xs ${luecke > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                <div className={`mb-0.5 text-[11px] font-bold uppercase tracking-wider sm:mb-1 sm:text-xs ${luecke > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                   {/* Am Telefon kuerzer: Neben dem Kaufkraft-Symbol passt
                       „Versorgungsluecke“ nicht mehr in eine Zeile. */}
                   <span className="sm:hidden">Lücke</span><span className="hidden sm:inline">Versorgungslücke</span>

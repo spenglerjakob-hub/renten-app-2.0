@@ -233,7 +233,7 @@ export function Seite() {
         <section className="mt-4 hidden break-inside-avoid rounded-lg border border-slate-300 p-3 print:block">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-xs text-slate-500">
               {istBeispiel ? 'Beispielwerte · ' : ''}Erstellt am {new Date().toLocaleDateString('de-DE')}
             </span>
           </div>
@@ -274,7 +274,7 @@ export function Seite() {
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ihre Angaben</h2>
             {istBeispiel && (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Beispiel
               </span>
             )}
@@ -386,7 +386,7 @@ export function Seite() {
                 <span className="text-xs font-medium text-slate-500">Effektivkosten p. a.</span>
                 <span className="text-sm font-bold tabular-nums text-slate-500">{prozent(KOSTEN)}</span>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
                 Fest angesetzt: Fondskosten, Depotführung und Produktkosten zusammen.
               </p>
             </div>
@@ -437,7 +437,7 @@ export function Seite() {
           ) : (
             <div className="mt-3 space-y-3">
               <div className="rounded-lg border border-slate-200 p-3">
-                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Ihre Belastung (Ansparphase)
                 </h3>
                 <div className="space-y-1">
@@ -461,7 +461,7 @@ export function Seite() {
                     {euro(profit.eigenaufwandNettoGesamt)}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-xs text-slate-500">
                   {profit.steuerersparnisGesamt > 0 && (
                     <>
                       Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
@@ -474,7 +474,7 @@ export function Seite() {
               </div>
 
               <div className="rounded-lg border-2 border-amber-300 bg-amber-50/60 p-3">
-                <h3 className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
                   Ihr Kapital zum Rentenbeginn
                 </h3>
                 <div className="mt-1 flex items-baseline justify-between gap-3">
@@ -493,7 +493,7 @@ export function Seite() {
                 </p>
               ))}
 
-              <p className="text-[11px] leading-relaxed text-slate-500">
+              <p className="text-xs leading-relaxed text-slate-500">
                 Die Steuerersparnis ist mit Ihrem heutigen Einkommen gerechnet und auf die Laufzeit
                 hochgerechnet. Genauer wäre Jahr für Jahr — dafür müsste man aber eine
                 Gehaltsentwicklung unterstellen, die niemand kennt.
@@ -664,7 +664,7 @@ export function Seite() {
                 />
               </div>
 
-              <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+              <p className="mt-4 text-xs leading-relaxed text-slate-500">
                 Gerechnet mit {prozent(rendite)} Rendite und {prozent(KOSTEN)} Effektivkosten.
                 Beträge nominal, also ohne Abzug der Inflation — in {jahreBisRente} Jahren ist ein
                 Euro weniger wert als heute.
@@ -802,7 +802,7 @@ function SchnellWahl({ betragJahr, text, aktiv, onWaehlen }: {
       <span className="block text-sm font-bold tabular-nums text-slate-800">
         {euro(betragJahr / 12)}
       </span>
-      <span className="block text-[11px] leading-tight text-slate-500">
+      <span className="block text-xs leading-tight text-slate-500">
         {text} · {euro(betragJahr)} im Jahr
       </span>
     </button>
@@ -844,7 +844,7 @@ function Saeule({
       <div className={`mt-2 border-t pt-2 text-lg font-black tabular-nums ${hervor ? 'border-indigo-200 text-indigo-800' : 'border-slate-200 text-slate-800'}`}>
         {ergebnis}
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">{fuss}</p>
+      <p className="mt-1 text-xs text-slate-500">{fuss}</p>
     </div>
   );
 }
@@ -852,7 +852,7 @@ function Saeule({
 function Kachel({ titel, wert, farbe = 'text-slate-800' }: { titel: string; wert: string; farbe?: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
       <div className={`text-base font-black tabular-nums ${farbe}`}>{wert}</div>
     </div>
   );

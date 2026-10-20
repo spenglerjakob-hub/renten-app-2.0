@@ -166,9 +166,9 @@ function TeilnehmerZeile({ t, jetzt }: { t: FruehstartTeilnehmer; jetzt: number 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <span className="min-w-0 flex-1 truncate font-bold text-slate-800">{t.email}</span>
         {ueberfaellig && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">Feedback überfällig</span>
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-900">Feedback überfällig</span>
         )}
-        {!laeuft && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">Zeit vorbei</span>}
+        {!laeuft && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">Zeit vorbei</span>}
       </div>
       <p className="mt-0.5 text-xs text-slate-500">
         {t.notiz && <>{t.notiz} · </>}dabei seit {datum(t.seit)} ·{' '}
@@ -240,7 +240,7 @@ function Rueckmeldungen() {
               <Sterne n={r.bewertung} />
               <span className="min-w-0 truncate font-bold text-slate-800">{r.email}</span>
               {r.fruehstarter && (
-                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-bold text-emerald-800">Early Adopter</span>
+                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">Early Adopter</span>
               )}
               <span className="ml-auto text-slate-500">{zeitpunkt(r.erstelltAm)}</span>
             </div>

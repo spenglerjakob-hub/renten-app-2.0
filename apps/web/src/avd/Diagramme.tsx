@@ -183,10 +183,10 @@ export function KapitalaufbauDiagramm({
             steht in derselben Zeile schon als Jahr, und die Ueberschrift
             nennt es. Die vier Betragsspalten bleiben, sie sind der Inhalt.
           */}
-          <table className="w-full text-[11px] sm:text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <caption className="sr-only">{zusammenfassung}</caption>
             <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-slate-200 text-left text-[10px] uppercase text-slate-500 sm:text-xs">
+              <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-500 sm:text-xs">
                 <th scope="col" className="py-2 pr-2">Jahr</th>
                 <th scope="col" className="hidden pr-2 sm:table-cell">Alter</th>
                 {/*

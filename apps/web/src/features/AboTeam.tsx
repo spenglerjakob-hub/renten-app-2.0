@@ -201,10 +201,10 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
                 {m.email}{m.email === ich && <span className="text-slate-500"> (Sie)</span>}
               </span>
               {m.rolle === 'inhaber' && (
-                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-bold text-indigo-800">verwaltet das Abo</span>
+                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-bold text-indigo-800">verwaltet das Abo</span>
               )}
               {!m.hatPlatz && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">ohne Platz</span>
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-900">ohne Platz</span>
               )}
               {inhaber && m.rolle === 'mitglied' && (
                 <Sicher text="Entfernen" frage="Entfernen?" ja="Ja"

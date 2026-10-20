@@ -121,7 +121,7 @@ export function BeratungDialog({
 
         <div className="rounded-lg bg-slate-50 px-3 py-2">
           <p className="text-xs font-bold text-slate-700">Das steht in der Mail:</p>
-          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600">
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600">
             {text}
           </pre>
         </div>
@@ -156,7 +156,7 @@ export function BeratungDialog({
           </button>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-slate-500">
+        <p className="text-xs leading-relaxed text-slate-500">
           Kein Mailprogramm eingerichtet? Kopieren Sie den Text und schreiben Sie an{' '}
           <span className="font-medium text-slate-700">{empfaenger}</span>.
         </p>

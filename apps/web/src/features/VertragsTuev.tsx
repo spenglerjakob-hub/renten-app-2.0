@@ -76,7 +76,7 @@ function FruehereBeitraege({ t, aendern }: {
         return (
           <div key={i} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 {stufen.length > 1 ? `Früherer Beitrag ${i + 1}` : 'Früherer Beitrag'}
               </span>
               {stufen.length > 1 && (
@@ -111,7 +111,7 @@ function FruehereBeitraege({ t, aendern }: {
               hilfe={`Letzter Monat mit diesem Beitrag — zusammen ${euroGenau(st.beitragMonat)}. Danach gilt der Beitrag oben.`}
             />
             {(vorBeginn || zukunft) && (
-              <p className="text-[11px] leading-relaxed text-amber-700">
+              <p className="text-xs leading-relaxed text-amber-700">
                 {vorBeginn
                   ? 'Dieses Datum liegt vor dem Beginn des Vertrags — die Stufe wirkt dann nicht.'
                   : 'Dieses Datum liegt in der Zukunft — bis dahin rechnet der TÜV mit diesem Beitrag statt mit dem oben.'}
@@ -124,7 +124,7 @@ function FruehereBeitraege({ t, aendern }: {
         <button
           type="button"
           onClick={() => aendern({ fruehereBeitraege: [...stufen, neueStufe()] })}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
         >
           <Plus className="h-3 w-3" aria-hidden /> Noch eine frühere Änderung
         </button>
@@ -204,7 +204,7 @@ export function VertragsTuev({
           <h2 className="flex items-center gap-2 text-lg font-bold text-amber-800 sm:gap-3 sm:text-2xl">
             <SearchCheck className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden /> Vertrags-TÜV
           </h2>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:mt-2 sm:text-sm">
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:mt-2 sm:text-sm">
             Stellen Sie Ihre Verträge nebeneinander. Gerechnet wird mit Ihrem tatsächlichen
             Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
             Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
@@ -365,7 +365,7 @@ export function VertragsTuev({
               <article key={t.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich">
                 <header className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
                   <h3 className="flex items-center gap-2 truncate text-sm font-bold text-slate-800">
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                       v.schicht === 1 ? 'bg-blue-100 text-blue-700'
                         : v.schicht === 2 ? 'bg-purple-100 text-purple-700'
                           : 'bg-emerald-100 text-emerald-700'
@@ -390,7 +390,7 @@ export function VertragsTuev({
                       tragen Sie ein" soll auch hier unten gelten, wo Eingabe
                       und Auswertung dicht nebeneinander stehen. */}
                   <div className={`space-y-3 rounded-lg border p-3 ${TON.eingabe}`}>
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">
                       1. Ihre Annahmen
                     </h4>
                     <ZahlFeld
@@ -455,19 +455,19 @@ export function VertragsTuev({
                     {v.typ === 'riester' && (
                       <div className="rounded-lg border border-slate-200 bg-white p-2.5">
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                             Kinder (Zulage) — für diesen Vertrag
                           </span>
                           <button
                             type="button"
                             onClick={() => tuevKindHinzufuegen(t.id)}
-                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
                           >
                             <Plus className="h-3 w-3" aria-hidden /> Kind
                           </button>
                         </div>
                         {t.kinder.length === 0 ? (
-                          <p className="text-[11px] text-slate-500">Keine Kinderzulage.</p>
+                          <p className="text-xs text-slate-500">Keine Kinderzulage.</p>
                         ) : (
                           <ul className="space-y-1.5">
                             {t.kinder.map((kind) => (
@@ -482,7 +482,7 @@ export function VertragsTuev({
                                   onChange={(e) => tuevKindAendern(t.id, kind.id, Number(e.target.value))}
                                   className="w-full rounded border border-slate-300 p-1 text-xs tabular-nums"
                                 />
-                                <span className="shrink-0 text-[11px] text-slate-500">
+                                <span className="shrink-0 text-xs text-slate-500">
                                   {kind.geburtsjahr >= 2008 ? '300 €' : '185 €'}
                                 </span>
                                 <button
@@ -512,7 +512,7 @@ export function VertragsTuev({
                       /* Weiss, nicht indigo: der Kasten steht jetzt selbst auf
                          indigofarbenem Grund und waere darin untergegangen. */
                       <div className="rounded-lg border border-indigo-300 bg-white p-2.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">
                           Kinder (Zulage) — aus Ihren Basisdaten
                         </span>
                         <div className="mt-1.5">
@@ -530,7 +530,7 @@ export function VertragsTuev({
                           jetzt={jetzt}
                         />
                         <KinderHinweis a={avdParam} />
-                        <p className="mt-1 text-[11px] leading-relaxed text-indigo-800">
+                        <p className="mt-1 text-xs leading-relaxed text-indigo-800">
                           Gilt für den ganzen Haushalt: Änderungen wirken auch in den Basisdaten,
                           auf der Zeitachse und im Vertragsblatt.
                         </p>
@@ -555,12 +555,12 @@ export function VertragsTuev({
 
                   {/* 2) EINZAHLUNG GEGEN AUSZAHLUNG */}
                   <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       2. Einzahlung gegen Auszahlung
                     </h4>
 
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         Ihre Belastung (Ansparphase)
                       </div>
                       {/*
@@ -610,7 +610,7 @@ export function VertragsTuev({
                     */}
                     {r.zulageMonat > 0 && (
                       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
                           Was der Staat dazugibt — monatlich, 1. Jahr
                         </div>
                         <div className="space-y-1.5">
@@ -645,7 +645,7 @@ export function VertragsTuev({
                                 Jahr gibt.
                               */}
                               {r.zulageDetail.bonusEinmalig > 0 && (
-                                <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
+                                <p className="mt-1 text-xs leading-relaxed text-emerald-800">
                                   Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
                                   {euro(r.zulageDetail.bonusEinmalig)}.
                                 </p>
@@ -655,7 +655,7 @@ export function VertragsTuev({
                             <GegenueberZeile text="Zulage" wert={euro(r.zulageMonat)} />
                           )}
                         </div>
-                        <p className="mt-2 text-[11px] leading-relaxed text-emerald-800">
+                        <p className="mt-2 text-xs leading-relaxed text-emerald-800">
                           Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
                           fließen zusätzlich in den Vertrag und senken Ihren eigenen Beitrag
                           nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als
@@ -671,7 +671,7 @@ export function VertragsTuev({
                       was er monatlich netto bringt.
                     */}
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-amber-700">
                         Ihr Ertrag (Auszahlungsphase)
                       </div>
                       <div className="space-y-1.5">
@@ -717,7 +717,7 @@ export function VertragsTuev({
                     </div>
 
                     <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         Über die gesamte Laufzeit
                       </div>
                       <div className="space-y-1.5">
@@ -737,7 +737,7 @@ export function VertragsTuev({
 
                   {/* 3) KENNZAHLEN UND FAZIT */}
                   <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       3. Kennzahlen und Fazit
                     </h4>
 
@@ -800,10 +800,10 @@ export function VertragsTuev({
                     */}
                     {wege && (
                       <div className="overflow-hidden rounded-lg border border-slate-200">
-                        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           Rente gegen Kapital — beide Wege gerechnet
                         </div>
-                        <table className="w-full text-[11px]">
+                        <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-slate-100 text-slate-500">
                               <th className="px-3 py-1.5 text-left font-semibold"> </th>
@@ -840,7 +840,7 @@ export function VertragsTuev({
                             />
                           </tbody>
                         </table>
-                        <p className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+                        <p className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
                           {/*
                             Der Wert ist ein ALTER, nicht eine Dauer:
                             `renteOderKapital` rechnet ab dem Alter bei
@@ -862,7 +862,7 @@ export function VertragsTuev({
                     )}
 
                     {r.zulagenGekuerzt && (
-                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
                         <strong>Zulagen werden gekürzt.</strong> Ihr Eigenbeitrag liegt unter dem
                         Mindesteigenbeitrag nach § 86 EStG (4 % des Vorjahresbruttos abzüglich
                         Zulagen). Die Zulagen fallen dadurch anteilig geringer aus.
@@ -870,13 +870,13 @@ export function VertragsTuev({
                     )}
 
                     {r.hinweise.map((h, i) => (
-                      <p key={i} className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+                      <p key={i} className="rounded-lg bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700">
                         {h}
                       </p>
                     ))}
 
                     {!wege && kenntKapitalwahl(v.typ) && (
-                      <p className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-relaxed text-slate-700">
+                      <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700">
                         Für den Vergleich fehlt {v.brutto > 0 ? 'die Kapitalauszahlung' : 'die monatliche Rente'}.
                         Tragen Sie beide Beträge am Vertrag ein — dann rechnet der TÜV beide Wege
                         und nennt den Break-even. Geschätzt wird nichts.
@@ -894,7 +894,7 @@ export function VertragsTuev({
                       <div className="space-y-2">
                         <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-2.5 sm:p-3">
                           <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                          <p className="text-[11px] leading-relaxed text-slate-700">
+                          <p className="text-xs leading-relaxed text-slate-700">
                             <strong className="text-slate-900">Ohne Verzinsung:</strong> Sie müssten{' '}
                             <strong className="text-rose-600">
                               {vergleich.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
@@ -904,7 +904,7 @@ export function VertragsTuev({
                         </div>
                         <div className="flex items-start gap-2.5 rounded-xl border border-indigo-50 bg-indigo-50/50 p-2.5 sm:p-3">
                           <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" aria-hidden />
-                          <p className="text-[11px] leading-relaxed text-indigo-900">
+                          <p className="text-xs leading-relaxed text-indigo-900">
                             <strong>Mit 2 % Verzinsung:</strong>{' '}
                             {vergleich.kapitalTraegtSichSelbst
                               ? 'Der Kapitalertrag allein trägt die Rente — die Verrentung rechnet sich finanziell nie.'

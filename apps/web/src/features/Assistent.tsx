@@ -169,7 +169,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
               type="button"
               onClick={() => geheZu(n)}
               aria-current={n === i ? 'step' : undefined}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors sm:text-xs ${
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
                 n === i ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
               }`}
             >

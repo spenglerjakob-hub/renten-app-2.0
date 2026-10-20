@@ -46,7 +46,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
           <h3 id="foerdercheck-titel" className="text-base font-bold text-emerald-800 sm:text-xl">
             Fördercheck
           </h3>
-          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-600 sm:text-sm">
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
             Oben steht, was Ihre Verträge leisten. Hier steht, welche Förderung Sie heute nicht
             ausschöpfen — und was ein geförderter Beitrag Sie nach Steuern und Abgaben
             tatsächlich kostet.
@@ -86,7 +86,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                   <span className="block text-lg font-black leading-none tabular-nums text-emerald-700 sm:text-2xl">
                     {euro(b.ersparnisJahr)}
                   </span>
-                  <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                  <span className="mt-0.5 block text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
                     Zulage im Jahr
                   </span>
                 </span>
@@ -109,18 +109,18 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 ZUSAETZLICH in den Vertrag; der eigene Beitrag bleibt, was er ist.
               */}
               {b.foerderArt === 'zulage' && (
-                <p className="mb-2 text-[11px] font-semibold text-emerald-800 sm:text-xs">
+                <p className="mb-2 text-xs font-semibold text-emerald-800">
                   {euro(b.rahmenMonat)} im Monat einzahlen — der Staat legt{' '}
                   {euro(b.ersparnisJahr / 12)} obendrauf.
                 </p>
               )}
 
-              <p className="text-[11px] leading-relaxed text-slate-600 sm:text-xs">{b.text}</p>
+              <p className="text-xs leading-relaxed text-slate-600">{b.text}</p>
 
               {/* Die Einschraenkung steht kleiner darunter — im Ausdruck
                   entfaellt sie ganz, dort zaehlt der Befund. */}
               {b.hinweis && (
-                <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 sm:text-[11px]">
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
                   {b.hinweis}
                 </p>
               )}
@@ -130,7 +130,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 erst der Netto-Aufwand sagt, was es kostet — und das ist die
                 Zahl, nach der jemand entscheidet.
               */}
-              <p className="mt-2.5 rounded-lg bg-emerald-50 px-2.5 py-2 text-[11px] leading-relaxed text-emerald-900 sm:text-xs">
+              <p className="mt-2.5 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs leading-relaxed text-emerald-900">
                 {b.foerderArt === 'zulage' ? (
                   /*
                     Die Zulage SENKT den Beitrag nicht, sie VERGROESSERT das Depot.
@@ -200,7 +200,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 </InfoPunkt>
               </p>
 
-              <p className="mt-1.5 text-[11px] text-slate-400">{b.paragraf}</p>
+              <p className="mt-1.5 text-xs text-slate-400">{b.paragraf}</p>
             </div>
           </article>
         ))}
@@ -212,7 +212,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
           verbraucht Foerderrahmen, den der Check nicht sehen kann. Ohne
           diesen Satz waere der ausgewiesene freie Rahmen zu gross.
         */
-        <p className="mx-2 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500 sm:text-[11px]">
+        <p className="mx-2 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
           Zu {ohneBeitrag === 1 ? 'einem geförderten Vertrag' : `${ohneBeitrag} geförderten Verträgen`}{' '}
           ist kein laufender Beitrag erfasst. Tragen Sie ihn oben in der Prüfung ein — sonst
           erscheint hier mehr freier Rahmen, als Sie tatsächlich haben.

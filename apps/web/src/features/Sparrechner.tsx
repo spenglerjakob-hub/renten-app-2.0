@@ -59,7 +59,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
             <span className="block text-xs font-bold text-slate-800 sm:text-sm">
               Sparrechner
             </span>
-            <span className="block text-[11px] text-slate-500 sm:text-xs">
+            <span className="block text-xs text-slate-500">
               Was kostet es, die Versorgungslücke zu schließen?
             </span>
           </span>
@@ -153,7 +153,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
             <div className="mt-4 overflow-x-auto">
               <table className="w-full border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-500">
                     <th className="py-1.5 pr-3 font-bold">Beitragsdynamik</th>
                     <th className="py-1.5 pr-3 text-right font-bold">Start heute</th>
                     <th className="py-1.5 pr-3 text-right font-bold">Im letzten Jahr</th>
@@ -191,7 +191,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
             */}
             {r.aufschub.length > 1 && (
               <div className="mt-5">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Was es kostet, damit zu warten
                 </div>
                 {schmal ? (
@@ -222,7 +222,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-500">
                         <th className="py-1.5 pr-3 font-bold">Beginn</th>
                         <th className="py-1.5 pr-3 text-right font-bold">Sparjahre</th>
                         <th className="py-1.5 pr-3 text-right font-bold">Startbeitrag</th>
@@ -283,7 +283,7 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
               </div>
             )}
 
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
               Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
               <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik beginnen Sie mit{' '}
               <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und zahlen im letzten Sparjahr{' '}
@@ -322,12 +322,12 @@ function Karteikarte({ titel, zeilen, hervor, gut }: {
 
   return (
     <div className={`rounded-lg border p-2.5 ${rahmen}`}>
-      <div className="text-[11px] font-bold text-slate-800">{titel}</div>
+      <div className="text-xs font-bold text-slate-800">{titel}</div>
       <dl className="mt-1 space-y-0.5">
         {zeilen.map(([text, wert, farbe]) => (
           <div key={text} className="flex items-baseline justify-between gap-3">
-            <dt className="text-[11px] text-slate-500">{text}</dt>
-            <dd className={`text-[11px] font-semibold tabular-nums ${farbe ?? 'text-slate-900'}`}>
+            <dt className="text-xs text-slate-500">{text}</dt>
+            <dd className={`text-xs font-semibold tabular-nums ${farbe ?? 'text-slate-900'}`}>
               {wert}
             </dd>
           </div>
@@ -342,11 +342,11 @@ function Kachel({ titel, wert, hinweis, akzent }: {
 }) {
   return (
     <div className={`rounded-lg border p-3 ${akzent ? 'border-indigo-300 bg-indigo-50/60' : 'border-slate-200 bg-slate-50'}`}>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
       <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-indigo-900' : 'text-slate-900'}`}>
         {wert}
       </div>
-      <div className="mt-0.5 text-[11px] leading-tight text-slate-500">{hinweis}</div>
+      <div className="mt-0.5 text-xs leading-tight text-slate-500">{hinweis}</div>
     </div>
   );
 }

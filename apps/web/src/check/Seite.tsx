@@ -302,7 +302,7 @@ export function Seite() {
                     <span className={`h-1.5 w-full rounded-full ${
                       aktiv ? 'bg-indigo-600' : fertig ? 'bg-emerald-500' : 'bg-slate-300'
                     }`} />
-                    <span className={`hidden text-[11px] font-semibold leading-tight sm:block ${
+                    <span className={`hidden text-xs font-semibold leading-tight sm:block ${
                       aktiv ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-700'
                     }`}>
                       {t}
@@ -936,7 +936,7 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
               className="mb-0.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
             >
               Vorschlag übernehmen: <strong>{euro(vorschlag)}</strong>
-              <span className="block text-[11px] text-slate-500">
+              <span className="block text-xs text-slate-500">
                 drei Viertel Ihres heutigen Nettos von rund {euro(nettoHeute)}
               </span>
             </button>

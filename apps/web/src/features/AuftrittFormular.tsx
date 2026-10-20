@@ -57,7 +57,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
           <div className="flex h-16 w-36 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-1">
             {wert.logo
               ? <img src={wert.logo} alt="Ihr Logo" className="max-h-full max-w-full object-contain" />
-              : <span className="text-[11px] text-slate-400">Noch kein Logo</span>}
+              : <span className="text-xs text-slate-400">Noch kein Logo</span>}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => dateiRef.current?.click()} disabled={liest} className={knopf}>
@@ -78,7 +78,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
             onChange={(e) => void logoGewaehlt(e.target.files?.[0])}
           />
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
           PNG, JPG oder WebP. Wird im Browser verkleinert. Laden Sie nur ein Logo hoch, das Sie verwenden dürfen.
         </p>
         {fehler && <p role="alert" className="mt-1 text-xs font-semibold text-rose-700">{fehler}</p>}
@@ -171,7 +171,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
             Eigene Farbe
           </label>
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
           Für Linien und Überschriften im Gutachten. Die Farben der Ergebnisse — Grün und Rot — bleiben.
         </p>
         {wert.farbe && !titelTauglich(wert.farbe) && (

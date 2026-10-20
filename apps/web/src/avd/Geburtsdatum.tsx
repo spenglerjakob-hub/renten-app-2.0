@@ -69,7 +69,7 @@ export function GeburtsdatumDialog({
           {plausibel ? 'Weiter zur Berechnung' : 'Bitte Geburtsdatum eintragen'}
         </button>
 
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-slate-500">
           Ihre Eingaben bleiben auf Ihrem Gerät. Die Seite rechnet im Browser und schickt nichts
           an uns — auch nicht dieses Datum.
         </p>

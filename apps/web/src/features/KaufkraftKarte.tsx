@@ -64,13 +64,13 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
           />
         )}
       </dl>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
         Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, {wo}).
         Modellrechnung, keine Zusage.
       </p>
 
       <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Für das Gespräch</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Für das Gespräch</p>
         <p className="mt-1 text-sm leading-relaxed text-indigo-950">{satz}</p>
         <button
           type="button"

@@ -58,7 +58,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
 
   return (
     <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         {titel ?? 'Ihre private Krankenversicherung'}
       </p>
 

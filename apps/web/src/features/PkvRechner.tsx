@@ -56,7 +56,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
             <span className="block text-xs font-bold text-slate-800 sm:text-sm">
               Ihre private Krankenversicherung
             </span>
-            <span className="block text-[11px] text-slate-500 sm:text-xs">
+            <span className="block text-xs text-slate-500">
               Heute {euro(r.heute.gesamtMonat)} — im Jahr {r.rentenjahr} {euro(r.beiRente.praemieMonat)}
             </span>
           </span>
@@ -92,7 +92,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           schmal={schmal}
         />
 
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
           Die Stufe nach unten liegt bei <strong>{ZUSCHLAG_BIS_ALTER + 1}</strong>: bis zum
           Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}. Geburtstags wird der gesetzliche Zuschlag von
           10 % erhoben, danach entfällt er (§ 149 VAG). Ab 65 senken die daraus angesparten Mittel
@@ -219,11 +219,11 @@ function BetKarte({ bet, n, abAlter }: {
   ];
   return (
     <div className="mt-5">
-      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
         Ihr Beitragsentlastungstarif
       </div>
       <table className="w-full overflow-hidden rounded-lg border border-slate-200 text-xs tabular-nums">
-        <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
+        <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
           <tr>
             <th className="px-2.5 py-1.5 text-left font-bold" />
             <th className="px-2.5 py-1.5 text-right font-bold">Brutto</th>
@@ -259,7 +259,7 @@ function BetKarte({ bet, n, abAlter }: {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
         Brutto sind die Beträge aus dem Vertrag, die Ersparnis schon nach dem Restbeitrag.{' '}
         <strong>Netto</strong> nach Arbeitgeberzuschuss und Steuer — darauf kommt es an: Den
         Beitrag mindert heute Ihr höherer Steuersatz, die Entlastung kostet im Ruhestand Abzug zu
@@ -276,11 +276,11 @@ function Kachel({ titel, wert, hinweis, akzent }: {
 }) {
   return (
     <div className={`rounded-lg border p-3 ${akzent ? 'border-rose-300 bg-rose-50/60' : 'border-slate-200 bg-slate-50'}`}>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
       <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-rose-900' : 'text-slate-900'}`}>
         {wert}
       </div>
-      <div className="mt-0.5 text-[11px] leading-tight text-slate-500">{hinweis}</div>
+      <div className="mt-0.5 text-xs leading-tight text-slate-500">{hinweis}</div>
     </div>
   );
 }

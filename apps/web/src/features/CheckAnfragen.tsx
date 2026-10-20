@@ -62,7 +62,7 @@ function Unterlagen({ dokumente }: { dokumente: BeraterDokument[] }) {
     <div className="mt-2 space-y-2 rounded-md border border-slate-200 bg-white p-2">
       {ARTEN.filter((art) => dokumente.some((d) => d.art === art)).map((art) => (
         <div key={art}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{DOKUMENT_ART_TEXT[art]}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{DOKUMENT_ART_TEXT[art]}</p>
           <ul className="mt-1 space-y-1">
             {dokumente.filter((d) => d.art === art).map((d) => (
               <li key={d.pfad} className="flex items-center gap-2 text-sm">
@@ -229,7 +229,7 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                 <li key={a.code} className="rounded-md bg-slate-50 px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate text-sm">{a.kunde || 'ohne Namen'}</span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${s.farbe}`}>{s.text}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${s.farbe}`}>{s.text}</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {a.eingang && (

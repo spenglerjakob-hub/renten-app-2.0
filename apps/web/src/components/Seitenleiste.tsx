@@ -171,7 +171,7 @@ export function Seitenleiste(props: {
                         </span>
                       )}
                     </span>
-                    {w.zusatz && <span className="block truncate text-[11px] leading-snug text-slate-400">{w.zusatz}</span>}
+                    {w.zusatz && <span className="block truncate text-xs leading-snug text-slate-400">{w.zusatz}</span>}
                   </span>
                 </button>
               </li>
@@ -203,7 +203,7 @@ export function Seitenleiste(props: {
           {ARBEITGEBER.map((s) => <SeitenLink key={s.href} seite={s} fokussierbar={offen} />)}
         </Gruppe>
 
-        <p className="mt-auto px-4 pb-2 pt-6 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-auto px-4 pb-2 pt-6 text-xs leading-relaxed text-slate-500">
           Die Seiten öffnen in einem neuen Tab — der Rechner bleibt mit allen Eingaben offen. Ohne Konto
           erreichbar sind nur das Altersvorsorgedepot und der persönliche Link aus den Check-Anfragen.
         </p>
@@ -216,7 +216,7 @@ export function Seitenleiste(props: {
 function Gruppe({ titel, children }: { titel: string; children: ReactNode }) {
   return (
     <div className="px-2 pt-4">
-      <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</h2>
+      <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</h2>
       <ul className="space-y-0.5">{children}</ul>
     </div>
   );
@@ -245,7 +245,7 @@ function SeitenLink({ seite, fokussierbar }: { seite: Seite; fokussierbar: boole
           <span className="flex items-center gap-1 text-sm font-bold text-white">
             {seite.titel} <ExternalLink className="h-3 w-3 text-slate-500" aria-hidden />
           </span>
-          <span className="block text-[11px] leading-snug text-slate-400">{seite.text}</span>
+          <span className="block text-xs leading-snug text-slate-400">{seite.text}</span>
         </span>
       </a>
       {seite.oeffentlich && <button

@@ -209,7 +209,7 @@ export function Seite() {
               }`}
             >
               {p.empfohlen && (
-                <span className="absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                <span className="absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">
                   {/* Kurz genug fuer eine Zeile: Der volle Satz brach um und
                       lag ueber dem Paketnamen. Der ganze Satz steht im Tooltip. */}
                   <Sparkles className="h-3 w-3" aria-hidden />

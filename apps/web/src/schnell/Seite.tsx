@@ -205,7 +205,7 @@ export function Seite() {
                 {/* Die Luecke in Euro allein sagt nicht, ob sie gross ist —
                     der Anteil am Ziel ordnet sie ein. */}
                 {z.zielNettoMonat > 0 && <Deckung netto={z.nettoMonat} ziel={z.zielNettoMonat} />}
-                <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">
                   Monatsbeträge nach Steuer und Kranken- und Pflegeversicherung, im Geld des Jahres {z.jahr};
                   „heute“ in heutiger Kaufkraft.
                 </p>
@@ -348,7 +348,7 @@ function Deckung({ netto, ziel }: { netto: number; ziel: number }) {
 function Kachel({ titel, wert, unten, ton }: { titel: string; wert: string; unten: ReactNode; ton?: 'luecke' | 'gut' }) {
   return (
     <div className={`rounded-lg border p-3 ${ton === 'luecke' ? 'border-rose-200' : ton === 'gut' ? 'border-emerald-200' : 'border-slate-200'}`}>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
       <div className={`mt-0.5 text-xl font-black tabular-nums ${ton === 'luecke' ? 'text-rose-600' : ton === 'gut' ? 'text-emerald-700' : 'text-slate-900'}`}>
         {wert}
       </div>
