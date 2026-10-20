@@ -114,3 +114,54 @@ export async function rueckmeldungenLaden(): Promise<Rueckmeldung[] | null> {
     fruehstarter: r.fruehstarter === true,
   }));
 }
+
+/** Eine Early-Adopter-Anfrage von der Preisseite — nur der Betreiber sieht sie. */
+export interface FruehstartAnfrage {
+  id: string;
+  erstelltAm: string;
+  name: string;
+  email: string;
+  buero: string;
+  berater: number | null;
+  status: 'offen' | 'zugesagt' | 'abgesagt';
+  entschiedenAm: string | null;
+  /** Token des persoenlichen Links nach der Zusage */
+  link: string | null;
+  linkGueltigBis: string | null;
+  eingeloestAm: string | null;
+}
+
+export async function fruehstartAnfragenLaden(): Promise<FruehstartAnfrage[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('fruehstart_anfragen');
+  if (error || !Array.isArray(data)) return null;
+  return (data as Record<string, unknown>[]).map((a) => ({
+    id: text(a.id),
+    erstelltAm: text(a.erstellt_am),
+    name: text(a.name),
+    email: text(a.email),
+    buero: text(a.buero),
+    berater: typeof a.berater === 'number' ? a.berater : null,
+    status: a.status === 'zugesagt' || a.status === 'abgesagt' ? a.status : 'offen',
+    entschiedenAm: text(a.entschieden_am) || null,
+    link: text(a.link) || null,
+    linkGueltigBis: text(a.link_gueltig_bis) || null,
+    eingeloestAm: text(a.eingeloest_am) || null,
+  }));
+}
+
+/** Zusagen: legt den persoenlichen Link an (oder liefert den noch gueltigen) und gibt sein Token zurueck. */
+export async function fruehstartAnfrageZusagen(id: string): Promise<{ token: string } | { fehler: string }> {
+  if (!supabase) return { fehler: 'Die Anmeldung ist nicht eingerichtet.' };
+  const { data, error } = await supabase.rpc('fruehstart_anfrage_zusagen', { p_id: id });
+  if (error || typeof data !== 'string') {
+    return { fehler: error?.code === '42501' ? 'Zusagen kann nur der Betreiber.' : 'Das hat nicht geklappt. Bitte noch einmal.' };
+  }
+  return { token: data };
+}
+
+export async function fruehstartAnfrageAbsagen(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.rpc('fruehstart_anfrage_absagen', { p_id: id });
+  return !error;
+}

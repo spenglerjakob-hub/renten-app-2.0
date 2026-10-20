@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ChevronDown, Link2, Mail } from 'lucide-react';
+import { Check, ChevronDown, Link2, Mail } from 'lucide-react';
 import { FRUEHSTART_MONATE } from '@renten/schema/preise';
 import { LinkFeld } from '../components/LinkFeld';
 import { Sicher } from '../components/Sicher';
 import { fruehstartLink } from '../lib/einladung';
 import {
+  fruehstartAnfrageAbsagen, fruehstartAnfrageZusagen, fruehstartAnfragenLaden,
   fruehstartLinkErstellen, fruehstartLinkZurueckziehen, fruehstartLinksLaden, fruehstartTeilnehmerLaden,
-  rueckmeldungenLaden, type FruehstartLink, type FruehstartTeilnehmer, type Rueckmeldung,
+  rueckmeldungenLaden, type FruehstartAnfrage, type FruehstartLink, type FruehstartTeilnehmer, type Rueckmeldung,
 } from '../lib/fruehstart';
+import { absageMail, anfrageLink, zusageMail } from './fruehstart-mail';
 import { datum } from '../store/zugang';
 
 /**
- * Nur fuer den Betreiber, im Fenster "Abo & Team": Early-Adopter-Links
- * erstellen und verwalten, die Teilnehmer im Blick behalten (wer schweigt?)
- * und alle Rueckmeldungen lesen.
+ * Nur fuer den Betreiber, im Fenster "Abo & Team": Anfragen von der
+ * Preisseite zu- oder absagen, Early-Adopter-Links erstellen und verwalten,
+ * die Teilnehmer im Blick behalten (wer schweigt?) und alle Rueckmeldungen
+ * lesen.
  *
  * Beide Bereiche laden erst beim Aufklappen — und bei jedem Aufklappen neu.
  * Was angezeigt wird, entscheidet der Server: Fuer andere Konten liefern die
@@ -22,6 +25,7 @@ import { datum } from '../store/zugang';
 export function BetreiberFruehstart() {
   return (
     <div className="mt-4 space-y-2">
+      <Klappe titel="Early Adopter: Anfragen"><Anfragen /></Klappe>
       <Klappe titel="Early Adopter: Links und Teilnehmer"><EarlyAdopter /></Klappe>
       <Klappe titel="Rückmeldungen"><Rueckmeldungen /></Klappe>
     </div>
@@ -46,6 +50,153 @@ const TAG = 86_400_000;
 const UEBERFAELLIG_NACH = 28 * TAG;
 const fehlgeschlagen = 'Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.';
 const anzahl = (n: number, eins: string, mehr: string) => `${n} ${n === 1 ? eins : mehr}`;
+
+/**
+ * Anfragen von der Preisseite. „Zusagen“ legt den persoenlichen Link an und
+ * bereitet eine E-Mail vor — abgeschickt wird sie aus dem eigenen
+ * Mailprogramm; das System schreibt Interessenten nicht an.
+ */
+function Anfragen() {
+  const [liste, setListe] = useState<FruehstartAnfrage[] | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  // Gerade zugesagt: dort steht der Knopf fuer die E-Mail vorn.
+  const [frisch, setFrisch] = useState<string | null>(null);
+
+  const laden = useCallback(async () => {
+    const l = await fruehstartAnfragenLaden();
+    if (l === null) setFehler('Die Anfragen konnten nicht geladen werden.');
+    setListe(l ?? []);
+  }, []);
+  useEffect(() => { void laden(); }, [laden]);
+
+  const zusagen = async (a: FruehstartAnfrage) => {
+    setFehler(null);
+    const r = await fruehstartAnfrageZusagen(a.id);
+    if ('fehler' in r) { setFehler(r.fehler); return; }
+    setFrisch(a.id);
+    await laden();
+  };
+  const absagen = async (a: FruehstartAnfrage) => {
+    setFehler(null);
+    if (!(await fruehstartAnfrageAbsagen(a.id))) setFehler(fehlgeschlagen);
+    await laden();
+  };
+
+  if (liste === null) return <p className="text-sm text-slate-500">Wird geladen …</p>;
+  const offen = liste.filter((a) => a.status === 'offen');
+  const entschieden = liste.filter((a) => a.status !== 'offen');
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs leading-relaxed text-slate-600">
+        Anfragen von der Preisseite. „Zusagen“ erstellt den persönlichen Link und bereitet eine E-Mail an den
+        Interessenten vor; abschicken tun Sie sie aus Ihrem Mailprogramm. Der Link darin führt immer auf
+        js-rentenplaner.de. Anfragen werden nach 180 Tagen gelöscht.
+      </p>
+      {fehler && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
+
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          Offen{offen.length > 0 ? ` (${offen.length})` : ''}
+        </h4>
+        {offen.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-500">Keine offenen Anfragen.</p>
+        ) : (
+          <ul className="mt-1.5 space-y-2">
+            {offen.map((a) => (
+              <li key={a.id} className="rounded-lg border border-slate-200 p-2.5">
+                <AnfrageKopf a={a} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => void zusagen(a)}
+                    className="flex items-center gap-1.5 rounded-lg bg-fuchsia-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-fuchsia-600">
+                    <Check className="h-3.5 w-3.5" aria-hidden /> Zusagen
+                  </button>
+                  <Sicher text="Absagen" frage="Absagen?" ja="Ja" onJa={() => absagen(a)} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {entschieden.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Entschieden</h4>
+          <ul className="mt-1.5 space-y-2">
+            {entschieden.map((a) => (
+              <li key={a.id} className={`rounded-lg border p-2.5 ${a.id === frisch ? 'border-fuchsia-300 bg-fuchsia-50' : 'border-slate-200'}`}>
+                <AnfrageKopf a={a} />
+                <Entscheidung a={a} frisch={a.id === frisch} onNeuerLink={() => zusagen(a)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnfrageKopf({ a }: { a: FruehstartAnfrage }) {
+  const zusatz = [a.buero, a.berater ? anzahl(a.berater, 'Berater', 'Berater') : ''].filter(Boolean).join(' · ');
+  return (
+    <>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+        <span className="font-bold text-slate-800">{a.name}</span>
+        <span className="min-w-0 break-all text-slate-600">{a.email}</span>
+        <span className="ml-auto text-xs text-slate-500">{zeitpunkt(a.erstelltAm)}</span>
+      </div>
+      {zusatz && <p className="mt-0.5 text-xs text-slate-600">{zusatz}</p>}
+    </>
+  );
+}
+
+const mailKnopf = 'flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-50';
+
+function Entscheidung({ a, frisch, onNeuerLink }: {
+  a: FruehstartAnfrage; frisch: boolean; onNeuerLink: () => Promise<void>;
+}) {
+  if (a.status === 'abgesagt') {
+    return (
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+        <span>Abgesagt am {datum(a.entschiedenAm)}</span>
+        <a href={absageMail(a)} className="flex items-center gap-1 font-bold text-indigo-700 hover:underline">
+          <Mail className="h-3.5 w-3.5" aria-hidden /> Absage-Mail vorbereiten
+        </a>
+      </div>
+    );
+  }
+  const jetzt = Date.now();
+  const eingeloest = a.eingeloestAm !== null;
+  const gueltig = !eingeloest && a.link !== null && a.linkGueltigBis !== null && Date.parse(a.linkGueltigBis) > jetzt;
+  return (
+    <div className="mt-1.5 space-y-2">
+      <p className="text-xs text-slate-600">
+        Zugesagt am {datum(a.entschiedenAm)} ·{' '}
+        {eingeloest
+          ? <strong className="text-emerald-800">Link eingelöst am {datum(a.eingeloestAm)}</strong>
+          : gueltig ? <>Link gültig bis {datum(a.linkGueltigBis)}</> : <>Link abgelaufen</>}
+      </p>
+      {frisch && gueltig && (
+        <p role="status" className="text-xs font-bold text-fuchsia-900">
+          Zugesagt. Jetzt die E-Mail vorbereiten und aus Ihrem Mailprogramm abschicken:
+        </p>
+      )}
+      {gueltig && a.link && (
+        <>
+          <a href={zusageMail(a, a.link)} className={`${mailKnopf} w-fit`}>
+            <Mail className="h-3.5 w-3.5" aria-hidden /> E-Mail vorbereiten
+          </a>
+          <LinkFeld link={anfrageLink(a.link)} neu={frisch} beschriftung={`Early-Adopter-Link für ${a.name}`} />
+        </>
+      )}
+      {!eingeloest && !gueltig && (
+        <button type="button" onClick={() => void onNeuerLink()} className={mailKnopf}>
+          <Link2 className="h-3.5 w-3.5" aria-hidden /> Neuen Link erstellen
+        </button>
+      )}
+    </div>
+  );
+}
 
 function EarlyAdopter() {
   const [links, setLinks] = useState<FruehstartLink[] | null>(null);

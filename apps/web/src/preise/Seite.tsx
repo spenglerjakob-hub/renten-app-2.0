@@ -5,6 +5,7 @@ import {
   preisJeNutzer, staffelIndex, type Intervall, type PaketId,
 } from '@renten/schema/preise';
 import { SeitenKopf } from '../components/SeitenKopf';
+import { FruehstartAnfrage } from './FruehstartAnfrage';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   EMPFOHLEN_GRUND, FaelleWahl, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
@@ -179,9 +180,12 @@ export function Seite() {
           Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
           allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
         </p>
-        <p className="mt-2 text-sm">
+        <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
           <a href="/schnellrechnung" className="font-semibold text-indigo-700 hover:underline">
             Erst ausprobieren? Schnellrechnung ohne Anmeldung →
+          </a>
+          <a href="#early-adopter" className="font-semibold text-indigo-700 hover:underline">
+            Vor dem Start: Early Adopter werden →
           </a>
         </p>
 
@@ -247,6 +251,8 @@ export function Seite() {
         <p className="mt-3 text-xs text-slate-500">Alle Preise netto, {UST_HINWEIS}</p>
 
         <ZeitRechnung />
+
+        <FruehstartAnfrage />
 
         <section aria-labelledby="staffel" className="mt-10">
           <h2 id="staffel" className="text-lg font-black text-slate-900">Mengenrabatt</h2>

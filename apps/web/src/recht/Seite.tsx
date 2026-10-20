@@ -230,7 +230,7 @@ function Datenschutz() {
         Versandt wird über unser Postfach bei [Hostinger].
       </P>
 
-      <H2>9. Rückmeldungen</H2>
+      <H2>9. Rückmeldungen und Anfragen als Early Adopter</H2>
       <P>
         Über „Feedback geben“ können Sie uns eine Rückmeldung schicken: eine Bewertung mit Sternen, einen Text
         oder beides. Gespeichert werden Bewertung, Text, die Seite, auf der Sie gerade waren, der Zeitpunkt und
@@ -240,6 +240,14 @@ function Datenschutz() {
         lit. f DSGVO); für Early Adopter gehören Rückmeldungen zur Vereinbarung über die kostenlosen Monate
         (Art. 6 Abs. 1 lit. b DSGVO). Gelöscht werden sie mit Ihrem Konto. Bitte schreiben Sie keine Angaben
         über Ihre Kunden hinein.
+      </P>
+      <P>
+        Auf der Preisseite können Sie eine Teilnahme als <strong>Early Adopter</strong> anfragen. Dafür verarbeiten
+        wir Ihren Namen, Ihre E-Mail-Adresse und — wenn Sie sie angeben — Ihr Büro und die Zahl der Berater, um
+        Ihre Anfrage zu prüfen und zu beantworten (Art. 6 Abs. 1 lit. b DSGVO, vorvertragliche Maßnahme). Die
+        Anfrage liegt bei Supabase in der EU; wir erhalten sie zusätzlich per E-Mail, versandt über unser Postfach
+        bei [Hostinger]. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
+        wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
       <H2>10. Weitere Seiten</H2>
@@ -267,6 +275,7 @@ function Datenschutz() {
       <H2>12. Speicherdauer im Überblick</H2>
       <Liste>
         <li>Konto, gespeicherte Szenarien, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos.</li>
+        <li>Anfragen als Early Adopter: 180 Tage nach Eingang.</li>
         <li>
           Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
           90 Tage; Unterlagen eines nicht abgesendeten Checks bis zum Ablauf des Links.
