@@ -212,6 +212,34 @@ Die Buchung schalten zwei Felder in `privat.einstellungen` frei:
 gilt, kann nur das Betreiberkonto buchen — Test- und Live-Seite teilen sich
 den Schluessel. Nachweis: `supabase/tests/stripe-nachweis.sql`.
 
+### Livegang (Testmodus → echte Zahlungen)
+
+In dieser Reihenfolge — jeder Schritt laesst sich einzeln pruefen:
+
+1. **Stripe-Konto aktivieren** (Dashboard, Live-Modus): Firmendaten, Bankkonto,
+   oeffentliche Angaben (Name, Support-E-Mail, Links auf `/nutzungsbedingungen`
+   und `/datenschutz`), Zahlarten Karte und SEPA-Lastschrift, unter Billing →
+   Kunden-E-Mails "Rechnungen per E-Mail senden" und unter Billing →
+   Zahlungsausfaelle, was nach dem letzten Einzugsversuch passiert (Abo kuendigen).
+2. **Rechtstexte** anwaltlich pruefen, `[eckige Klammern]` fuellen, in
+   `apps/web/src/recht/Seite.tsx` `ENTWURF = false` und `STAND` setzen.
+3. **Live-Webhook** in Stripe (Live-Modus) anlegen: Adresse
+   `https://ardzirxpurlkaishhuqv.supabase.co/functions/v1/abo-webhook`,
+   API-Version `2025-03-31.basil`, die sechs Ereignisse oben.
+4. **Secrets tauschen** (Supabase → Edge Functions → Secrets):
+   `STRIPE_SECRET_KEY` auf `sk_live_…`, `STRIPE_WEBHOOK_SECRET` auf das Signing
+   Secret des Live-Webhooks. Ab jetzt bucht auch die Testseite echt.
+5. **Preise abgleichen** in "Abo & Team" — der Bericht muss "Live-Modus" melden.
+6. **Probekauf** mit dem Betreiberkonto (1 Platz, monatlich), danach im
+   Kundenportal kuendigen und die Zahlung in Stripe erstatten.
+7. **Freigeben:** Branch `live` auf den geprueften Stand vorziehen. Die neue
+   Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt.
+8. **Buchung fuer alle oeffnen:**
+   `update privat.einstellungen set zahlung_nur_betreiber = false where id;`
+   Ab wann ein Paket Pflicht ist, steuert getrennt davon `abo_pflicht_ab`.
+
+Zurueck in den Testmodus: Schritte 4 und 8 umkehren.
+
 ## Rechtlicher Hinweis
 
 Modellrechnung ohne Gewaehr. Keine Steuer-, Renten- oder Anlageberatung.
