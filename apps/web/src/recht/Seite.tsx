@@ -122,8 +122,8 @@ function Datenschutz() {
       <P>
         Der JS-Rentenplaner rechnet Altersvorsorge durch — Renten, Steuern, Sozialabgaben und Verträge. Die
         Berechnung läuft vollständig in Ihrem Browser. Auf unseren Server gelangen Daten nur, wenn Sie ein
-        Konto nutzen, ein Szenario in Ihrem Konto speichern, einen Vorsorge-Check an Ihren Berater senden,
-        uns eine Rückmeldung schicken oder ein Abo buchen.
+        Konto nutzen, ein Szenario oder eine Mitarbeiterberatung in Ihrem Konto speichern, einen
+        Vorsorge-Check an Ihren Berater senden, uns eine Rückmeldung schicken oder ein Abo buchen.
         Wir setzen keine Analyse-, Tracking- oder Werbedienste ein und laden keine Inhalte von Drittanbietern
         (etwa Schriftarten) nach.
       </P>
@@ -201,7 +201,30 @@ function Datenschutz() {
         Auftrag (Art. 28 DSGVO).
       </P>
 
-      <H2>7. Vorsorge-Check</H2>
+      <H2>7. bAV-Mitarbeiterberatung</H2>
+      <P>
+        In der bAV-Mitarbeiterberatung legen Berater Firmen und Beratungen in ihrem Konto an. Zu einer Firma
+        speichern wir Name, Anschrift, Begrüßung und Hinweise, das Modell der Betriebsrente, Versicherer und Tarif
+        sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
+        Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
+        betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
+        im Browser; gespeichert werden nur die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
+        sichtbar, das sie angelegt hat; das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen
+        Speicher bei Supabase in der EU.
+      </P>
+      <P>
+        Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
+        Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht als Angabe
+        besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
+        was der Berater ihnen zeigt, druckt oder als Datei gibt. Die Übersicht für den Arbeitgeber enthält Namen,
+        Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
+      </P>
+      <P>
+        Gelöscht wird eine Beratung, sobald der Berater sie löscht. Mit einer Firma werden ihre Beratungen und ihr
+        Logo gelöscht, mit dem Konto alles.
+      </P>
+
+      <H2>8. Vorsorge-Check</H2>
       <P>
         Über den Vorsorge-Check erfassen Sie Ihre Angaben Schritt für Schritt. Ohne persönlichen Link Ihres
         Beraters bleiben sie in Ihrem Browser. Mit Link senden Sie sie — nach Ihrer ausdrücklichen Einwilligung
@@ -225,14 +248,14 @@ function Datenschutz() {
         Sie nicht ab, mit Ablauf des Links.
       </P>
 
-      <H2>8. E-Mail-Benachrichtigung an Berater</H2>
+      <H2>9. E-Mail-Benachrichtigung an Berater</H2>
       <P>
         Geht ein Vorsorge-Check ein, erhält der Berater eine E-Mail an seine Konto-Adresse. Sie enthält nur den
         Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden.
         Versandt wird über unser Postfach bei [Hostinger].
       </P>
 
-      <H2>9. Rückmeldungen und Anfragen als Early Adopter</H2>
+      <H2>10. Rückmeldungen und Anfragen als Early Adopter</H2>
       <P>
         Über „Feedback geben“ können Sie uns eine Rückmeldung schicken: eine Bewertung mit Sternen, einen Text
         oder beides. Gespeichert werden Bewertung, Text, die Seite, auf der Sie gerade waren, der Zeitpunkt und
@@ -252,7 +275,7 @@ function Datenschutz() {
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
-      <H2>10. Abo, Büro und Zahlung</H2>
+      <H2>11. Abo, Büro und Zahlung</H2>
       <P>
         <strong>Büro und Team.</strong> Buchen Sie ein Abo, legen wir für Ihr Konto ein Büro an. Dazu speichern wir
         den Namen des Büros, wer ihm angehört und seit wann, wer es verwaltet, die Einladungslinks (wer sie wann
@@ -286,14 +309,15 @@ function Datenschutz() {
         acht Jahre (§ 147 AO, § 257 HGB) [Fristen prüfen lassen].
       </P>
 
-      <H2>11. Weitere Seiten</H2>
+      <H2>12. Weitere Seiten</H2>
       <P>
         Die Seiten zum Altersvorsorgedepot, zum Zuschussmodell und zum Matching-Modell rechnen ausschließlich in
-        Ihrem Browser und speichern nichts. „Beratung anfragen“ öffnet Ihr eigenes E-Mail-Programm; was Sie
-        dort absenden, entscheiden Sie selbst.
+        Ihrem Browser und speichern nichts — es sei denn, Sie übernehmen ein Modell mit „Für die
+        Mitarbeiter-Beratung übernehmen“ in Ihr Konto (Abschnitt 7). „Beratung anfragen“ öffnet Ihr eigenes
+        E-Mail-Programm; was Sie dort absenden, entscheiden Sie selbst.
       </P>
 
-      <H2>12. Empfänger und Auftragsverarbeiter</H2>
+      <H2>13. Empfänger und Auftragsverarbeiter</H2>
       <Liste>
         <li>
           <strong>Supabase Inc.</strong> (San Francisco, USA) — Datenbank, Anmeldung und Serverfunktionen.
@@ -308,13 +332,16 @@ function Datenschutz() {
         </li>
         <li>
           <strong>Stripe Payments Europe, Ltd.</strong> (Dublin, Irland) — Zahlungsabwicklung, Rechnungen und
-          Kundenportal für das Abo, siehe Abschnitt 10.
+          Kundenportal für das Abo, siehe Abschnitt 11.
         </li>
       </Liste>
 
-      <H2>13. Speicherdauer im Überblick</H2>
+      <H2>14. Speicherdauer im Überblick</H2>
       <Liste>
-        <li>Konto, gespeicherte Szenarien, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos.</li>
+        <li>
+          Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung, Ihr Auftritt im Gutachten
+          und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht vorher löschen.
+        </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
         <li>Anfragen als Early Adopter: 180 Tage nach Eingang.</li>
@@ -326,7 +353,7 @@ function Datenschutz() {
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
 
-      <H2>14. Ihre Rechte</H2>
+      <H2>15. Ihre Rechte</H2>
       <P>
         Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
         der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21 DSGVO). Eine
@@ -338,15 +365,15 @@ function Datenschutz() {
         [zuständige Behörde am Sitz des Verantwortlichen].
       </P>
 
-      <H2>15. Datensicherheit</H2>
+      <H2>16. Datensicherheit</H2>
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
         Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
-        gültige, signierte Verweise. Ebenso liegt das Logo für Ihr Gutachten in einem nicht öffentlichen
-        Speicher, den nur Ihr Konto lesen kann. Zahlungsdaten gibt es bei uns nicht; Meldungen von Stripe über
-        Ihr Abo nehmen wir nur mit gültiger Signatur an.
+        gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
+        Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann. Zahlungsdaten gibt
+        es bei uns nicht; Meldungen von Stripe über Ihr Abo nehmen wir nur mit gültiger Signatur an.
       </P>
     </>
   );
