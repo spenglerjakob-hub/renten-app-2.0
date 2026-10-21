@@ -55,7 +55,7 @@ function Hinweise({ titel, punkte }: { titel: string; punkte: string[] }) {
 
 export function SchrittAngebot({ firma, logo }: SchrittProps) {
   const a = firma.angebot;
-  // Beispiel bei 100 EUR Umwandlung und einem mittleren Gehalt — die eigene Rechnung folgt in Schritt 3.
+  // Beispiel bei 100 EUR Umwandlung und einem mittleren Gehalt — die eigene Rechnung folgt in Schritt 4.
   const bsp = useMemo(() => bavMitarbeiter(
     a.modell as FirmenModell,
     { jahresbrutto: 45_000, umwandlungMonat: 100, privatVersichert: false, pkvPraemieMonat: 0, kinder: { hatKinder: false, kinderUnter25: 0 }, bavBestandMonat: 0 },

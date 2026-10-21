@@ -63,7 +63,7 @@ export function eingabenVon(a: BeratungAngaben, umwandlungMonat: number): Mitarb
   };
 }
 
-/** Schritt 3: was die Umwandlung kostet und was in den Vertrag fliesst. */
+/** Schritt 4: was die Umwandlung kostet und was in den Vertrag fliesst. */
 export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): MitarbeiterBav {
   return bavMitarbeiter(f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f, p), p);
 }
@@ -253,7 +253,7 @@ const NAME: Record<MitarbeiterVertrag['weg'], string> = { direkt: 'Betriebsrente
 const leer = (w: VersichererWerte) => w.garantierteRente <= 0 && w.prognoseRente <= 0 && w.prognoseKapital <= 0;
 
 /**
- * Schritt 4: die Werte des Versicherers nach Steuer und Krankenversicherung im
+ * Schritt 5: die Werte des Versicherers nach Steuer und Krankenversicherung im
  * ersten Rentenjahr — garantiert und prognostiziert, dazu das Kapital.
  *
  * Wie `angebotPositionen`: Die Vertraege kommen zu einem Klon des Szenarios,

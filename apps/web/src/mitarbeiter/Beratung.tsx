@@ -14,9 +14,8 @@ export const SCHRITTE = [
 ] as const;
 
 /**
- * Eine Beratung: sechs Schritte fuer den geteilten Bildschirm.
- *
- * Sieben Schritte; „Versorgungsluecke“ kam als dritter dazu (Datenversion 2).
+ * Eine Beratung: sieben Schritte fuer den geteilten Bildschirm. „Versorgungsluecke“
+ * kam als dritter dazu (Datenversion 2; `beratungLesen` hebt aeltere Daten an).
  *
  * Gerechnet wird bei jeder Eingabe neu (`rechnung.ts`), gespeichert beim
  * Wechsel des Schritts, mit „Speichern“ und beim Verlassen der Beratung —

@@ -11,7 +11,7 @@ import { BeratungAnsicht } from './Beratung';
  * Die bAV-Mitarbeiterberatung (/mitarbeiterberatung).
  *
  * Hat sich eine Firma fuer ein Modell entschieden, fuehrt der Berater jeden
- * Mitarbeiter im Gespraech durch sechs Schritte — vor Ort oder per Video mit
+ * Mitarbeiter im Gespraech durch sieben Schritte — vor Ort oder per Video mit
  * geteiltem Bildschirm. Drei Ebenen: Firmen → Firma (Angebot, Mitarbeiter,
  * Uebersicht fuer den Arbeitgeber) → Beratung. Wo man steht, steht in der
  * Adresse (`ort.ts`).

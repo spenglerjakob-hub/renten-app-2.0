@@ -44,7 +44,7 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
         <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">bAV-Mitarbeiterberatung</h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
           Hat sich eine Firma für ein Modell entschieden, stellen Sie hier ihr Angebot ein — Modell, Versicherer, Logo —
-          und führen dann jeden Mitarbeiter im Gespräch durch sechs Schritte. Am Ende stehen das Beratungsprotokoll,
+          und führen dann jeden Mitarbeiter im Gespräch durch sieben Schritte. Am Ende stehen das Beratungsprotokoll,
           die Entgeltumwandlungsvereinbarung oder die Verzichtserklärung und eine Übersicht für den Arbeitgeber.
         </p>
         <p className="mt-2 max-w-3xl text-sm text-slate-600">
