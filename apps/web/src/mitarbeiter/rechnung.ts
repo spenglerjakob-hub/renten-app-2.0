@@ -1,6 +1,6 @@
 import {
   bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
-  renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE,
+  renteOderKapital, schaetzeEntgeltpunkte, SV_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
@@ -161,10 +161,18 @@ export function grvMinderungVon(
 }
 
 /**
+ * Angenommene Rentenanpassung im Jahr — in der Mitarbeiterberatung 1,5 %
+ * statt der 1 % des Vorsorge-Checks. Gilt fuer das ganze Szenario der
+ * Beratung, also fuer die Versorgungsluecke und die Leistung im Alter gleich.
+ */
+export const RENTENANPASSUNG = 0.015;
+
+/**
  * Das Szenario des Mitarbeiters — ueber `szenarioAusCheck`, wie beim
- * Vorsorge-Check. Verheiratet: der Partner gleich alt, mit seinem Brutto und
- * einer daraus geschaetzten gesetzlichen Rente. Mehr fragt die Beratung
- * nicht; fuer Steuer und Krankenversicherung im Alter reicht das.
+ * Vorsorge-Check, mit der Rentenanpassung der Beratung. Verheiratet: der
+ * Partner gleich alt, mit seinem Brutto und einer daraus geschaetzten
+ * gesetzlichen Rente. Mehr fragt die Beratung nicht; fuer Steuer und
+ * Krankenversicherung im Alter reicht das.
  */
 export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMonatA: number, p: LegalParameters = P): SzenarioParsed {
   const x = leereAntworten();
@@ -193,7 +201,8 @@ export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMon
   x.krankenkasse = a.krankenkasse;
   x.zusatzbeitrag = a.zusatzbeitrag;
   x.pkv = { ...x.pkv, praemieMonat: a.pkvPraemieMonat };
-  return szenarioAusCheck(x);
+  const s = szenarioAusCheck(x);
+  return { ...s, annahmen: { ...s.annahmen, rentendynamik: RENTENANPASSUNG } };
 }
 
 /**
@@ -378,6 +387,10 @@ export interface Versorgungsluecke {
   lueckeMonat: number;
   /** Netto-Rente / Nettolohn */
   anteil: number;
+  /** Was fehlt, in ganzen Prozent des Nettolohns; mit `renteProzent` zusammen 100 */
+  lueckeProzent: number;
+  /** Was die Rente ersetzt, in ganzen Prozent des Nettolohns */
+  renteProzent: number;
   rentenbeginn: string;
   rentenbeginnJahr: number;
   alterBeiRentenbeginn: number;
@@ -410,12 +423,18 @@ export function versorgungslueckeRechnung(f: FirmenAngebot, d: BeratungDaten, p:
     nettoMonat: posten.nettoJahr / 12 / kk,
   };
   const lohn = nettolohnHeute(a, f, p);
+  const lueckeMonat = Math.max(0, lohn.nettoMonat - rente.nettoMonat);
+  const anteil = lohn.nettoMonat > 0 ? rente.nettoMonat / lohn.nettoMonat : 0;
+  // Ganze Prozent, die sich zu 100 ergaenzen: die Luecke als Rest der gerundeten Rente
+  const renteProzent = Math.round(anteil * 100);
   return {
     lohn,
     grv: b.grv,
     rente,
-    lueckeMonat: Math.max(0, lohn.nettoMonat - rente.nettoMonat),
-    anteil: lohn.nettoMonat > 0 ? rente.nettoMonat / lohn.nettoMonat : 0,
+    lueckeMonat,
+    anteil,
+    lueckeProzent: lueckeMonat >= 0.5 ? Math.max(0, 100 - renteProzent) : 0,
+    renteProzent,
     rentenbeginn,
     rentenbeginnJahr: b.zeile.jahr,
     alterBeiRentenbeginn: rb.jahr - g.jahr,
@@ -434,33 +453,38 @@ const nettoBei = (f: FirmenAngebot, d: BeratungDaten, u: number, p: LegalParamet
   beitragsRechnung(f, { ...d, umwandlungMonat: u }, p).nettoAufwandMonat;
 
 export interface ReglerGrenzen {
-  /** Hoechstens so viel Umwandlung: der steuerfreie Rahmen (8 % der BBG) */
+  /**
+   * Hoechstens so viel Umwandlung: bis der Rahmen voll ist, der frei von
+   * Sozialabgaben bleibt — 4 % der BBG, Beitraege des Arbeitgebers in den
+   * Vertrag zaehlen mit (`rahmenVoll`, wie „Rahmen voll“ auf den
+   * Arbeitgeber-Seiten). Darueber fielen auf die Umwandlung Sozialabgaben an;
+   * fuer den Mitarbeiter lohnt sie sich dann kaum.
+   */
   maxUmwandlung: number;
+  /** Der Netto-Aufwand dafuer */
   maxNetto: number;
-  /** „Rahmen voll“: Umwandlung und Netto dazu */
-  vollUmwandlung: number;
-  vollNetto: number;
+  /** Der Rahmen im Monat: 4 % der BBG */
+  rahmenMonat: number;
 }
 
 export function reglerGrenzen(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): ReglerGrenzen {
-  const maxUmwandlung = Math.floor((STEUER_FREI_QUOTE * p.bbgRvJahr) / 12);
-  const vollUmwandlung = Math.min(maxUmwandlung, rahmenVoll(f, d.angaben, p));
+  const maxUmwandlung = rahmenVoll(f, d.angaben, p);
   return {
     maxUmwandlung,
-    maxNetto: Math.floor(nettoBei(f, d, maxUmwandlung, p)),
-    vollUmwandlung,
-    vollNetto: nettoBei(f, d, vollUmwandlung, p),
+    maxNetto: nettoBei(f, d, maxUmwandlung, p),
+    rahmenMonat: (SV_FREI_QUOTE * p.bbgRvJahr) / 12,
   };
 }
 
 /**
  * Die Umwandlung, die netto genau `netto` kostet — Bisektion wie `suche` im
  * Loesungsvergleich: Der Netto-Aufwand steigt mit der Umwandlung. Auf Cent,
- * hoechstens bis `maxUmwandlung`.
+ * hoechstens bis `max`, dem vollen Rahmen.
  */
-export function umwandlungFuerNetto(f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P): number {
-  if (netto <= 0) return 0;
-  const max = Math.floor((STEUER_FREI_QUOTE * p.bbgRvJahr) / 12);
+export function umwandlungFuerNetto(
+  f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P, max = rahmenVoll(f, d.angaben, p),
+): number {
+  if (netto <= 0 || max <= 0) return 0;
   if (nettoBei(f, d, max, p) <= netto) return max;
   let tief = 0;
   let hoch = max;

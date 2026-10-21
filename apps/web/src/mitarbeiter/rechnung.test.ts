@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  HOCHRECHNUNG_FEST, P, beginnVon, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, beginnVon, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
@@ -109,6 +109,10 @@ describe('Versorgungslücke', () => {
     expect(v.rente.nettoMonat).toBeCloseTo(v.rente.bruttoMonat - v.rente.kvPvMonat - v.rente.steuerMonat, 6);
     expect(v.lueckeMonat).toBeCloseTo(v.lohn.nettoMonat - v.rente.nettoMonat, 6);
     expect(v.anteil).toBeCloseTo(v.rente.nettoMonat / v.lohn.nettoMonat, 9);
+    // In ganzen Prozent, zusammen 100
+    expect(v.renteProzent + v.lueckeProzent).toBe(100);
+    expect(Math.abs(v.lueckeProzent - (v.lueckeMonat / v.lohn.nettoMonat) * 100)).toBeLessThanOrEqual(0.5 + 1e-9);
+    expect(v.rentenanpassung).toBe(RENTENANPASSUNG);
     expect(v.grv.geschaetzt).toBe(true);
     expect(v.rentenbeginn).toBe('01.04.2052');
     expect(v.alterBeiRentenbeginn).toBe(67);
@@ -121,6 +125,16 @@ describe('Versorgungslücke', () => {
     expect(eingetragen.grv).toEqual({ monat: 2500, geschaetzt: false });
     expect(eingetragen.rente.nettoMonat).toBeGreaterThan(geschaetzt.rente.nettoMonat);
     expect(versorgungslueckeRechnung(firma, beratung({ geburtsdatum: '' }))).toBeNull();
+    // Reicht die Rente, fehlt nichts
+    const reicht = versorgungslueckeRechnung(firma, { ...d, angaben: { ...d.angaben, grvRente: 6000 } })!;
+    expect(reicht.lueckeMonat).toBe(0);
+    expect(reicht.lueckeProzent).toBe(0);
+  });
+
+  it('Rentenanpassung der Beratung: 1,5 % im Szenario, für Lücke und Leistung', () => {
+    expect(RENTENANPASSUNG).toBe(0.015);
+    const d = anna();
+    expect(szenarioAusBeratung(d.angaben, firma, 1500).annahmen.rentendynamik).toBe(0.015);
   });
 
   it('der Nettolohn ist derselbe wie in der Probeabrechnung „ohne bAV“', () => {
@@ -132,7 +146,7 @@ describe('Versorgungslücke', () => {
 describe('Netto-Regler', () => {
   it('netto → brutto → netto, auf den Cent', () => {
     const d = anna();
-    for (const netto of [25, 80, 100, 160]) {
+    for (const netto of [25, 80, 100, 120]) {
       const u = umwandlungFuerNetto(firma, d, netto);
       expect(beitragsRechnung(firma, { ...d, umwandlungMonat: u }).nettoAufwandMonat).toBeCloseTo(netto, 1);
     }
@@ -140,14 +154,23 @@ describe('Netto-Regler', () => {
     expect(umwandlungFuerNetto(firma, d, 0)).toBe(0);
   });
 
-  it('Grenzen: der steuerfreie Rahmen oben, „Rahmen voll“ als Marke', () => {
+  it('Grenze: der Rahmen frei von Sozialabgaben — 4 % der BBG mit dem Arbeitgeberbeitrag', () => {
     const d = anna();
     const g = reglerGrenzen(firma, d);
-    expect(g.maxUmwandlung).toBe(Math.floor((0.08 * P.bbgRvJahr) / 12));
+    expect(g.maxUmwandlung).toBeCloseTo(rahmenVoll(firma, d.angaben), 6);
+    expect(g.rahmenMonat).toBeCloseTo((0.04 * P.bbgRvJahr) / 12, 9);
+    // Zuschuss 50 % bis 100 €: Umwandlung und Zuschuss füllen den Rahmen genau
+    const r = beitragsRechnung(firma, { ...d, umwandlungMonat: g.maxUmwandlung });
+    expect(r.gesamtMonat).toBeCloseTo(g.rahmenMonat, 0);
+    expect(r.svPflichtigMonat).toBeCloseTo(0, 6);
+    expect(g.maxNetto).toBeCloseTo(r.nettoAufwandMonat, 9);
+    // Mehr netto, als der Rahmen hergibt: der volle Rahmen, nicht mehr
     expect(umwandlungFuerNetto(firma, d, g.maxNetto + 500)).toBe(g.maxUmwandlung);
-    expect(g.vollUmwandlung).toBeCloseTo(rahmenVoll(firma, d.angaben), 6);
-    expect(g.vollNetto).toBeGreaterThan(0);
-    expect(g.vollNetto).toBeLessThan(g.maxNetto);
+  });
+
+  it('Unterstützungskasse: Die Umwandlung allein füllt den Rahmen', () => {
+    const uk = firmenAngebotSchema.parse({ modell: { art: 'matching', weg: 'ukasse', matchingMonat: 100 } });
+    expect(reglerGrenzen(uk, anna()).maxUmwandlung).toBeCloseTo(Math.floor(((0.04 * P.bbgRvJahr) / 12) * 100) / 100, 6);
   });
 });
 

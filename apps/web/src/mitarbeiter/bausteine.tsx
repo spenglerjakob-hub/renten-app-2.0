@@ -155,14 +155,16 @@ export function DruckBereich({ children }: { children: ReactNode }) {
  * zusammen der Nettolohn heute, der in der Mitte steht. Die Zahlen stehen
  * zusaetzlich als Text daneben; der Ring ist die Anschauung.
  */
-export function LueckenRing({ nettolohn, rente, luecke }: { nettolohn: number; rente: number; luecke: number }) {
+export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProzent }: {
+  nettolohn: number; rente: number; luecke: number; renteProzent: number; lueckeProzent: number;
+}) {
   const r = 42;
   const umfang = 2 * Math.PI * r;
   const anteil = nettolohn > 0 ? Math.min(1, Math.max(0, rente / nettolohn)) : 0;
   const ganz = (x: number) => euroText(Math.round(x));
   return (
     <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
-      aria-label={`Nettolohn ${ganz(nettolohn)}: davon ${ganz(rente)} Netto-Altersrente und ${ganz(luecke)} Versorgungslücke`}>
+      aria-label={`Nettolohn ${ganz(nettolohn)}: davon ${ganz(rente)} Netto-Altersrente (${renteProzent} %) und ${ganz(luecke)} Versorgungslücke (${lueckeProzent} %)`}>
       <circle cx="60" cy="60" r={r} fill="none" stroke="#f43f5e" strokeWidth="14" />
       <circle cx="60" cy="60" r={r} fill="none" stroke="#10b981" strokeWidth="14"
         strokeDasharray={`${anteil * umfang} ${umfang}`} transform="rotate(-90 60 60)" />

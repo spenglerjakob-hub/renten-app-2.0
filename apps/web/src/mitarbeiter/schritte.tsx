@@ -218,18 +218,29 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
         <div className={`flex flex-col items-center gap-4 sm:flex-row sm:justify-center ${aktuell ? '' : 'opacity-60'}`}>
           {luecke ? (
             <>
-              <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat} />
+              <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+                renteProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
               <dl className="space-y-3">
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wide text-emerald-700">Netto-Altersrente</dt>
-                  <dd className="text-2xl font-black tabular-nums text-emerald-700">{euro(luecke.rente.nettoMonat)}</dd>
+                  <dd className="text-2xl font-black tabular-nums text-emerald-700">
+                    {euro(luecke.rente.nettoMonat)} <span className="text-base font-bold">· {luecke.renteProzent} %</span>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wide text-rose-700">Versorgungslücke</dt>
-                  <dd className="text-2xl font-black tabular-nums text-rose-600">{euro(luecke.lueckeMonat)}</dd>
+                  <dd className="text-2xl font-black tabular-nums text-rose-600">
+                    {euro(luecke.lueckeMonat)} <span className="text-base font-bold">· {luecke.lueckeProzent} %</span>
+                  </dd>
                 </div>
-                <p className="max-w-[14rem] text-xs leading-relaxed text-slate-500">
-                  Die gesetzliche Rente ersetzt {prozentText(luecke.anteil, 0)} Ihres Nettolohns — in heutiger Kaufkraft.
+                {luecke.lueckeProzent > 0 && (
+                  <p className="max-w-[16rem] rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold leading-snug text-rose-900">
+                    Im Alter fehlen Ihnen <span className="whitespace-nowrap text-xl font-black tabular-nums text-rose-600">{luecke.lueckeProzent} %</span>{' '}
+                    Ihres heutigen Nettolohns.
+                  </p>
+                )}
+                <p className="max-w-[16rem] text-xs leading-relaxed text-slate-500">
+                  Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
                 </p>
               </dl>
             </>
@@ -297,21 +308,28 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
 /**
  * Der Regler fuer den Netto-Aufwand: Der Mitarbeiter sagt, was er netto
  * entbehren kann; die Umwandlung brutto folgt daraus (`umwandlungFuerNetto`).
- * Den genauen Bruttobetrag fuer die Vereinbarung kann man darunter eintippen.
+ * Er reicht bis zum Rahmen, der frei von Sozialabgaben bleibt (4 % der BBG,
+ * mit dem Arbeitgeberbeitrag) — darueber lohnt sich die Umwandlung fuer den
+ * Mitarbeiter kaum. Den genauen Bruttobetrag kann man darunter eintippen.
  */
 function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
   const [genau, setGenau] = useState(false);
   // Die Grenzen haengen an den Angaben, nicht am Betrag — beim Ziehen am Regler nicht jedes Mal neu.
   const grenzen = useMemo(() => reglerGrenzen(firma.angebot, daten), [firma.angebot, daten.angaben]);
   const netto = Math.round(r.nettoAufwandMonat);
-  const max = Math.max(1, grenzen.maxNetto, netto);
-  const setzeU = (u: number) => setze((d) => ({ ...d, umwandlungMonat: Math.max(0, Math.round(u * 100) / 100) }));
-  const setzeNetto = (n: number) => setze((d) => ({ ...d, umwandlungMonat: umwandlungFuerNetto(firma.angebot, d, n) }));
-  // Die Marke sitzt ueber der Mitte des Reglerknopfs: Der Knopf (16 px) laeuft nicht ganz bis an die Raender.
-  const lage = (x: number) => {
-    const q = Math.min(1, Math.max(0, x / max));
-    return `calc(${q * 100}% + ${(0.5 - q) * 16}px)`;
-  };
+  // Das Ende des Reglers ist der volle Rahmen
+  const ende = Math.max(1, Math.round(grenzen.maxNetto));
+  const ohneRahmen = grenzen.maxUmwandlung < 0.005;
+  const darueber = daten.umwandlungMonat > grenzen.maxUmwandlung + 0.005;
+  // Was den Rahmen mit fuellt: der Zuschuss — im Matching-Modell nur der gesetzliche in die Direktversicherung;
+  // der Beitrag in die Unterstuetzungskasse liegt ausserhalb.
+  const m = firma.angebot.modell;
+  const mitImRahmen = m.art !== 'matching' ? ' für Umwandlung und Arbeitgeberbeitrag zusammen'
+    : m.weg === 'dv' ? ' für Umwandlung und gesetzlichen Zuschuss zusammen' : '';
+  const setzeU = (u: number) => setze((d) => ({ ...d, umwandlungMonat: Math.min(grenzen.maxUmwandlung, Math.max(0, Math.round(u * 100) / 100)) }));
+  const setzeNetto = (n: number) => (n >= ende
+    ? setzeU(grenzen.maxUmwandlung)
+    : setze((d) => ({ ...d, umwandlungMonat: umwandlungFuerNetto(firma.angebot, d, n, P, grenzen.maxUmwandlung) })));
   const fehltGehalt = daten.angaben.jahresbrutto <= 0;
 
   return (
@@ -323,28 +341,38 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
           <p className="text-3xl font-black tabular-nums text-slate-900">
             {euro(netto)} <span className="text-base font-bold text-slate-500">netto im Monat</span>
           </p>
-          <div className="relative mt-4 pb-6">
-            <input type="range" min={0} max={max} step={1} value={netto}
+          <div className="mt-4">
+            <input type="range" min={0} max={ende} step={1} value={Math.min(netto, ende)} disabled={ohneRahmen}
               onChange={(e) => setzeNetto(Number(e.target.value))}
               aria-label="Netto-Aufwand im Monat"
               aria-valuetext={`${netto} Euro netto, ${Math.round(r.umwandlungMonat)} Euro Umwandlung brutto`}
-              className="block w-full accent-indigo-600" />
-            {grenzen.vollNetto > 0.5 && grenzen.vollNetto < max && (
-              <span aria-hidden className="pointer-events-none absolute top-6 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-emerald-700"
-                style={{ left: lage(grenzen.vollNetto) }}>
-                ▲ Rahmen voll
-              </span>
-            )}
+              className="block w-full accent-indigo-600 disabled:opacity-50" />
           </div>
-          <div className="flex justify-between text-xs tabular-nums text-slate-500">
-            <span>0 €</span><span>{euro(max / 2)}</span><span>{euro(max)}</span>
+          <div className="mt-1 flex justify-between text-xs tabular-nums text-slate-500">
+            <span>0 €</span><span>{euro(ende / 2)}</span><span>{euro(ende)} · Rahmen voll</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
             = <strong className="tabular-nums">{euroGenau(r.umwandlungMonat)}</strong> Umwandlung brutto · + {euroGenau(r.arbeitgeberMonat)} vom
             Arbeitgeber · <strong className="tabular-nums">{euroGenau(r.gesamtMonat)}</strong> in Ihre Vorsorge
           </p>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            {ohneRahmen
+              ? 'Der Rahmen, der frei von Sozialabgaben bleibt, ist schon voll — durch den Beitrag des Arbeitgebers oder eine bestehende Betriebsrente.'
+              : `Der Regler reicht bis zum Rahmen, der frei von Sozialabgaben bleibt: 4 % der Beitragsbemessungsgrenze, ${euro(grenzen.rahmenMonat)} im Monat`
+                + `${mitImRahmen} — bei Ihnen mit ${euroGenau(grenzen.maxUmwandlung)} Umwandlung voll. `
+                + 'Darüber fielen auf die Umwandlung Sozialabgaben an; das lohnt sich für Sie kaum.'
+                + (m.art === 'matching' ? ' Der Beitrag des Arbeitgebers in die Unterstützungskasse kommt obendrauf.' : '')}
+          </p>
+          {darueber && (
+            <p role="status" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+              Eingetragen sind {euroGenau(daten.umwandlungMonat)} Umwandlung — mehr als der Rahmen frei von Sozialabgaben.{' '}
+              <button type="button" onClick={() => setzeU(grenzen.maxUmwandlung)} className="font-bold underline">
+                Auf {euroGenau(grenzen.maxUmwandlung)} setzen
+              </button>
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => setzeU(grenzen.vollUmwandlung)} className={KNOPF_ZWEIT}>
+            <button type="button" onClick={() => setzeU(grenzen.maxUmwandlung)} disabled={ohneRahmen} className={KNOPF_ZWEIT}>
               <Wand2 className="h-4 w-4" aria-hidden /> Rahmen voll nutzen
             </button>
             <button type="button" onClick={() => setGenau((x) => !x)} aria-expanded={genau}
@@ -354,7 +382,8 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
           </div>
           {genau && (
             <div className="mt-3 w-56">
-              <ZahlFeld label="Umwandlung brutto im Monat" wert={daten.umwandlungMonat} onChange={setzeU} einheit="€" schritt={10} />
+              <ZahlFeld label="Umwandlung brutto im Monat" wert={daten.umwandlungMonat} onChange={setzeU} einheit="€" schritt={10}
+                max={grenzen.maxUmwandlung} />
             </div>
           )}
         </>

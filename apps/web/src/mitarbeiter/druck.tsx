@@ -189,10 +189,10 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           <Paare zeilen={[
             ['Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
             [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat (heutige Kaufkraft)`],
-            ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat`],
+            ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} % des Nettolohns`],
           ]} />
           <p className="mt-1 text-[9pt] text-slate-700">
-            Die gesetzliche Rente ersetzt rund {Math.round(luecke.anteil * 100)} % des Nettolohns. Angenommen: Inflation{' '}
+            Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
             {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Steuer als Monatsanteil
             der Jahressteuer.
           </p>
