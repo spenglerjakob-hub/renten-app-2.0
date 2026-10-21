@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Building2, CheckCircle2, FileSignature, FileText, HandCoins, PiggyBank, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
-import type { BeratungAngaben, BeratungDaten, BeratungStatus, HochrechnungAnnahmen, VersichererWerte } from '@renten/schema';
+import type { BeratungAngaben, BeratungDaten, BeratungStatus, VersichererWerte } from '@renten/schema';
 import type { Firma } from '../lib/bav-beratung';
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
@@ -428,40 +428,31 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
 }
 
 /**
- * Was bis zum Rentenbeginn zusammenkommt und was daraus im Monat entnommen
- * werden kann — mit denselben Annahmen wie das ETF-Depot im Rechner, als Beispiel.
+ * Was bis zum Rentenbeginn zusammenkommen kann und welche Rente daraus
+ * geschaetzt wird — gerechnet wie das ETF-Depot im Rechner. Verstellbar ist
+ * allein die Rendite; die uebrigen Annahmen laufen fest im Hintergrund
+ * (`HOCHRECHNUNG_FEST`) und stehen bewusst nirgends.
  */
-function HochrechnungKarte({ h, rentenbeginn, setzeAnnahmen }: {
-  h: Hochrechnung; rentenbeginn: string | null; setzeAnnahmen: (a: Partial<HochrechnungAnnahmen>) => void;
+function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
+  h: Hochrechnung; rentenbeginn: string | null; setzeRendite: (rendite: number) => void;
 }) {
   if (h.monate <= 0) return null;
-  const a = h.annahmen;
   const teile = [
     { text: 'Ihr Netto-Aufwand', wert: h.nettoSumme, farbe: 'bg-sky-500' },
     { text: 'Steuer- und SV-Ersparnis', wert: h.ersparnisSumme, farbe: 'bg-indigo-400' },
     { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-amber-400' },
-    { text: 'Erträge nach Kosten', wert: h.ertrag, farbe: 'bg-emerald-500' },
+    { text: 'Erträge', wert: h.ertrag, farbe: 'bg-emerald-500' },
   ];
   const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
   return (
-    <Karte titel="Beispielhafte Hochrechnung">
+    <Karte titel="Beispielhafte Hochrechnung"
+      rechts={<span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">geschätzt</span>}>
       <p className="text-sm text-slate-600">
         {euro(h.beitragMonat)} im Monat in Ihre Vorsorge, {laufzeitText(h.monate)} bis zum Rentenbeginn{rentenbeginn ? ` am ${rentenbeginn}` : ''}.
       </p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ProzentFeld label="Rendite Ansparphase" wert={a.renditeAnsparphase}
-          onChange={(renditeAnsparphase) => setzeAnnahmen({ renditeAnsparphase })} />
-        <ProzentFeld label="Rendite Entnahmephase" wert={a.renditeEntnahme}
-          onChange={(renditeEntnahme) => setzeAnnahmen({ renditeEntnahme })}
-          hilfe="In der Entnahmephase wird meist vorsichtiger angelegt." />
-        <ProzentFeld label="Ausgabeaufschlag" wert={a.ausgabeaufschlag} max={10}
-          onChange={(ausgabeaufschlag) => setzeAnnahmen({ ausgabeaufschlag })}
-          hilfe="Kosten auf jeden Beitrag, bei Versicherungen etwa die Abschlusskosten." />
-        <ProzentFeld label="Laufende Kosten (TER)" wert={a.ter} max={5}
-          onChange={(ter) => setzeAnnahmen({ ter })}
-          hilfe="Gehen von der Rendite ab, in beiden Phasen." />
-        <ZahlFeld label="Entnahmedauer" wert={a.entnahmedauer} min={1} max={60} einheit="Jahre"
-          onChange={(n) => setzeAnnahmen({ entnahmedauer: Math.min(60, Math.max(1, Math.round(n))) })} />
+        <ProzentFeld label="Angenommene Rendite" wert={h.annahmen.renditeAnsparphase} onChange={setzeRendite}
+          hilfe="Wertentwicklung im Jahr bis zum Rentenbeginn." />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
         <div>
@@ -469,11 +460,10 @@ function HochrechnungKarte({ h, rentenbeginn, setzeAnnahmen }: {
           <div className="text-lg font-black tabular-nums text-emerald-800">{euro(h.kapital)}</div>
         </div>
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Entnahme brutto</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Geschätzte Rente brutto</div>
           <div className="text-lg font-black tabular-nums text-emerald-800">
-            {euro(h.entnahmeMonat)} <span className="text-xs font-normal">/ Monat</span>
+            {euro(h.renteMonat)} <span className="text-xs font-normal">/ Monat</span>
           </div>
-          <div className="text-xs text-slate-500">{a.entnahmedauer} Jahre lang</div>
         </div>
       </div>
       <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-500">Woraus das Kapital besteht</p>
@@ -491,11 +481,9 @@ function HochrechnungKarte({ h, rentenbeginn, setzeAnnahmen }: {
         ))}
       </dl>
       <p className="mt-3 text-xs leading-relaxed text-slate-500">
-        Beispiel mit angenommenen Werten und gleichbleibenden Beiträgen — keine Zusage. Gerechnet wie bei einem Fondsdepot:
-        In der Ansparphase wächst das Geld mit der Rendite abzüglich der laufenden Kosten, der Ausgabeaufschlag geht von
-        jedem Beitrag ab; ab Rentenbeginn wird das Kapital mit der Rendite der Entnahmephase über {a.entnahmedauer} Jahre
-        verteilt. Die Entnahme ist brutto, vor Kranken- und Pflegeversicherung und Steuer. Was der Vertrag tatsächlich
-        verspricht, steht im Angebot des Versicherers (nächster Schritt).
+        Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine
+        Zusage. Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab. Die Rente ist brutto, vor
+        Kranken- und Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers (nächster Schritt).
       </p>
     </Karte>
   );
@@ -553,7 +541,7 @@ export function SchrittRechnung(props: SchrittProps) {
       </div>
 
       <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
-        setzeAnnahmen={(a) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, ...a } }))} />
+        setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
     </div>
   );
 }

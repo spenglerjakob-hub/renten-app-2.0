@@ -4,7 +4,7 @@ import {
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
-import type { BeratungAngaben, BeratungDaten, FirmenAngebot, HochrechnungAnnahmen, VersichererWerte } from '@renten/schema';
+import type { BeratungAngaben, BeratungDaten, FirmenAngebot, VersichererWerte } from '@renten/schema';
 import { leereAntworten, regelRentenbeginn, szenarioAusCheck } from '../check/uebernahme';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -514,16 +514,33 @@ export function probeabrechnung(f: FirmenAngebot, d: BeratungDaten, r: Mitarbeit
 }
 
 /* --------------------------------------------------------------------------
- * BEISPIELHAFTE HOCHRECHNUNG — mit den Annahmen und der Rechnung des
- * ETF-Depots im Rechner (`etfVerlauf` in der Zeitachse): In der Ansparphase
- * waechst das Geld mit der Rendite minus den laufenden Kosten, der
- * Ausgabeaufschlag geht von jedem Beitrag ab. Ab Rentenbeginn verteilt
- * `entnahmeplan` aus dem Rechenkern das Kapital ueber die Entnahmedauer, mit
- * der Rendite der Entnahmephase minus den Kosten. Angespart wird monatsgenau,
- * weil Beitraege und Laufzeit hier monatsgenau sind; Steuern auf Ertraege
- * (Vorabpauschale) gibt es in der bAV nicht. Ein Beispiel — die Werte des
- * Versicherers folgen.
+ * BEISPIELHAFTE HOCHRECHNUNG — mit der Rechnung des ETF-Depots im Rechner
+ * (`etfVerlauf` in der Zeitachse): In der Ansparphase waechst das Geld mit der
+ * Rendite minus den laufenden Kosten, der Ausgabeaufschlag geht von jedem
+ * Beitrag ab. Ab Rentenbeginn verteilt `entnahmeplan` aus dem Rechenkern das
+ * Kapital ueber die Entnahmedauer, mit der Rendite der Entnahmephase minus
+ * den Kosten. Angespart wird monatsgenau, weil Beitraege und Laufzeit hier
+ * monatsgenau sind; Steuern auf Ertraege (Vorabpauschale) gibt es in der bAV
+ * nicht. Ein Beispiel — die Werte des Versicherers folgen.
  * ------------------------------------------------------------------------ */
+
+/** Die Annahmen der Hochrechnung — benannt wie beim ETF-Depot am `Vertrag` */
+export interface HochrechnungAnnahmen {
+  renditeAnsparphase: number;
+  renditeEntnahme: number;
+  ausgabeaufschlag: number;
+  ter: number;
+  entnahmedauer: number;
+}
+
+/**
+ * Was fest im Hintergrund rechnet. Abgestimmt an Angeboten der AXA ueber
+ * verschiedene Eintrittsalter: Mit diesen Werten lag die Hochrechnung stets
+ * nahe am Ergebnis des Versicherers. Sie stehen weder am Bildschirm noch im
+ * Protokoll; verstellbar ist allein die Rendite der Ansparphase
+ * (`daten.hochrechnung`). Die Entnahme ueber 30 Jahre gibt die Rente an.
+ */
+export const HOCHRECHNUNG_FEST = { renditeEntnahme: 0.02, ausgabeaufschlag: 0, ter: 0.015, entnahmedauer: 30 } as const;
 
 export interface Hochrechnung {
   monate: number;
@@ -538,16 +555,18 @@ export interface Hochrechnung {
   /** Kapital minus Beitraege, also nach allen Kosten — negativ, wenn die Kosten ueberwiegen */
   ertrag: number;
   kapital: number;
-  /** Entnahme brutto im Monat, `annahmen.entnahmedauer` Jahre lang */
-  entnahmeMonat: number;
+  /** Die geschaetzte Rente brutto im Monat — die Entnahme ueber `annahmen.entnahmedauer` Jahre */
+  renteMonat: number;
 }
 
 /**
  * Endwert der Monatsbeitraege nach Ausgabeaufschlag, vorschuessig (Beitrag am
  * Monatsanfang), Monatszins aus der Jahresrendite nach Kosten.
  */
-export function hochrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, heute = new Date()): Hochrechnung {
-  const a = d.hochrechnung;
+export function hochrechnung(
+  f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, heute = new Date(),
+  a: HochrechnungAnnahmen = { ...HOCHRECHNUNG_FEST, renditeAnsparphase: d.hochrechnung.renditeAnsparphase },
+): Hochrechnung {
   const n = monateDerUmwandlung(d, f, heute);
   const c = r.gesamtMonat;
   const angelegt = c * (1 - a.ausgabeaufschlag);
@@ -566,7 +585,7 @@ export function hochrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterB
     beitraegeSumme,
     ertrag: kapital - beitraegeSumme,
     kapital,
-    entnahmeMonat: plan.bruttoProJahr / 12,
+    renteMonat: plan.bruttoProJahr / 12,
   };
 }
 

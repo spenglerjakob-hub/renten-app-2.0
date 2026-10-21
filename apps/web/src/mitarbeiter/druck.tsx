@@ -230,12 +230,10 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         )}
         {h.monate > 0 && (
           <p className="mt-1 text-[9pt] text-slate-700">
-            Beispielhafte Hochrechnung (Rendite {prozent(h.annahmen.renditeAnsparphase)} in der Ansparphase und{' '}
-            {prozent(h.annahmen.renditeEntnahme)} in der Entnahmephase, laufende Kosten {prozent(h.annahmen.ter)}, Ausgabeaufschlag{' '}
-            {prozent(h.annahmen.ausgabeaufschlag)}; keine Zusage): bis zum Rentenbeginn {euroGenau(Math.round(h.beitraegeSumme))} Beiträge,
-            davon netto aus eigener Tasche {euroGenau(Math.round(h.nettoSumme))}; Kapital bei Rentenbeginn rund{' '}
-            {euroGenau(Math.round(h.kapital))}, daraus {h.annahmen.entnahmedauer} Jahre lang rund {euroGenau(Math.round(h.entnahmeMonat))}{' '}
-            im Monat brutto.
+            Beispielhafte, geschätzte Hochrechnung mit {prozent(h.annahmen.renditeAnsparphase)} Rendite im Jahr (keine Zusage): bis zum
+            Rentenbeginn {euroGenau(Math.round(h.beitraegeSumme))} Beiträge, davon netto aus eigener Tasche{' '}
+            {euroGenau(Math.round(h.nettoSumme))}; Kapital bei Rentenbeginn rund {euroGenau(Math.round(h.kapital))}, geschätzte Rente
+            rund {euroGenau(Math.round(h.renteMonat))} im Monat brutto.
           </p>
         )}
       </Abschnitt>

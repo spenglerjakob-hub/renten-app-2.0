@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  P, beginnVon, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  HOCHRECHNUNG_FEST, P, beginnVon, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
-  umwandlungFuerNetto, versorgungslueckeRechnung,
+  umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
 
 const firma = firmenAngebotSchema.parse({ bundesland: 'Bayern', modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } });
@@ -175,14 +175,19 @@ describe('Probeabrechnung', () => {
   });
 });
 
-describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner', () => {
-  const mit = (d: BeratungDaten, a: Partial<BeratungDaten['hochrechnung']>): BeratungDaten =>
-    ({ ...d, hochrechnung: { ...d.hochrechnung, ...a } });
+describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner, mit festen Annahmen', () => {
+  const mitRendite = (d: BeratungDaten, renditeAnsparphase: number): BeratungDaten => ({ ...d, hochrechnung: { renditeAnsparphase } });
+  const annahmen = (a: Partial<HochrechnungAnnahmen>): HochrechnungAnnahmen => ({ ...HOCHRECHNUNG_FEST, renditeAnsparphase: 0.06, ...a });
 
-  it('Vorgaben: 6 % Rendite minus 1,5 % Kosten beim Ansparen, 2 % minus 1,5 % über 30 Jahre bei der Entnahme', () => {
+  it('fest im Hintergrund: 2 % in der Entnahmephase, kein Ausgabeaufschlag, 1,5 % laufende Kosten, 30 Jahre', () => {
+    expect(HOCHRECHNUNG_FEST).toEqual({ renditeEntnahme: 0.02, ausgabeaufschlag: 0, ter: 0.015, entnahmedauer: 30 });
+  });
+
+  it('Vorgabe 6 %: Kapital mit 4,5 % nach Kosten, Rente mit 0,5 % über 30 Jahre', () => {
     const d = anna();
     const r = beitragsRechnung(firma, d);
     const h = hochrechnung(firma, d, r, HEUTE);
+    expect(h.annahmen).toEqual({ ...HOCHRECHNUNG_FEST, renditeAnsparphase: 0.06 });
     expect(h.monate).toBe(303);
     expect(h.beitragMonat).toBeCloseTo(r.gesamtMonat, 9);
     expect(h.beitraegeSumme).toBeCloseTo(r.gesamtMonat * 303, 6);
@@ -191,35 +196,38 @@ describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner', () => {
     expect(h.kapital).toBeCloseTo(r.gesamtMonat * ((Math.pow(1 + i, 303) - 1) / i) * (1 + i), 6);
     expect(h.ertrag).toBeCloseTo(h.kapital - h.beitraegeSumme, 9);
     // Dieselbe Formel wie die „Entnahme brutto“ des Depots (`entnahmeplan`)
-    expect(h.entnahmeMonat * 12).toBeCloseTo((h.kapital * 0.005) / (1 - Math.pow(1.005, -30)), 6);
+    expect(h.renteMonat * 12).toBeCloseTo((h.kapital * 0.005) / (1 - Math.pow(1.005, -30)), 6);
+    // Anna: 300 € im Monat über 303 Monate
+    expect(Math.round(h.kapital)).toBe(167_044);
+    expect(Math.round(h.renteMonat)).toBe(501);
   });
 
-  it('Rendite gleich Kosten: Kapital = Beiträge; der Ausgabeaufschlag geht von jedem Beitrag ab', () => {
-    const d = mit(anna(), { renditeAnsparphase: 0.015 });
-    const r = beitragsRechnung(firma, d);
-    const h = hochrechnung(firma, d, r, HEUTE);
-    expect(h.kapital).toBeCloseTo(h.beitraegeSumme, 6);
-    const aufschlag = hochrechnung(firma, mit(d, { ausgabeaufschlag: 0.05 }), r, HEUTE);
-    expect(aufschlag.kapital).toBeCloseTo(h.beitraegeSumme * 0.95, 6);
-    expect(aufschlag.ertrag).toBeCloseTo(-h.beitraegeSumme * 0.05, 6);
-    // Rendite unter den Kosten: wie im Depot nicht unter null
-    expect(hochrechnung(firma, mit(d, { renditeAnsparphase: 0.01 }), r, HEUTE).kapital).toBeCloseTo(h.beitraegeSumme, 6);
-  });
-
-  it('Entnahme ohne Rendite nach Kosten: das Kapital geteilt durch die Monate', () => {
-    const d = mit(anna(), { renditeEntnahme: 0.01, entnahmedauer: 25 });
-    const h = hochrechnung(firma, d, beitragsRechnung(firma, d), HEUTE);
-    expect(h.entnahmeMonat).toBeCloseTo(h.kapital / (25 * 12), 6);
-  });
-
-  it('mehr Rendite oder weniger Kosten: mehr Kapital; kürzere Entnahme: mehr im Monat', () => {
+  it('die Rendite aus der Beratung wirkt auf Kapital und Rente; die festen Annahmen bleiben', () => {
     const d = anna();
     const r = beitragsRechnung(firma, d);
-    const h = hochrechnung(firma, d, r, HEUTE);
-    expect(hochrechnung(firma, mit(d, { renditeAnsparphase: 0.08 }), r, HEUTE).kapital).toBeGreaterThan(h.kapital);
-    expect(hochrechnung(firma, mit(d, { ter: 0.005 }), r, HEUTE).kapital).toBeGreaterThan(h.kapital);
-    expect(hochrechnung(firma, mit(d, { entnahmedauer: 20 }), r, HEUTE).entnahmeMonat).toBeGreaterThan(h.entnahmeMonat);
-    expect(hochrechnung(firma, mit(d, { renditeEntnahme: 0.04 }), r, HEUTE).kapital).toBeCloseTo(h.kapital, 9);
+    const h6 = hochrechnung(firma, d, r, HEUTE);
+    const h8 = hochrechnung(firma, mitRendite(d, 0.08), r, HEUTE);
+    expect(h8.annahmen).toEqual({ ...HOCHRECHNUNG_FEST, renditeAnsparphase: 0.08 });
+    expect(h8.kapital).toBeGreaterThan(h6.kapital);
+    // Dieselbe Entnahme: Die Rente waechst im selben Verhaeltnis wie das Kapital
+    expect(h8.renteMonat / h8.kapital).toBeCloseTo(h6.renteMonat / h6.kapital, 12);
+  });
+
+  it('Formel: Rendite gleich Kosten ergibt Kapital = Beiträge; Ausgabeaufschlag je Beitrag; nicht unter null', () => {
+    const d = anna();
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE, annahmen({ renditeAnsparphase: 0.015 }));
+    expect(h.kapital).toBeCloseTo(h.beitraegeSumme, 6);
+    const aufschlag = hochrechnung(firma, d, r, HEUTE, annahmen({ renditeAnsparphase: 0.015, ausgabeaufschlag: 0.05 }));
+    expect(aufschlag.kapital).toBeCloseTo(h.beitraegeSumme * 0.95, 6);
+    expect(aufschlag.ertrag).toBeCloseTo(-h.beitraegeSumme * 0.05, 6);
+    expect(hochrechnung(firma, d, r, HEUTE, annahmen({ renditeAnsparphase: 0.01 })).kapital).toBeCloseTo(h.beitraegeSumme, 6);
+  });
+
+  it('Formel: Entnahme ohne Rendite nach Kosten ist das Kapital geteilt durch die Monate', () => {
+    const d = anna();
+    const h = hochrechnung(firma, d, beitragsRechnung(firma, d), HEUTE, annahmen({ renditeEntnahme: 0.01, entnahmedauer: 25 }));
+    expect(h.renteMonat).toBeCloseTo(h.kapital / (25 * 12), 6);
   });
 });
 
