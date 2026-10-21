@@ -100,7 +100,7 @@ export const BERATUNG_STATUS = ['offen', 'teilnahme', 'verzicht'] as const;
 export const entscheidungSchema = z.object({
   /** Dasselbe wie die Spalte `status` — dort fuer Liste und Uebersicht */
   status: z.enum(BERATUNG_STATUS).default('offen'),
-  betragMonat: betrag(10_000).default(0),
+  /** Der Betrag ist `umwandlungMonat` — eine Zahl, nicht zwei, die auseinanderlaufen koennten */
   beginn: datum(),
   /** Verzicht: Grund, freiwillig */
   grund: z.string().max(500).default(''),

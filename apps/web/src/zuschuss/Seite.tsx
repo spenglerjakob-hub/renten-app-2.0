@@ -5,6 +5,7 @@ import {
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
+import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
@@ -328,12 +329,15 @@ export function Seite() {
               </p>
             </div>
 
-            <button
-              type="button" onClick={() => window.print()}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 print:hidden"
-            >
-              <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
-            </button>
+            <div className="flex flex-wrap gap-2 print:hidden">
+              <button
+                type="button" onClick={() => window.print()}
+                className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700"
+              >
+                <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
+              </button>
+              <UebernehmenKnopf modell={{ art: 'zuschuss', quote, deckelMonat: deckel }} bundesland={bundesland} />
+            </div>
             <RechtsLinks />
           </div>
         </div>

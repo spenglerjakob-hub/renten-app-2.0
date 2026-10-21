@@ -72,6 +72,8 @@ export default defineConfig({
         preise: resolve(hier, 'preise.html'),
         // Die Schnellrechnung ohne Anmeldung — oeffentlich, vorerst noindex.
         schnellrechnung: resolve(hier, 'schnellrechnung.html'),
+        // Die bAV-Mitarbeiterberatung — mit Anmeldung, Paket Arbeitgeber-Vorsorgemodelle.
+        mitarbeiterberatung: resolve(hier, 'mitarbeiterberatung.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },
