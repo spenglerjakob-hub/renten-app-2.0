@@ -10,9 +10,11 @@
  * keine Anfrage mehr und werden hier gleich mit entfernt, nicht erst beim
  * naechtlichen Aufraeumen (Edge Function `check-dokumente`).
  *
- * DAS LOGO FUERS GUTACHTEN (Bucket `branding`) ebenso: Die Zeile in
- * `berater_profil` geht per Kaskade, die Datei nicht. Sie liegt im Ordner
- * mit der ID des Nutzers und wird hier mit entfernt.
+ * DIE LOGOS ebenso: das Logo fuers Gutachten (Bucket `branding`, Zeile in
+ * `berater_profil`) und die Firmenlogos der Mitarbeiterberatung (Bucket
+ * `bav-firmenlogos`, Zeilen in `bav_firmen` und `bav_beratungen`). Die Zeilen
+ * gehen per Kaskade, die Dateien nicht. Sie liegen im Ordner mit der ID des
+ * Nutzers und werden hier mit entfernt.
  *
  * WER DARF: nur der Inhaber selbst. Das Zugriffstoken aus dem
  * Authorization-Kopf wird beim Auth-Server geprueft (`auth.getUser`); geloescht
@@ -121,27 +123,30 @@ Deno.serve(async (req) => {
   }
 
   /*
-    Das Logo fuers Gutachten: der Ordner <nutzer.id> im Bucket `branding`.
-    Hoechstens drei Dateien (Policy); ein Fehler laesst das Loeschen ebenso
-    wenig scheitern wie bei den Unterlagen.
+    Die Logos: der Ordner <nutzer.id> in `branding` (Gutachten, hoechstens
+    drei Dateien) und in `bav-firmenlogos` (Firmen, hoechstens 400 — Policy).
+    Ein Fehler laesst das Loeschen ebenso wenig scheitern wie bei den
+    Unterlagen.
   */
   let logos = 0;
-  try {
-    const { data: dateien, error: fehlerListe } = await zweiVersuche(
-      () => db.storage.from('branding').list(nutzer.id, { limit: 100 }),
-    );
-    if (fehlerListe) throw fehlerListe;
-    const namen = (dateien ?? [])
-      .map((d) => d.name)
-      .filter((n) => typeof n === 'string' && n !== '')
-      .map((n) => `${nutzer.id}/${n}`);
-    if (namen.length > 0) {
-      const { error: fehlerDateien } = await zweiVersuche(() => db.storage.from('branding').remove(namen));
-      if (fehlerDateien) throw fehlerDateien;
-      logos = namen.length;
+  for (const bucket of ['branding', 'bav-firmenlogos']) {
+    try {
+      const { data: dateien, error: fehlerListe } = await zweiVersuche(
+        () => db.storage.from(bucket).list(nutzer.id, { limit: 1000 }),
+      );
+      if (fehlerListe) throw fehlerListe;
+      const namen = (dateien ?? [])
+        .map((d) => d.name)
+        .filter((n) => typeof n === 'string' && n !== '')
+        .map((n) => `${nutzer.id}/${n}`);
+      if (namen.length > 0) {
+        const { error: fehlerDateien } = await zweiVersuche(() => db.storage.from(bucket).remove(namen));
+        if (fehlerDateien) throw fehlerDateien;
+        logos += namen.length;
+      }
+    } catch (e) {
+      console.error(`Logos in ${bucket} nicht entfernt`, e instanceof Error ? e.message : e);
     }
-  } catch (e) {
-    console.error('Logo nicht entfernt', e instanceof Error ? e.message : e);
   }
 
   console.log('Konto geloescht', nutzer.id, unterlagen > 0 ? `(${unterlagen} Unterlagen)` : '', logos > 0 ? `(${logos} Logo-Dateien)` : '');
