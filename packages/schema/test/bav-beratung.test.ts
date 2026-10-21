@@ -44,7 +44,7 @@ describe('Daten einer Beratung', () => {
     expect(d.hochrechnung).toEqual({ renditeAnsparphase: 0.06 });
     expect(d.entscheidung.status).toBe('offen');
     expect(d.umwandlungMonat).toBe(0);
-    expect(d.versicherer.direkt).toEqual({ beitragMonat: 0, garantierteRente: 0, prognoseRente: 0, prognoseKapital: 0, dynamik: 0 });
+    expect(d.versicherer.direkt).toEqual({ beitragMonat: 0, garantierteRente: 0, prognoseRente: 0, prognoseKapital: 0, dynamik: 0, ausHochrechnung: false });
     expect(d.angaben.kv).toBe('gesetzlich');
   });
 

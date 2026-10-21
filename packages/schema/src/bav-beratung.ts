@@ -93,6 +93,13 @@ export const versichererWerteSchema = z.object({
   prognoseKapital: betrag(100_000_000).default(0),
   /** Jaehrliche Steigerung des Beitrags laut Angebot */
   dynamik: z.number().min(0).max(0.1).default(0),
+  /**
+   * Prognose-Rente und Kapital stammen aus der geschaetzten Hochrechnung
+   * („Geschaetzte Hochrechnung uebernehmen“), nicht aus dem Angebot — so
+   * gekennzeichnet am Bildschirm, im Fazit und im Protokoll. Wer einen der
+   * beiden Werte von Hand aendert, hebt das Kennzeichen auf.
+   */
+  ausHochrechnung: z.boolean().default(false),
 });
 
 export const BERATUNG_STATUS = ['offen', 'teilnahme', 'verzicht'] as const;

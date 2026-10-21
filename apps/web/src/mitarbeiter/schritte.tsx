@@ -8,11 +8,12 @@ import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
   AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
-import { laufzeitText } from '../features/tuev-berechnung';
+import { belastungsTreppe, laufzeitText } from '../features/tuev-berechnung';
 import { Bon, Kachel, Zeile } from '../arbeitgeber/bausteine';
 import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, Karte, LueckenRing, TextBereich, useDrucken } from './bausteine';
 import {
-  P, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
+  P, automatischerBeginn, grvMinderungVon, grvVon, hochrechnung, hochrechnungJeVertrag, nettolohnHeute, probeabrechnung,
+  reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
   type AuszahlungsWerte, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
   type Probeabrechnung, type Versorgungsluecke,
 } from './rechnung';
@@ -109,8 +110,16 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
         <div className="space-y-3">
           <TextFeld label="Name" wert={a.name} onChange={(name) => setzeA({ name })} maxLaenge={120} autoComplete="off" />
           <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
-          <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}
-            hilfe={regel ? `Leer: Regelaltersgrenze, ${regel}.` : 'Leer: Regelaltersgrenze aus dem Geburtsdatum.'} />
+          <div>
+            <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}
+              hilfe={!regel ? 'Wird aus dem Geburtsdatum berechnet: die Regelaltersgrenze.'
+                : a.rentenbeginn ? 'Eingetragen.' : 'Automatisch: die Regelaltersgrenze aus dem Geburtsdatum. Ändern, wenn die Rente früher oder später beginnt.'} />
+            {regel && a.rentenbeginn && a.rentenbeginn !== regel && (
+              <button type="button" onClick={() => setzeA({ rentenbeginn: '' })} className="mt-1 text-xs font-bold text-indigo-700 hover:underline">
+                Regelaltersgrenze verwenden ({regel})
+              </button>
+            )}
+          </div>
         </div>
       </Karte>
 
@@ -602,9 +611,9 @@ const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFrac
  * Netto-Auszahlung. Die geringere gesetzliche Rente steht im Fazit und
  * darunter in „Unterm Strich“.
  */
-function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
+function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell, treppe }: {
   k: KennzahlenErgebnis; minderungMonat: number; daten: BeratungDaten;
-  setze: SchrittProps['setze']; aktuell: boolean;
+  setze: SchrittProps['setze']; aktuell: boolean; treppe: ReturnType<typeof belastungsTreppe>;
 }) {
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return null;
@@ -618,7 +627,9 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-xl text-xs leading-relaxed text-slate-500">
           Ihr Netto-Aufwand gegen die Netto-Auszahlung — der Vertrag allein,{' '}
-          {istKapital ? 'mit der Kapitalauszahlung' : `mit der ${haupt.art === 'prognose' ? 'prognostizierten' : 'garantierten'} Rente`}.
+          {istKapital ? `mit der ${k.geschaetzt ? 'geschätzten ' : ''}Kapitalauszahlung`
+            : haupt.art === 'prognose' ? (k.geschaetzt ? 'mit der geschätzten Rente aus der Hochrechnung' : 'mit der prognostizierten Rente')
+              : 'mit der garantierten Rente'}.
         </p>
         <div className="w-44">
           <ZahlFeld label="Rente bis zum Alter von" wert={daten.lebenserwartung} min={60} max={120} schritt={1} stufen einheit="J."
@@ -661,11 +672,11 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
 
       {wege.length > 1 && (
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[20rem] text-xs">
+          <table className="w-full min-w-[20rem] text-sm">
             <thead>
               <tr className="text-slate-500">
-                <th className="py-1 text-left font-semibold" />
-                {wege.map((w) => <th key={w.art} className="py-1 pl-2 text-right font-semibold">{WEG_TITEL[w.art]}</th>)}
+                <th className="py-1.5 text-left font-semibold" />
+                {wege.map((w) => <th key={w.art} className="py-1.5 pl-2 text-right font-semibold">{WEG_TITEL[w.art]}</th>)}
               </tr>
             </thead>
             <tbody className="tabular-nums text-slate-700">
@@ -677,8 +688,8 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
                 ['Amortisation', (w: KennzahlenWeg) => (w.art === 'kapital' ? '—' : `${zahl(w.amortisationsJahre, 1)} J.`)],
               ] as const).map(([text, wert]) => (
                 <tr key={text} className="border-t border-slate-100">
-                  <td className="py-1 text-slate-600">{text}</td>
-                  {wege.map((w) => <td key={w.art} className="py-1 pl-2 text-right">{wert(w)}</td>)}
+                  <td className="py-1.5 text-slate-600">{text}</td>
+                  {wege.map((w) => <td key={w.art} className="py-1.5 pl-2 text-right">{wert(w)}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -686,9 +697,30 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
         </div>
       )}
 
-      <p className="mt-3 text-sm leading-relaxed text-slate-800">
+      <p className="mt-4 text-base leading-relaxed text-slate-800">
         <strong>Fazit:</strong> {fazitText(k, minderungMonat)}
       </p>
+
+      {/* Dieselbe Treppe wie im Vertrags-TUEV („Ihre Belastung“): vom Gesamtbeitrag zu dem, was es wirklich kostet. */}
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:max-w-md">
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ihre Belastung (Ansparphase, im Monat)</div>
+        <div className="space-y-1.5">
+          <GegenueberZeile text="Gesamtbeitrag" wert={euroGenau(treppe.zufluss)} />
+          {treppe.zeilen.map((z) => (
+            z.art === 'summe' ? (
+              <div key={z.text} className="!mt-2 border-t border-slate-200 pt-2">
+                <GegenueberZeile text={z.text} wert={euroGenau(z.betrag)} />
+              </div>
+            ) : (
+              <GegenueberZeile key={z.text} text={z.text} wert={euroGenau(z.betrag)} farbe="text-emerald-600" info={z.erklaerung} />
+            )
+          ))}
+          <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
+            <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
+            <span className="text-base font-black tabular-nums text-slate-900">{euroGenau(treppe.aufwand)}</span>
+          </div>
+        </div>
+      </div>
     </Karte>
   );
 }
@@ -700,7 +732,23 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   const minderung = grvMinderungVon(daten, firma.angebot, r);
   const setzeW = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) =>
     setze((d) => ({ ...d, versicherer: { ...d.versicherer, [weg]: { ...d.versicherer[weg], ...p } } }));
+  // Von Hand geaenderte Prognosewerte stammen nicht mehr aus der Hochrechnung
+  const setzePrognose = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) => setzeW(weg, { ...p, ausHochrechnung: false });
   const ohneGeburt = !rentenbeginnVon(daten.angaben);
+  const h = hochrechnung(firma.angebot, daten, r);
+  const geschaetzt = r.vertraege.some((v) => daten.versicherer[v.weg].ausHochrechnung);
+  const lohn = nettolohnHeute(daten.angaben, firma.angebot);
+  const treppe = belastungsTreppe({
+    zulageMonat: 0,
+    agZuschussMonat: r.arbeitgeberMonat,
+    beitragMonat: r.gesamtMonat,
+    svErsparnisMonat: r.svErsparnisMonat,
+    steuerersparnisMonat: r.steuerersparnisMonat,
+    echterAufwandMonat: r.nettoAufwandMonat,
+  }, {
+    zve: lohn.zveJahr, p: P, beamter: false, selbststaendig: false,
+    privatVersichert: daten.angaben.kv === 'privat', splitting: lohn.splitting,
+  });
 
   if (r.vertraege.length === 0) {
     return <Karte><p className="text-sm text-slate-600">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
@@ -708,24 +756,53 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   return (
     <div className="space-y-4">
       <p className="text-sm leading-relaxed text-slate-600">
-        Tragen Sie die Werte aus dem Angebot des Versicherers ein. Daraus wird die Rente nach Kranken- und Pflegeversicherung
-        und Steuer im ersten Rentenjahr{leistung ? ` (${leistung.rentenbeginnJahr})` : ''}.
+        Tragen Sie die Werte aus dem Angebot des Versicherers ein — oder übernehmen Sie die geschätzte Hochrechnung aus „Ihre
+        Rechnung“. Daraus wird die Rente nach Kranken- und Pflegeversicherung und Steuer im ersten
+        Rentenjahr{leistung ? ` (${leistung.rentenbeginnJahr})` : ''}.
       </p>
       {r.vertraege.map((v) => {
         const w = daten.versicherer[v.weg];
         const l = leistung?.vertraege.find((x) => x.weg === v.weg) ?? null;
         const traeger = traegerText(v.weg, a);
+        const schaetzung = h.monate > 0 ? hochrechnungJeVertrag(h, r, v.weg) : null;
+        const veraltet = w.ausHochrechnung && schaetzung !== null
+          && (Math.abs(w.prognoseRente - schaetzung.renteMonat) >= 1 || Math.abs(w.prognoseKapital - schaetzung.kapital) >= 1);
+        // Die Hochrechnung rechnet mit gleichbleibenden Beitraegen — deshalb ohne Dynamik
+        const uebernehmen = () => schaetzung && setzeW(v.weg, {
+          prognoseRente: schaetzung.renteMonat, prognoseKapital: schaetzung.kapital, dynamik: 0, ausHochrechnung: true,
+        });
         return (
-          <Karte key={v.weg} titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}>
+          <Karte key={v.weg} titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}
+            rechts={w.ausHochrechnung
+              ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Prognose aus der geschätzten Hochrechnung</span>
+              : undefined}>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
               <div className="space-y-3 lg:col-span-5">
                 <ZahlFeld label="Beitrag laut Angebot im Monat" wert={w.beitragMonat > 0 ? w.beitragMonat : Math.round(v.beitragMonat * 100) / 100}
                   onChange={(beitragMonat) => setzeW(v.weg, { beitragMonat })} einheit="€" schritt={10}
                   hilfe={`Aus der Rechnung: ${euroGenau(v.beitragMonat)}, davon Arbeitgeber ${euroGenau(v.arbeitgeberMonat)}.`} />
                 <ZahlFeld label="Garantierte Rente im Monat" wert={w.garantierteRente} onChange={(garantierteRente) => setzeW(v.weg, { garantierteRente })} einheit="€" schritt={10} />
-                <ZahlFeld label="Prognostizierte Rente im Monat" wert={w.prognoseRente} onChange={(prognoseRente) => setzeW(v.weg, { prognoseRente })} einheit="€" schritt={10} />
-                <ZahlFeld label="Kapital zum Rentenbeginn (Prognose)" wert={w.prognoseKapital} onChange={(prognoseKapital) => setzeW(v.weg, { prognoseKapital })} einheit="€" schritt={1000} />
+                <ZahlFeld label="Prognostizierte Rente im Monat" wert={w.prognoseRente} onChange={(prognoseRente) => setzePrognose(v.weg, { prognoseRente })} einheit="€" schritt={10} />
+                <ZahlFeld label="Kapital zum Rentenbeginn (Prognose)" wert={w.prognoseKapital} onChange={(prognoseKapital) => setzePrognose(v.weg, { prognoseKapital })} einheit="€" schritt={1000} />
                 <ProzentFeld label="Dynamik des Beitrags" wert={w.dynamik} onChange={(dynamik) => setzeW(v.weg, { dynamik })} max={10} />
+                {schaetzung && (!w.ausHochrechnung || veraltet) && (
+                  <div className={`rounded-lg border p-3 ${veraltet ? 'border-amber-200 bg-amber-50' : 'border-indigo-100 bg-indigo-50/60'}`}>
+                    <button type="button" onClick={uebernehmen} className={KNOPF_ZWEIT}>
+                      <Wand2 className="h-4 w-4" aria-hidden /> {veraltet ? 'Hochrechnung erneut übernehmen' : 'Geschätzte Hochrechnung übernehmen'}
+                    </button>
+                    <p className={`mt-1.5 text-xs leading-relaxed ${veraltet ? 'text-amber-900' : 'text-slate-600'}`}>
+                      {veraltet ? 'Die Hochrechnung hat sich seit der Übernahme geändert. ' : ''}
+                      Aus „Ihre Rechnung“: Kapital {euro(schaetzung.kapital)} und Rente {euro(schaetzung.renteMonat)} im Monat — als
+                      Prognose, gekennzeichnet als geschätzt.
+                    </p>
+                  </div>
+                )}
+                {w.ausHochrechnung && !veraltet && (
+                  <p className="text-xs leading-relaxed text-slate-600">
+                    Rente und Kapital stammen aus der geschätzten Hochrechnung — keine Zusage. Liegt das Angebot des Versicherers vor,
+                    tragen Sie dessen Werte einfach darüber ein.
+                  </p>
+                )}
               </div>
               <div className={`space-y-3 lg:col-span-7 ${aktuell ? '' : 'opacity-60'}`}>
                 {ohneGeburt && <p className="text-sm text-amber-800">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
@@ -734,11 +811,11 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                   <>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Wertezeile titel="Garantiert" w={l.garantiert} kk={leistung.kaufkraftfaktor} />
-                      <Wertezeile titel="Prognose" w={l.prognose} kk={leistung.kaufkraftfaktor} />
+                      <Wertezeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} kk={leistung.kaufkraftfaktor} />
                     </div>
                     {l.kapital && (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <h4 className="text-sm font-black text-slate-900">Oder als Kapital (Prognose)</h4>
+                        <h4 className="text-sm font-black text-slate-900">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
                         <dl className="mt-1 space-y-0.5 text-[13px]">
                           <Zeile text="Kapital brutto" betrag={l.kapital.brutto} />
                           <Zeile text="− Steuer" betrag={l.kapital.steuer} />
@@ -761,7 +838,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
       })}
 
       {kennzahlen && (
-        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} />
+        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} treppe={treppe} />
       )}
 
       {leistung && (
@@ -786,7 +863,8 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
             )}
           </dl>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Mit der prognostizierten Rente, nach Steuer und Krankenversicherung und nach Abzug der geminderten gesetzlichen Rente —
+            Mit der {geschaetzt ? 'geschätzten Rente aus der Hochrechnung' : 'prognostizierten Rente'}, nach Steuer und Krankenversicherung
+            und nach Abzug der geminderten gesetzlichen Rente —
             in heutiger Kaufkraft ({euro(leistung.plusHaushaltMonat ?? 0)} im Jahr {leistung.rentenbeginnJahr}).
             Prognosen sind nicht garantiert; maßgeblich ist das Angebot des Versicherers.
           </p>
@@ -804,10 +882,17 @@ const WAHL: { status: BeratungStatus; text: string; symbol: ReactNode }[] = [
   { status: 'offen', text: 'Ich überlege noch', symbol: <FileText className="h-5 w-5" aria-hidden /> },
 ];
 
-export function SchrittEntscheidung({ daten, setze, r, geheZu }: SchrittProps) {
+export function SchrittEntscheidung({ firma, daten, setze, r, geheZu }: SchrittProps) {
   const e = daten.entscheidung;
   const setzeE = (p: Partial<BeratungDaten['entscheidung']>) => setze((d) => ({ ...d, entscheidung: { ...d.entscheidung, ...p } }));
   const heute = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  // Vorbelegt mit dem naechsten Monatsersten (oder dem Beginn laut Angebot); mit „Ich nehme teil“ steht er fest.
+  const autoBeginn = automatischerBeginn(firma.angebot);
+  const waehle = (status: BeratungStatus) => setzeE({
+    status,
+    datum: e.datum || heute,
+    ...(status === 'teilnahme' && !e.beginn ? { beginn: autoBeginn } : {}),
+  });
 
   return (
     <div className="space-y-4">
@@ -815,7 +900,7 @@ export function SchrittEntscheidung({ daten, setze, r, geheZu }: SchrittProps) {
         <div role="radiogroup" aria-label="Entscheidung" className="grid gap-2 sm:grid-cols-3">
           {WAHL.map((w) => (
             <button key={w.status} type="button" role="radio" aria-checked={e.status === w.status}
-              onClick={() => setzeE({ status: w.status, datum: e.datum || heute })}
+              onClick={() => waehle(w.status)}
               className={`flex items-center gap-2 rounded-xl border-2 p-3 text-left text-sm font-bold ${
                 e.status === w.status ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
               }`}>
@@ -831,7 +916,16 @@ export function SchrittEntscheidung({ daten, setze, r, geheZu }: SchrittProps) {
               <p className="text-lg font-black tabular-nums text-slate-900">{euroGenau(r.umwandlungMonat)}</p>
               <button type="button" onClick={() => geheZu(3)} className="text-xs font-bold text-indigo-700 hover:underline">Betrag ändern</button>
             </div>
-            <DatumFeld label="Beginn" wert={e.beginn} onChange={(beginn) => setzeE({ beginn })} hilfe="Leer: der nächste Monatserste." />
+            <div>
+              <DatumFeld label="Beginn" wert={e.beginn || autoBeginn} onChange={(beginn) => setzeE({ beginn })}
+                hilfe={e.beginn && e.beginn !== autoBeginn ? 'Eingetragen.'
+                  : firma.angebot.beginn ? 'Automatisch: der Beginn laut Angebot der Firma.' : 'Automatisch: der nächste Monatserste. Ändern, wenn die Umwandlung später beginnt.'} />
+              {e.beginn && e.beginn !== autoBeginn && (
+                <button type="button" onClick={() => setzeE({ beginn: autoBeginn })} className="mt-1 text-xs font-bold text-indigo-700 hover:underline">
+                  {firma.angebot.beginn ? 'Beginn laut Angebot' : 'Nächsten Monatsersten'} verwenden ({autoBeginn})
+                </button>
+              )}
+            </div>
           </div>
         )}
         {e.status === 'verzicht' && (

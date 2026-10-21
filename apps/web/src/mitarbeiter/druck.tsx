@@ -7,7 +7,7 @@ import { DeckblattKopf } from '../druck/DeckblattKopf';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
-  P, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
+  P, beginnDatum, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
   type AuszahlungsWerte, type KennzahlenErgebnis, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
@@ -111,6 +111,12 @@ const WEG_IM_SATZ = (weg: 'direkt' | 'ukasse', firma: Firma) =>
     : `eine ${WEG_NAME[firma.angebot.durchfuehrungsweg]}${traegerText('direkt', firma.angebot) ? ` bei ${traegerText('direkt', firma.angebot)}` : ''}`;
 
 /* --- Beratungsprotokoll --------------------------------------------------- */
+
+/** Woher die Leistung stammt — je Vertrag aus dem Angebot oder aus der geschaetzten Hochrechnung. */
+function quelleDerLeistung(ausHochrechnung: boolean[]): string {
+  if (ausHochrechnung.every(Boolean)) return 'laut geschätzter Hochrechnung';
+  return ausHochrechnung.some(Boolean) ? 'laut Angebot und geschätzter Hochrechnung' : 'laut Angebot';
+}
 
 function LeistungsZeile({ titel, w }: { titel: string; w: AuszahlungsWerte | null }) {
   if (!w) return null;
@@ -239,7 +245,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
       </Abschnitt>
 
       {leistung && leistung.vertraege.length > 0 && (
-        <Abschnitt titel={`Leistung im Alter laut Angebot — erstes Rentenjahr ${leistung.rentenbeginnJahr}`}>
+        <Abschnitt titel={`Leistung im Alter ${quelleDerLeistung(leistung.vertraege.map((l) => daten.versicherer[l.weg].ausHochrechnung))} — erstes Rentenjahr ${leistung.rentenbeginnJahr}`}>
           {leistung.vertraege.map((l) => {
             const w = daten.versicherer[l.weg];
             return (
@@ -251,11 +257,11 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
                 </p>
                 <div className="grid grid-cols-2 gap-8">
                   <LeistungsZeile titel="Garantiert" w={l.garantiert} />
-                  <LeistungsZeile titel="Prognose" w={l.prognose} />
+                  <LeistungsZeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} />
                 </div>
                 {l.kapital && (
                   <p className="mt-1">
-                    Oder als Kapital (Prognose): {euroGenau(l.kapital.brutto)} brutto, nach Steuer und Kranken- und Pflegeversicherung{' '}
+                    Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'}): {euroGenau(l.kapital.brutto)} brutto, nach Steuer und Kranken- und Pflegeversicherung{' '}
                     {euroGenau(l.kapital.netto)}.
                     {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins)
                       ? ` Die Rente holt das Kapital mit rund ${Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.` : ''}
@@ -278,7 +284,8 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           {leistung.plusHaushaltMonat !== null && (
             <p className="mt-2 font-bold">
               Unterm Strich steigt das Netto im Ruhestand um rund {euroGenau(Math.round(leistung.plusHaushaltMonat / leistung.kaufkraftfaktor))} im Monat
-              (heutige Kaufkraft; mit der Prognose, nach Abzug der geminderten gesetzlichen Rente).
+              (heutige Kaufkraft; mit der {kennzahlen?.geschaetzt ? 'geschätzten Rente aus der Hochrechnung' : 'Prognose'}, nach Abzug der geminderten
+              gesetzlichen Rente).
             </p>
           )}
         </Abschnitt>
@@ -295,7 +302,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         {e.empfehlung.trim() && <p className="whitespace-pre-line">{e.empfehlung}</p>}
         <p className="mt-1 font-bold">
           {e.status === 'teilnahme'
-            ? `Entscheidung: Teilnahme mit ${euroGenau(r.umwandlungMonat)} Umwandlung im Monat${e.beginn ? ` ab ${e.beginn}` : ''}.`
+            ? `Entscheidung: Teilnahme mit ${euroGenau(r.umwandlungMonat)} Umwandlung im Monat ab ${beginnDatum(daten, firma.angebot)}.`
             : e.status === 'verzicht'
               ? `Entscheidung: Verzicht${e.grund.trim() ? ` — ${e.grund.trim()}` : ''}.`
               : 'Entscheidung: noch offen (Bedenkzeit).'}
@@ -334,7 +341,7 @@ export function Vereinbarung({ firma, logo, daten, r }: DokumentProps) {
 
       <h2 className="mt-5 font-black">1. Entgeltumwandlung</h2>
       <p>
-        Der Arbeitnehmer wandelt ab dem {e.beginn || LINIE} monatlich <strong>{euroGenau(r.umwandlungMonat)}</strong> seines
+        Der Arbeitnehmer wandelt ab dem {beginnDatum(daten, firma.angebot)} monatlich <strong>{euroGenau(r.umwandlungMonat)}</strong> seines
         Bruttoentgelts in einen Beitrag zur betrieblichen Altersversorgung um (§ 1a BetrAVG). Bei Teilzahlungsmonaten gilt
         der Betrag anteilig.
       </p>

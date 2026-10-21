@@ -660,7 +660,8 @@ export interface TreppenZeile {
  * steht unveraendert `echterAufwandMonat`.
  */
 export function belastungsTreppe(
-  r: TuevErgebnis,
+  /** Nur diese Felder — so rechnet auch die Mitarbeiterberatung ihre Belastung damit */
+  r: Pick<TuevErgebnis, 'zulageMonat' | 'agZuschussMonat' | 'beitragMonat' | 'svErsparnisMonat' | 'steuerersparnisMonat' | 'echterAufwandMonat'>,
   /**
    * Was zum Erklaeren gebraucht wird, aber nicht im Ergebnis steht: das zu
    * versteuernde Einkommen, der Rechtsstand und die Erwerbsart des Inhabers.
@@ -675,6 +676,8 @@ export function belastungsTreppe(
     beamter: boolean;
     selbststaendig: boolean;
     privatVersichert: boolean;
+    /** Grenzsteuersatz im Splittingtarif — fehlt die Angabe, gilt der Grundtarif */
+    splitting?: boolean;
   },
 ): {
   zufluss: number;
@@ -727,8 +730,9 @@ export function belastungsTreppe(
       text: '− Steuerersparnis',
       betrag: r.steuerersparnisMonat,
       art: 'abzug',
+      // Das zu versteuernde Einkommen mindert der eigene Beitrag — nicht der Zuschuss des Arbeitgebers
       erklaerung: fuerErklaerung
-        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat, fuerErklaerung),
+        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat - agZuschuss, fuerErklaerung),
     });
   }
 
@@ -773,9 +777,9 @@ function svErklaerung(
 function steuerErklaerung(
   steuerMonat: number,
   beitragMonat: number,
-  k: { zve: number; p: LegalParameters },
+  k: { zve: number; p: LegalParameters; splitting?: boolean },
 ): string {
-  const grenz = grenzsteuersatz(k.zve, false, k.p);
+  const grenz = grenzsteuersatz(k.zve, k.splitting ?? false, k.p);
   return `Der Beitrag mindert Ihr zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
     + 'wird die DIFFERENZ Ihrer Jahressteuer mit und ohne Beitrag — nicht ein '
     + `Durchschnittssatz: Der letzte Euro Ihres Einkommens kostet rund `

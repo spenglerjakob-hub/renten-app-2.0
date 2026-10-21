@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, beginnVon, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
@@ -97,6 +97,20 @@ describe('Gesetzliche Rente', () => {
     const m = grvMinderungVon(reich, firma, beitragsRechnung(firma, reich), P, HEUTE);
     expect(m.renteMonat).toBe(0);
     expect(m.ueberBbg).toBe(true);
+  });
+});
+
+describe('Beginn automatisch', () => {
+  it('der nächste Monatserste — oder der Beginn laut Angebot; ein eingetragener gilt', () => {
+    const ohne = firmenAngebotSchema.parse({});
+    expect(automatischerBeginn(ohne, new Date('2026-10-21T12:00:00'))).toBe('01.11.2026');
+    expect(automatischerBeginn(ohne, new Date('2026-12-05T12:00:00'))).toBe('01.01.2027');
+    expect(automatischerBeginn({ ...ohne, beginn: '01.03.2027' }, HEUTE)).toBe('01.03.2027');
+    const d = beratungDatenSchema.parse({ angaben: { geburtsdatum: '15.03.1985' } });
+    expect(beginnDatum(d, ohne, HEUTE)).toBe('01.11.2026');
+    expect(beginnVon(d, ohne, HEUTE)).toEqual({ jahr: 2026, monat: 11 });
+    const eingetragen = { ...d, entscheidung: { ...d.entscheidung, beginn: '01.02.2027' } };
+    expect(beginnDatum(eingetragen, ohne, HEUTE)).toBe('01.02.2027');
   });
 });
 
@@ -247,6 +261,19 @@ describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner, mit feste
     expect(hochrechnung(firma, d, r, HEUTE, annahmen({ renditeAnsparphase: 0.01 })).kapital).toBeCloseTo(h.beitraegeSumme, 6);
   });
 
+  it('je Vertrag nach dem Anteil am Beitrag — im Matching-Modell geteilt', () => {
+    const d = anna();
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    expect(hochrechnungJeVertrag(h, r, 'direkt')).toEqual({ renteMonat: Math.round(h.renteMonat), kapital: Math.round(h.kapital) });
+    const rm = beitragsRechnung(matchingFirma, d);
+    const hm = hochrechnung(matchingFirma, d, rm, HEUTE);
+    const teile = rm.vertraege.map((v) => hochrechnungJeVertrag(hm, rm, v.weg));
+    expect(teile.length).toBe(2);
+    expect(Math.abs(teile.reduce((x, t) => x + t.kapital, 0) - hm.kapital)).toBeLessThanOrEqual(1);
+    expect(Math.abs(teile.reduce((x, t) => x + t.renteMonat, 0) - hm.renteMonat)).toBeLessThanOrEqual(1);
+  });
+
   it('Formel: Entnahme ohne Rendite nach Kosten ist das Kapital geteilt durch die Monate', () => {
     const d = anna();
     const h = hochrechnung(firma, d, beitragsRechnung(firma, d), HEUTE, annahmen({ renditeEntnahme: 0.01, entnahmedauer: 25 }));
@@ -287,6 +314,17 @@ describe('Kennzahlen: Vertrag allein, wie im Vertrags-TÜV', () => {
     const leer = anna();
     expect(kennzahlenRechnung(firma, leer, leistungsRechnung(firma, leer, beitragsRechnung(firma, leer)), P, HEUTE)).toBeNull();
   });
+
+  it('aus der geschätzten Hochrechnung übernommen: so gekennzeichnet', () => {
+    const d = anna(200, { ...werte, ausHochrechnung: false });
+    const r = beitragsRechnung(firma, d);
+    expect(kennzahlenRechnung(firma, d, leistungsRechnung(firma, d, r), P, HEUTE)!.geschaetzt).toBe(false);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    const g = { ...d, versicherer: { ...d.versicherer, direkt: { ...d.versicherer.direkt, prognoseRente: Math.round(h.renteMonat), prognoseKapital: Math.round(h.kapital), ausHochrechnung: true } } };
+    const k = kennzahlenRechnung(firma, g, leistungsRechnung(firma, g, r), P, HEUTE)!;
+    expect(k.geschaetzt).toBe(true);
+    expect(k.prognose!.summeEinzahlung).toBeCloseTo(r.nettoAufwandMonat * 303, 6);
+  });
 });
 
 describe('Szenario aus den Angaben', () => {
@@ -312,7 +350,7 @@ describe('Leistung im Alter aus den Werten des Versicherers', () => {
   const mitWerten = (f = firma) => {
     const d = beratung({ grvRente: 1450 });
     const r = beitragsRechnung(f, d);
-    const werte = { beitragMonat: 0, garantierteRente: 420, prognoseRente: 600, prognoseKapital: 162_000, dynamik: 0 };
+    const werte = { beitragMonat: 0, garantierteRente: 420, prognoseRente: 600, prognoseKapital: 162_000, dynamik: 0, ausHochrechnung: false };
     return { d: { ...d, versicherer: { direkt: werte, ukasse: { ...werte, garantierteRente: 200, prognoseRente: 300, prognoseKapital: 80_000 } } }, r, f };
   };
 

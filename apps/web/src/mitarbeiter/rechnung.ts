@@ -82,14 +82,29 @@ export function rentenbeginnVon(a: BeratungAngaben): string | null {
 const monatsIndex = (x: { jahr: number; monat: number }) => x.jahr * 12 + (x.monat - 1);
 
 /**
+ * Der Beginn, wenn in der Beratung keiner eingetragen ist: laut Angebot der
+ * Firma, sonst der naechste Monatserste — als TT.MM.JJJJ. So steht er
+ * vorbelegt im Feld; bleibt er unveraendert, gilt er.
+ */
+export function automatischerBeginn(f: FirmenAngebot, heute = new Date()): string {
+  if (parseDatum(f.beginn)) return f.beginn;
+  const naechster = heute.getMonth() + 2;
+  const [jahr, monat] = naechster > 12 ? [heute.getFullYear() + 1, 1] : [heute.getFullYear(), naechster];
+  return `01.${String(monat).padStart(2, '0')}.${jahr}`;
+}
+
+/** Der Beginn als TT.MM.JJJJ: der eingetragene, sonst der automatische. */
+export function beginnDatum(d: BeratungDaten, f: FirmenAngebot, heute = new Date()): string {
+  return parseDatum(d.entscheidung.beginn) ? d.entscheidung.beginn : automatischerBeginn(f, heute);
+}
+
+/**
  * Der erste Monat der Umwandlung: laut Entscheidung, sonst laut Angebot der
  * Firma, sonst der naechste Monatserste.
  */
 export function beginnVon(d: BeratungDaten, f: FirmenAngebot, heute = new Date()): { jahr: number; monat: number } {
-  const x = parseDatum(d.entscheidung.beginn) ?? parseDatum(f.beginn);
-  if (x) return { jahr: x.jahr, monat: x.monat };
-  const naechster = heute.getMonth() + 2;
-  return naechster > 12 ? { jahr: heute.getFullYear() + 1, monat: 1 } : { jahr: heute.getFullYear(), monat: naechster };
+  const x = parseDatum(beginnDatum(d, f, heute))!;
+  return { jahr: x.jahr, monat: x.monat };
 }
 
 /**
@@ -352,6 +367,10 @@ export interface Lohn {
   steuernMonat: number;
   svMonat: number;
   nettoMonat: number;
+  /** Zu versteuerndes Einkommen im Jahr — fuer die Erklaerung der Steuerersparnis */
+  zveJahr: number;
+  /** Splittingtarif (verheiratet, Partner ohne Einkommen) */
+  splitting: boolean;
 }
 
 /**
@@ -362,8 +381,9 @@ export interface Lohn {
  * Lohnsteuer der Abrechnung verteilt sie je nach Steuerklasse anders.
  */
 export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P): Lohn {
+  const splitting = a.verheiratet && a.partnerBrutto <= 0;
   const n = bruttoZuNetto(Math.max(0, a.jahresbrutto), {
-    verheiratet: a.verheiratet && a.partnerBrutto <= 0,
+    verheiratet: splitting,
     bundesland: bundeslandVon(a, f),
     kirchensteuerpflichtig: a.kirchensteuer,
     kinder: kinderStatus(a),
@@ -375,6 +395,8 @@ export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalPar
     steuernMonat: (n.est + n.soli + n.kirchensteuer) / 12,
     svMonat: n.sv / 12,
     nettoMonat: n.monatsnetto,
+    zveJahr: n.zve,
+    splitting,
   };
 }
 
@@ -613,6 +635,19 @@ export function hochrechnung(
   };
 }
 
+/**
+ * Was ein Vertrag von der Hochrechnung traegt — nach seinem Anteil am Beitrag
+ * (die Hochrechnung waechst linear mit dem Beitrag), auf ganze Euro wie am
+ * Bildschirm. Fuer „Geschaetzte Hochrechnung uebernehmen“ in der Leistung im
+ * Alter; im Matching-Modell teilen sich Direktversicherung und
+ * Unterstuetzungskasse die Werte.
+ */
+export function hochrechnungJeVertrag(h: Hochrechnung, r: MitarbeiterBav, weg: MitarbeiterVertrag['weg']): { renteMonat: number; kapital: number } {
+  const v = r.vertraege.find((x) => x.weg === weg);
+  const anteil = v && r.gesamtMonat > 0 ? v.beitragMonat / r.gesamtMonat : 0;
+  return { renteMonat: Math.round(h.renteMonat * anteil), kapital: Math.round(h.kapital * anteil) };
+}
+
 /* --------------------------------------------------------------------------
  * KENNZAHLEN — wie im Vertrags-TUEV: Netto-Aufwand gegen Netto-Auszahlung,
  * mit `kennzahlen` aus dem Rechenkern. Der Vertrag allein; die geringere
@@ -629,6 +664,8 @@ export interface KennzahlenErgebnis {
   monateEinzahlung: number;
   jahreAuszahlung: number;
   lebenserwartung: number;
+  /** Die Prognose stammt (auch) aus der geschaetzten Hochrechnung, nicht aus einem Angebot */
+  geschaetzt: boolean;
   prognose: KennzahlenWeg | null;
   garantiert: KennzahlenWeg | null;
   kapital: KennzahlenWeg | null;
@@ -681,6 +718,7 @@ export function kennzahlenRechnung(
     monateEinzahlung: monate,
     jahreAuszahlung,
     lebenserwartung: d.lebenserwartung,
+    geschaetzt: l.vertraege.some((v) => d.versicherer[v.weg].ausHochrechnung),
     prognose: weg('prognose', summe((v) => v.prognose?.nettoMonat ?? 0)),
     garantiert: weg('garantiert', summe((v) => v.garantiert?.nettoMonat ?? 0)),
     kapital: weg('kapital', summe((v) => v.kapital?.netto ?? 0)),

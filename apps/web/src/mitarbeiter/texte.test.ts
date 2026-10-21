@@ -72,7 +72,14 @@ describe('Fazit und Herleitung', () => {
     echterGewinn: 17_814.28, amortisationsJahre: 11.59, ...x,
   });
   const k = (x: Partial<KennzahlenErgebnis>): KennzahlenErgebnis => ({
-    monateEinzahlung: 303, jahreAuszahlung: 18, lebenserwartung: 85, prognose: null, garantiert: null, kapital: null, ...x,
+    monateEinzahlung: 303, jahreAuszahlung: 18, lebenserwartung: 85, geschaetzt: false, prognose: null, garantiert: null, kapital: null, ...x,
+  });
+
+  it('aus der geschätzten Hochrechnung: so benannt, mit dem Hinweis „keine Zusage“', () => {
+    const t = nbsp(fazitText(k({ geschaetzt: true, prognose: weg('prognose', {}) }), 0));
+    expect(t).toContain('erhalten Sie mit der geschätzten Rente aus der Hochrechnung nach Steuer und Krankenversicherung 1,55 € zurück.');
+    expect(t).toContain('Die Werte beruhen auf der beispielhaften, geschätzten Hochrechnung — keine Zusage.');
+    expect(nbsp(fazitText(k({ prognose: weg('prognose', {}) }), 0))).not.toContain('geschätzt');
   });
 
   it('Prognose mit Garantie und Minderung der gesetzlichen Rente', () => {

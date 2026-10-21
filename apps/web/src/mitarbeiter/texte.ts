@@ -146,8 +146,9 @@ export function minderungText(m: MinderungHerleitung): string {
 export function fazitText(k: KennzahlenErgebnis, minderungMonat: number): string {
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return '';
-  const mit = haupt.art === 'prognose' ? 'mit der prognostizierten Rente'
-    : haupt.art === 'garantiert' ? 'mit der garantierten Rente' : 'mit der Kapitalauszahlung';
+  const mit = haupt.art === 'prognose' ? (k.geschaetzt ? 'mit der geschätzten Rente aus der Hochrechnung' : 'mit der prognostizierten Rente')
+    : haupt.art === 'garantiert' ? 'mit der garantierten Rente'
+      : k.geschaetzt ? 'mit der geschätzten Kapitalauszahlung' : 'mit der Kapitalauszahlung';
   const prozent = (x: number) => `${dezimal(x * 100, 1)} %`;
   const s: string[] = [
     `Für jeden Euro, den Sie netto einzahlen, erhalten Sie ${mit} nach Steuer und Krankenversicherung `
@@ -179,5 +180,6 @@ export function fazitText(k: KennzahlenErgebnis, minderungMonat: number): string
       + '(nach heutigem Stand) — siehe „Unterm Strich“.',
     );
   }
+  if (k.geschaetzt) s.push('Die Werte beruhen auf der beispielhaften, geschätzten Hochrechnung — keine Zusage.');
   return s.join(' ');
 }
