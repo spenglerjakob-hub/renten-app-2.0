@@ -131,7 +131,18 @@ export interface MatchingSteuer {
   verheiratet: boolean;
   bundesland: string;
   kirchensteuerpflichtig: boolean;
+  /**
+   * Verheiratet: zu versteuerndes Einkommen des Partners, Jahr. Die
+   * Steuerersparnis des Mitarbeiters rechnet dann mit dem gemeinsamen zvE im
+   * Splittingtarif. Fehlt es, gilt der Partner als ohne Einkommen — so
+   * rechnen die Arbeitgeber-Seiten.
+   */
+  partnerZveJahr?: number;
 }
+
+/** Das zvE, auf dem die Steuerersparnis des Mitarbeiters aufsetzt — mit dem des Partners. */
+const zveBasis = (eigenesZve: number, s: MatchingSteuer) =>
+  eigenesZve + (s.verheiratet ? Math.max(0, s.partnerZveJahr ?? 0) : 0);
 
 /**
  * Dieselben Kosten vor Steuern als Gehaltserhoehung — mit allen
@@ -470,7 +481,7 @@ export function matchingModell(
   const steuerFrei = e.weg === 'dv' ? Math.min(a.e, Math.max(0, steuerGrenze - a.z)) : a.e;
   const wirkung = svWirkung(a.svFrei, sk, p);
   const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
-  const steuerAn = zusatzsteuer(heute.zve - zveMinderung, zveMinderung, steuerOpt, p);
+  const steuerAn = zusatzsteuer(zveBasis(heute.zve, steuerOpt) - zveMinderung, zveMinderung, steuerOpt, p);
   const aufwandAn = Math.max(0, a.e - wirkung.ersparnis - steuerAn);
 
   // --- Arbeitgeber ---------------------------------------------------------
@@ -725,7 +736,7 @@ function zuschussKern(
   const steuerFrei = Math.min(a.e, Math.max(0, steuerGrenze - a.ag));
   const wirkung = svWirkung(a.svFrei, sk, p);
   const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
-  const steuerAn = zusatzsteuer(heute.zve - zveMinderung, zveMinderung, steuerOpt, p);
+  const steuerAn = zusatzsteuer(zveBasis(heute.zve, steuerOpt) - zveMinderung, zveMinderung, steuerOpt, p);
   const aufwandAn = Math.max(0, a.e - wirkung.ersparnis - steuerAn);
 
   // --- Arbeitgeber ---------------------------------------------------------
@@ -886,6 +897,20 @@ export interface FestbetragErgebnis extends ZuschussErgebnis {
 
 const festbetragRegel = (festMonat: number, mindestMonat: number): ZuschussRegel =>
   (e) => (e > 0 && e + 0.005 >= Math.max(0, mindestMonat) * 12 ? Math.max(0, festMonat) * 12 : 0);
+
+/**
+ * Die Umwandlung, bei der Umwandlung und Festbetrag (mindestens der
+ * Pflichtzuschuss) den beitragsfreien Rahmen genau fuellen — Monat, auf Cent
+ * abgerundet. Die Summe springt an der Mindestumwandlung nach oben, faellt
+ * aber nie — die Bisektion in `rahmenVoll` gilt deshalb auch hier.
+ */
+export function festbetragVollAusschoepfen(
+  e: Pick<FestbetragEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'festbetragMonat' | 'mindestUmwandlungMonat' | 'bisher'>,
+  bundesland: string,
+  p: LegalParameters,
+): number {
+  return rahmenVoll(e, festbetragRegel(e.festbetragMonat, e.mindestUmwandlungMonat), bundesland, p, vorbelegtJahr(e.bisher, true));
+}
 
 export function festbetragModell(
   e: FestbetragEingaben,

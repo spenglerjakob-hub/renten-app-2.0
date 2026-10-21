@@ -14,3 +14,10 @@ export {
   lookupKey, stripeStaffeln, paketDeckt,
   type Paket, type PaketId, type Bereich, type Intervall,
 } from './preise.js';
+export {
+  firmenModellSchema, firmenAngebotSchema, beratungAngabenSchema, versichererWerteSchema,
+  entscheidungSchema, beratungDatenSchema, angebotLesen, beratungLesen,
+  MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS,
+  type FirmenModellDaten, type FirmenAngebot, type BeratungAngaben, type VersichererWerte,
+  type Entscheidung, type BeratungDaten, type BeratungStatus,
+} from './bav-beratung.js';

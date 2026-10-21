@@ -100,7 +100,7 @@ export {
 export {
   matchingModell, optimaleUmwandlung, arbeitgeberSvErsparnis,
   zuschussModell, zuschussVollAusschoepfen, zuschussStaffel,
-  festbetragModell, festbetragGehaltsStaffel,
+  festbetragModell, festbetragGehaltsStaffel, festbetragVollAusschoepfen,
   type FestbetragEingaben, type FestbetragErgebnis, type FestbetragStufe,
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
@@ -108,6 +108,10 @@ export {
   betriebUmstieg, type BetriebAngaben, type BetriebGruppe, type BetriebZeile, type BetriebErgebnis, type BetriebKopfVl,
   type ModellBasis, type ModellKosten,
 } from './analyse/matching-modell.js';
+export {
+  bavMitarbeiter, bavRahmenVoll, grvMinderung,
+  type FirmenModell, type MitarbeiterEingaben, type MitarbeiterBav, type MitarbeiterVertrag,
+} from './analyse/bav-mitarbeiter.js';
 export {
   bkvModell, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, PAUSCHAL_40_GRENZE_JAHR, PAUSCHAL_40_MINDEST_MA,
   type BkvEingaben, type BkvErgebnis, type BkvWeg, type BkvWegId, type BkvGehalt,
