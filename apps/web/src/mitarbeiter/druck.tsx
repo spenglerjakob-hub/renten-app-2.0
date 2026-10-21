@@ -6,8 +6,13 @@ import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftri
 import { DeckblattKopf } from '../druck/DeckblattKopf';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
-import { P, grvMinderungVon, rentenbeginnVon, type AuszahlungsWerte, type Leistung } from './rechnung';
-import { MODELL_NAME, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME } from './texte';
+import {
+  P, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
+  type AuszahlungsWerte, type KennzahlenErgebnis, type Leistung, type Versorgungsluecke,
+} from './rechnung';
+import {
+  MODELL_NAME, fazitText, festePunkte, firmenHinweise, minderungText, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+} from './texte';
 import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
 
 /**
@@ -27,6 +32,9 @@ export interface DokumentProps {
   r: MitarbeiterBav;
   leistung: Leistung | null;
   auftritt: Auftritt | null;
+  /** Nur fuer das Protokoll; fehlen sie, entfallen die Abschnitte */
+  luecke?: Versorgungsluecke | null;
+  kennzahlen?: KennzahlenErgebnis | null;
 }
 
 const LINIE = '__________________________';
@@ -117,11 +125,16 @@ function LeistungsZeile({ titel, w }: { titel: string; w: AuszahlungsWerte | nul
   );
 }
 
-export function Protokoll({ firma, logo, daten, r, leistung, auftritt }: DokumentProps) {
+export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen }: DokumentProps) {
   const a = daten.angaben;
   const e = daten.entscheidung;
   const fussCss = fusszeileCss(auftritt);
-  const minderung = grvMinderungVon(a, r);
+  const minderung = grvMinderungVon(daten, firma.angebot, r);
+  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a));
+  const abrechnung = probeabrechnung(firma.angebot, daten, r);
+  const h = hochrechnung(firma.angebot, daten, r);
+  const kz = kennzahlen ? kennzahlen.prognose ?? kennzahlen.garantiert ?? kennzahlen.kapital : null;
+  const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
   const kasse = KRANKENKASSEN.find((k) => k.name === a.krankenkasse);
   const prozent = (x: number) => `${(Math.round(x * 10000) / 100).toLocaleString('de-DE')} %`;
   const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
@@ -163,13 +176,28 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt }: Dokumen
           ['Krankenversicherung', a.kv === 'privat'
             ? `privat, ${euroGenau(a.pkvPraemieMonat)} im Monat`
             : `gesetzlich${kasse ? `, ${kasse.name}` : ''}, Zusatzbeitrag ${prozent(a.zusatzbeitrag)}`],
-          ['Gesetzliche Rente', leistung
-            ? `${euroGenau(leistung.grv.monat)} im Monat${leistung.grv.geschaetzt ? ' (aus dem Gehalt geschätzt, heutige Kaufkraft)' : ' (laut Renteninformation)'}`
-            : a.grvRente > 0 ? `${euroGenau(a.grvRente)} im Monat (laut Renteninformation)` : 'nicht angegeben'],
+          ['Gesetzliche Rente', grv.monat > 0
+            ? `${euroGenau(grv.monat)} im Monat nach heutigem Stand (${grv.geschaetzt ? 'aus dem Gehalt geschätzt' : 'eingetragen'})`
+            : 'nicht angegeben'],
           ['Rentenbeginn', rentenbeginnVon(a) ?? '—'],
           ['Bestehende Betriebsrente', a.bavBestandMonat > 0 ? `${euroGenau(a.bavBestandMonat)} Beitrag im Monat` : 'keine'],
         ]} />
       </Abschnitt>
+
+      {luecke && (
+        <Abschnitt titel="Versorgungslücke">
+          <Paare zeilen={[
+            ['Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
+            [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat (heutige Kaufkraft)`],
+            ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat`],
+          ]} />
+          <p className="mt-1 text-[9pt] text-slate-700">
+            Die gesetzliche Rente ersetzt rund {Math.round(luecke.anteil * 100)} % des Nettolohns. Angenommen: Inflation{' '}
+            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Steuer als Monatsanteil
+            der Jahressteuer.
+          </p>
+        </Abschnitt>
+      )}
 
       <Abschnitt titel="Rechnung im Monat">
         <div className="grid grid-cols-2 gap-8">
@@ -190,10 +218,21 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt }: Dokumen
           <p className="mt-1">Je 1 € netto fließen {r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} € in die Vorsorge.</p>
         )}
         {r.hinweise.map((h) => <p key={h} className="mt-1 text-[9pt] text-slate-700">{h}</p>)}
+        <p className="mt-1">
+          Netto im Monat: {euroGenau(abrechnung.netto.ohne)} ohne, {euroGenau(abrechnung.netto.mit)} mit Betriebsrente — Eigenbeteiligung{' '}
+          {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)} Gesamtbeitrag.
+        </p>
         {minderung.renteMonat > 0.5 && (
           <p className="mt-1 text-[9pt] text-slate-700">
-            Die gesetzliche Rente sinkt durch die beitragsfreie Umwandlung um rund {euroGenau(Math.round(minderung.renteMonat))} im Monat
-            (heutige Kaufkraft, gleiches Gehalt bis zum Rentenbeginn).
+            Die gesetzliche Rente sinkt durch die beitragsfreie Umwandlung um rund {euroGenau(Math.round(minderung.renteMonat))} im Monat.
+            So gerechnet: {minderungText(minderung)}
+          </p>
+        )}
+        {h.monate > 0 && (
+          <p className="mt-1 text-[9pt] text-slate-700">
+            Beispielhafte Hochrechnung ({zahl(h.zins * 100, 0)} % im Jahr nach Kosten, keine Zusage): bis zum Rentenbeginn{' '}
+            {euroGenau(Math.round(h.beitraegeSumme))} Beiträge, davon netto aus eigener Tasche {euroGenau(Math.round(h.nettoSumme))};
+            mögliches Kapital rund {euroGenau(Math.round(h.kapital))}.
           </p>
         )}
       </Abschnitt>
@@ -224,6 +263,17 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt }: Dokumen
               </div>
             );
           })}
+          {kennzahlen && kz && (
+            <div className="mt-2 break-inside-avoid">
+              <p className="font-bold">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
+              <p>
+                Netto-Hebel {zahl(kz.nettoHebel)} × · Nettorendite {zahl(kz.rendite * 100)} % p. a. · Netto-Gewinn{' '}
+                {euroGenau(Math.round(kz.echterGewinn))}
+                {kz.art !== 'kapital' ? ` · Amortisation ${zahl(kz.amortisationsJahre, 1)} Jahre ab Rentenbeginn` : ''}
+              </p>
+              <p className="mt-1">Fazit: {fazitText(kennzahlen, minderung.renteMonat)}</p>
+            </div>
+          )}
           {leistung.plusHaushaltMonat !== null && (
             <p className="mt-2 font-bold">
               Unterm Strich steigt das Netto im Ruhestand um rund {euroGenau(Math.round(leistung.plusHaushaltMonat / leistung.kaufkraftfaktor))} im Monat

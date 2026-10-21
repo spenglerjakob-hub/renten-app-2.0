@@ -3,16 +3,20 @@ import { ArrowLeft, ArrowRight, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
 import { beratungLaden, beratungSpeichern, firmaLaden, type Beratung, type Firma } from '../lib/bav-beratung';
 import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, useBeraterAuftritt, useFirmenlogo } from './bausteine';
-import { beitragsRechnung, leistungsRechnung } from './rechnung';
+import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
 import {
-  SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittRechnung, SchrittUnterlagen,
+  SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung, SchrittUnterlagen,
 } from './schritte';
 import type { Ort } from './ort';
 
-export const SCHRITTE = ['Angebot', 'Ihre Angaben', 'Ihre Rechnung', 'Leistung im Alter', 'Entscheidung', 'Unterlagen'] as const;
+export const SCHRITTE = [
+  'Angebot', 'Ihre Angaben', 'Versorgungslücke', 'Ihre Rechnung', 'Leistung im Alter', 'Entscheidung', 'Unterlagen',
+] as const;
 
 /**
  * Eine Beratung: sechs Schritte fuer den geteilten Bildschirm.
+ *
+ * Sieben Schritte; „Versorgungsluecke“ kam als dritter dazu (Datenversion 2).
  *
  * Gerechnet wird bei jeder Eingabe neu (`rechnung.ts`), gespeichert beim
  * Wechsel des Schritts, mit „Speichern“ und beim Verlassen der Beratung —
@@ -69,9 +73,18 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const f = firma && typeof firma === 'object' ? firma : null;
   const r = useMemo(() => (f && daten ? beitragsRechnung(f.angebot, daten) : null), [f, daten]);
   const schritt = daten?.schritt ?? 0;
+  // Die Projektionen nur dort, wo sie gebraucht werden — die Unterlagen (Schritt 7) brauchen alles.
   const leistung = useMemo(() => {
-    if (!f || !aufgeschoben || schritt < 3) return null;
+    if (!f || !aufgeschoben || schritt < 4) return null;
     return leistungsRechnung(f.angebot, aufgeschoben, beitragsRechnung(f.angebot, aufgeschoben));
+  }, [f, aufgeschoben, schritt]);
+  const kennzahlen = useMemo(
+    () => (f && aufgeschoben && leistung ? kennzahlenRechnung(f.angebot, aufgeschoben, leistung) : null),
+    [f, aufgeschoben, leistung],
+  );
+  const luecke = useMemo(() => {
+    if (!f || !aufgeschoben || (schritt !== 2 && schritt !== 6)) return null;
+    return versorgungslueckeRechnung(f.angebot, aufgeschoben);
   }, [f, aufgeschoben, schritt]);
 
   const zurFirma = () => gehe({ firma: firmaId, beratung: null, reiter: 'mitarbeiter' });
@@ -137,7 +150,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       </div>
 
       <nav aria-label="Schritte der Beratung">
-        <ol className="grid grid-cols-6 gap-1">
+        <ol className="grid grid-cols-7 gap-1">
           {SCHRITTE.map((t, i) => (
             <li key={t}>
               <button
@@ -160,10 +173,11 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
       {schritt === 0 && <SchrittAngebot {...props} />}
       {schritt === 1 && <SchrittAngaben {...props} />}
-      {schritt === 2 && <SchrittRechnung {...props} />}
-      {schritt === 3 && <SchrittLeistung {...props} aktuell={aufgeschoben === daten} />}
-      {schritt === 4 && <SchrittEntscheidung {...props} />}
-      {schritt === 5 && <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} />}
+      {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
+      {schritt === 3 && <SchrittRechnung {...props} />}
+      {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} aktuell={aufgeschoben === daten} />}
+      {schritt === 5 && <SchrittEntscheidung {...props} />}
+      {schritt === 6 && <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
         <button type="button" onClick={() => geheZu(schritt - 1)} disabled={schritt === 0} className={KNOPF_ZWEIT}>

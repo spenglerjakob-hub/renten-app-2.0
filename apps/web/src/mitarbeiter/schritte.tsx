@@ -1,17 +1,22 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Building2, CheckCircle2, FileSignature, FileText, HandCoins, PiggyBank, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import type { BeratungAngaben, BeratungDaten, BeratungStatus, VersichererWerte } from '@renten/schema';
 import type { Firma } from '../lib/bav-beratung';
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
-import { AuswahlFeld, DatumFeld, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau } from '../components/Feld';
-import { Bon, Kachel, Zeile } from '../arbeitgeber/bausteine';
-import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, Karte, TextBereich, useDrucken } from './bausteine';
 import {
-  P, grvMinderungVon, grvVon, rahmenVoll, rentenbeginnVon, type AuszahlungsWerte, type Leistung,
+  AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
+} from '../components/Feld';
+import { laufzeitText } from '../features/tuev-berechnung';
+import { Bon, Kachel, Zeile } from '../arbeitgeber/bausteine';
+import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, Karte, LueckenRing, TextBereich, useDrucken } from './bausteine';
+import {
+  P, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
+  type AuszahlungsWerte, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
+  type Probeabrechnung, type Versorgungsluecke,
 } from './rechnung';
-import { festePunkte, firmenHinweise, regelText, traegerText, vertragName } from './texte';
+import { fazitText, festePunkte, firmenHinweise, minderungText, regelText, traegerText, vertragName } from './texte';
 import { Protokoll, Vereinbarung, Verzicht } from './druck';
 
 export interface SchrittProps {
@@ -97,7 +102,6 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
   const a = daten.angaben;
   const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
   const regel = rentenbeginnVon({ ...a, rentenbeginn: '' });
-  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a));
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -169,43 +173,323 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
 
       <Karte titel="Bisherige Vorsorge">
         <div className="space-y-3">
-          <ZahlFeld label="Gesetzliche Rente laut Renteninformation (im Monat)" wert={a.grvRente} onChange={(grvRente) => setzeA({ grvRente })} einheit="€" schritt={50}
-            hilfe={a.grvRente > 0 ? 'Die künftige Regelaltersrente aus der Renteninformation.'
-              : grv.monat > 0 ? `Leer: aus dem Gehalt geschätzt — rund ${euro(grv.monat)} in heutiger Kaufkraft.`
-              : 'Leer: wird aus Gehalt und Geburtsdatum geschätzt.'} />
           <ZahlFeld label="Bestehende Betriebsrente: Beitrag im Monat" wert={a.bavBestandMonat} onChange={(bavBestandMonat) => setzeA({ bavBestandMonat })} einheit="€" schritt={10}
             hilfe="Direktversicherung oder Pensionskasse, Mitarbeiter und Arbeitgeber zusammen. Sie belegt die Freigrenzen zuerst." />
+          <p className="text-xs leading-relaxed text-slate-500">
+            Die gesetzliche Rente folgt im nächsten Schritt — aus dem Gehalt geschätzt und mit der Renteninformation anpassbar.
+          </p>
         </div>
       </Karte>
     </div>
   );
 }
 
-/* --- 3. Rechnung ------------------------------------------------------------ */
+/* --- 3. Versorgungsluecke -------------------------------------------------- */
 
-export function SchrittRechnung({ firma, daten, setze, r }: SchrittProps) {
+const prozentText = (x: number, stellen = 1) => `${(x * 100).toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen })} %`;
+
+export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & { luecke: Versorgungsluecke | null; aktuell: boolean }) {
   const a = daten.angaben;
+  const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
+  const rentenbeginn = rentenbeginnVon(a);
+  const schaetzung = grvVon(a.jahresbrutto, 0, a.geburtsdatum, rentenbeginn);
+  const eingetragen = a.grvRente > 0;
+
+  if (!rentenbeginn || a.jahresbrutto <= 0) {
+    return (
+      <Karte>
+        <p className="text-sm text-amber-800">Für die Versorgungslücke fehlen Geburtsdatum und Bruttogehalt (Schritt 2).</p>
+      </Karte>
+    );
+  }
+  const reicht = luecke !== null && luecke.lueckeMonat < 0.5;
+
+  return (
+    <Karte>
+      <h2 className="text-lg font-black text-slate-900 sm:text-xl">
+        {reicht ? 'Ihre gesetzliche Rente im Vergleich zum Nettolohn' : 'Ihre gesetzliche Rente reicht nicht aus'}
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+        Im Alter brauchen die meisten etwas weniger Geld als heute — trotzdem reicht die gesetzliche Rente oft nicht. Die
+        Differenz zum heutigen Nettolohn heißt Versorgungslücke. Eine Betriebsrente kann sie verkleinern.
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className={`flex flex-col items-center gap-4 sm:flex-row sm:justify-center ${aktuell ? '' : 'opacity-60'}`}>
+          {luecke ? (
+            <>
+              <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat} />
+              <dl className="space-y-3">
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-emerald-700">Netto-Altersrente</dt>
+                  <dd className="text-2xl font-black tabular-nums text-emerald-700">{euro(luecke.rente.nettoMonat)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-rose-700">Versorgungslücke</dt>
+                  <dd className="text-2xl font-black tabular-nums text-rose-600">{euro(luecke.lueckeMonat)}</dd>
+                </div>
+                <p className="max-w-[14rem] text-xs leading-relaxed text-slate-500">
+                  Die gesetzliche Rente ersetzt {prozentText(luecke.anteil, 0)} Ihres Nettolohns — in heutiger Kaufkraft.
+                </p>
+              </dl>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">Wird gerechnet …</p>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-sm font-black text-slate-900">Berechnungsgrundlagen</h3>
+          <div className="mt-2">
+            <ZahlFeld label="Gesetzliche Rente nach heutigem Stand (im Monat)" wert={eingetragen ? a.grvRente : Math.round(schaetzung.monat)}
+              onChange={(grvRente) => setzeA({ grvRente })} einheit="€" schritt={50}
+              hilfe={eingetragen
+                ? 'Eingetragen — etwa aus der Renteninformation.'
+                : 'Aus dem Gehalt geschätzt: Berufsstart mit 22, Gehalt im Verhältnis zum Durchschnitt wie heute. '
+                  + 'Mit dem Wert der Renteninformation überschreiben.'} />
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+              {eingetragen ? (
+                <button type="button" onClick={() => setzeA({ grvRente: 0 })} className="font-bold text-indigo-700 hover:underline">
+                  Schätzung verwenden ({euro(schaetzung.monat)})
+                </button>
+              ) : (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900">geschätzt</span>
+              )}
+            </div>
+          </div>
+          {luecke && (
+            <dl className={`mt-3 divide-y divide-slate-100 text-sm ${aktuell ? '' : 'opacity-60'}`}>
+              {([
+                ['Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
+                ['Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
+                ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
+                ['Angenommene Inflation', prozentText(luecke.inflation)],
+                ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
+                [`Brutto-Altersrente ${luecke.rentenbeginnJahr}, heutige Kaufkraft`, euro(luecke.rente.bruttoMonat)],
+                ['− Kranken- und Pflegeversicherung', euro(luecke.rente.kvPvMonat)],
+                ['− Steuer', euro(luecke.rente.steuerMonat)],
+              ] as const).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3 py-1">
+                  <dt className="text-slate-600">{k}</dt><dd className="shrink-0 tabular-nums text-slate-900">{v}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between gap-3 py-1 font-black">
+                <dt className="text-slate-900">= Netto-Altersrente</dt><dd className="shrink-0 tabular-nums text-emerald-700">{euro(luecke.rente.nettoMonat)}</dd>
+              </div>
+            </dl>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-5 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+        Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
+        mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
+        Der Nettolohn rechnet die Steuer als Monatsanteil der Jahressteuer
+        {a.verheiratet && a.partnerBrutto > 0 ? ', bei Verheirateten mit eigenem Einkommen des Partners wie Steuerklasse IV' : ''}.
+        Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
+      </p>
+    </Karte>
+  );
+}
+
+/* --- 4. Rechnung ------------------------------------------------------------ */
+
+/**
+ * Der Regler fuer den Netto-Aufwand: Der Mitarbeiter sagt, was er netto
+ * entbehren kann; die Umwandlung brutto folgt daraus (`umwandlungFuerNetto`).
+ * Den genauen Bruttobetrag fuer die Vereinbarung kann man darunter eintippen.
+ */
+function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
+  const [genau, setGenau] = useState(false);
+  // Die Grenzen haengen an den Angaben, nicht am Betrag — beim Ziehen am Regler nicht jedes Mal neu.
+  const grenzen = useMemo(() => reglerGrenzen(firma.angebot, daten), [firma.angebot, daten.angaben]);
+  const netto = Math.round(r.nettoAufwandMonat);
+  const max = Math.max(1, grenzen.maxNetto, netto);
   const setzeU = (u: number) => setze((d) => ({ ...d, umwandlungMonat: Math.max(0, Math.round(u * 100) / 100) }));
-  const voll = () => setzeU(rahmenVoll(firma.angebot, a));
-  const minderung = grvMinderungVon(a, r);
-  const fehltGehalt = a.jahresbrutto <= 0;
+  const setzeNetto = (n: number) => setze((d) => ({ ...d, umwandlungMonat: umwandlungFuerNetto(firma.angebot, d, n) }));
+  // Die Marke sitzt ueber der Mitte des Reglerknopfs: Der Knopf (16 px) laeuft nicht ganz bis an die Raender.
+  const lage = (x: number) => {
+    const q = Math.min(1, Math.max(0, x / max));
+    return `calc(${q * 100}% + ${(0.5 - q) * 16}px)`;
+  };
+  const fehltGehalt = daten.angaben.jahresbrutto <= 0;
+
+  return (
+    <Karte titel="Wie viel möchten Sie netto wandeln?">
+      {fehltGehalt ? (
+        <p className="text-sm text-amber-800">Für die Rechnung fehlt das Bruttogehalt (Schritt 2).</p>
+      ) : (
+        <>
+          <p className="text-3xl font-black tabular-nums text-slate-900">
+            {euro(netto)} <span className="text-base font-bold text-slate-500">netto im Monat</span>
+          </p>
+          <div className="relative mt-4 pb-6">
+            <input type="range" min={0} max={max} step={1} value={netto}
+              onChange={(e) => setzeNetto(Number(e.target.value))}
+              aria-label="Netto-Aufwand im Monat"
+              aria-valuetext={`${netto} Euro netto, ${Math.round(r.umwandlungMonat)} Euro Umwandlung brutto`}
+              className="block w-full accent-indigo-600" />
+            {grenzen.vollNetto > 0.5 && grenzen.vollNetto < max && (
+              <span aria-hidden className="pointer-events-none absolute top-6 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-emerald-700"
+                style={{ left: lage(grenzen.vollNetto) }}>
+                ▲ Rahmen voll
+              </span>
+            )}
+          </div>
+          <div className="flex justify-between text-xs tabular-nums text-slate-500">
+            <span>0 €</span><span>{euro(max / 2)}</span><span>{euro(max)}</span>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-slate-700">
+            = <strong className="tabular-nums">{euroGenau(r.umwandlungMonat)}</strong> Umwandlung brutto · + {euroGenau(r.arbeitgeberMonat)} vom
+            Arbeitgeber · <strong className="tabular-nums">{euroGenau(r.gesamtMonat)}</strong> in Ihre Vorsorge
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setzeU(grenzen.vollUmwandlung)} className={KNOPF_ZWEIT}>
+              <Wand2 className="h-4 w-4" aria-hidden /> Rahmen voll nutzen
+            </button>
+            <button type="button" onClick={() => setGenau((x) => !x)} aria-expanded={genau}
+              className="text-xs font-bold text-indigo-700 hover:underline">
+              {genau ? 'Bruttobetrag ausblenden' : 'Betrag brutto genau eingeben'}
+            </button>
+          </div>
+          {genau && (
+            <div className="mt-3 w-56">
+              <ZahlFeld label="Umwandlung brutto im Monat" wert={daten.umwandlungMonat} onChange={setzeU} einheit="€" schritt={10} />
+            </div>
+          )}
+        </>
+      )}
+    </Karte>
+  );
+}
+
+function AbrechnungsZeile({ text, ohne, mit, art = 'normal', zusatz }: {
+  text: string; ohne: number | null; mit: number | null; art?: 'normal' | 'abzug' | 'info' | 'summe'; zusatz?: string;
+}) {
+  const wert = (x: number | null) => (x === null ? '—' : `${art === 'abzug' && x > 0.004 ? '− ' : ''}${euroGenau(x)}`);
+  const farbe = art === 'info' ? 'text-slate-400' : art === 'summe' ? 'font-black text-slate-900' : 'text-slate-700';
+  return (
+    <tr className={`${art === 'summe' ? 'border-t-2 border-slate-300' : 'border-t border-slate-100'} ${farbe}`}>
+      <td className="py-1.5 pr-2">
+        {text}
+        {zusatz && <span className="block text-[11px] font-normal text-slate-400">{zusatz}</span>}
+      </td>
+      <td className="py-1.5 pl-2 text-right tabular-nums">{wert(ohne)}</td>
+      <td className="py-1.5 pl-2 text-right tabular-nums">{wert(mit)}</td>
+    </tr>
+  );
+}
+
+/** Der Monat ohne und mit Betriebsrente — wie eine Gehaltsabrechnung. */
+function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
+  const anteil = a.gesamtMonat > 0 ? Math.min(1, a.eigenbeteiligungMonat / a.gesamtMonat) : 0;
+  return (
+    <Karte titel="Probeabrechnung: Ihr Monat ohne und mit Betriebsrente">
+      <table className="w-full text-[13px] sm:text-sm">
+        <thead>
+          <tr className="text-xs text-slate-500">
+            <th className="pb-1 text-left font-semibold" />
+            <th className="pb-1 pl-2 text-right font-semibold">ohne bAV</th>
+            <th className="pb-1 pl-2 text-right font-bold text-indigo-700">mit bAV</th>
+          </tr>
+        </thead>
+        <tbody>
+          <AbrechnungsZeile text="Bruttogehalt" ohne={a.bruttoMonat} mit={a.bruttoMonat} />
+          <AbrechnungsZeile text="Entgeltumwandlung" ohne={null} mit={a.umwandlungMonat} art="abzug" />
+          <AbrechnungsZeile text="Beitrag des Arbeitgebers" zusatz="steuer- und beitragsfrei, fließt in den Vertrag" ohne={null} mit={a.arbeitgeberMonat} art="info" />
+          <AbrechnungsZeile text="Steuerpflichtiges Brutto" ohne={a.steuerBrutto.ohne} mit={a.steuerBrutto.mit} />
+          <AbrechnungsZeile text="Brutto für die Sozialabgaben" ohne={a.svBrutto.ohne} mit={a.svBrutto.mit} />
+          <AbrechnungsZeile text="Steuern¹" zusatz="Lohnsteuer, Solidaritätszuschlag, Kirchensteuer" ohne={a.steuern.ohne} mit={a.steuern.mit} art="abzug" />
+          <AbrechnungsZeile text="Sozialabgaben" zusatz="Kranken-, Pflege-, Renten-, Arbeitslosenversicherung" ohne={a.sv.ohne} mit={a.sv.mit} art="abzug" />
+          <AbrechnungsZeile text="Netto" ohne={a.netto.ohne} mit={a.netto.mit} art="summe" />
+        </tbody>
+      </table>
+      <div className="mt-4 rounded-xl bg-indigo-50 p-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+          <p className="text-xs text-indigo-900">
+            Eigenbeteiligung aus dem Nettolohn
+            <span className="block text-xl font-black tabular-nums">{euroGenau(a.eigenbeteiligungMonat)}</span>
+          </p>
+          <p className="text-right text-xs text-indigo-900">
+            Gesamtbeitrag
+            <span className="block text-xl font-black tabular-nums text-emerald-700">{euroGenau(a.gesamtMonat)}</span>
+          </p>
+        </div>
+        <div className="mt-2 h-2 rounded-full bg-emerald-200" aria-hidden>
+          <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${anteil * 100}%` }} />
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        ¹ Als Monatsanteil der Jahressteuer. Auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je nach Steuerklasse
+        anders; über das Jahr gleicht die Steuererklärung das aus.
+      </p>
+    </Karte>
+  );
+}
+
+const ZINSEN = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06] as const;
+
+/** Was bis zum Rentenbeginn zusammenkommt — mit einem angenommenen Zins, als Beispiel. */
+function HochrechnungKarte({ h, rentenbeginn, setzeZins }: { h: Hochrechnung; rentenbeginn: string | null; setzeZins: (z: number) => void }) {
+  if (h.monate <= 0) return null;
+  const teile = [
+    { text: 'Ihr Netto-Aufwand', wert: h.nettoSumme, farbe: 'bg-sky-500' },
+    { text: 'Steuer- und SV-Ersparnis', wert: h.ersparnisSumme, farbe: 'bg-indigo-400' },
+    { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-amber-400' },
+    { text: `Zinsen (${prozentText(h.zins, 0)})`, wert: h.zinsen, farbe: 'bg-emerald-500' },
+  ];
+  const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
+  return (
+    <Karte titel="Beispielhafte Hochrechnung bis zum Rentenbeginn">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">
+          {laufzeitText(h.monate)} bis zum Rentenbeginn{rentenbeginn ? ` am ${rentenbeginn}` : ''}.
+        </p>
+        <div role="radiogroup" aria-label="Angenommener Zins" className="flex flex-wrap gap-1">
+          {ZINSEN.map((z) => (
+            <button key={z} type="button" role="radio" aria-checked={Math.abs(h.zins - z) < 1e-9} onClick={() => setzeZins(z)}
+              className={`rounded-md border px-2 py-1 text-xs font-bold tabular-nums ${
+                Math.abs(h.zins - z) < 1e-9 ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}>
+              {prozentText(z, 0)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 flex h-4 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+        {teile.map((t) => (
+          <div key={t.text} className={t.farbe} style={{ width: `${summe > 0 ? (Math.max(0, t.wert) / summe) * 100 : 0}%` }} />
+        ))}
+      </div>
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+        {teile.map((t) => (
+          <div key={t.text} className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2 text-slate-600"><span className={`h-2.5 w-2.5 rounded-sm ${t.farbe}`} aria-hidden />{t.text}</dt>
+            <dd className="tabular-nums text-slate-900">{euro(t.wert)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-slate-200 pt-2">
+        <span className="text-sm font-bold text-slate-700">Mögliches Kapital zum Rentenbeginn</span>
+        <span className="text-2xl font-black tabular-nums text-emerald-700">{euro(h.kapital)}</span>
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        Beispiel mit {prozentText(h.zins, 0)} Verzinsung im Jahr nach Kosten, gleichbleibende Beiträge — keine Zusage. Was der
+        Vertrag tatsächlich verspricht, steht im Angebot des Versicherers (nächster Schritt).
+      </p>
+    </Karte>
+  );
+}
+
+export function SchrittRechnung(props: SchrittProps) {
+  const { firma, daten, setze, r } = props;
+  const minderung = grvMinderungVon(daten, firma.angebot, r);
+  const abrechnung = useMemo(() => probeabrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
+  const h = useMemo(() => hochrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
 
   return (
     <div className="space-y-4">
-      <Karte titel="Wie viel möchten Sie umwandeln?">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-48">
-            <ZahlFeld label="Umwandlung im Monat" wert={daten.umwandlungMonat} onChange={setzeU} einheit="€" schritt={10} gross />
-          </div>
-          {[50, 100, 150, 200].map((b) => (
-            <button key={b} type="button" onClick={() => setzeU(b)} className={KNOPF_ZWEIT}>{b} €</button>
-          ))}
-          <button type="button" onClick={voll} disabled={fehltGehalt} className={KNOPF_ZWEIT}>
-            <Wand2 className="h-4 w-4" aria-hidden /> Rahmen voll nutzen
-          </button>
-        </div>
-        {fehltGehalt && <p className="mt-2 text-sm text-amber-800">Für die Rechnung fehlt das Bruttogehalt (Schritt 2).</p>}
-      </Karte>
+      <NettoRegler {...props} />
 
       <section className="grid gap-3 sm:grid-cols-3">
         <Kachel symbol={<HandCoins className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
@@ -217,46 +501,44 @@ export function SchrittRechnung({ firma, daten, setze, r }: SchrittProps) {
           unten={r.hebel > 0 ? `je 1 € netto ${r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 1 })} € Vorsorge` : 'jeden Monat'} />
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Bon titel="Was es Sie kostet">
-          <Zeile text="Umwandlung" betrag={r.umwandlungMonat} />
-          <Zeile text="− gesparte Sozialabgaben" betrag={r.svErsparnisMonat} />
-          <Zeile text="− gesparte Steuer" betrag={r.steuerersparnisMonat} />
-          <Zeile text="= kostet Sie netto" betrag={r.nettoAufwandMonat} summe />
-        </Bon>
-        <Bon titel="Was in Ihre Vorsorge fließt">
-          <Zeile text="Ihre Umwandlung" betrag={r.umwandlungMonat} />
-          {r.pflichtzuschussMonat > 0.005 && <Zeile text="+ gesetzlicher Zuschuss" betrag={r.pflichtzuschussMonat} />}
-          {r.freiwilligMonat > 0.005 && (
-            <Zeile text={firma.angebot.modell.art === 'matching' ? '+ Arbeitgeber (Unterstützungskasse)' : '+ Zuschuss des Arbeitgebers'} betrag={r.freiwilligMonat} />
-          )}
-          <Zeile text="= in Ihre Vorsorge" betrag={r.gesamtMonat} summe />
-          {r.vertraege.length > 1 && r.vertraege.map((v) => (
-            <p key={v.weg} className="flex justify-between gap-2 pl-3 text-xs text-slate-500">
-              <span>davon {vertragName(v.weg, firma.angebot)}</span><span className="tabular-nums">{euro(v.beitragMonat)}</span>
-            </p>
-          ))}
-        </Bon>
-      </section>
-
-      {(r.hinweise.length > 0 || minderung.renteMonat > 0.5) && (
-        <section className="space-y-1.5">
-          {r.hinweise.map((h) => (
-            <p key={h} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700">{h}</p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <ProbeabrechnungKarte a={abrechnung} />
+        </div>
+        <div className="space-y-3 lg:col-span-2">
+          <Bon titel="Was in Ihre Vorsorge fließt">
+            <Zeile text="Ihre Umwandlung" betrag={r.umwandlungMonat} />
+            {r.pflichtzuschussMonat > 0.005 && <Zeile text="+ gesetzlicher Zuschuss" betrag={r.pflichtzuschussMonat} />}
+            {r.freiwilligMonat > 0.005 && (
+              <Zeile text={firma.angebot.modell.art === 'matching' ? '+ Arbeitgeber (Unterstützungskasse)' : '+ Zuschuss des Arbeitgebers'} betrag={r.freiwilligMonat} />
+            )}
+            <Zeile text="= in Ihre Vorsorge" betrag={r.gesamtMonat} summe />
+            {r.vertraege.length > 1 && r.vertraege.map((v) => (
+              <p key={v.weg} className="flex justify-between gap-2 pl-3 text-xs text-slate-500">
+                <span>davon {vertragName(v.weg, firma.angebot)}</span><span className="tabular-nums">{euro(v.beitragMonat)}</span>
+              </p>
+            ))}
+          </Bon>
+          {r.hinweise.map((h2) => (
+            <p key={h2} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700">{h2}</p>
           ))}
           {minderung.renteMonat > 0.5 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
               Für den beitragsfreien Teil zahlen Sie keine Rentenbeiträge. Ihre gesetzliche Rente sinkt dadurch um rund{' '}
-              <strong>{euro(minderung.renteMonat)}</strong> im Monat — in heutiger Kaufkraft, bei gleichem Gehalt bis zum Rentenbeginn.
+              <strong>{euro(minderung.renteMonat)}</strong> im Monat — nach heutigem Stand, bei gleichem Gehalt bis zum Rentenbeginn.
+              <InfoPunkt titel="So gerechnet">{minderungText(minderung)}</InfoPunkt>
             </p>
           )}
-        </section>
-      )}
+        </div>
+      </div>
+
+      <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
+        setzeZins={(beispielZins) => setze((d) => ({ ...d, beispielZins }))} />
     </div>
   );
 }
 
-/* --- 4. Leistung im Alter -------------------------------------------------- */
+/* --- 5. Leistung im Alter -------------------------------------------------- */
 
 function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | null; kk: number }) {
   if (!w) return null;
@@ -274,14 +556,117 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
   );
 }
 
-export function SchrittLeistung({ firma, daten, setze, r, leistung, aktuell }: SchrittProps & { aktuell: boolean }) {
+const WEG_TITEL: Record<KennzahlenWeg['art'], string> = { garantiert: 'Garantiert', prognose: 'Prognose', kapital: 'Kapital' };
+const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
+
+/**
+ * Kennzahlen und Fazit — wie im Vertrags-TUEV (`VertragsTuev.tsx`, „3.
+ * Kennzahlen und Fazit“), fuer den Vertrag allein: Netto-Aufwand gegen
+ * Netto-Auszahlung. Die geringere gesetzliche Rente steht im Fazit und
+ * darunter in „Unterm Strich“.
+ */
+function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
+  k: KennzahlenErgebnis; minderungMonat: number; daten: BeratungDaten;
+  setze: SchrittProps['setze']; aktuell: boolean;
+}) {
+  const haupt = k.prognose ?? k.garantiert ?? k.kapital;
+  if (!haupt) return null;
+  const gut = haupt.nettoHebel >= 1;
+  const istKapital = haupt.art === 'kapital';
+  const wege = [k.garantiert, k.prognose, k.kapital].filter((x): x is KennzahlenWeg => x !== null);
+  const laufzeit = laufzeitText(k.monateEinzahlung);
+
+  return (
+    <Karte titel="Kennzahlen und Fazit">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <p className="max-w-xl text-xs leading-relaxed text-slate-500">
+          Ihr Netto-Aufwand gegen die Netto-Auszahlung — der Vertrag allein,{' '}
+          {istKapital ? 'mit der Kapitalauszahlung' : `mit der ${haupt.art === 'prognose' ? 'prognostizierten' : 'garantierten'} Rente`}.
+        </p>
+        <div className="w-44">
+          <ZahlFeld label="Rente bis zum Alter von" wert={daten.lebenserwartung} min={60} max={120} schritt={1} stufen einheit="J."
+            onChange={(n) => setze((d) => ({ ...d, lebenserwartung: Math.min(120, Math.max(60, Math.round(n))) }))} />
+        </div>
+      </div>
+
+      <div className={`mt-3 rounded-lg border p-3 ${gut ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'} ${aktuell ? '' : 'opacity-60'}`}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Kennzahl titel="Netto-Hebel" wert={`${zahl(haupt.nettoHebel)} ×`} farbe={gut ? 'text-emerald-700' : 'text-rose-700'}
+            fussnote="Auszahlung je Euro Einzahlung"
+            info={(
+              <>
+                {euro(haupt.summeAuszahlung)} Auszahlung geteilt durch {euro(haupt.summeEinzahlung)} eigenen Aufwand über {laufzeit}.{' '}
+                <strong>Beide Seiten netto</strong>: oben nach Steuer und Kranken- und Pflegeversicherung im Alter, unten nach der
+                Steuer- und Sozialabgabenersparnis. Ohne Verzinsung gerechnet — was das Geld dann wert ist, sagt die Rendite daneben.
+              </>
+            )} />
+          <Kennzahl titel="Nettorendite" wert={`${zahl(haupt.rendite * 100)} %`} farbe={haupt.rendite > 0 ? 'text-emerald-700' : 'text-rose-700'}
+            fussnote="p. a. nach allen Abzügen"
+            info={(
+              <>
+                Der interne Zinsfuß Ihrer Zahlungsreihe: der Zinssatz, bei dem {laufzeit} Einzahlung und{' '}
+                {istKapital ? 'die Kapitalauszahlung' : `${k.jahreAuszahlung} Jahre Rente`} genau aufgehen. Anders als der Hebel{' '}
+                <strong>berücksichtigt er, wann</strong> jeder Euro fließt.
+              </>
+            )} />
+          <Kennzahl titel="Netto-Gewinn" wert={euro(haupt.echterGewinn)} farbe={haupt.echterGewinn >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+            fussnote={istKapital ? 'mit der Kapitalauszahlung' : `bis ${k.lebenserwartung}`} />
+          {!istKapital && (
+            <Kennzahl titel="Amortisation" wert={`${zahl(haupt.amortisationsJahre, 1)} J.`} fussnote="ab Rentenbeginn" />
+          )}
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <GegenueberZeile text={`Eingezahlt, netto (${laufzeit})`} wert={euro(haupt.summeEinzahlung)} farbe="text-rose-600" />
+          <GegenueberZeile text={istKapital ? 'Ausgezahlt, netto (einmalig)' : `Ausgezahlt, netto (${k.jahreAuszahlung} Jahre bis ${k.lebenserwartung})`}
+            wert={euro(haupt.summeAuszahlung)} farbe="text-emerald-600" />
+        </div>
+      </div>
+
+      {wege.length > 1 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[20rem] text-xs">
+            <thead>
+              <tr className="text-slate-500">
+                <th className="py-1 text-left font-semibold" />
+                {wege.map((w) => <th key={w.art} className="py-1 pl-2 text-right font-semibold">{WEG_TITEL[w.art]}</th>)}
+              </tr>
+            </thead>
+            <tbody className="tabular-nums text-slate-700">
+              {([
+                ['Netto', (w: KennzahlenWeg) => (w.art === 'kapital' ? euro(w.netto) : `${euro(w.netto)} / Mon.`)],
+                ['Netto-Hebel', (w: KennzahlenWeg) => `${zahl(w.nettoHebel)} ×`],
+                ['Nettorendite', (w: KennzahlenWeg) => `${zahl(w.rendite * 100)} %`],
+                ['Netto-Gewinn', (w: KennzahlenWeg) => euro(w.echterGewinn)],
+                ['Amortisation', (w: KennzahlenWeg) => (w.art === 'kapital' ? '—' : `${zahl(w.amortisationsJahre, 1)} J.`)],
+              ] as const).map(([text, wert]) => (
+                <tr key={text} className="border-t border-slate-100">
+                  <td className="py-1 text-slate-600">{text}</td>
+                  {wege.map((w) => <td key={w.art} className="py-1 pl-2 text-right">{wert(w)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="mt-3 text-sm leading-relaxed text-slate-800">
+        <strong>Fazit:</strong> {fazitText(k, minderungMonat)}
+      </p>
+    </Karte>
+  );
+}
+
+export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, aktuell }: SchrittProps & {
+  kennzahlen: KennzahlenErgebnis | null; aktuell: boolean;
+}) {
   const a = firma.angebot;
+  const minderung = grvMinderungVon(daten, firma.angebot, r);
   const setzeW = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) =>
     setze((d) => ({ ...d, versicherer: { ...d.versicherer, [weg]: { ...d.versicherer[weg], ...p } } }));
   const ohneGeburt = !rentenbeginnVon(daten.angaben);
 
   if (r.vertraege.length === 0) {
-    return <Karte><p className="text-sm text-slate-600">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 3 einen Betrag wählen.</p></Karte>;
+    return <Karte><p className="text-sm text-slate-600">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
   }
   return (
     <div className="space-y-4">
@@ -338,15 +723,22 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, aktuell }: S
         );
       })}
 
+      {kennzahlen && (
+        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} />
+      )}
+
       {leistung && (
         <Karte titel="Unterm Strich">
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between gap-2">
-              <dt>Gesetzliche Rente{leistung.grv.geschaetzt ? ' (geschätzt)' : ''}, heutige Kaufkraft</dt>
+              <dt>Gesetzliche Rente nach heutigem Stand{leistung.grv.geschaetzt ? ' (geschätzt)' : ''}</dt>
               <dd className="tabular-nums">{euro(leistung.grv.monat)}</dd>
             </div>
             <div className="flex justify-between gap-2 text-amber-900">
-              <dt>Minderung durch die beitragsfreie Umwandlung</dt>
+              <dt>
+                Minderung durch die beitragsfreie Umwandlung
+                <InfoPunkt titel="So gerechnet">{minderungText(minderung)}</InfoPunkt>
+              </dt>
               <dd className="tabular-nums">− {euro(leistung.grvMinderungMonat)}</dd>
             </div>
             {leistung.plusHaushaltMonat !== null && (
@@ -367,7 +759,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, aktuell }: S
   );
 }
 
-/* --- 5. Entscheidung ------------------------------------------------------ */
+/* --- 6. Entscheidung ------------------------------------------------------ */
 
 const WAHL: { status: BeratungStatus; text: string; symbol: ReactNode }[] = [
   { status: 'teilnahme', text: 'Ich nehme teil', symbol: <CheckCircle2 className="h-5 w-5" aria-hidden /> },
@@ -400,7 +792,7 @@ export function SchrittEntscheidung({ daten, setze, r, geheZu }: SchrittProps) {
             <div>
               <span className="mb-1 block text-xs font-bold text-slate-700">Umwandlung im Monat</span>
               <p className="text-lg font-black tabular-nums text-slate-900">{euroGenau(r.umwandlungMonat)}</p>
-              <button type="button" onClick={() => geheZu(2)} className="text-xs font-bold text-indigo-700 hover:underline">Betrag ändern</button>
+              <button type="button" onClick={() => geheZu(3)} className="text-xs font-bold text-indigo-700 hover:underline">Betrag ändern</button>
             </div>
             <DatumFeld label="Beginn" wert={e.beginn} onChange={(beginn) => setzeE({ beginn })} hilfe="Leer: der nächste Monatserste." />
           </div>
@@ -426,13 +818,16 @@ export function SchrittEntscheidung({ daten, setze, r, geheZu }: SchrittProps) {
   );
 }
 
-/* --- 6. Unterlagen ---------------------------------------------------------- */
+/* --- 7. Unterlagen ---------------------------------------------------------- */
 
-export function SchrittUnterlagen(props: SchrittProps & { auftritt: Auftritt | null; sichern: (d: BeratungDaten) => Promise<boolean> }) {
-  const { firma, logo, daten, r, leistung, auftritt, sichern } = props;
+export function SchrittUnterlagen(props: SchrittProps & {
+  auftritt: Auftritt | null; sichern: (d: BeratungDaten) => Promise<boolean>;
+  luecke: Versorgungsluecke | null; kennzahlen: KennzahlenErgebnis | null;
+}) {
+  const { firma, logo, daten, r, leistung, auftritt, sichern, luecke, kennzahlen } = props;
   const drucken = useDrucken();
   const status = daten.entscheidung.status;
-  const dok = { firma, logo, daten, r, leistung, auftritt };
+  const dok = { firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen };
 
   const knopf = (text: string, symbol: ReactNode, inhalt: ReactNode, haupt = false) => (
     <button type="button" className={`${haupt ? KNOPF : KNOPF_ZWEIT} max-w-full text-left`}

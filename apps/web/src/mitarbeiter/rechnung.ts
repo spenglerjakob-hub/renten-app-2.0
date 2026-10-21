@@ -1,7 +1,7 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, parameterFuer, parseDatum, projiziere,
-  renteOderKapital, schaetzeEntgeltpunkte,
-  type FirmenModell, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
+  bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, kennzahlen, parameterFuer, parseDatum, projiziere,
+  renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE,
+  type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
 import type { BeratungAngaben, BeratungDaten, FirmenAngebot, VersichererWerte } from '@renten/schema';
@@ -78,10 +78,28 @@ export function rentenbeginnVon(a: BeratungAngaben): string | null {
   return parseDatum(a.rentenbeginn) ? a.rentenbeginn : regelRentenbeginn(a.geburtsdatum);
 }
 
-/** Ganze Jahre bis zum Rentenbeginn — fuer die Minderung der gesetzlichen Rente. */
-export function jahreBisRente(a: BeratungAngaben): number {
-  const r = parseDatum(rentenbeginnVon(a));
-  return r ? Math.max(0, r.jahr - JETZT) : 0;
+/** Ein Monat als fortlaufende Zahl — dann ist „Monate dazwischen“ eine Subtraktion. */
+const monatsIndex = (x: { jahr: number; monat: number }) => x.jahr * 12 + (x.monat - 1);
+
+/**
+ * Der erste Monat der Umwandlung: laut Entscheidung, sonst laut Angebot der
+ * Firma, sonst der naechste Monatserste.
+ */
+export function beginnVon(d: BeratungDaten, f: FirmenAngebot, heute = new Date()): { jahr: number; monat: number } {
+  const x = parseDatum(d.entscheidung.beginn) ?? parseDatum(f.beginn);
+  if (x) return { jahr: x.jahr, monat: x.monat };
+  const naechster = heute.getMonth() + 2;
+  return naechster > 12 ? { jahr: heute.getFullYear() + 1, monat: 1 } : { jahr: heute.getFullYear(), monat: naechster };
+}
+
+/**
+ * Wie viele Monate umgewandelt wird: vom Beginn bis vor den Rentenbeginn.
+ * Beginn 01.01.2027 und Rentenbeginn 01.04.2052 sind 303 Monate. Ohne
+ * Geburtsdatum null.
+ */
+export function monateDerUmwandlung(d: BeratungDaten, f: FirmenAngebot, heute = new Date()): number {
+  const r = parseDatum(rentenbeginnVon(d.angaben));
+  return r ? Math.max(0, monatsIndex(r) - monatsIndex(beginnVon(d, f, heute))) : 0;
 }
 
 /**
@@ -100,9 +118,46 @@ export function grvVon(
   return { monat: Math.round(s.monatsrenteHeutigeKaufkraft * 100) / 100, geschaetzt: true };
 }
 
-/** Um so viel sinkt die gesetzliche Rente durch die beitragsfreie Umwandlung — heutige Kaufkraft. */
-export function grvMinderungVon(a: BeratungAngaben, r: MitarbeiterBav, p: LegalParameters = P) {
-  return grvMinderung(a.jahresbrutto, r.umwandlungMonat - r.svPflichtigMonat, jahreBisRente(a), p);
+/** Die Minderung der gesetzlichen Rente mit allen Zwischenwerten — fuer „So gerechnet“. */
+export interface MinderungHerleitung {
+  /** Beitragsfreie Umwandlung im Jahr: so viel weniger rentenversichertes Entgelt */
+  svFreiJahr: number;
+  durchschnittsentgelt: number;
+  /** Entgeltpunkte, die je Jahr fehlen */
+  entgeltpunkteJeJahr: number;
+  /** Jahre der Umwandlung, monatsgenau */
+  jahre: number;
+  entgeltpunkte: number;
+  rentenwert: number;
+  /** Um so viel sinkt die Monatsrente — nach heutigem Stand */
+  renteMonat: number;
+  /** Auch nach der Umwandlung ueber der Beitragsbemessungsgrenze: keine Minderung */
+  ueberBbg: boolean;
+}
+
+/**
+ * Um so viel sinkt die gesetzliche Rente durch die beitragsfreie Umwandlung
+ * (`grvMinderung` im Rechenkern): weniger rentenversichertes Entgelt, also
+ * weniger Entgeltpunkte — je Jahr der Umwandlung, monatsgenau vom Beginn bis
+ * zum Rentenbeginn, mal dem heutigen Rentenwert.
+ */
+export function grvMinderungVon(
+  d: BeratungDaten, f: FirmenAngebot, r: MitarbeiterBav, p: LegalParameters = P, heute = new Date(),
+): MinderungHerleitung {
+  const a = d.angaben;
+  const svFreiMonat = Math.max(0, r.umwandlungMonat - r.svPflichtigMonat);
+  const jahre = monateDerUmwandlung(d, f, heute) / 12;
+  const g = grvMinderung(a.jahresbrutto, svFreiMonat, jahre, p);
+  return {
+    svFreiJahr: svFreiMonat * 12,
+    durchschnittsentgelt: p.durchschnittsentgelt,
+    entgeltpunkteJeJahr: jahre > 0 ? g.entgeltpunkte / jahre : 0,
+    jahre,
+    entgeltpunkte: g.entgeltpunkte,
+    rentenwert: p.rentenwert,
+    renteMonat: g.renteMonat,
+    ueberBbg: svFreiMonat > 0 && a.jahresbrutto - svFreiMonat * 12 >= p.bbgRvJahr,
+  };
 }
 
 /**
@@ -139,6 +194,18 @@ export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMon
   x.zusatzbeitrag = a.zusatzbeitrag;
   x.pkv = { ...x.pkv, praemieMonat: a.pkvPraemieMonat };
   return szenarioAusCheck(x);
+}
+
+/**
+ * Das Szenario des Mitarbeiters OHNE neuen Vertrag und seine Projektion —
+ * fuer die Versorgungsluecke und als Vergleich fuer die Leistung im Alter.
+ */
+export function basisProjektion(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P) {
+  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a), p);
+  const szenario = szenarioAusBeratung(a, f, grv.monat, p);
+  const projektion = projiziere(szenario);
+  const zeile = projektion.zeilen.find((z) => z.jahr === projektion.ruhestandsjahr) ?? null;
+  return { grv, szenario, projektion, zeile };
 }
 
 export interface AuszahlungsWerte {
@@ -203,10 +270,11 @@ export function leistungsRechnung(
   const rb = parseDatum(rentenbeginn);
   if (!g || !rb) return null;
   const vertraege = r.vertraege.filter((v) => !leer(d.versicherer[v.weg]));
-  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginn, p);
-  const minderung = grvMinderungVon(a, r, p).renteMonat;
-  const basis = szenarioAusBeratung(a, f, grv.monat, p);
-  const beginnJahr = JETZT + 1;
+  const b = basisProjektion(a, f, p);
+  const grv = b.grv;
+  const minderung = grvMinderungVon(d, f, r, p).renteMonat;
+  const basis = b.szenario;
+  const beginnJahr = beginnVon(d, f).jahr;
 
   const mit = (strategie: Vertrag['strategie'], rente: (w: VersichererWerte) => number) => {
     const neu: Vertrag[] = vertraege.map((v) => {
@@ -222,7 +290,7 @@ export function leistungsRechnung(
     return projiziere({ ...basis, personen, vertraege: [...basis.vertraege, ...neu] });
   };
 
-  const ohne = projiziere(basis);
+  const ohne = b.projektion;
   const jahr = ohne.ruhestandsjahr;
   const zeileOhne = ohne.zeilen.find((z) => z.jahr === jahr);
   const mitPrognose = vertraege.some((v) => d.versicherer[v.weg].prognoseRente > 0)
@@ -261,5 +329,299 @@ export function leistungsRechnung(
     grv,
     grvMinderungMonat: minderung,
     plusHaushaltMonat: zeileMit && zeileOhne ? zeileMit.nettoMonat - zeileOhne.nettoMonat : null,
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * VERSORGUNGSLUECKE — der Nettolohn heute gegen die gesetzliche Rente netto,
+ * beides in heutiger Kaufkraft.
+ * ------------------------------------------------------------------------ */
+
+/** Lohn heute, im Monat: Steuern als Anteil der Jahressteuer, Sozialabgaben, Netto. */
+export interface Lohn {
+  bruttoMonat: number;
+  steuernMonat: number;
+  svMonat: number;
+  nettoMonat: number;
+}
+
+/**
+ * Der Nettolohn des Mitarbeiters heute — `bruttoZuNetto`, mit denselben
+ * Angaben wie die Modelle. Verheiratet zaehlt der Splittingtarif nur, wenn
+ * der Partner kein Einkommen hat; sonst rechnet es wie Steuerklasse IV mit
+ * dem Grundtarif. Die Steuer ist der Monatsanteil der Jahressteuer — die
+ * Lohnsteuer der Abrechnung verteilt sie je nach Steuerklasse anders.
+ */
+export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P): Lohn {
+  const n = bruttoZuNetto(Math.max(0, a.jahresbrutto), {
+    verheiratet: a.verheiratet && a.partnerBrutto <= 0,
+    bundesland: bundeslandVon(a, f),
+    kirchensteuerpflichtig: a.kirchensteuer,
+    kinder: kinderStatus(a),
+    privatVersichert: a.kv === 'privat',
+    pkvPraemieMonat: a.kv === 'privat' ? a.pkvPraemieMonat : 0,
+  }, p);
+  return {
+    bruttoMonat: n.monatsbrutto,
+    steuernMonat: (n.est + n.soli + n.kirchensteuer) / 12,
+    svMonat: n.sv / 12,
+    nettoMonat: n.monatsnetto,
+  };
+}
+
+export interface Versorgungsluecke {
+  lohn: Lohn;
+  /** Gesetzliche Rente nach heutigem Stand — eingetragen oder geschaetzt */
+  grv: { monat: number; geschaetzt: boolean };
+  /** Die gesetzliche Rente im ersten Rentenjahr, in heutiger Kaufkraft */
+  rente: AuszahlungsWerte;
+  lueckeMonat: number;
+  /** Netto-Rente / Nettolohn */
+  anteil: number;
+  rentenbeginn: string;
+  rentenbeginnJahr: number;
+  alterBeiRentenbeginn: number;
+  inflation: number;
+  rentenanpassung: number;
+}
+
+/**
+ * Was von der gesetzlichen Rente netto bleibt, gegen den Nettolohn heute.
+ *
+ * Die Rente kommt aus der Projektion (Posten `person-A` im ersten
+ * Rentenjahr): mit Rentenanpassung bis dahin, nach Kranken- und
+ * Pflegeversicherung und Steuer — und geteilt durch die Teuerung, also in
+ * heutiger Kaufkraft. Ohne Geburtsdatum oder Gehalt null.
+ */
+export function versorgungslueckeRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): Versorgungsluecke | null {
+  const a = d.angaben;
+  const rentenbeginn = rentenbeginnVon(a);
+  const g = parseDatum(a.geburtsdatum);
+  const rb = parseDatum(rentenbeginn);
+  if (!g || !rb || !rentenbeginn || a.jahresbrutto <= 0) return null;
+  const b = basisProjektion(a, f, p);
+  const posten = b.zeile?.posten.find((x) => x.id === 'person-A');
+  if (!b.zeile || !posten) return null;
+  const kk = b.zeile.kaufkraftfaktor > 0 ? b.zeile.kaufkraftfaktor : 1;
+  const rente: AuszahlungsWerte = {
+    bruttoMonat: posten.bruttoJahr / 12 / kk,
+    kvPvMonat: posten.kvPvJahr / 12 / kk,
+    steuerMonat: posten.steuerJahr / 12 / kk,
+    nettoMonat: posten.nettoJahr / 12 / kk,
+  };
+  const lohn = nettolohnHeute(a, f, p);
+  return {
+    lohn,
+    grv: b.grv,
+    rente,
+    lueckeMonat: Math.max(0, lohn.nettoMonat - rente.nettoMonat),
+    anteil: lohn.nettoMonat > 0 ? rente.nettoMonat / lohn.nettoMonat : 0,
+    rentenbeginn,
+    rentenbeginnJahr: b.zeile.jahr,
+    alterBeiRentenbeginn: rb.jahr - g.jahr,
+    inflation: b.szenario.annahmen.inflation,
+    rentenanpassung: b.szenario.annahmen.rentendynamik,
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * NETTO-REGLER — der Mitarbeiter waehlt, was er netto aufwenden will; die
+ * Umwandlung (brutto) ergibt sich daraus. Gespeichert wird weiter die
+ * Umwandlung: Sie steht in der Vereinbarung.
+ * ------------------------------------------------------------------------ */
+
+const nettoBei = (f: FirmenAngebot, d: BeratungDaten, u: number, p: LegalParameters) =>
+  beitragsRechnung(f, { ...d, umwandlungMonat: u }, p).nettoAufwandMonat;
+
+export interface ReglerGrenzen {
+  /** Hoechstens so viel Umwandlung: der steuerfreie Rahmen (8 % der BBG) */
+  maxUmwandlung: number;
+  maxNetto: number;
+  /** „Rahmen voll“: Umwandlung und Netto dazu */
+  vollUmwandlung: number;
+  vollNetto: number;
+}
+
+export function reglerGrenzen(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): ReglerGrenzen {
+  const maxUmwandlung = Math.floor((STEUER_FREI_QUOTE * p.bbgRvJahr) / 12);
+  const vollUmwandlung = Math.min(maxUmwandlung, rahmenVoll(f, d.angaben, p));
+  return {
+    maxUmwandlung,
+    maxNetto: Math.floor(nettoBei(f, d, maxUmwandlung, p)),
+    vollUmwandlung,
+    vollNetto: nettoBei(f, d, vollUmwandlung, p),
+  };
+}
+
+/**
+ * Die Umwandlung, die netto genau `netto` kostet — Bisektion wie `suche` im
+ * Loesungsvergleich: Der Netto-Aufwand steigt mit der Umwandlung. Auf Cent,
+ * hoechstens bis `maxUmwandlung`.
+ */
+export function umwandlungFuerNetto(f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P): number {
+  if (netto <= 0) return 0;
+  const max = Math.floor((STEUER_FREI_QUOTE * p.bbgRvJahr) / 12);
+  if (nettoBei(f, d, max, p) <= netto) return max;
+  let tief = 0;
+  let hoch = max;
+  for (let i = 0; i < 30 && hoch - tief > 0.001; i++) {
+    const mitte = (tief + hoch) / 2;
+    if (nettoBei(f, d, mitte, p) < netto) tief = mitte;
+    else hoch = mitte;
+  }
+  return Math.round(hoch * 100) / 100;
+}
+
+/* --------------------------------------------------------------------------
+ * PROBEABRECHNUNG — der Monat ohne und mit Betriebsrente.
+ * ------------------------------------------------------------------------ */
+
+export interface Probeabrechnung {
+  bruttoMonat: number;
+  umwandlungMonat: number;
+  arbeitgeberMonat: number;
+  steuerBrutto: { ohne: number; mit: number };
+  svBrutto: { ohne: number; mit: number };
+  steuern: { ohne: number; mit: number };
+  sv: { ohne: number; mit: number };
+  netto: { ohne: number; mit: number };
+  /** = Netto ohne − Netto mit, genau der Netto-Aufwand der Rechnung */
+  eigenbeteiligungMonat: number;
+  gesamtMonat: number;
+}
+
+/**
+ * „Ohne“ ist der Nettolohn heute. „Mit“ zieht davon genau die Ersparnisse
+ * der Rechnung ab — so ist die Netto-Differenz auf den Cent die
+ * Eigenbeteiligung, und es gibt keine zweite Steuerrechnung.
+ */
+export function probeabrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, p: LegalParameters = P): Probeabrechnung {
+  const lohn = nettolohnHeute(d.angaben, f, p);
+  const b = lohn.bruttoMonat;
+  const u = r.umwandlungMonat;
+  return {
+    bruttoMonat: b,
+    umwandlungMonat: u,
+    arbeitgeberMonat: r.arbeitgeberMonat,
+    steuerBrutto: { ohne: b, mit: b - (u - r.steuerpflichtigMonat) },
+    svBrutto: { ohne: b, mit: b - (u - r.svPflichtigMonat) },
+    steuern: { ohne: lohn.steuernMonat, mit: lohn.steuernMonat - r.steuerersparnisMonat },
+    sv: { ohne: lohn.svMonat, mit: lohn.svMonat - r.svErsparnisMonat },
+    netto: { ohne: lohn.nettoMonat, mit: lohn.nettoMonat - r.nettoAufwandMonat },
+    eigenbeteiligungMonat: r.nettoAufwandMonat,
+    gesamtMonat: r.gesamtMonat,
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * BEISPIELHAFTE HOCHRECHNUNG — was bis zum Rentenbeginn zusammenkommt, mit
+ * einem angenommenen Zins. Ein Beispiel; die Werte des Versicherers folgen.
+ * ------------------------------------------------------------------------ */
+
+export interface Hochrechnung {
+  monate: number;
+  zins: number;
+  nettoSumme: number;
+  /** Was Steuer- und Sozialabgabenersparnis beitragen */
+  ersparnisSumme: number;
+  arbeitgeberSumme: number;
+  beitraegeSumme: number;
+  zinsen: number;
+  kapital: number;
+}
+
+/**
+ * Endwert gleichbleibender Monatsbeitraege, vorschuessig (Beitrag am
+ * Monatsanfang), Monatszins aus dem Jahreszins.
+ */
+export function hochrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, zins = d.beispielZins, heute = new Date()): Hochrechnung {
+  const n = monateDerUmwandlung(d, f, heute);
+  const c = r.gesamtMonat;
+  const i = Math.pow(1 + Math.max(0, zins), 1 / 12) - 1;
+  const kapital = i > 0 ? c * ((Math.pow(1 + i, n) - 1) / i) * (1 + i) : c * n;
+  const beitraegeSumme = c * n;
+  return {
+    monate: n,
+    zins,
+    nettoSumme: r.nettoAufwandMonat * n,
+    ersparnisSumme: (r.umwandlungMonat - r.nettoAufwandMonat) * n,
+    arbeitgeberSumme: r.arbeitgeberMonat * n,
+    beitraegeSumme,
+    zinsen: kapital - beitraegeSumme,
+    kapital,
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * KENNZAHLEN — wie im Vertrags-TUEV: Netto-Aufwand gegen Netto-Auszahlung,
+ * mit `kennzahlen` aus dem Rechenkern. Der Vertrag allein; die geringere
+ * gesetzliche Rente steht getrennt („Unterm Strich“).
+ * ------------------------------------------------------------------------ */
+
+export interface KennzahlenWeg extends Kennzahlen {
+  art: 'prognose' | 'garantiert' | 'kapital';
+  /** Netto-Rente im Monat aller Vertraege — beim Kapital die Einmalzahlung */
+  netto: number;
+}
+
+export interface KennzahlenErgebnis {
+  monateEinzahlung: number;
+  jahreAuszahlung: number;
+  lebenserwartung: number;
+  prognose: KennzahlenWeg | null;
+  garantiert: KennzahlenWeg | null;
+  kapital: KennzahlenWeg | null;
+}
+
+/**
+ * Die Zahlungsreihe wie im Vertrags-TUEV (`vertrags-tuev.ts`): je
+ * Kalenderjahr der Netto-Aufwand der Monate mit Umwandlung — mit der Dynamik
+ * des Angebots steigt die Umwandlung jedes Jahr, der Netto-Aufwand wird dafuer
+ * neu gerechnet. Ausgezahlt wird die Netto-Rente des ersten Rentenjahres bis
+ * zur Lebenserwartung, beim Kapital einmal.
+ */
+export function kennzahlenRechnung(
+  f: FirmenAngebot, d: BeratungDaten, l: Leistung | null, p: LegalParameters = P, heute = new Date(),
+): KennzahlenErgebnis | null {
+  if (!l || l.vertraege.length === 0) return null;
+  const monate = monateDerUmwandlung(d, f, heute);
+  if (monate <= 0) return null;
+  const m = f.modell;
+  const wegDerUmwandlung = m.art === 'matching' && m.weg === 'ukasse' ? 'ukasse' : 'direkt';
+  const dynamik = Math.max(0, d.versicherer[wegDerUmwandlung].dynamik);
+
+  const start = beginnVon(d, f, heute);
+  const ohneDynamik = nettoBei(f, d, d.umwandlungMonat, p);
+  const einzahlungenJeJahr: number[] = [];
+  let rest = monate;
+  for (let t = 0; rest > 0; t++) {
+    // Im ersten Jahr ab dem Beginnmonat, danach volle Jahre, zuletzt bis vor den Rentenbeginn.
+    const imJahr = Math.min(rest, t === 0 ? 13 - start.monat : 12);
+    const netto = dynamik > 0 && t > 0 ? nettoBei(f, d, d.umwandlungMonat * Math.pow(1 + dynamik, t), p) : ohneDynamik;
+    einzahlungenJeJahr.push(netto * imJahr);
+    rest -= imJahr;
+  }
+
+  const jahreAuszahlung = Math.max(1, Math.round(d.lebenserwartung - l.alterBeiRentenbeginn));
+  const summe = (w: (v: VertragsLeistung) => number) => l.vertraege.reduce((s, v) => s + w(v), 0);
+  const weg = (art: KennzahlenWeg['art'], netto: number): KennzahlenWeg | null => {
+    if (netto <= 0) return null;
+    const istKapital = art === 'kapital';
+    const k = kennzahlen({
+      einzahlungenJeJahr,
+      auszahlungJeJahr: istKapital ? 0 : netto * 12,
+      jahreAuszahlung: istKapital ? 0 : jahreAuszahlung,
+      kapitalEinmalig: istKapital ? netto : 0,
+    });
+    return { ...k, art, netto };
+  };
+
+  return {
+    monateEinzahlung: monate,
+    jahreAuszahlung,
+    lebenserwartung: d.lebenserwartung,
+    prognose: weg('prognose', summe((v) => v.prognose?.nettoMonat ?? 0)),
+    garantiert: weg('garantiert', summe((v) => v.garantiert?.nettoMonat ?? 0)),
+    kapital: weg('kapital', summe((v) => v.kapital?.netto ?? 0)),
   };
 }

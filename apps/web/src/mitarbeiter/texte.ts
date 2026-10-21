@@ -1,5 +1,6 @@
 import type { FirmenAngebot, FirmenModellDaten } from '@renten/schema';
 import type { MitarbeiterVertrag } from '@renten/engine';
+import type { KennzahlenErgebnis, MinderungHerleitung } from './rechnung';
 
 /**
  * Die Saetze der Mitarbeiterberatung — einmal hier, damit Bildschirm,
@@ -114,4 +115,69 @@ export function festePunkte(a: FirmenAngebot): string[] {
     + 'Beides ist in der Rechnung zur Leistung im Alter enthalten.',
   );
   return p;
+}
+
+const dezimal = (x: number, stellen: number) =>
+  x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
+const ganzeEuro = (x: number) => euroText(Math.round(x));
+
+/**
+ * So entsteht die Minderung der gesetzlichen Rente — in Saetzen mit den
+ * Zahlen des Mitarbeiters, fuer „So gerechnet“ und das Protokoll.
+ */
+export function minderungText(m: MinderungHerleitung): string {
+  if (m.ueberBbg) {
+    return 'Ihr Gehalt liegt auch nach der Umwandlung über der Beitragsbemessungsgrenze der Rentenversicherung. '
+      + 'Rentenbeiträge zahlen Sie dort ohnehin nur bis zur Grenze — die Umwandlung kostet keine Entgeltpunkte.';
+  }
+  if (m.svFreiJahr <= 0 || m.jahre <= 0) return 'Ohne beitragsfreie Umwandlung sinkt die gesetzliche Rente nicht.';
+  return `${ganzeEuro(m.svFreiJahr)} beitragsfreie Umwandlung im Jahr ÷ Durchschnittsentgelt ${ganzeEuro(m.durchschnittsentgelt)} `
+    + `= ${dezimal(m.entgeltpunkteJeJahr, 4)} Entgeltpunkte weniger je Jahr. × ${dezimal(m.jahre, 2)} Jahre vom Beginn bis zum `
+    + `Rentenbeginn = ${dezimal(m.entgeltpunkte, 2)} Entgeltpunkte. × Rentenwert ${euroText(m.rentenwert)} = `
+    + `${euroText(m.renteMonat)} weniger Rente im Monat — nach heutigem Stand, ohne Abschläge, bei einem Gehalt, `
+    + 'das mit dem Durchschnitt Schritt hält.';
+}
+
+/**
+ * Das Fazit der Kennzahlen in Saetzen — der Vertrag allein, wie im
+ * Vertrags-TUEV. Die geringere gesetzliche Rente steht ausdruecklich dabei:
+ * Sie ist in den Kennzahlen nicht enthalten.
+ */
+export function fazitText(k: KennzahlenErgebnis, minderungMonat: number): string {
+  const haupt = k.prognose ?? k.garantiert ?? k.kapital;
+  if (!haupt) return '';
+  const mit = haupt.art === 'prognose' ? 'mit der prognostizierten Rente'
+    : haupt.art === 'garantiert' ? 'mit der garantierten Rente' : 'mit der Kapitalauszahlung';
+  const prozent = (x: number) => `${dezimal(x * 100, 1)} %`;
+  const s: string[] = [
+    `Für jeden Euro, den Sie netto einzahlen, erhalten Sie ${mit} nach Steuer und Krankenversicherung `
+    + `${dezimal(haupt.nettoHebel, 2)} € zurück${haupt.nettoHebel < 1 ? ' — weniger, als Sie einzahlen' : ''}. `
+    + `Das entspricht einer Nettorendite von ${prozent(haupt.rendite)} im Jahr.`,
+  ];
+  if (haupt.art === 'kapital') {
+    s.push(`Netto-Gewinn: ${ganzeEuro(haupt.echterGewinn)}.`);
+  } else if (haupt.amortisationsJahre <= k.jahreAuszahlung) {
+    s.push(
+      `Nach ${dezimal(haupt.amortisationsJahre, 1)} Jahren Rente sind Ihre Einzahlungen zurückgeflossen; `
+      + `bis ${k.lebenserwartung} bleibt ein Netto-Gewinn von ${ganzeEuro(haupt.echterGewinn)}.`,
+    );
+  } else {
+    s.push(
+      `Ihre Einzahlungen fließen erst nach ${dezimal(haupt.amortisationsJahre, 1)} Jahren Rente zurück — `
+      + `später, als bis zum Alter von ${k.lebenserwartung} gerechnet.`,
+    );
+  }
+  if (haupt.art === 'prognose' && k.garantiert) {
+    s.push(
+      `Schon mit der garantierten Rente sind es ${dezimal(k.garantiert.nettoHebel, 2)} € je Euro `
+      + `(${prozent(k.garantiert.rendite)} im Jahr).`,
+    );
+  }
+  if (minderungMonat > 0.5) {
+    s.push(
+      `Nicht eingerechnet: Ihre gesetzliche Rente fällt um rund ${ganzeEuro(minderungMonat)} im Monat geringer aus `
+      + '(nach heutigem Stand) — siehe „Unterm Strich“.',
+    );
+  }
+  return s.join(' ');
 }
