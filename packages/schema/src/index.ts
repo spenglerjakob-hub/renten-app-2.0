@@ -16,8 +16,8 @@ export {
 } from './preise.js';
 export {
   firmenModellSchema, firmenAngebotSchema, beratungAngabenSchema, versichererWerteSchema,
-  entscheidungSchema, beratungDatenSchema, angebotLesen, beratungLesen,
+  entscheidungSchema, hochrechnungAnnahmenSchema, beratungDatenSchema, angebotLesen, beratungLesen,
   MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS,
   type FirmenModellDaten, type FirmenAngebot, type BeratungAngaben, type VersichererWerte,
-  type Entscheidung, type BeratungDaten, type BeratungStatus,
+  type Entscheidung, type HochrechnungAnnahmen, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';

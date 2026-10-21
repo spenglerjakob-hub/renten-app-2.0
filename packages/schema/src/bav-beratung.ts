@@ -109,6 +109,20 @@ export const entscheidungSchema = z.object({
   datum: datum(),
 });
 
+/**
+ * Annahmen der beispielhaften Hochrechnung — dieselben wie beim ETF-Depot im
+ * Rechner und mit denselben Namen wie dort am `Vertrag`: Rendite vor Kosten in
+ * Anspar- und Entnahmephase, Ausgabeaufschlag auf jeden Beitrag, laufende
+ * Kosten im Jahr, Dauer der Entnahme. Grenzen wie die Felder der Oberflaeche.
+ */
+export const hochrechnungAnnahmenSchema = z.object({
+  renditeAnsparphase: z.number().min(0).max(0.2).default(0.06),
+  renditeEntnahme: z.number().min(0).max(0.2).default(0.02),
+  ausgabeaufschlag: z.number().min(0).max(0.1).default(0),
+  ter: z.number().min(0).max(0.05).default(0.015),
+  entnahmedauer: z.number().int().min(1).max(60).default(30),
+});
+
 export const beratungDatenSchema = z.object({
   /** 2: sieben Schritte (mit „Ihre Versorgungslücke“) — aeltere Daten hebt `beratungLesen` an */
   version: z.literal(2).default(2),
@@ -123,8 +137,8 @@ export const beratungDatenSchema = z.object({
   entscheidung: entscheidungSchema.default({}),
   /** Bis zu welchem Alter die Rente in die Kennzahlen eingeht — dieselbe Vorgabe wie im Loesungsvergleich */
   lebenserwartung: z.number().int().min(60).max(120).default(85),
-  /** Zins der beispielhaften Hochrechnung, p. a. nach Kosten */
-  beispielZins: z.number().min(0).max(0.1).default(0.03),
+  /** Annahmen der beispielhaften Hochrechnung (ersetzt den einen Zins `beispielZins`, den das Lesen verwirft) */
+  hochrechnung: hochrechnungAnnahmenSchema.default({}),
   /** Der zuletzt offene Schritt (0–6) — zum Weitermachen */
   schritt: z.number().int().min(0).max(6).default(0),
 });
@@ -134,6 +148,7 @@ export type FirmenAngebot = z.infer<typeof firmenAngebotSchema>;
 export type BeratungAngaben = z.infer<typeof beratungAngabenSchema>;
 export type VersichererWerte = z.infer<typeof versichererWerteSchema>;
 export type Entscheidung = z.infer<typeof entscheidungSchema>;
+export type HochrechnungAnnahmen = z.infer<typeof hochrechnungAnnahmenSchema>;
 export type BeratungDaten = z.infer<typeof beratungDatenSchema>;
 export type BeratungStatus = (typeof BERATUNG_STATUS)[number];
 

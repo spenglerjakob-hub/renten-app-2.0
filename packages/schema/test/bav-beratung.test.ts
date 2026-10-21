@@ -40,7 +40,8 @@ describe('Daten einer Beratung', () => {
     const d = beratungDatenSchema.parse({});
     expect(d.version).toBe(2);
     expect(d.lebenserwartung).toBe(85);
-    expect(d.beispielZins).toBe(0.03);
+    // Die Annahmen der Hochrechnung wie beim ETF-Depot
+    expect(d.hochrechnung).toEqual({ renditeAnsparphase: 0.06, renditeEntnahme: 0.02, ausgabeaufschlag: 0, ter: 0.015, entnahmedauer: 30 });
     expect(d.entscheidung.status).toBe('offen');
     expect(d.umwandlungMonat).toBe(0);
     expect(d.versicherer.direkt).toEqual({ beitragMonat: 0, garantierteRente: 0, prognoseRente: 0, prognoseKapital: 0, dynamik: 0 });
@@ -65,6 +66,15 @@ describe('Daten einer Beratung', () => {
     expect(beratungLesen({ version: 1, schritt: 5, angaben: { name: 'Anna' } })).toMatchObject({ version: 2, schritt: 6, angaben: { name: 'Anna' } });
     // Version 2 bleibt, wie sie ist
     expect(beratungLesen({ version: 2, schritt: 2 }).schritt).toBe(2);
+  });
+
+  it('lesen: der eine Zins der ersten Hochrechnung wird verworfen, alles andere bleibt', () => {
+    const d = beratungLesen({ version: 2, schritt: 3, beispielZins: 0.05, umwandlungMonat: 200, angaben: { name: 'Anna' } });
+    expect(d).toMatchObject({ schritt: 3, umwandlungMonat: 200, angaben: { name: 'Anna' } });
+    expect(d).not.toHaveProperty('beispielZins');
+    expect(d.hochrechnung.renditeAnsparphase).toBe(0.06);
+    expect(beratungLesen({ hochrechnung: { ter: 0.008, entnahmedauer: 25 } }).hochrechnung)
+      .toEqual({ renditeAnsparphase: 0.06, renditeEntnahme: 0.02, ausgabeaufschlag: 0, ter: 0.008, entnahmedauer: 25 });
   });
 
   it('lesen: Kaputtes fällt auf die Vorgaben zurück', () => {

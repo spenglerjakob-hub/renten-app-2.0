@@ -175,25 +175,51 @@ describe('Probeabrechnung', () => {
   });
 });
 
-describe('Beispielhafte Hochrechnung', () => {
-  it('ohne Zins: Kapital = Beiträge; die Teile ergeben die Beiträge', () => {
+describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner', () => {
+  const mit = (d: BeratungDaten, a: Partial<BeratungDaten['hochrechnung']>): BeratungDaten =>
+    ({ ...d, hochrechnung: { ...d.hochrechnung, ...a } });
+
+  it('Vorgaben: 6 % Rendite minus 1,5 % Kosten beim Ansparen, 2 % minus 1,5 % über 30 Jahre bei der Entnahme', () => {
     const d = anna();
     const r = beitragsRechnung(firma, d);
-    const h = hochrechnung(firma, d, r, 0, HEUTE);
+    const h = hochrechnung(firma, d, r, HEUTE);
     expect(h.monate).toBe(303);
+    expect(h.beitragMonat).toBeCloseTo(r.gesamtMonat, 9);
     expect(h.beitraegeSumme).toBeCloseTo(r.gesamtMonat * 303, 6);
-    expect(h.kapital).toBeCloseTo(h.beitraegeSumme, 6);
     expect(h.nettoSumme + h.ersparnisSumme + h.arbeitgeberSumme).toBeCloseTo(h.beitraegeSumme, 6);
+    const i = Math.pow(1.045, 1 / 12) - 1;
+    expect(h.kapital).toBeCloseTo(r.gesamtMonat * ((Math.pow(1 + i, 303) - 1) / i) * (1 + i), 6);
+    expect(h.ertrag).toBeCloseTo(h.kapital - h.beitraegeSumme, 9);
+    // Dieselbe Formel wie die „Entnahme brutto“ des Depots (`entnahmeplan`)
+    expect(h.entnahmeMonat * 12).toBeCloseTo((h.kapital * 0.005) / (1 - Math.pow(1.005, -30)), 6);
   });
 
-  it('mit Zins: vorschüssige Monatsbeiträge, Zinsanteil = Kapital − Beiträge', () => {
+  it('Rendite gleich Kosten: Kapital = Beiträge; der Ausgabeaufschlag geht von jedem Beitrag ab', () => {
+    const d = mit(anna(), { renditeAnsparphase: 0.015 });
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    expect(h.kapital).toBeCloseTo(h.beitraegeSumme, 6);
+    const aufschlag = hochrechnung(firma, mit(d, { ausgabeaufschlag: 0.05 }), r, HEUTE);
+    expect(aufschlag.kapital).toBeCloseTo(h.beitraegeSumme * 0.95, 6);
+    expect(aufschlag.ertrag).toBeCloseTo(-h.beitraegeSumme * 0.05, 6);
+    // Rendite unter den Kosten: wie im Depot nicht unter null
+    expect(hochrechnung(firma, mit(d, { renditeAnsparphase: 0.01 }), r, HEUTE).kapital).toBeCloseTo(h.beitraegeSumme, 6);
+  });
+
+  it('Entnahme ohne Rendite nach Kosten: das Kapital geteilt durch die Monate', () => {
+    const d = mit(anna(), { renditeEntnahme: 0.01, entnahmedauer: 25 });
+    const h = hochrechnung(firma, d, beitragsRechnung(firma, d), HEUTE);
+    expect(h.entnahmeMonat).toBeCloseTo(h.kapital / (25 * 12), 6);
+  });
+
+  it('mehr Rendite oder weniger Kosten: mehr Kapital; kürzere Entnahme: mehr im Monat', () => {
     const d = anna();
     const r = beitragsRechnung(firma, d);
-    const h = hochrechnung(firma, d, r, 0.03, HEUTE);
-    const i = Math.pow(1.03, 1 / 12) - 1;
-    expect(h.kapital).toBeCloseTo(r.gesamtMonat * ((Math.pow(1 + i, 303) - 1) / i) * (1 + i), 6);
-    expect(h.zinsen).toBeCloseTo(h.kapital - h.beitraegeSumme, 9);
-    expect(hochrechnung(firma, d, r, 0.05, HEUTE).kapital).toBeGreaterThan(h.kapital);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    expect(hochrechnung(firma, mit(d, { renditeAnsparphase: 0.08 }), r, HEUTE).kapital).toBeGreaterThan(h.kapital);
+    expect(hochrechnung(firma, mit(d, { ter: 0.005 }), r, HEUTE).kapital).toBeGreaterThan(h.kapital);
+    expect(hochrechnung(firma, mit(d, { entnahmedauer: 20 }), r, HEUTE).entnahmeMonat).toBeGreaterThan(h.entnahmeMonat);
+    expect(hochrechnung(firma, mit(d, { renditeEntnahme: 0.04 }), r, HEUTE).kapital).toBeCloseTo(h.kapital, 9);
   });
 });
 

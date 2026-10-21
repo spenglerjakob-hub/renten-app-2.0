@@ -1,10 +1,10 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, kennzahlen, parameterFuer, parseDatum, projiziere,
+  bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
   renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
-import type { BeratungAngaben, BeratungDaten, FirmenAngebot, VersichererWerte } from '@renten/schema';
+import type { BeratungAngaben, BeratungDaten, FirmenAngebot, HochrechnungAnnahmen, VersichererWerte } from '@renten/schema';
 import { leereAntworten, regelRentenbeginn, szenarioAusCheck } from '../check/uebernahme';
 import type { SzenarioParsed } from '../store/szenario';
 
@@ -514,41 +514,59 @@ export function probeabrechnung(f: FirmenAngebot, d: BeratungDaten, r: Mitarbeit
 }
 
 /* --------------------------------------------------------------------------
- * BEISPIELHAFTE HOCHRECHNUNG — was bis zum Rentenbeginn zusammenkommt, mit
- * einem angenommenen Zins. Ein Beispiel; die Werte des Versicherers folgen.
+ * BEISPIELHAFTE HOCHRECHNUNG — mit den Annahmen und der Rechnung des
+ * ETF-Depots im Rechner (`etfVerlauf` in der Zeitachse): In der Ansparphase
+ * waechst das Geld mit der Rendite minus den laufenden Kosten, der
+ * Ausgabeaufschlag geht von jedem Beitrag ab. Ab Rentenbeginn verteilt
+ * `entnahmeplan` aus dem Rechenkern das Kapital ueber die Entnahmedauer, mit
+ * der Rendite der Entnahmephase minus den Kosten. Angespart wird monatsgenau,
+ * weil Beitraege und Laufzeit hier monatsgenau sind; Steuern auf Ertraege
+ * (Vorabpauschale) gibt es in der bAV nicht. Ein Beispiel — die Werte des
+ * Versicherers folgen.
  * ------------------------------------------------------------------------ */
 
 export interface Hochrechnung {
   monate: number;
-  zins: number;
+  annahmen: HochrechnungAnnahmen;
+  /** Was jeden Monat in den Vertrag fliesst: Umwandlung und Arbeitgeber */
+  beitragMonat: number;
   nettoSumme: number;
   /** Was Steuer- und Sozialabgabenersparnis beitragen */
   ersparnisSumme: number;
   arbeitgeberSumme: number;
   beitraegeSumme: number;
-  zinsen: number;
+  /** Kapital minus Beitraege, also nach allen Kosten — negativ, wenn die Kosten ueberwiegen */
+  ertrag: number;
   kapital: number;
+  /** Entnahme brutto im Monat, `annahmen.entnahmedauer` Jahre lang */
+  entnahmeMonat: number;
 }
 
 /**
- * Endwert gleichbleibender Monatsbeitraege, vorschuessig (Beitrag am
- * Monatsanfang), Monatszins aus dem Jahreszins.
+ * Endwert der Monatsbeitraege nach Ausgabeaufschlag, vorschuessig (Beitrag am
+ * Monatsanfang), Monatszins aus der Jahresrendite nach Kosten.
  */
-export function hochrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, zins = d.beispielZins, heute = new Date()): Hochrechnung {
+export function hochrechnung(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, heute = new Date()): Hochrechnung {
+  const a = d.hochrechnung;
   const n = monateDerUmwandlung(d, f, heute);
   const c = r.gesamtMonat;
-  const i = Math.pow(1 + Math.max(0, zins), 1 / 12) - 1;
-  const kapital = i > 0 ? c * ((Math.pow(1 + i, n) - 1) / i) * (1 + i) : c * n;
+  const angelegt = c * (1 - a.ausgabeaufschlag);
+  // Wie im Depot: Rendite nach laufenden Kosten, nicht unter null
+  const i = Math.pow(1 + Math.max(0, a.renditeAnsparphase - a.ter), 1 / 12) - 1;
+  const kapital = i > 0 ? angelegt * ((Math.pow(1 + i, n) - 1) / i) * (1 + i) : angelegt * n;
+  const plan = entnahmeplan(kapital, kapital, a.entnahmedauer, Math.max(0, a.renditeEntnahme - a.ter));
   const beitraegeSumme = c * n;
   return {
     monate: n,
-    zins,
+    annahmen: a,
+    beitragMonat: c,
     nettoSumme: r.nettoAufwandMonat * n,
     ersparnisSumme: (r.umwandlungMonat - r.nettoAufwandMonat) * n,
     arbeitgeberSumme: r.arbeitgeberMonat * n,
     beitraegeSumme,
-    zinsen: kapital - beitraegeSumme,
+    ertrag: kapital - beitraegeSumme,
     kapital,
+    entnahmeMonat: plan.bruttoProJahr / 12,
   };
 }
 
