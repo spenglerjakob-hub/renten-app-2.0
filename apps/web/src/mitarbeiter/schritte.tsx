@@ -602,6 +602,35 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
   );
 }
 
+/**
+ * „Ihre Belastung“ — dieselbe Treppe wie im Vertrags-TUEV: vom Beitrag in den
+ * Vertrag zu dem, was es wirklich kostet. Im Rahmen der Kaesten daneben.
+ */
+function BelastungKasten({ treppe }: { treppe: ReturnType<typeof belastungsTreppe> }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <h4 className="text-sm font-black text-slate-900">Ihre Belastung</h4>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Ansparphase, im Monat</p>
+      <div className="mt-2 space-y-1.5">
+        <GegenueberZeile text="Gesamtbeitrag" wert={euroGenau(treppe.zufluss)} />
+        {treppe.zeilen.map((z) => (
+          z.art === 'summe' ? (
+            <div key={z.text} className="!mt-2 border-t border-slate-200 pt-2">
+              <GegenueberZeile text={z.text} wert={euroGenau(z.betrag)} />
+            </div>
+          ) : (
+            <GegenueberZeile key={z.text} text={z.text} wert={euroGenau(z.betrag)} farbe="text-emerald-600" info={z.erklaerung} />
+          )
+        ))}
+        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
+          <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
+          <span className="text-base font-black tabular-nums text-slate-900">{euroGenau(treppe.aufwand)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const WEG_TITEL: Record<KennzahlenWeg['art'], string> = { garantiert: 'Garantiert', prognose: 'Prognose', kapital: 'Kapital' };
 const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
 
@@ -611,9 +640,9 @@ const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFrac
  * Netto-Auszahlung. Die geringere gesetzliche Rente steht im Fazit und
  * darunter in „Unterm Strich“.
  */
-function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell, treppe }: {
+function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
   k: KennzahlenErgebnis; minderungMonat: number; daten: BeratungDaten;
-  setze: SchrittProps['setze']; aktuell: boolean; treppe: ReturnType<typeof belastungsTreppe>;
+  setze: SchrittProps['setze']; aktuell: boolean;
 }) {
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return null;
@@ -700,27 +729,6 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell, treppe }: {
       <p className="mt-4 text-base leading-relaxed text-slate-800">
         <strong>Fazit:</strong> {fazitText(k, minderungMonat)}
       </p>
-
-      {/* Dieselbe Treppe wie im Vertrags-TUEV („Ihre Belastung“): vom Gesamtbeitrag zu dem, was es wirklich kostet. */}
-      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:max-w-md">
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ihre Belastung (Ansparphase, im Monat)</div>
-        <div className="space-y-1.5">
-          <GegenueberZeile text="Gesamtbeitrag" wert={euroGenau(treppe.zufluss)} />
-          {treppe.zeilen.map((z) => (
-            z.art === 'summe' ? (
-              <div key={z.text} className="!mt-2 border-t border-slate-200 pt-2">
-                <GegenueberZeile text={z.text} wert={euroGenau(z.betrag)} />
-              </div>
-            ) : (
-              <GegenueberZeile key={z.text} text={z.text} wert={euroGenau(z.betrag)} farbe="text-emerald-600" info={z.erklaerung} />
-            )
-          ))}
-          <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
-            <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
-            <span className="text-base font-black tabular-nums text-slate-900">{euroGenau(treppe.aufwand)}</span>
-          </div>
-        </div>
-      </div>
     </Karte>
   );
 }
@@ -738,17 +746,25 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   const h = hochrechnung(firma.angebot, daten, r);
   const geschaetzt = r.vertraege.some((v) => daten.versicherer[v.weg].ausHochrechnung);
   const lohn = nettolohnHeute(daten.angaben, firma.angebot);
-  const treppe = belastungsTreppe({
-    zulageMonat: 0,
-    agZuschussMonat: r.arbeitgeberMonat,
-    beitragMonat: r.gesamtMonat,
-    svErsparnisMonat: r.svErsparnisMonat,
-    steuerersparnisMonat: r.steuerersparnisMonat,
-    echterAufwandMonat: r.nettoAufwandMonat,
-  }, {
-    zve: lohn.zveJahr, p: P, beamter: false, selbststaendig: false,
-    privatVersichert: daten.angaben.kv === 'privat', splitting: lohn.splitting,
-  });
+  /*
+    „Ihre Belastung“ steht beim Vertrag, in den die Umwandlung fliesst — mit
+    dessen Beitrag und Arbeitgeberanteil; die Ersparnisse gehoeren ganz zur
+    Umwandlung. Ein Vertrag, den nur der Arbeitgeber bezahlt (Matching:
+    Unterstuetzungskasse), kostet den Mitarbeiter nichts und bekommt keinen.
+  */
+  const belastungFuer = (v: MitarbeiterBav['vertraege'][number]) => (v.beitragMonat - v.arbeitgeberMonat > 0.005
+    ? belastungsTreppe({
+      zulageMonat: 0,
+      agZuschussMonat: v.arbeitgeberMonat,
+      beitragMonat: v.beitragMonat,
+      svErsparnisMonat: r.svErsparnisMonat,
+      steuerersparnisMonat: r.steuerersparnisMonat,
+      echterAufwandMonat: r.nettoAufwandMonat,
+    }, {
+      zve: lohn.zveJahr, p: P, beamter: false, selbststaendig: false,
+      privatVersichert: daten.angaben.kv === 'privat', splitting: lohn.splitting,
+    })
+    : null);
 
   if (r.vertraege.length === 0) {
     return <Karte><p className="text-sm text-slate-600">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
@@ -771,6 +787,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
         const uebernehmen = () => schaetzung && setzeW(v.weg, {
           prognoseRente: schaetzung.renteMonat, prognoseKapital: schaetzung.kapital, dynamik: 0, ausHochrechnung: true,
         });
+        const belastung = belastungFuer(v);
         return (
           <Karte key={v.weg} titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}
             rechts={w.ausHochrechnung
@@ -805,31 +822,32 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                 )}
               </div>
               <div className={`space-y-3 lg:col-span-7 ${aktuell ? '' : 'opacity-60'}`}>
+                {/* Oben die Belastung neben der Prognose; die garantierten Werte stehen nur unten in den Kennzahlen. */}
+                {(belastung || l?.prognose) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {belastung && <BelastungKasten treppe={belastung} />}
+                    {l && leistung && (
+                      <Wertezeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} kk={leistung.kaufkraftfaktor} />
+                    )}
+                  </div>
+                )}
                 {ohneGeburt && <p className="text-sm text-amber-800">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
                 {!ohneGeburt && !l && <p className="text-sm text-slate-500">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
-                {l && leistung && (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Wertezeile titel="Garantiert" w={l.garantiert} kk={leistung.kaufkraftfaktor} />
-                      <Wertezeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} kk={leistung.kaufkraftfaktor} />
-                    </div>
-                    {l.kapital && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <h4 className="text-sm font-black text-slate-900">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
-                        <dl className="mt-1 space-y-0.5 text-[13px]">
-                          <Zeile text="Kapital brutto" betrag={l.kapital.brutto} />
-                          <Zeile text="− Steuer" betrag={l.kapital.steuer} />
-                          <Zeile text="− Kranken- und Pflegeversicherung (10 Jahre)" betrag={l.kapital.kvPv} />
-                          <Zeile text="= netto" betrag={l.kapital.netto} summe />
-                        </dl>
-                        {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins) && (
-                          <p className="mt-1 text-xs text-slate-600">
-                            Die Rente holt das Kapital mit rund {Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.
-                          </p>
-                        )}
-                      </div>
+                {l?.kapital && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <h4 className="text-sm font-black text-slate-900">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
+                    <dl className="mt-1 space-y-0.5 text-[13px]">
+                      <Zeile text="Kapital brutto" betrag={l.kapital.brutto} />
+                      <Zeile text="− Steuer" betrag={l.kapital.steuer} />
+                      <Zeile text="− Kranken- und Pflegeversicherung (10 Jahre)" betrag={l.kapital.kvPv} />
+                      <Zeile text="= netto" betrag={l.kapital.netto} summe />
+                    </dl>
+                    {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins) && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        Die Rente holt das Kapital mit rund {Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.
+                      </p>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -838,7 +856,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
       })}
 
       {kennzahlen && (
-        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} treppe={treppe} />
+        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} />
       )}
 
       {leistung && (
