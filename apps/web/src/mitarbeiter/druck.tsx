@@ -117,7 +117,7 @@ function LeistungsZeile({ titel, w }: { titel: string; w: AuszahlungsWerte | nul
   );
 }
 
-export function Protokoll({ firma, daten, r, leistung, auftritt }: DokumentProps) {
+export function Protokoll({ firma, logo, daten, r, leistung, auftritt }: DokumentProps) {
   const a = daten.angaben;
   const e = daten.entscheidung;
   const fussCss = fusszeileCss(auftritt);
@@ -130,9 +130,15 @@ export function Protokoll({ firma, daten, r, leistung, auftritt }: DokumentProps
     <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
       {fussCss && <style>{fussCss}</style>}
       <DeckblattKopf auftritt={auftritt} />
-      <h1 className="mt-5 text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Beratungsprotokoll betriebliche Altersversorgung</h1>
-      <p className="mt-1 text-[11pt]">für {a.name || 'den Mitarbeiter'}, {firma.name}</p>
-      {ortDatum(daten) && <p className="text-[9pt] text-slate-600">Beratung: {ortDatum(daten)}</p>}
+      {/* Oben der Berater, neben dem Titel die Firma, um deren Angebot es geht */}
+      <div className="mt-5 flex items-start justify-between gap-6">
+        <div>
+          <h1 className="text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Beratungsprotokoll betriebliche Altersversorgung</h1>
+          <p className="mt-1 text-[11pt]">für {a.name || 'den Mitarbeiter'}, {firma.name}</p>
+          {ortDatum(daten) && <p className="text-[9pt] text-slate-600">Beratung: {ortDatum(daten)}</p>}
+        </div>
+        {logo && <img src={logo} alt="" className="h-12 max-w-[10rem] shrink-0 object-contain" />}
+      </div>
 
       <Abschnitt titel="Anlass und Angebot der Firma">
         <p>{firma.name} bietet ihren Mitarbeitern eine Betriebsrente an. {regelText(firma.angebot.modell)}</p>
