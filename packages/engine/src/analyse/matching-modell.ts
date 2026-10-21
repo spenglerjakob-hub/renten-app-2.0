@@ -173,6 +173,8 @@ export interface MatchingErgebnis {
     nettoAufwandMonat: number;
     /** Teil der Umwandlung, auf den er weiter Sozialabgaben zahlt */
     svPflichtigMonat: number;
+    /** Teil der Umwandlung ueber dem steuerfreien Rahmen — er wird wie Lohn versteuert */
+    steuerpflichtigMonat: number;
   };
   arbeitgeber: {
     pflichtzuschussMonat: number;
@@ -550,6 +552,7 @@ export function matchingModell(
       steuerersparnisMonat: steuerAn / 12,
       nettoAufwandMonat: aufwandAn / 12,
       svPflichtigMonat: (a.e - a.svFrei) / 12,
+      steuerpflichtigMonat: (a.e - steuerFrei) / 12,
     },
     arbeitgeber: {
       pflichtzuschussMonat: a.z / 12,
@@ -787,6 +790,7 @@ function zuschussKern(
       steuerersparnisMonat: steuerAn / 12,
       nettoAufwandMonat: aufwandAn / 12,
       svPflichtigMonat: (a.e - a.svFrei) / 12,
+      steuerpflichtigMonat: (a.e - steuerFrei) / 12,
     },
     arbeitgeber: {
       zuschussMonat: a.ag / 12,

@@ -110,7 +110,8 @@ export const entscheidungSchema = z.object({
 });
 
 export const beratungDatenSchema = z.object({
-  version: z.literal(1).default(1),
+  /** 2: sieben Schritte (mit „Ihre Versorgungslücke“) — aeltere Daten hebt `beratungLesen` an */
+  version: z.literal(2).default(2),
   angaben: beratungAngabenSchema.default({}),
   umwandlungMonat: betrag(10_000).default(0),
   versicherer: z.object({
@@ -120,8 +121,12 @@ export const beratungDatenSchema = z.object({
     ukasse: versichererWerteSchema.default({}),
   }).default({}),
   entscheidung: entscheidungSchema.default({}),
-  /** Der zuletzt offene Schritt (0–5) — zum Weitermachen */
-  schritt: z.number().int().min(0).max(5).default(0),
+  /** Bis zu welchem Alter die Rente in die Kennzahlen eingeht — dieselbe Vorgabe wie im Loesungsvergleich */
+  lebenserwartung: z.number().int().min(60).max(120).default(85),
+  /** Zins der beispielhaften Hochrechnung, p. a. nach Kosten */
+  beispielZins: z.number().min(0).max(0.1).default(0.03),
+  /** Der zuletzt offene Schritt (0–6) — zum Weitermachen */
+  schritt: z.number().int().min(0).max(6).default(0),
 });
 
 export type FirmenModellDaten = z.infer<typeof firmenModellSchema>;
@@ -142,8 +147,21 @@ export function angebotLesen(roh: unknown): FirmenAngebot {
   return r.success ? r.data : firmenAngebotSchema.parse({});
 }
 
-/** Dasselbe fuer die Daten einer Beratung. */
+/**
+ * Version 1 kannte sechs Schritte. Version 2 schiebt „Ihre Versorgungslücke“
+ * als dritten ein — wer in einem spaeteren Schritt stand, steht danach eins
+ * weiter, also wieder im selben Schritt. Alles andere bleibt, wie es ist.
+ */
+function anheben(roh: unknown): unknown {
+  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return roh;
+  const o = roh as Record<string, unknown>;
+  if (o.version === 2) return o;
+  const schritt = typeof o.schritt === 'number' && o.schritt >= 2 ? o.schritt + 1 : o.schritt;
+  return { ...o, version: 2, schritt };
+}
+
+/** Dasselbe fuer die Daten einer Beratung — aeltere Fassungen werden zuerst angehoben. */
 export function beratungLesen(roh: unknown): BeratungDaten {
-  const r = beratungDatenSchema.safeParse(roh ?? {});
+  const r = beratungDatenSchema.safeParse(anheben(roh ?? {}));
   return r.success ? r.data : beratungDatenSchema.parse({});
 }

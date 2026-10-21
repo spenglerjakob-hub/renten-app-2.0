@@ -38,7 +38,9 @@ describe('Firmenangebot', () => {
 describe('Daten einer Beratung', () => {
   it('leer: offen, ohne Umwandlung, zwei leere Versichererwerte', () => {
     const d = beratungDatenSchema.parse({});
-    expect(d.version).toBe(1);
+    expect(d.version).toBe(2);
+    expect(d.lebenserwartung).toBe(85);
+    expect(d.beispielZins).toBe(0.03);
     expect(d.entscheidung.status).toBe('offen');
     expect(d.umwandlungMonat).toBe(0);
     expect(d.versicherer.direkt).toEqual({ beitragMonat: 0, garantierteRente: 0, prognoseRente: 0, prognoseKapital: 0, dynamik: 0 });
@@ -56,8 +58,18 @@ describe('Daten einer Beratung', () => {
     expect(beratungDatenSchema.safeParse({ entscheidung: { status: 'ja' } }).success).toBe(false);
   });
 
+  it('lesen: Version 1 (sechs Schritte) wird angehoben — man steht wieder im selben Schritt', () => {
+    // v1: 0 Angebot, 1 Angaben, 2 Rechnung, 3 Leistung, 4 Entscheidung, 5 Unterlagen
+    expect(beratungLesen({ version: 1, schritt: 1 }).schritt).toBe(1);
+    expect(beratungLesen({ version: 1, schritt: 2 }).schritt).toBe(3);
+    expect(beratungLesen({ version: 1, schritt: 5, angaben: { name: 'Anna' } })).toMatchObject({ version: 2, schritt: 6, angaben: { name: 'Anna' } });
+    // Version 2 bleibt, wie sie ist
+    expect(beratungLesen({ version: 2, schritt: 2 }).schritt).toBe(2);
+  });
+
   it('lesen: Kaputtes fällt auf die Vorgaben zurück', () => {
     expect(beratungLesen({ schritt: 9 }).schritt).toBe(0);
+    expect(beratungLesen({ version: 2, lebenserwartung: 300 }).lebenserwartung).toBe(85);
     expect(beratungLesen({ angaben: { name: 'Anna Beispiel' } }).angaben.name).toBe('Anna Beispiel');
   });
 });

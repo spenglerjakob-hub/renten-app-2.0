@@ -61,6 +61,8 @@ export interface MitarbeiterBav {
   nettoAufwandMonat: number;
   /** Teil der Umwandlung, auf den weiter Sozialabgaben fallen */
   svPflichtigMonat: number;
+  /** Teil der Umwandlung ueber dem steuerfreien Rahmen (8 % der BBG) — er wird versteuert */
+  steuerpflichtigMonat: number;
   /** Gesetzlicher Pflichtzuschuss (§ 1a Abs. 1a BetrAVG) */
   pflichtzuschussMonat: number;
   /** Was der Arbeitgeber darueber hinaus gibt: Zuschuss, Festbetrag oder Matching */

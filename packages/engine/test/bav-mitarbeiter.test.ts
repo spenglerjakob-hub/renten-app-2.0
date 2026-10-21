@@ -96,6 +96,30 @@ describe('Hinweise für den Mitarbeiter', () => {
   });
 });
 
+describe('Steuerfreier Rahmen (8 % der BBG)', () => {
+  const steuerGrenze = (0.08 * p.bbgRvJahr) / 12;
+
+  it('innerhalb des Rahmens ist nichts steuerpflichtig — in allen drei Modellen', () => {
+    for (const modell of [ZUSCHUSS, FESTBETRAG, MATCHING]) {
+      expect(bavMitarbeiter(modell, ma(), steuer, p).steuerpflichtigMonat).toBe(0);
+    }
+  });
+
+  it('darüber wird der Rest versteuert; der Arbeitgeberbeitrag belegt den Rahmen zuerst', () => {
+    const z = bavMitarbeiter(ZUSCHUSS, ma({ umwandlungMonat: 700 }), steuer, p);
+    // 700 € Umwandlung + 100 € Zuschuss (gedeckelt) gegen den Rahmen
+    expect(z.steuerpflichtigMonat).toBeCloseTo(700 + 100 - steuerGrenze, 6);
+    const m = bavMitarbeiter(MATCHING, ma({ umwandlungMonat: 700 }), steuer, p);
+    // Matching: nur der Pflichtzuschuss liegt mit in der Direktversicherung
+    expect(m.steuerpflichtigMonat).toBeCloseTo(700 + m.pflichtzuschussMonat - steuerGrenze, 6);
+  });
+
+  it('Umwandlung in die Unterstützungskasse ist ohne Grenze steuerfrei', () => {
+    const uk: FirmenModell = { ...MATCHING, weg: 'ukasse' } as FirmenModell;
+    expect(bavMitarbeiter(uk, ma({ umwandlungMonat: 900 }), steuer, p).steuerpflichtigMonat).toBe(0);
+  });
+});
+
 describe('Verheiratet: das Einkommen des Partners zählt mit', () => {
   it('mit Partnereinkommen spart die Umwandlung mehr Steuer', () => {
     const verh = { ...steuer, verheiratet: true };
