@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvMinderungVon, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
@@ -77,26 +77,6 @@ describe('Gesetzliche Rente', () => {
     expect(monateDerUmwandlung(anna(), firma, HEUTE)).toBe(303);
     expect(monateDerUmwandlung(beratung(), firma, HEUTE)).toBe(366);
     expect(monateDerUmwandlung(beratung({ geburtsdatum: '' }), firma, HEUTE)).toBe(0);
-  });
-
-  it('Minderung: fehlende Entgeltpunkte je Jahr × Jahre × Rentenwert, monatsgenau', () => {
-    const d = anna();
-    const m = grvMinderungVon(d, firma, beitragsRechnung(firma, d), P, HEUTE);
-    expect(m.svFreiJahr).toBeCloseTo(2400, 6);
-    expect(m.jahre).toBeCloseTo(25.25, 9);
-    expect(m.entgeltpunkteJeJahr).toBeCloseTo(2400 / P.durchschnittsentgelt, 9);
-    expect(m.renteMonat).toBeCloseTo(m.entgeltpunkteJeJahr * 25.25 * P.rentenwert, 9);
-    // Rechtsstand 2026: 51.944 € Durchschnittsentgelt, 42,52 € Rentenwert — das Beispiel aus dem Gespräch
-    if (P.jahr === 2026) expect(m.renteMonat).toBeCloseTo(49.61, 2);
-    expect(m.ueberBbg).toBe(false);
-  });
-
-  it('über der Beitragsbemessungsgrenze keine Minderung', () => {
-    const d = anna();
-    const reich = { ...d, angaben: { ...d.angaben, jahresbrutto: 120_000 } };
-    const m = grvMinderungVon(reich, firma, beitragsRechnung(firma, reich), P, HEUTE);
-    expect(m.renteMonat).toBe(0);
-    expect(m.ueberBbg).toBe(true);
   });
 });
 
@@ -379,12 +359,13 @@ describe('Leistung im Alter aus den Werten des Versicherers', () => {
     expect(v.prognose!.steuerMonat).toBeGreaterThan(0);
   });
 
-  it('unterm Strich: das Haushaltsnetto steigt — um weniger als die Betriebsrente, die gesetzliche sinkt ja', () => {
+  it('ohne Minderung: die gesetzliche Rente bleibt, wie sie ist', () => {
     const { d, r, f } = mitWerten();
     const l = leistungsRechnung(f, d, r)!;
-    expect(l.grvMinderungMonat).toBeGreaterThan(0);
-    expect(l.plusHaushaltMonat!).toBeGreaterThan(0);
-    expect(l.plusHaushaltMonat!).toBeLessThan(l.vertraege[0]!.prognose!.nettoMonat);
+    expect(l).not.toHaveProperty('grvMinderungMonat');
+    expect(l).not.toHaveProperty('plusHaushaltMonat');
+    // Dieselbe Projektion wie die Versorgungsluecke: Die gesetzliche Rente im Szenario ist die unveraenderte
+    expect(basisProjektion(d.angaben, f).grv.monat).toBe(1450);
   });
 
   it('Matching-Modell: Direktversicherung und Unterstützungskasse je für sich', () => {

@@ -8,17 +8,25 @@ import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
   AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
-import { belastungsTreppe, laufzeitText } from '../features/tuev-berechnung';
+import { laufzeitText } from '../features/tuev-berechnung';
 import { Bon, Kachel, Zeile } from '../arbeitgeber/bausteine';
 import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, Karte, LueckenRing, TextBereich, useDrucken } from './bausteine';
 import {
-  P, automatischerBeginn, grvMinderungVon, grvVon, hochrechnung, hochrechnungJeVertrag, nettolohnHeute, probeabrechnung,
+  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, probeabrechnung,
   reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
-  type AuszahlungsWerte, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
+  type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
   type Probeabrechnung, type Versorgungsluecke,
 } from './rechnung';
-import { fazitText, festePunkte, firmenHinweise, minderungText, regelText, traegerText, vertragName } from './texte';
-import { Protokoll, Vereinbarung, Verzicht } from './druck';
+import { fazitText, festePunkte, firmenHinweise, regelText, traegerText, vertragName } from './texte';
+import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
+
+/** Was zum Drucken der Unterlagen gebraucht wird — in der Entscheidung und bei den Unterlagen. */
+interface UnterlagenProps {
+  auftritt: Auftritt | null;
+  sichern: (d: BeratungDaten) => Promise<boolean>;
+  luecke: Versorgungsluecke | null;
+  kennzahlen: KennzahlenErgebnis | null;
+}
 
 export interface SchrittProps {
   firma: Firma;
@@ -529,7 +537,6 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
 
 export function SchrittRechnung(props: SchrittProps) {
   const { firma, daten, setze, r } = props;
-  const minderung = grvMinderungVon(daten, firma.angebot, r);
   const abrechnung = useMemo(() => probeabrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
   const h = useMemo(() => hochrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
 
@@ -568,13 +575,6 @@ export function SchrittRechnung(props: SchrittProps) {
           {r.hinweise.map((h2) => (
             <p key={h2} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700">{h2}</p>
           ))}
-          {minderung.renteMonat > 0.5 && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-              Für den beitragsfreien Teil zahlen Sie keine Rentenbeiträge. Ihre gesetzliche Rente sinkt dadurch um rund{' '}
-              <strong>{euro(minderung.renteMonat)}</strong> im Monat — nach heutigem Stand, bei gleichem Gehalt bis zum Rentenbeginn.
-              <InfoPunkt titel="So gerechnet">{minderungText(minderung)}</InfoPunkt>
-            </p>
-          )}
         </div>
       </div>
 
@@ -606,7 +606,7 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
  * „Ihre Belastung“ — dieselbe Treppe wie im Vertrags-TUEV: vom Beitrag in den
  * Vertrag zu dem, was es wirklich kostet. Im Rahmen der Kaesten daneben.
  */
-function BelastungKasten({ treppe }: { treppe: ReturnType<typeof belastungsTreppe> }) {
+function BelastungKasten({ treppe }: { treppe: BelastungsTreppe }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
       <h4 className="text-sm font-black text-slate-900">Ihre Belastung</h4>
@@ -637,12 +637,10 @@ const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFrac
 /**
  * Kennzahlen und Fazit — wie im Vertrags-TUEV (`VertragsTuev.tsx`, „3.
  * Kennzahlen und Fazit“), fuer den Vertrag allein: Netto-Aufwand gegen
- * Netto-Auszahlung. Die geringere gesetzliche Rente steht im Fazit und
- * darunter in „Unterm Strich“.
+ * Netto-Auszahlung.
  */
-function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
-  k: KennzahlenErgebnis; minderungMonat: number; daten: BeratungDaten;
-  setze: SchrittProps['setze']; aktuell: boolean;
+function KennzahlenKarte({ k, daten, setze, aktuell }: {
+  k: KennzahlenErgebnis; daten: BeratungDaten; setze: SchrittProps['setze']; aktuell: boolean;
 }) {
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return null;
@@ -727,7 +725,7 @@ function KennzahlenKarte({ k, minderungMonat, daten, setze, aktuell }: {
       )}
 
       <p className="mt-4 text-base leading-relaxed text-slate-800">
-        <strong>Fazit:</strong> {fazitText(k, minderungMonat)}
+        <strong>Fazit:</strong> {fazitText(k)}
       </p>
     </Karte>
   );
@@ -737,34 +735,12 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   kennzahlen: KennzahlenErgebnis | null; aktuell: boolean;
 }) {
   const a = firma.angebot;
-  const minderung = grvMinderungVon(daten, firma.angebot, r);
   const setzeW = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) =>
     setze((d) => ({ ...d, versicherer: { ...d.versicherer, [weg]: { ...d.versicherer[weg], ...p } } }));
   // Von Hand geaenderte Prognosewerte stammen nicht mehr aus der Hochrechnung
   const setzePrognose = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) => setzeW(weg, { ...p, ausHochrechnung: false });
   const ohneGeburt = !rentenbeginnVon(daten.angaben);
   const h = hochrechnung(firma.angebot, daten, r);
-  const geschaetzt = r.vertraege.some((v) => daten.versicherer[v.weg].ausHochrechnung);
-  const lohn = nettolohnHeute(daten.angaben, firma.angebot);
-  /*
-    „Ihre Belastung“ steht beim Vertrag, in den die Umwandlung fliesst — mit
-    dessen Beitrag und Arbeitgeberanteil; die Ersparnisse gehoeren ganz zur
-    Umwandlung. Ein Vertrag, den nur der Arbeitgeber bezahlt (Matching:
-    Unterstuetzungskasse), kostet den Mitarbeiter nichts und bekommt keinen.
-  */
-  const belastungFuer = (v: MitarbeiterBav['vertraege'][number]) => (v.beitragMonat - v.arbeitgeberMonat > 0.005
-    ? belastungsTreppe({
-      zulageMonat: 0,
-      agZuschussMonat: v.arbeitgeberMonat,
-      beitragMonat: v.beitragMonat,
-      svErsparnisMonat: r.svErsparnisMonat,
-      steuerersparnisMonat: r.steuerersparnisMonat,
-      echterAufwandMonat: r.nettoAufwandMonat,
-    }, {
-      zve: lohn.zveJahr, p: P, beamter: false, selbststaendig: false,
-      privatVersichert: daten.angaben.kv === 'privat', splitting: lohn.splitting,
-    })
-    : null);
 
   if (r.vertraege.length === 0) {
     return <Karte><p className="text-sm text-slate-600">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
@@ -787,7 +763,8 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
         const uebernehmen = () => schaetzung && setzeW(v.weg, {
           prognoseRente: schaetzung.renteMonat, prognoseKapital: schaetzung.kapital, dynamik: 0, ausHochrechnung: true,
         });
-        const belastung = belastungFuer(v);
+        // „Ihre Belastung“ steht beim Vertrag, in den die Umwandlung fliesst
+        const belastung = belastungJeVertrag(v, r, daten.angaben, firma.angebot);
         return (
           <Karte key={v.weg} titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}
             rechts={w.ausHochrechnung
@@ -856,37 +833,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
       })}
 
       {kennzahlen && (
-        <KennzahlenKarte k={kennzahlen} minderungMonat={minderung.renteMonat} daten={daten} setze={setze} aktuell={aktuell} />
-      )}
-
-      {leistung && (
-        <Karte titel="Unterm Strich">
-          <dl className="space-y-1 text-sm">
-            <div className="flex justify-between gap-2">
-              <dt>Gesetzliche Rente nach heutigem Stand{leistung.grv.geschaetzt ? ' (geschätzt)' : ''}</dt>
-              <dd className="tabular-nums">{euro(leistung.grv.monat)}</dd>
-            </div>
-            <div className="flex justify-between gap-2 text-amber-900">
-              <dt>
-                Minderung durch die beitragsfreie Umwandlung
-                <InfoPunkt titel="So gerechnet">{minderungText(minderung)}</InfoPunkt>
-              </dt>
-              <dd className="tabular-nums">− {euro(leistung.grvMinderungMonat)}</dd>
-            </div>
-            {leistung.plusHaushaltMonat !== null && (
-              <div className="flex justify-between gap-2 border-t border-slate-200 pt-1 font-black text-emerald-800">
-                <dt>Ihr Netto im Ruhestand steigt um</dt>
-                <dd className="tabular-nums">{euro(leistung.plusHaushaltMonat / leistung.kaufkraftfaktor)} im Monat</dd>
-              </div>
-            )}
-          </dl>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Mit der {geschaetzt ? 'geschätzten Rente aus der Hochrechnung' : 'prognostizierten Rente'}, nach Steuer und Krankenversicherung
-            und nach Abzug der geminderten gesetzlichen Rente —
-            in heutiger Kaufkraft ({euro(leistung.plusHaushaltMonat ?? 0)} im Jahr {leistung.rentenbeginnJahr}).
-            Prognosen sind nicht garantiert; maßgeblich ist das Angebot des Versicherers.
-          </p>
-        </Karte>
+        <KennzahlenKarte k={kennzahlen} daten={daten} setze={setze} aktuell={aktuell} />
       )}
     </div>
   );
@@ -900,7 +847,9 @@ const WAHL: { status: BeratungStatus; text: string; symbol: ReactNode }[] = [
   { status: 'offen', text: 'Ich überlege noch', symbol: <FileText className="h-5 w-5" aria-hidden /> },
 ];
 
-export function SchrittEntscheidung({ firma, daten, setze, r, geheZu }: SchrittProps) {
+export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
+  const { firma, logo, daten, setze, r, leistung, geheZu, auftritt, sichern, luecke, kennzahlen } = props;
+  const drucken = useDrucken();
   const e = daten.entscheidung;
   const setzeE = (p: Partial<BeratungDaten['entscheidung']>) => setze((d) => ({ ...d, entscheidung: { ...d.entscheidung, ...p } }));
   const heute = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -951,6 +900,18 @@ export function SchrittEntscheidung({ firma, daten, setze, r, geheZu }: SchrittP
             <TextBereich label="Grund (freiwillig)" wert={e.grund} onChange={(grund) => setzeE({ grund })} maxLaenge={500} zeilen={2} />
           </div>
         )}
+        {e.status === 'offen' && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-slate-700">
+              Bedenkzeit? Geben Sie die Gesprächsunterlagen mit — alles aus dem Gespräch zum Nachlesen, mit Ihrem Kontakt für
+              Rückfragen.
+            </p>
+            <button type="button" className={`${KNOPF} max-w-full text-left`}
+              onClick={() => { void sichern(daten); drucken(<Gespraechsunterlagen {...{ firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen }} />); }}>
+              <Printer className="h-4 w-4" aria-hidden /> Gesprächsunterlagen drucken
+            </button>
+          </div>
+        )}
       </Karte>
 
       <Karte titel="Empfehlung und Ort">
@@ -969,10 +930,7 @@ export function SchrittEntscheidung({ firma, daten, setze, r, geheZu }: SchrittP
 
 /* --- 7. Unterlagen ---------------------------------------------------------- */
 
-export function SchrittUnterlagen(props: SchrittProps & {
-  auftritt: Auftritt | null; sichern: (d: BeratungDaten) => Promise<boolean>;
-  luecke: Versorgungsluecke | null; kennzahlen: KennzahlenErgebnis | null;
-}) {
+export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps) {
   const { firma, logo, daten, r, leistung, auftritt, sichern, luecke, kennzahlen } = props;
   const drucken = useDrucken();
   const status = daten.entscheidung.status;
@@ -993,13 +951,16 @@ export function SchrittUnterlagen(props: SchrittProps & {
       </p>
       {/* Das weiche Trennzeichen bricht das lange Wort auf dem Telefon, statt es ueber den Rand ragen zu lassen. */}
       <div className="mt-4 flex flex-wrap gap-2">
-        {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, true)}
+        {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
+        {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen')}
         {status === 'teilnahme' && knopf('Entgeltumwandlungs\u00ADvereinbarung', <FileSignature className="h-4 w-4" aria-hidden />, <Vereinbarung {...dok} />)}
         {status === 'verzicht' && knopf('Verzichtserklärung', <FileSignature className="h-4 w-4" aria-hidden />, <Verzicht {...dok} />)}
+        {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
       </div>
       {status === 'offen' && (
         <p className="mt-3 text-sm text-slate-600">
-          Noch keine Entscheidung — das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
+          Noch keine Entscheidung — die Gesprächsunterlagen bekommt {daten.angaben.name || 'der Mitarbeiter'} zum Nachlesen mit,
+          das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
         </p>
       )}
       <p className="mt-4 text-xs leading-relaxed text-slate-500">

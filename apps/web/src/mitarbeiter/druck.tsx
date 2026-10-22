@@ -4,14 +4,16 @@ import type { BeratungDaten } from '@renten/schema';
 import type { Firma } from '../lib/bav-beratung';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import { DeckblattKopf } from '../druck/DeckblattKopf';
+import { laufzeitText } from '../features/tuev-berechnung';
+import { LueckenRing } from './bausteine';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
-  P, beginnDatum, grvMinderungVon, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
-  type AuszahlungsWerte, type KennzahlenErgebnis, type Leistung, type Versorgungsluecke,
+  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
+  type AuszahlungsWerte, type BelastungsTreppe, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
-  MODELL_NAME, fazitText, festePunkte, firmenHinweise, minderungText, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+  MODELL_NAME, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
 import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
 
@@ -39,9 +41,13 @@ export interface DokumentProps {
 
 const LINIE = '__________________________';
 
-function Abschnitt({ titel, children, umbruch = false }: { titel: string; children: ReactNode; umbruch?: boolean }) {
+function Abschnitt({ titel, children, umbruch = false, teilbar = false }: {
+  titel: string; children: ReactNode; umbruch?: boolean;
+  /** Lange Abschnitte duerfen ueber die Seite laufen; ihre Teile halten dann selbst zusammen */
+  teilbar?: boolean;
+}) {
   return (
-    <section className={`mt-5 break-inside-avoid ${umbruch ? 'break-before-page' : ''}`}>
+    <section className={`mt-5 ${teilbar ? '' : 'break-inside-avoid'} ${umbruch ? 'break-before-page' : ''}`}>
       <h2 className="border-b border-[color:var(--akzent-linie,#1e293b)] pb-0.5 text-[12pt] font-black text-[color:var(--akzent-titel,#0f172a)]">{titel}</h2>
       <div className="mt-2 text-[10pt] leading-snug">{children}</div>
     </section>
@@ -112,6 +118,32 @@ const WEG_IM_SATZ = (weg: 'direkt' | 'ukasse', firma: Firma) =>
 
 /* --- Beratungsprotokoll --------------------------------------------------- */
 
+const prozentZahl = (x: number) => `${(Math.round(x * 10000) / 100).toLocaleString('de-DE')} %`;
+
+/** Die Angaben des Mitarbeiters — im Protokoll und in den Gespraechsunterlagen dieselben Zeilen. */
+function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][] {
+  const a = daten.angaben;
+  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a));
+  const kasse = KRANKENKASSEN.find((k) => k.name === a.krankenkasse);
+  const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
+  return [
+    ['Geburtsdatum', a.geburtsdatum || '—'],
+    ['Bruttogehalt im Jahr', euroGenau(a.jahresbrutto)],
+    ['Bundesland', a.bundesland || firma.angebot.bundesland],
+    ['Familienstand', a.verheiratet ? `verheiratet${a.partnerBrutto > 0 ? `, Partner ${euroGenau(a.partnerBrutto)} brutto im Jahr` : ', Partner ohne Einkommen'}` : 'ledig'],
+    ['Kirchensteuer', a.kirchensteuer ? 'ja' : 'nein'],
+    ['Kinder', kinder],
+    ['Krankenversicherung', a.kv === 'privat'
+      ? `privat, ${euroGenau(a.pkvPraemieMonat)} im Monat`
+      : `gesetzlich${kasse ? `, ${kasse.name}` : ''}, Zusatzbeitrag ${prozentZahl(a.zusatzbeitrag)}`],
+    ['Gesetzliche Rente', grv.monat > 0
+      ? `${euroGenau(grv.monat)} im Monat nach heutigem Stand (${grv.geschaetzt ? 'aus dem Gehalt geschätzt' : 'eingetragen'})`
+      : 'nicht angegeben'],
+    ['Rentenbeginn', rentenbeginnVon(a) ?? '—'],
+    ['Bestehende Betriebsrente', a.bavBestandMonat > 0 ? `${euroGenau(a.bavBestandMonat)} Beitrag im Monat` : 'keine'],
+  ];
+}
+
 /** Woher die Leistung stammt — je Vertrag aus dem Angebot oder aus der geschaetzten Hochrechnung. */
 function quelleDerLeistung(ausHochrechnung: boolean[]): string {
   if (ausHochrechnung.every(Boolean)) return 'laut geschätzter Hochrechnung';
@@ -135,15 +167,11 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
   const a = daten.angaben;
   const e = daten.entscheidung;
   const fussCss = fusszeileCss(auftritt);
-  const minderung = grvMinderungVon(daten, firma.angebot, r);
-  const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a));
   const abrechnung = probeabrechnung(firma.angebot, daten, r);
   const h = hochrechnung(firma.angebot, daten, r);
   const kz = kennzahlen ? kennzahlen.prognose ?? kennzahlen.garantiert ?? kennzahlen.kapital : null;
   const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
-  const kasse = KRANKENKASSEN.find((k) => k.name === a.krankenkasse);
-  const prozent = (x: number) => `${(Math.round(x * 10000) / 100).toLocaleString('de-DE')} %`;
-  const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
+  const prozent = prozentZahl;
 
   return (
     <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
@@ -172,22 +200,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
       </Abschnitt>
 
       <Abschnitt titel="Angaben">
-        <Paare zeilen={[
-          ['Geburtsdatum', a.geburtsdatum || '—'],
-          ['Bruttogehalt im Jahr', euroGenau(a.jahresbrutto)],
-          ['Bundesland', a.bundesland || firma.angebot.bundesland],
-          ['Familienstand', a.verheiratet ? `verheiratet${a.partnerBrutto > 0 ? `, Partner ${euroGenau(a.partnerBrutto)} brutto im Jahr` : ', Partner ohne Einkommen'}` : 'ledig'],
-          ['Kirchensteuer', a.kirchensteuer ? 'ja' : 'nein'],
-          ['Kinder', kinder],
-          ['Krankenversicherung', a.kv === 'privat'
-            ? `privat, ${euroGenau(a.pkvPraemieMonat)} im Monat`
-            : `gesetzlich${kasse ? `, ${kasse.name}` : ''}, Zusatzbeitrag ${prozent(a.zusatzbeitrag)}`],
-          ['Gesetzliche Rente', grv.monat > 0
-            ? `${euroGenau(grv.monat)} im Monat nach heutigem Stand (${grv.geschaetzt ? 'aus dem Gehalt geschätzt' : 'eingetragen'})`
-            : 'nicht angegeben'],
-          ['Rentenbeginn', rentenbeginnVon(a) ?? '—'],
-          ['Bestehende Betriebsrente', a.bavBestandMonat > 0 ? `${euroGenau(a.bavBestandMonat)} Beitrag im Monat` : 'keine'],
-        ]} />
+        <Paare zeilen={angabenZeilen(daten, firma)} />
       </Abschnitt>
 
       {luecke && (
@@ -228,12 +241,6 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           Netto im Monat: {euroGenau(abrechnung.netto.ohne)} ohne, {euroGenau(abrechnung.netto.mit)} mit Betriebsrente — Eigenbeteiligung{' '}
           {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)} Gesamtbeitrag.
         </p>
-        {minderung.renteMonat > 0.5 && (
-          <p className="mt-1 text-[9pt] text-slate-700">
-            Die gesetzliche Rente sinkt durch die beitragsfreie Umwandlung um rund {euroGenau(Math.round(minderung.renteMonat))} im Monat.
-            So gerechnet: {minderungText(minderung)}
-          </p>
-        )}
         {h.monate > 0 && (
           <p className="mt-1 text-[9pt] text-slate-700">
             Beispielhafte, geschätzte Hochrechnung mit {prozent(h.annahmen.renditeAnsparphase)} Rendite im Jahr (keine Zusage): bis zum
@@ -278,15 +285,8 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
                 {euroGenau(Math.round(kz.echterGewinn))}
                 {kz.art !== 'kapital' ? ` · Amortisation ${zahl(kz.amortisationsJahre, 1)} Jahre ab Rentenbeginn` : ''}
               </p>
-              <p className="mt-1">Fazit: {fazitText(kennzahlen, minderung.renteMonat)}</p>
+              <p className="mt-1">Fazit: {fazitText(kennzahlen)}</p>
             </div>
-          )}
-          {leistung.plusHaushaltMonat !== null && (
-            <p className="mt-2 font-bold">
-              Unterm Strich steigt das Netto im Ruhestand um rund {euroGenau(Math.round(leistung.plusHaushaltMonat / leistung.kaufkraftfaktor))} im Monat
-              (heutige Kaufkraft; mit der {kennzahlen?.geschaetzt ? 'geschätzten Rente aus der Hochrechnung' : 'Prognose'}, nach Abzug der geminderten
-              gesetzlichen Rente).
-            </p>
           )}
         </Abschnitt>
       )}
@@ -310,6 +310,266 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
       </Abschnitt>
 
       <Unterschriften links="Mitarbeiter" rechts="Berater" ort={ortDatum(daten)} />
+      <p className="mt-6 text-[8pt] text-slate-500">
+        Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
+        mit den Regeln von heute fortgeschrieben.
+      </p>
+    </article>
+  );
+}
+
+/* --- Gespraechsunterlagen ------------------------------------------------- */
+
+const heuteText = () => new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+function AbrechnungsZeileDruck({ text, ohne, mit, summe = false }: { text: string; ohne: number | null; mit: number; summe?: boolean }) {
+  return (
+    <tr className={summe ? 'border-t border-slate-400 font-bold' : ''}>
+      <td className="py-0.5 pr-2">{text}</td>
+      <td className="py-0.5 pl-2 text-right">{ohne === null ? '—' : euroGenau(ohne)}</td>
+      <td className="py-0.5 pl-2 text-right">{euroGenau(mit)}</td>
+    </tr>
+  );
+}
+
+function BelastungDruck({ t }: { t: BelastungsTreppe }) {
+  return (
+    <div className="max-w-[22rem]">
+      <Betrag text="Gesamtbeitrag" wert={t.zufluss} />
+      {t.zeilen.map((z) => <Betrag key={z.text} text={z.text} wert={z.betrag} summe={z.art === 'summe'} />)}
+      <Betrag text="Kostet Sie wirklich" wert={t.aufwand} summe />
+    </div>
+  );
+}
+
+const WEG_SPALTE: Record<KennzahlenWeg['art'], string> = { garantiert: 'Garantiert', prognose: 'Prognose', kapital: 'Kapital' };
+
+/**
+ * Die Unterlagen zum Mitnehmen — fuer den Mitarbeiter geschrieben, vor allem
+ * fuer den, der es sich noch ueberlegt. Sie zeichnen das Gespraech Schritt fuer
+ * Schritt nach, mit seinen Angaben und Zahlen, so wie am Bildschirm: Angebot,
+ * Angaben, Versorgungsluecke, Rechnung mit Probeabrechnung und Belastung,
+ * Hochrechnung, Leistung im Alter. Keine Unterschriften; am Ende steht der
+ * Kontakt des Beraters. Die Abschnitte sind fortlaufend nummeriert — fehlt
+ * einer (etwa die Luecke ohne Geburtsdatum), rueckt der naechste nach.
+ */
+export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen }: DokumentProps) {
+  const a = daten.angaben;
+  const angebot = firma.angebot;
+  const fussCss = fusszeileCss(auftritt);
+  const abrechnung = probeabrechnung(angebot, daten, r);
+  const h = hochrechnung(angebot, daten, r);
+  const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
+  const offen = daten.entscheidung.status === 'offen';
+  const datum = daten.entscheidung.datum || heuteText();
+  const belastungen = r.vertraege
+    .map((v) => ({ v, t: belastungJeVertrag(v, r, a, angebot) }))
+    .filter((x): x is { v: typeof x.v; t: BelastungsTreppe } => x.t !== null);
+  const haupt = kennzahlen ? kennzahlen.prognose ?? kennzahlen.garantiert ?? kennzahlen.kapital : null;
+  const wege = kennzahlen ? [kennzahlen.garantiert, kennzahlen.prognose, kennzahlen.kapital].filter((x): x is KennzahlenWeg => x !== null) : [];
+  const kontakt = auftritt
+    ? [auftritt.berater, auftritt.firma, auftritt.telefon && `Telefon ${auftritt.telefon}`, auftritt.email, auftritt.web].filter(Boolean)
+    : [];
+  let n = 0;
+  const nr = () => `${(n += 1)}. `;
+
+  return (
+    <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
+      {fussCss && <style>{fussCss}</style>}
+      <DeckblattKopf auftritt={auftritt} />
+      <div className="mt-5 flex items-start justify-between gap-6">
+        <div>
+          <h1 className="text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Ihre betriebliche Altersversorgung</h1>
+          <p className="mt-1 text-[11pt]">Unterlagen zu unserem Gespräch am {datum}</p>
+          <p className="text-[11pt]">für {a.name || 'Sie'}, {firma.name}</p>
+        </div>
+        {logo && <img src={logo} alt="" className="h-12 max-w-[10rem] shrink-0 object-contain" />}
+      </div>
+      <p className="mt-3 text-[10.5pt] leading-relaxed">
+        {offen
+          ? 'Nehmen Sie sich Zeit — hier steht alles aus unserem Gespräch zum Nachlesen. Wenn Sie Fragen haben oder sich '
+            + 'entschieden haben, melden Sie sich gern.'
+          : 'Hier steht alles aus unserem Gespräch zum Nachlesen.'}
+      </p>
+
+      <Abschnitt titel={`${nr()}Das Angebot Ihres Arbeitgebers`}>
+        {angebot.begruessung.trim() && <p className="whitespace-pre-line">{angebot.begruessung.trim()}</p>}
+        <p className="mt-1 font-bold">{regelText(angebot.modell)}</p>
+        <ul className="mt-1 list-disc pl-5">
+          {r.vertraege.map((v) => (
+            <li key={v.weg}>{vertragName(v.weg, angebot)}{traegerText(v.weg, angebot) ? `: ${traegerText(v.weg, angebot)}` : ''}</li>
+          ))}
+        </ul>
+        {firmenHinweise(angebot).length > 0 && (
+          <>
+            <p className="mt-2 font-bold">Was {firma.name} dazu festgelegt hat</p>
+            <ul className="list-disc pl-5">{firmenHinweise(angebot).map((x) => <li key={x}>{x}</li>)}</ul>
+          </>
+        )}
+      </Abschnitt>
+
+      <Abschnitt titel={`${nr()}Ihre Angaben`}>
+        <Paare zeilen={angabenZeilen(daten, firma)} />
+      </Abschnitt>
+
+      {luecke && (
+        <Abschnitt titel={`${nr()}Ihre Versorgungslücke`}>
+          <div className="flex items-center gap-6">
+            <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+              renteProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
+            <div className="min-w-0 flex-1">
+              <Paare zeilen={[
+                ['Ihr Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
+                [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat — ${luecke.renteProzent} %`],
+                ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} %`],
+              ]} />
+              {luecke.lueckeProzent > 0 && (
+                <p className="mt-2 font-bold">Im Alter fehlen Ihnen {luecke.lueckeProzent} % Ihres heutigen Nettolohns.</p>
+              )}
+              <p className="mt-1 text-[9pt] text-slate-700">
+                In heutiger Kaufkraft. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung{' '}
+                {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr.
+              </p>
+            </div>
+          </div>
+        </Abschnitt>
+      )}
+
+      <Abschnitt titel={`${nr()}Ihre Rechnung`} teilbar>
+        <p className="break-inside-avoid">
+          Sie wandeln <strong>{euroGenau(r.umwandlungMonat)}</strong> brutto im Monat um, Ihr Arbeitgeber gibt{' '}
+          {euroGenau(r.arbeitgeberMonat)} dazu — in Ihre Vorsorge fließen <strong>{euroGenau(r.gesamtMonat)}</strong>. Netto kostet
+          Sie das <strong>{euroGenau(r.nettoAufwandMonat)}</strong> im Monat.
+        </p>
+        <div className="mt-3 break-inside-avoid">
+          <p className="font-bold">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</p>
+          <table className="mt-1 w-full max-w-[34rem] tabular-nums">
+            <thead>
+              <tr className="text-[9pt] text-slate-600">
+                <th className="text-left font-semibold" />
+                <th className="pl-2 text-right font-semibold">ohne bAV</th>
+                <th className="pl-2 text-right font-semibold">mit bAV</th>
+              </tr>
+            </thead>
+            <tbody>
+              <AbrechnungsZeileDruck text="Bruttogehalt" ohne={abrechnung.bruttoMonat} mit={abrechnung.bruttoMonat} />
+              <AbrechnungsZeileDruck text="− Entgeltumwandlung" ohne={null} mit={abrechnung.umwandlungMonat} />
+              <AbrechnungsZeileDruck text="Beitrag des Arbeitgebers (fließt in den Vertrag)" ohne={null} mit={abrechnung.arbeitgeberMonat} />
+              <AbrechnungsZeileDruck text="Steuerpflichtiges Brutto" ohne={abrechnung.steuerBrutto.ohne} mit={abrechnung.steuerBrutto.mit} />
+              <AbrechnungsZeileDruck text="Brutto für die Sozialabgaben" ohne={abrechnung.svBrutto.ohne} mit={abrechnung.svBrutto.mit} />
+              <AbrechnungsZeileDruck text="− Steuern" ohne={abrechnung.steuern.ohne} mit={abrechnung.steuern.mit} />
+              <AbrechnungsZeileDruck text="− Sozialabgaben" ohne={abrechnung.sv.ohne} mit={abrechnung.sv.mit} />
+              <AbrechnungsZeileDruck text="= Netto" ohne={abrechnung.netto.ohne} mit={abrechnung.netto.mit} summe />
+            </tbody>
+          </table>
+          <p className="mt-1 text-[9pt] text-slate-700">
+            Eigenbeteiligung aus dem Nettolohn {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)}{' '}
+            Gesamtbeitrag. Steuern als Monatsanteil der Jahressteuer — auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je
+            nach Steuerklasse anders.
+          </p>
+        </div>
+        {belastungen.map(({ v, t }) => (
+          <div key={v.weg} className="mt-3 break-inside-avoid">
+            <p className="font-bold">Ihre Belastung im Monat{belastungen.length > 1 ? ` — ${vertragName(v.weg, angebot)}` : ''}</p>
+            <BelastungDruck t={t} />
+          </div>
+        ))}
+        {h.monate > 0 && (
+          <div className="mt-3 break-inside-avoid">
+            <p className="font-bold">Beispielhafte und geschätzte Hochrechnung</p>
+            <Paare zeilen={[
+              ['Angenommene Rendite', `${prozentZahl(h.annahmen.renditeAnsparphase)} im Jahr`],
+              ['Bis zum Rentenbeginn', `${laufzeitText(h.monate)}${rentenbeginnVon(a) ? `, am ${rentenbeginnVon(a)}` : ''}`],
+              ['Kapital bei Rentenbeginn', euroGenau(Math.round(h.kapital))],
+              ['Geschätzte Rente brutto', `${euroGenau(Math.round(h.renteMonat))} im Monat`],
+            ]} />
+            <p className="mt-1">
+              Woraus das Kapital besteht: Ihr Netto-Aufwand {euroGenau(Math.round(h.nettoSumme))}, Steuer- und SV-Ersparnis{' '}
+              {euroGenau(Math.round(h.ersparnisSumme))}, Arbeitgeber {euroGenau(Math.round(h.arbeitgeberSumme))}, Erträge{' '}
+              {euroGenau(Math.round(h.ertrag))}.
+            </p>
+            <p className="mt-1 text-[9pt] text-slate-700">
+              Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine Zusage.
+              Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab; die Rente ist brutto, vor Kranken- und
+              Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers.
+            </p>
+          </div>
+        )}
+      </Abschnitt>
+
+      {leistung && leistung.vertraege.length > 0 && (
+        <Abschnitt titel={`${nr()}Ihre Leistung im Alter ${quelleDerLeistung(leistung.vertraege.map((l) => daten.versicherer[l.weg].ausHochrechnung))}`} teilbar>
+          <p className="text-[9pt] text-slate-700">
+            Im ersten Rentenjahr {leistung.rentenbeginnJahr}, nach Kranken- und Pflegeversicherung und Steuer.
+          </p>
+          {leistung.vertraege.map((l) => {
+            const w = daten.versicherer[l.weg];
+            return (
+              <div key={l.weg} className="mt-2 break-inside-avoid">
+                <p className="font-bold">{vertragName(l.weg, angebot)}{traegerText(l.weg, angebot) ? ` — ${traegerText(l.weg, angebot)}` : ''}</p>
+                <div className="max-w-[22rem]">
+                  <LeistungsZeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} />
+                </div>
+                {l.kapital && (
+                  <p className="mt-1">
+                    Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'}): {euroGenau(l.kapital.brutto)} brutto, nach Steuer und
+                    Kranken- und Pflegeversicherung {euroGenau(l.kapital.netto)}.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+          {kennzahlen && haupt && (
+            <div className="mt-3 break-inside-avoid">
+              <p className="font-bold">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
+              <p>
+                Netto-Hebel {zahl(haupt.nettoHebel)} × · Nettorendite {zahl(haupt.rendite * 100)} % p. a. · Netto-Gewinn{' '}
+                {euroGenau(Math.round(haupt.echterGewinn))}
+                {haupt.art !== 'kapital' ? ` · Amortisation ${zahl(haupt.amortisationsJahre, 1)} Jahre ab Rentenbeginn` : ''}
+              </p>
+              {wege.length > 1 && (
+                <table className="mt-1 w-full max-w-[34rem] tabular-nums">
+                  <thead>
+                    <tr className="text-[9pt] text-slate-600">
+                      <th className="text-left font-semibold" />
+                      {wege.map((x) => <th key={x.art} className="pl-2 text-right font-semibold">{WEG_SPALTE[x.art]}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      ['Netto', (x: KennzahlenWeg) => (x.art === 'kapital' ? euroGenau(Math.round(x.netto)) : `${euroGenau(Math.round(x.netto))} / Mon.`)],
+                      ['Netto-Hebel', (x: KennzahlenWeg) => `${zahl(x.nettoHebel)} ×`],
+                      ['Nettorendite', (x: KennzahlenWeg) => `${zahl(x.rendite * 100)} %`],
+                      ['Netto-Gewinn', (x: KennzahlenWeg) => euroGenau(Math.round(x.echterGewinn))],
+                      ['Amortisation', (x: KennzahlenWeg) => (x.art === 'kapital' ? '—' : `${zahl(x.amortisationsJahre, 1)} J.`)],
+                    ] as const).map(([text, wert]) => (
+                      <tr key={text} className="border-t border-slate-200">
+                        <td className="py-0.5">{text}</td>
+                        {wege.map((x) => <td key={x.art} className="py-0.5 pl-2 text-right">{wert(x)}</td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="mt-2">Fazit: {fazitText(kennzahlen)}</p>
+            </div>
+          )}
+        </Abschnitt>
+      )}
+
+      <Abschnitt titel={`${nr()}Gut zu wissen`}>
+        <ul className="list-disc space-y-0.5 pl-5">
+          {festePunkte(angebot).map((x) => <li key={x}>{x}</li>)}
+          <li>Prognosen sind nicht garantiert. Verbindlich sind das Angebot und die Bedingungen des Versorgungsträgers.</li>
+        </ul>
+      </Abschnitt>
+
+      <Abschnitt titel="Ihre Fragen beantworte ich gern">
+        {kontakt.length > 0
+          ? <p className="whitespace-pre-line">{kontakt.join('\n')}</p>
+          : <p>Sprechen Sie mich jederzeit an.</p>}
+      </Abschnitt>
+
       <p className="mt-6 text-[8pt] text-slate-500">
         Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
         mit den Regeln von heute fortgeschrieben.

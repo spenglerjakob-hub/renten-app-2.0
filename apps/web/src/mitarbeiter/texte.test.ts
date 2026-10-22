@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { firmenAngebotSchema } from '@renten/schema';
-import { euroText, fazitText, festePunkte, firmenHinweise, minderungText, regelFuerVereinbarung, regelText, traegerText, vertragName } from './texte';
-import type { KennzahlenErgebnis, KennzahlenWeg, MinderungHerleitung } from './rechnung';
+import { euroText, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName } from './texte';
+import type { KennzahlenErgebnis, KennzahlenWeg } from './rechnung';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
 
@@ -63,6 +63,11 @@ describe('Vertrag, Träger und Hinweise', () => {
     const uk = firmenAngebotSchema.parse({ modell: { art: 'matching', weg: 'ukasse' } });
     expect(festePunkte(uk).some((p) => p.includes('nehmen Sie'))).toBe(false);
     expect(festePunkte(uk).some((p) => p.includes('drei Jahre'))).toBe(true);
+    // Die gesetzliche Rente: allgemein, ohne Betrag und ohne Verweis auf eine Rechnung
+    expect(festePunkte(a)).toContain(
+      'Auf den beitragsfreien Teil Ihrer Umwandlung zahlen Sie keine Rentenbeiträge; Ihre gesetzliche Rente fällt dadurch etwas niedriger aus.',
+    );
+    expect(festePunkte(a).some((p) => p.includes('die Rechnung zeigt'))).toBe(false);
   });
 });
 
@@ -76,38 +81,28 @@ describe('Fazit und Herleitung', () => {
   });
 
   it('aus der geschätzten Hochrechnung: so benannt, mit dem Hinweis „keine Zusage“', () => {
-    const t = nbsp(fazitText(k({ geschaetzt: true, prognose: weg('prognose', {}) }), 0));
+    const t = nbsp(fazitText(k({ geschaetzt: true, prognose: weg('prognose', {}) })));
     expect(t).toContain('erhalten Sie mit der geschätzten Rente aus der Hochrechnung nach Steuer und Krankenversicherung 1,55 € zurück.');
     expect(t).toContain('Die Werte beruhen auf der beispielhaften, geschätzten Hochrechnung — keine Zusage.');
-    expect(nbsp(fazitText(k({ prognose: weg('prognose', {}) }), 0))).not.toContain('geschätzt');
+    expect(nbsp(fazitText(k({ prognose: weg('prognose', {}) })))).not.toContain('geschätzt');
   });
 
-  it('Prognose mit Garantie und Minderung der gesetzlichen Rente', () => {
-    const t = nbsp(fazitText(k({ prognose: weg('prognose', {}), garantiert: weg('garantiert', { nettoHebel: 1.1351, rendite: 0.00566 }) }), 49.61));
+  it('Prognose mit Garantie — ohne Minderung der gesetzlichen Rente', () => {
+    const t = nbsp(fazitText(k({ prognose: weg('prognose', {}), garantiert: weg('garantiert', { nettoHebel: 1.1351, rendite: 0.00566 }) })));
     expect(t).toContain('Für jeden Euro, den Sie netto einzahlen, erhalten Sie mit der prognostizierten Rente nach Steuer und Krankenversicherung 1,55 € zurück.');
     expect(t).toContain('Nettorendite von 2,0 % im Jahr');
     expect(t).toContain('Nach 11,6 Jahren Rente sind Ihre Einzahlungen zurückgeflossen; bis 85 bleibt ein Netto-Gewinn von 17.814 €.');
     expect(t).toContain('Schon mit der garantierten Rente sind es 1,14 € je Euro (0,6 % im Jahr).');
-    expect(t).toContain('Nicht eingerechnet: Ihre gesetzliche Rente fällt um rund 50 € im Monat geringer aus');
+    expect(t).not.toContain('gesetzliche Rente fällt');
+    expect(t).not.toContain('Nicht eingerechnet');
   });
 
   it('weniger zurück als eingezahlt; Amortisation hinter der Lebenserwartung', () => {
-    const t = nbsp(fazitText(k({ garantiert: weg('garantiert', { nettoHebel: 0.85, rendite: -0.012, amortisationsJahre: 21.2 }) }), 0));
+    const t = nbsp(fazitText(k({ garantiert: weg('garantiert', { nettoHebel: 0.85, rendite: -0.012, amortisationsJahre: 21.2 }) })));
     expect(t).toContain('mit der garantierten Rente');
     expect(t).toContain('0,85 € zurück — weniger, als Sie einzahlen.');
     expect(t).toContain('erst nach 21,2 Jahren Rente zurück — später, als bis zum Alter von 85 gerechnet.');
     expect(t).not.toContain('Nicht eingerechnet');
-    expect(fazitText(k({}), 50)).toBe('');
-  });
-
-  it('So gerechnet: die Minderung Schritt für Schritt', () => {
-    const m: MinderungHerleitung = {
-      svFreiJahr: 2400, durchschnittsentgelt: 51_944, entgeltpunkteJeJahr: 2400 / 51_944, jahre: 25.25,
-      entgeltpunkte: (2400 / 51_944) * 25.25, rentenwert: 42.52, renteMonat: (2400 / 51_944) * 25.25 * 42.52, ueberBbg: false,
-    };
-    const t = nbsp(minderungText(m));
-    expect(t).toContain('2.400 € beitragsfreie Umwandlung im Jahr ÷ Durchschnittsentgelt 51.944 € = 0,0462 Entgeltpunkte weniger je Jahr.');
-    expect(t).toContain('× 25,25 Jahre vom Beginn bis zum Rentenbeginn = 1,17 Entgeltpunkte. × Rentenwert 42,52 € = 49,61 € weniger Rente im Monat');
-    expect(nbsp(minderungText({ ...m, ueberBbg: true }))).toContain('kostet keine Entgeltpunkte');
+    expect(fazitText(k({}))).toBe('');
   });
 });

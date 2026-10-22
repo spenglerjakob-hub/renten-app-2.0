@@ -1,11 +1,12 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, grvMinderung, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
+  bavMitarbeiter, bavRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
   renteOderKapital, schaetzeEntgeltpunkte, SV_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
 import type { BeratungAngaben, BeratungDaten, FirmenAngebot, VersichererWerte } from '@renten/schema';
 import { leereAntworten, regelRentenbeginn, szenarioAusCheck } from '../check/uebernahme';
+import { belastungsTreppe } from '../features/tuev-berechnung';
 import type { SzenarioParsed } from '../store/szenario';
 
 /**
@@ -133,48 +134,6 @@ export function grvVon(
   return { monat: Math.round(s.monatsrenteHeutigeKaufkraft * 100) / 100, geschaetzt: true };
 }
 
-/** Die Minderung der gesetzlichen Rente mit allen Zwischenwerten — fuer „So gerechnet“. */
-export interface MinderungHerleitung {
-  /** Beitragsfreie Umwandlung im Jahr: so viel weniger rentenversichertes Entgelt */
-  svFreiJahr: number;
-  durchschnittsentgelt: number;
-  /** Entgeltpunkte, die je Jahr fehlen */
-  entgeltpunkteJeJahr: number;
-  /** Jahre der Umwandlung, monatsgenau */
-  jahre: number;
-  entgeltpunkte: number;
-  rentenwert: number;
-  /** Um so viel sinkt die Monatsrente — nach heutigem Stand */
-  renteMonat: number;
-  /** Auch nach der Umwandlung ueber der Beitragsbemessungsgrenze: keine Minderung */
-  ueberBbg: boolean;
-}
-
-/**
- * Um so viel sinkt die gesetzliche Rente durch die beitragsfreie Umwandlung
- * (`grvMinderung` im Rechenkern): weniger rentenversichertes Entgelt, also
- * weniger Entgeltpunkte — je Jahr der Umwandlung, monatsgenau vom Beginn bis
- * zum Rentenbeginn, mal dem heutigen Rentenwert.
- */
-export function grvMinderungVon(
-  d: BeratungDaten, f: FirmenAngebot, r: MitarbeiterBav, p: LegalParameters = P, heute = new Date(),
-): MinderungHerleitung {
-  const a = d.angaben;
-  const svFreiMonat = Math.max(0, r.umwandlungMonat - r.svPflichtigMonat);
-  const jahre = monateDerUmwandlung(d, f, heute) / 12;
-  const g = grvMinderung(a.jahresbrutto, svFreiMonat, jahre, p);
-  return {
-    svFreiJahr: svFreiMonat * 12,
-    durchschnittsentgelt: p.durchschnittsentgelt,
-    entgeltpunkteJeJahr: jahre > 0 ? g.entgeltpunkte / jahre : 0,
-    jahre,
-    entgeltpunkte: g.entgeltpunkte,
-    rentenwert: p.rentenwert,
-    renteMonat: g.renteMonat,
-    ueberBbg: svFreiMonat > 0 && a.jahresbrutto - svFreiMonat * 12 >= p.bbgRvJahr,
-  };
-}
-
 /**
  * Angenommene Rentenanpassung im Jahr — in der Mitarbeiterberatung 1,5 %
  * statt der 1 % des Vorsorge-Checks. Gilt fuer das ganze Szenario der
@@ -261,15 +220,6 @@ export interface Leistung {
   alterBeiRentenbeginn: number;
   /** Teuerung bis zum ersten Rentenjahr — teilt man durch ihn, steht es in heutiger Kaufkraft */
   kaufkraftfaktor: number;
-  grv: { monat: number; geschaetzt: boolean };
-  /** Minderung der gesetzlichen Rente, heutige Kaufkraft */
-  grvMinderungMonat: number;
-  /**
-   * Um so viel steigt das Netto des HAUSHALTS im ersten Rentenjahr: mit der
-   * prognostizierten Rente und der geminderten gesetzlichen Rente, gegen
-   * ohne beides. Null ohne Prognose.
-   */
-  plusHaushaltMonat: number | null;
 }
 
 const TYP: Record<MitarbeiterVertrag['weg'], Vertrag['typ']> = { direkt: 'bav', ukasse: 'bavUkasse' };
@@ -281,9 +231,8 @@ const leer = (w: VersichererWerte) => w.garantierteRente <= 0 && w.prognoseRente
  * ersten Rentenjahr — garantiert und prognostiziert, dazu das Kapital.
  *
  * Wie `angebotPositionen`: Die Vertraege kommen zu einem Klon des Szenarios,
- * `projiziere` rechnet. Mit Vertrag sinkt die gesetzliche Rente um die
- * Minderung — so ist es in Wirklichkeit, und Steuer und KV auf die
- * Betriebsrente haengen auch an ihr.
+ * `projiziere` rechnet. Die gesetzliche Rente bleibt dabei, wie sie ist —
+ * eine Minderung durch die Umwandlung rechnet die Beratung nicht ein.
  */
 export function leistungsRechnung(
   f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, p: LegalParameters = P,
@@ -295,8 +244,6 @@ export function leistungsRechnung(
   if (!g || !rb) return null;
   const vertraege = r.vertraege.filter((v) => !leer(d.versicherer[v.weg]));
   const b = basisProjektion(a, f, p);
-  const grv = b.grv;
-  const minderung = grvMinderungVon(d, f, r, p).renteMonat;
   const basis = b.szenario;
   const beginnJahr = beginnVon(d, f).jahr;
 
@@ -310,8 +257,7 @@ export function leistungsRechnung(
         beginnJahr, monatsbeitrag: w.beitragMonat > 0 ? w.beitragMonat : v.beitragMonat, dynamik: w.dynamik,
       };
     });
-    const personen = basis.personen.map((x) => (x.id === 'A' ? { ...x, grvBruttoHeute: Math.max(0, grv.monat - minderung) } : x));
-    return projiziere({ ...basis, personen, vertraege: [...basis.vertraege, ...neu] });
+    return projiziere({ ...basis, vertraege: [...basis.vertraege, ...neu] });
   };
 
   const ohne = b.projektion;
@@ -344,15 +290,11 @@ export function leistungsRechnung(
     return { weg: v.weg, garantiert, prognose, kapital, breakEven };
   });
 
-  const zeileMit = mitPrognose?.zeilen.find((z) => z.jahr === jahr);
   return {
     vertraege: ergebnis,
     rentenbeginnJahr: jahr,
     alterBeiRentenbeginn,
     kaufkraftfaktor: zeileOhne?.kaufkraftfaktor ?? 1,
-    grv,
-    grvMinderungMonat: minderung,
-    plusHaushaltMonat: zeileMit && zeileOhne ? zeileMit.nettoMonat - zeileOhne.nettoMonat : null,
   };
 }
 
@@ -557,6 +499,32 @@ export function probeabrechnung(f: FirmenAngebot, d: BeratungDaten, r: Mitarbeit
     eigenbeteiligungMonat: r.nettoAufwandMonat,
     gesamtMonat: r.gesamtMonat,
   };
+}
+
+export type BelastungsTreppe = ReturnType<typeof belastungsTreppe>;
+
+/**
+ * „Ihre Belastung“ — die Treppe des Vertrags-TUEV (`belastungsTreppe`) fuer den
+ * Vertrag, in den die Umwandlung fliesst: mit dessen Beitrag und
+ * Arbeitgeberanteil; die Ersparnisse gehoeren ganz zur Umwandlung. Null fuer
+ * einen Vertrag, den nur der Arbeitgeber bezahlt (Matching:
+ * Unterstuetzungskasse) — er kostet den Mitarbeiter nichts.
+ */
+export function belastungJeVertrag(
+  v: MitarbeiterVertrag, r: MitarbeiterBav, a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P,
+): BelastungsTreppe | null {
+  if (v.beitragMonat - v.arbeitgeberMonat <= 0.005) return null;
+  const lohn = nettolohnHeute(a, f, p);
+  return belastungsTreppe({
+    zulageMonat: 0,
+    agZuschussMonat: v.arbeitgeberMonat,
+    beitragMonat: v.beitragMonat,
+    svErsparnisMonat: r.svErsparnisMonat,
+    steuerersparnisMonat: r.steuerersparnisMonat,
+    echterAufwandMonat: r.nettoAufwandMonat,
+  }, {
+    zve: lohn.zveJahr, p, beamter: false, selbststaendig: false, privatVersichert: a.kv === 'privat', splitting: lohn.splitting,
+  });
 }
 
 /* --------------------------------------------------------------------------

@@ -72,7 +72,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const f = firma && typeof firma === 'object' ? firma : null;
   const r = useMemo(() => (f && daten ? beitragsRechnung(f.angebot, daten) : null), [f, daten]);
   const schritt = daten?.schritt ?? 0;
-  // Die Projektionen nur dort, wo sie gebraucht werden — die Unterlagen (Schritt 7) brauchen alles.
+  // Die Projektionen nur dort, wo sie gebraucht werden — Entscheidung und Unterlagen (Schritt 6 und 7) drucken alles.
   const leistung = useMemo(() => {
     if (!f || !aufgeschoben || schritt < 4) return null;
     return leistungsRechnung(f.angebot, aufgeschoben, beitragsRechnung(f.angebot, aufgeschoben));
@@ -81,8 +81,9 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     () => (f && aufgeschoben && leistung ? kennzahlenRechnung(f.angebot, aufgeschoben, leistung) : null),
     [f, aufgeschoben, leistung],
   );
+  // Fuer den Schritt selbst und fuer die Unterlagen (Gespraechsunterlagen ab der Entscheidung)
   const luecke = useMemo(() => {
-    if (!f || !aufgeschoben || (schritt !== 2 && schritt !== 6)) return null;
+    if (!f || !aufgeschoben || (schritt !== 2 && schritt < 5)) return null;
     return versorgungslueckeRechnung(f.angebot, aufgeschoben);
   }, [f, aufgeschoben, schritt]);
 
@@ -175,7 +176,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
       {schritt === 3 && <SchrittRechnung {...props} />}
       {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} aktuell={aufgeschoben === daten} />}
-      {schritt === 5 && <SchrittEntscheidung {...props} />}
+      {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
       {schritt === 6 && <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
