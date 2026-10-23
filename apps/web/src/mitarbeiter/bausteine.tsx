@@ -5,24 +5,61 @@ import type { Auftritt } from '../features/auftritt';
 import { useAuftritt } from '../store/auftritt';
 import { euroText } from './texte';
 
-/** Knopf-Klassen der Seite — dieselben wie im Rechner. */
-export const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50';
-export const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
-export const KNOPF_GEFAHR = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50';
+/*
+ * DER STIL DIESER SEITE — nach der Referenz „Steep“ (serif analytics on warm
+ * paper). Knoepfe sind Pillen in Tinte: gefuellt fuer die Hauptaktion, mit
+ * Kontur fuer die zweite. Karten sind flach und nebelgrau, 24 px rund, ohne
+ * Rahmen und Schatten. Pfirsich mit Siena-Schrift steht hoechstens einmal je
+ * Ansicht — fuer die eine Aussage, die bleiben soll.
+ */
+export const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-full bg-mb-tinte px-5 py-2.5 text-sm font-medium text-white hover:bg-black disabled:opacity-40';
+export const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-mb-tinte bg-transparent px-5 py-2.5 text-sm font-medium text-mb-tinte hover:bg-mb-nebel disabled:border-mb-linie disabled:opacity-40';
+/* Loeschen bleibt rot: Wer etwas unwiderruflich entfernt, soll es nicht mit einem gewoehnlichen Knopf verwechseln. */
+export const KNOPF_GEFAHR = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40';
+/** Textlink mit Pfeil — die leiseste Aktion; unterstrichen erst beim Darueberfahren. */
+export const LINK = 'inline-flex items-center gap-1 text-sm font-medium text-mb-tinte underline-offset-4 hover:underline';
+/** Die eine Akzentkarte je Ansicht. */
+export const PFIRSICH = 'rounded-3xl bg-mb-pfirsich text-mb-siena';
+/** Ein schwebendes Stueck Produkt (Gehaltszettel, Luecken-Ring) — das Einzige mit Schatten. */
+export const SCHWEBEND = 'rounded-[20px] bg-white shadow-schwebend';
+/** Etikett ueber Kennzahlen — leise, ohne Grossbuchstaben-Geschrei. */
+export const ETIKETT = 'text-sm text-mb-schiefer';
+
+/** Ueberschrift in Serifen, Gewicht 400 — die Handschrift der Seite. */
+export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '' }: {
+  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string;
+}) {
+  return (
+    <Tag className={`text-balance font-titel font-normal text-mb-tinte ${
+      gross ? 'text-[34px] leading-[1.15] tracking-[-0.015em] sm:text-[44px]' : 'text-[26px] leading-[1.2] tracking-[-0.01em] sm:text-[30px]'
+    } ${klasse}`}>
+      {children}
+    </Tag>
+  );
+}
 
 export function Karte({ titel, children, rechts, klasse = '' }: {
   titel?: ReactNode; children: ReactNode; rechts?: ReactNode; klasse?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
+    <section className={`rounded-3xl bg-mb-nebel p-5 sm:p-7 ${klasse}`}>
       {(titel || rechts) && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {titel && <h2 className="text-base font-black text-slate-900">{titel}</h2>}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {titel && <h2 className="text-lg font-medium tracking-[-0.01em] text-mb-tinte sm:text-xl">{titel}</h2>}
           {rechts}
         </div>
       )}
       {children}
     </section>
+  );
+}
+
+/** Ein leiser Vermerk wie „geschätzt“ — Kontur statt Farbe. */
+export function Vermerk({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-mb-linie bg-white px-2.5 py-0.5 text-xs text-mb-schiefer">
+      {children}
+    </span>
   );
 }
 
@@ -34,7 +71,7 @@ export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilf
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-bold text-slate-700">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-600">{label}</label>
       <textarea
         id={id}
         value={wert}
@@ -43,9 +80,9 @@ export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilf
         placeholder={platzhalter}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby={hilfe ? `${id}-hilfe` : undefined}
-        className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm leading-relaxed"
+        className="w-full rounded-2xl border border-mb-linie bg-white p-3 text-sm leading-relaxed"
       />
-      <div className="mt-0.5 flex justify-between gap-2 text-[11px] text-slate-500">
+      <div className="mt-1 flex justify-between gap-2 text-xs text-mb-schiefer">
         <span id={`${id}-hilfe`}>{hilfe}</span>
         <span className="tabular-nums">{wert.length}/{maxLaenge}</span>
       </div>
@@ -54,16 +91,27 @@ export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilf
 }
 
 const STATUS_TEXT: Record<BeratungStatus, string> = { offen: 'offen', teilnahme: 'Teilnahme', verzicht: 'Verzicht' };
-export const STATUS_FARBE: Record<BeratungStatus, string> = {
-  offen: 'bg-slate-100 text-slate-700',
-  teilnahme: 'bg-emerald-100 text-emerald-800',
-  verzicht: 'bg-amber-100 text-amber-900',
+/*
+ * Status ohne Ampelfarben: ein Punkt und das Wort. Teilnahme in Tinte mit
+ * vollem Punkt, Verzicht leise mit leerem Ring, offen dazwischen — lesbar
+ * auch ohne Farbe.
+ */
+export const STATUS_PUNKT: Record<BeratungStatus, string> = {
+  teilnahme: 'bg-mb-tinte',
+  offen: 'bg-mb-asche',
+  verzicht: 'border border-mb-asche bg-white',
+};
+const STATUS_SCHRIFT: Record<BeratungStatus, string> = {
+  teilnahme: 'text-mb-tinte',
+  offen: 'text-mb-schiefer',
+  verzicht: 'text-mb-schiefer',
 };
 
 /** „Teilnahme 150 €“, „Verzicht“, „offen“. */
 export function StatusChip({ status, betrag }: { status: BeratungStatus; betrag?: number }) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_FARBE[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm ${STATUS_SCHRIFT[status]}`}>
+      <span aria-hidden className={`h-2 w-2 rounded-full ${STATUS_PUNKT[status]}`} />
       {STATUS_TEXT[status]}{status === 'teilnahme' && betrag !== undefined && betrag > 0 ? ` ${euroText(betrag)}` : ''}
     </span>
   );
@@ -105,7 +153,9 @@ export function FirmenZeichen({ name, logo, gross = false }: { name: string; log
       {logo && (
         <img src={logo} alt={`Logo ${name}`} className={`${gross ? 'h-14 max-w-[10rem]' : 'h-9 max-w-[7rem]'} shrink-0 object-contain`} />
       )}
-      <span className={`min-w-0 break-words font-black text-slate-900 ${gross ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{name}</span>
+      <span className={`min-w-0 break-words text-mb-tinte ${gross
+        ? 'text-balance font-titel text-[34px] font-normal leading-[1.15] tracking-[-0.015em] sm:text-[44px]'
+        : 'text-lg font-medium'}`}>{name}</span>
     </div>
   );
 }
@@ -151,9 +201,10 @@ export function DruckBereich({ children }: { children: ReactNode }) {
 }
 
 /**
- * Der Ring der Versorgungsluecke: gruen die Netto-Rente, rot die Luecke —
- * zusammen der Nettolohn heute, der in der Mitte steht. Die Zahlen stehen
- * zusaetzlich als Text daneben; der Ring ist die Anschauung.
+ * Der Ring der Versorgungsluecke: Tinte die Netto-Rente, Pfirsich mit
+ * Siena-Kante die Luecke — zusammen der Nettolohn heute, der in der Mitte
+ * steht. Die Zahlen stehen zusaetzlich als Text daneben; der Ring ist die
+ * Anschauung.
  */
 export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProzent }: {
   nettolohn: number; rente: number; luecke: number; renteProzent: number; lueckeProzent: number;
@@ -165,12 +216,12 @@ export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProz
   return (
     <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
       aria-label={`Nettolohn ${ganz(nettolohn)}: davon ${ganz(rente)} Netto-Altersrente (${renteProzent} %) und ${ganz(luecke)} Versorgungslücke (${lueckeProzent} %)`}>
-      <circle cx="60" cy="60" r={r} fill="none" stroke="#f43f5e" strokeWidth="14" />
-      <circle cx="60" cy="60" r={r} fill="none" stroke="#10b981" strokeWidth="14"
+      <circle cx="60" cy="60" r={r} fill="none" stroke="#fbe1d1" strokeWidth="12" />
+      <circle cx="60" cy="60" r={r + 6} fill="none" stroke="#5d2a1a" strokeWidth="0.6" strokeOpacity="0.35" />
+      <circle cx="60" cy="60" r={r} fill="none" stroke="#17191c" strokeWidth="12"
         strokeDasharray={`${anteil * umfang} ${umfang}`} transform="rotate(-90 60 60)" />
-      <circle cx="60" cy="60" r="33" fill="#f1f5f9" />
-      <text x="60" y="59" textAnchor="middle" fontSize="12.5" fontWeight="800" fill="#334155">{ganz(nettolohn)}</text>
-      <text x="60" y="72" textAnchor="middle" fontSize="7.5" fill="#64748b">Ihr Nettolohn</text>
+      <text x="60" y="60" textAnchor="middle" fontSize="13" fontWeight="500" fill="#17191c">{ganz(nettolohn)}</text>
+      <text x="60" y="72" textAnchor="middle" fontSize="7" fill="#6e727c">Ihr Nettolohn</text>
     </svg>
   );
 }

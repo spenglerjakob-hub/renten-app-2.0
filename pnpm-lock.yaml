@@ -48,6 +48,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource-variable/source-serif-4':
+        specifier: 5.2.5
+        version: 5.2.5
       '@renten/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -502,6 +505,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/source-serif-4@5.2.5':
+    resolution: {integrity: sha512-pME7tAmvBb9F/fVsiXVQsiaBiAESutwkt+e6ix4BqTlrLZOcZFaGJvBu3oCcw1YKOtBUFcz3+89/WIhn+wjt3A==}
 
   '@hono/node-server@1.19.17':
     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
@@ -1669,6 +1675,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.12':
     optional: true
+
+  '@fontsource-variable/source-serif-4@5.2.5': {}
 
   '@hono/node-server@1.19.17(hono@4.13.3)':
     dependencies:

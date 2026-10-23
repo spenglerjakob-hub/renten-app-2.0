@@ -9,7 +9,7 @@ import { Logo } from './Logo';
  * Namen, andere nicht, und der Name war mal Link, mal nicht. Die Breite
  * folgt dem Inhalt der Seite, damit Logo und Ueberschrift buendig stehen.
  */
-export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, klasse = '', innen = '' }: {
+export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, klasse = '', innen = '', hell = false }: {
   /** Tailwind-Klasse der Inhaltsbreite, gleich der von <main> */
   breite?: string;
   /**
@@ -23,15 +23,20 @@ export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, kla
   klasse?: string;
   /** Zusaetzliche Klassen an der inneren Zeile */
   innen?: string;
+  /**
+   * Hell auf Weiss, ohne Flaeche und Rand — fuer die Mitarbeiterberatung,
+   * deren Stil (Referenz „Steep“) keine dunkle Kopfleiste kennt.
+   */
+  hell?: boolean;
 }) {
   const name = <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>;
   return (
-    <header className={`bg-slate-900 text-white ${klasse}`}>
+    <header className={`${hell ? 'bg-white text-mb-tinte' : 'bg-slate-900 text-white'} ${klasse}`}>
       <div className={`mx-auto flex ${breite} items-center gap-3 px-4 py-4 sm:px-6 ${innen}`}>
         <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
         <div className="min-w-0 flex-1">
           {verlinkt ? <a href="/" className="hover:underline">{name}</a> : name}
-          <p className="text-xs text-slate-400 print:hidden">Ihre Zukunft. Smart geplant.</p>
+          <p className={`text-xs print:hidden ${hell ? 'text-mb-schiefer' : 'text-slate-400'}`}>Ihre Zukunft. Smart geplant.</p>
         </div>
         {rechts}
       </div>

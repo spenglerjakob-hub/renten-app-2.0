@@ -28,7 +28,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
     setGeladen(true);
   };
 
-  const zelle = 'border-b border-slate-100 px-2 py-2 align-top';
+  const zelle = 'border-b border-mb-linie px-2 py-2.5 align-top';
   const zahl = `${zelle} text-right tabular-nums`;
 
   return (
@@ -46,19 +46,19 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
         </div>
       )}
     >
-      <p className="text-sm leading-relaxed text-slate-600">
+      <p className="text-sm leading-relaxed text-mb-schiefer">
         Wer teilnimmt, mit welchem Betrag und ab wann — für die Lohnabrechnung. Gehälter und persönliche Angaben aus den
         Gesprächen stehen nicht darin.
       </p>
 
       {zeilen.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">Noch keine Beratung — die Übersicht füllt sich mit den Gesprächen.</p>
+        <p className="mt-3 text-sm text-mb-schiefer">Noch keine Beratung — die Übersicht füllt sich mit den Gesprächen.</p>
       ) : (
         <>
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-xl bg-slate-50 p-3">
-              <dt className="text-xs font-bold text-slate-500">Beratungen</dt>
-              <dd className="mt-0.5 text-sm font-bold leading-snug text-slate-800">
+            <div className="rounded-2xl bg-white p-4">
+              <dt className="text-sm text-mb-schiefer">Beratungen</dt>
+              <dd className="mt-1 text-sm font-medium leading-snug text-mb-tinte">
                 {anzahlText('teilnahme', summen.teilnahmen)}<br />{anzahlText('verzicht', summen.verzichte)}<br />{anzahlText('offen', summen.offen)}
               </dd>
             </div>
@@ -67,24 +67,24 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
               { titel: 'Arbeitgeber', wert: summen.arbeitgeberMonat },
               { titel: 'In die Vorsorge', wert: summen.gesamtMonat },
             ].map((k) => (
-              <div key={k.titel} className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-xs font-bold text-slate-500">{k.titel} im Monat</dt>
-                <dd className="mt-0.5 text-lg font-black tabular-nums text-slate-900">{euroGenau(k.wert)}</dd>
-                <dd className="text-xs tabular-nums text-slate-500">{euroGenau(k.wert * 12)} im Jahr</dd>
+              <div key={k.titel} className="rounded-2xl bg-white p-4">
+                <dt className="text-sm text-mb-schiefer">{k.titel} im Monat</dt>
+                <dd className="mt-1 text-xl font-medium tabular-nums text-mb-tinte">{euroGenau(k.wert)}</dd>
+                <dd className="text-xs tabular-nums text-mb-schiefer">{euroGenau(k.wert * 12)} im Jahr</dd>
               </div>
             ))}
           </dl>
 
           {/* Auf dem Telefon je Mitarbeiter ein Eintrag — die Tabelle braucht mehr Breite. Die Summen stehen oben. */}
-          <ul className="mt-4 divide-y divide-slate-100 sm:hidden" aria-label="Entscheidungen">
+          <ul className="mt-4 divide-y divide-mb-linie sm:hidden" aria-label="Entscheidungen">
             {zeilen.map((z, i) => (
               <li key={`${z.name}-${i}`} className="py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="min-w-0 break-words text-sm font-bold text-slate-900">{z.name}</span>
+                  <span className="min-w-0 break-words text-sm font-medium text-mb-tinte">{z.name}</span>
                   <StatusChip status={z.status} />
                 </div>
                 {z.status === 'teilnahme' && (
-                  <p className="mt-0.5 text-xs tabular-nums text-slate-600">
+                  <p className="mt-0.5 text-xs tabular-nums text-mb-schiefer">
                     {euroGenau(z.umwandlungMonat)} + {euroGenau(z.arbeitgeberMonat)} Arbeitgeber = {euroGenau(z.gesamtMonat)}
                     {z.beginn ? `, ab ${z.beginn}` : ''}
                   </p>
@@ -96,7 +96,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
           <div className="mt-4 hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[34rem] border-collapse text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-500">
+                <tr className="text-left text-xs text-mb-schiefer">
                   <th className={zelle}>Name</th>
                   <th className={zelle}>Entscheidung</th>
                   <th className={`${zelle} text-right`}>Umwandlung</th>
@@ -108,7 +108,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
               <tbody>
                 {zeilen.map((z, i) => (
                   <tr key={`${z.name}-${i}`}>
-                    <td className={`${zelle} break-words font-bold text-slate-900`}>{z.name}</td>
+                    <td className={`${zelle} break-words font-medium text-mb-tinte`}>{z.name}</td>
                     <td className={zelle}><StatusChip status={z.status} /></td>
                     <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.umwandlungMonat) : '—'}</td>
                     <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.arbeitgeberMonat) : '—'}</td>
@@ -118,7 +118,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
                 ))}
               </tbody>
               <tfoot>
-                <tr className="font-bold text-slate-900">
+                <tr className="font-medium text-mb-tinte">
                   <td className={zelle} colSpan={2}>Summe im Monat</td>
                   <td className={zahl}>{euroGenau(summen.umwandlungMonat)}</td>
                   <td className={zahl}>{euroGenau(summen.arbeitgeberMonat)}</td>
@@ -129,7 +129,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
             </table>
           </div>
 
-          <p role="status" className="mt-3 text-xs leading-relaxed text-slate-500">
+          <p role="status" className="mt-3 text-xs leading-relaxed text-mb-schiefer">
             {geladen
               ? 'Die CSV-Datei liegt in Ihrem Download-Ordner. Sie öffnet sich direkt in Excel.'
               : 'Die CSV-Datei öffnet sich direkt in Excel. Beträge laut Beratung — maßgeblich sind die unterschriebenen Vereinbarungen.'}

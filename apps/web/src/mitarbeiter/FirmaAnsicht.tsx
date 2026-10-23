@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { beratungDatenSchema } from '@renten/schema';
 import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, type Beratung, type Firma,
 } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
-import { FirmenZeichen, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, StatusChip, useFirmenlogo } from './bausteine';
+import { ETIKETT, FirmenZeichen, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
 import { Uebersicht } from './Uebersicht';
 import { MODELL_NAME, regelText } from './texte';
@@ -40,11 +40,11 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   }, [firmaId]);
 
   const zurueck = (
-    <button type="button" onClick={() => gehe(FIRMEN)} className="inline-flex items-center gap-1 text-sm font-bold text-indigo-700 hover:underline">
+    <button type="button" onClick={() => gehe(FIRMEN)} className={LINK}>
       <ArrowLeft className="h-4 w-4" aria-hidden /> Alle Firmen
     </button>
   );
-  if (firma === 'laedt') return <p className="text-sm text-slate-500">Die Firma wird geladen …</p>;
+  if (firma === 'laedt') return <p className="text-sm text-mb-schiefer">Die Firma wird geladen …</p>;
   if (firma === 'fehler' || firma === null) {
     return (
       <div className="space-y-3">
@@ -70,16 +70,18 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {zurueck}
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
         <FirmenZeichen name={firma.name} logo={logo} gross />
-        <p className="max-w-xl text-sm text-slate-600">
-          <strong className="text-slate-800">{MODELL_NAME[firma.angebot.modell.art]}:</strong> {regelText(firma.angebot.modell)}
+        <p className="max-w-md text-sm leading-relaxed text-mb-schiefer">
+          <span className={`block ${ETIKETT}`}>{MODELL_NAME[firma.angebot.modell.art]}</span>
+          <span className="text-mb-tinte">{regelText(firma.angebot.modell)}</span>
         </p>
       </div>
 
-      <div role="tablist" aria-label="Bereiche der Firma" className="flex flex-wrap gap-1 border-b border-slate-300">
+      {/* Reiter als Pillen: der aktive gefuellt in Tinte, die anderen nur Text. */}
+      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full bg-mb-nebel p-1">
         {REITER.map((r) => (
           <button
             key={r.id}
@@ -89,8 +91,8 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
             aria-selected={reiter === r.id}
             aria-controls={`bereich-${r.id}`}
             onClick={() => gehe({ firma: firma.id, beratung: null, reiter: r.id })}
-            className={`-mb-px rounded-t-lg border px-2 py-2 text-sm font-bold sm:px-3 ${
-              reiter === r.id ? 'border-slate-300 border-b-slate-100 bg-slate-100 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
+              reiter === r.id ? 'bg-mb-tinte text-white' : 'text-mb-schiefer hover:text-mb-tinte'
             }`}
           >
             <span className="sm:hidden">{r.kurz}</span><span className="hidden sm:inline">{r.text}</span>
@@ -109,26 +111,26 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
               </button>
             )}
           >
-            {beratungen === 'laedt' && <p className="text-sm text-slate-500">Beratungen werden geladen …</p>}
+            {beratungen === 'laedt' && <p className="text-sm text-mb-schiefer">Beratungen werden geladen …</p>}
             {beratungen === 'fehler' && <p role="alert" className="text-sm text-rose-800">Die Beratungen konnten nicht geladen werden.</p>}
             {Array.isArray(beratungen) && liste.length === 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-mb-schiefer">
                 Noch keine Beratung. Mit „Neue Beratung“ beginnt das Gespräch mit dem ersten Mitarbeiter.
               </p>
             )}
             {liste.length > 0 && (
-              <ul className="divide-y divide-slate-100" aria-label="Beratungen">
+              <ul className="divide-y divide-mb-linie" aria-label="Beratungen">
                 {liste.map((b) => (
-                  <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                  <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
                     <button type="button" onClick={() => gehe({ firma: firma.id, beratung: b.id, reiter: 'mitarbeiter' })}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <span className="min-w-0 break-words font-bold text-slate-900">{b.mitarbeiter || 'Ohne Namen'}</span>
+                      className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-left">
+                      <span className="min-w-0 break-words text-base font-medium text-mb-tinte">{b.mitarbeiter || 'Ohne Namen'}</span>
                       <StatusChip status={b.status} betrag={b.daten.umwandlungMonat} />
-                      {b.beratenAm && <span className="text-xs text-slate-500">{datumText(b.beratenAm)}</span>}
-                      <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                      {b.beratenAm && <span className="text-sm text-mb-asche">{datumText(b.beratenAm)}</span>}
+                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-mb-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </button>
                     <button type="button" onClick={() => setLoeschen(b)} aria-label={`Beratung ${b.mitarbeiter || 'ohne Namen'} löschen`}
-                      className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700">
+                      className="rounded-full p-2 text-mb-asche hover:bg-rose-50 hover:text-rose-700">
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
                   </li>

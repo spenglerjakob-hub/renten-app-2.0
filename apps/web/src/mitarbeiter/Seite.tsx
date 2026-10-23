@@ -38,9 +38,15 @@ export function Seite() {
 
   return (
     <DruckBereich>
-      <div className="min-h-screen bg-slate-100 text-slate-800">
-        <SeitenKopf verlinkt />
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      {/*
+        Eigener Stil dieser Seite nach der Referenz „Steep“: weisse Flaeche,
+        Serifen-Ueberschriften, Tinte statt Indigo, ein Pfirsich-Akzent je
+        Ansicht. Tokens in tailwind.config.js (mb-*), die gemeinsamen Felder
+        stellt `.mb-steep` in index.css um.
+      */}
+      <div className="mb-steep min-h-screen bg-white text-mb-tinte">
+        <SeitenKopf verlinkt hell />
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
           {ort.firma === null ? (
             <FirmenListe gehe={gehe} />
           ) : ort.beratung === null ? (

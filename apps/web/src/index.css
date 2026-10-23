@@ -18,6 +18,30 @@
   .hide-scrollbar::-webkit-scrollbar { display: none; }
 }
 
+/*
+ * bAV-MITARBEITERBERATUNG — der Stil der Seite (Referenz „Steep“) fuer die
+ * gemeinsamen Eingabefelder aus `components/Feld.tsx`. Nur unter
+ * `.mb-steep`; alle anderen Seiten behalten ihre Felder. Die eigenen
+ * Bausteine der Seite tragen ihre Klassen selbst.
+ */
+@layer components {
+  .mb-steep :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+    border-radius: 16px;
+    border-color: theme('colors.mb.linie');
+    background-color: #fff;
+  }
+  /* Die Stufen-Knoepfe am rechten Rand folgen der Rundung des Felds. */
+  .mb-steep .rounded-r-md { border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
+  .mb-steep :focus-visible { --tw-ring-color: theme('colors.mb.tinte'); }
+  .mb-steep input[type="checkbox"], .mb-steep input[type="radio"], .mb-steep input[type="range"] {
+    accent-color: theme('colors.mb.tinte');
+  }
+  /* Gemeinsame Bausteine (Kennzahl, Feld-Beschriftungen): kein Fettdruck ueber 500, keine
+     gesperrten Grossbuchstaben — Steep staffelt mit Groesse und Grau, nicht mit Gewicht. */
+  .mb-steep .font-black { font-weight: 500; }
+  .mb-steep .uppercase { text-transform: none; letter-spacing: normal; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

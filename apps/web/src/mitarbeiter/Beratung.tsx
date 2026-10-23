@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
 import { beratungLaden, beratungSpeichern, firmaLaden, type Beratung, type Firma } from '../lib/bav-beratung';
-import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, useBeraterAuftritt, useFirmenlogo } from './bausteine';
+import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, LINK, useBeraterAuftritt, useFirmenlogo } from './bausteine';
 import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
 import {
   SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung, SchrittUnterlagen,
@@ -89,12 +89,12 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
   const zurFirma = () => gehe({ firma: firmaId, beratung: null, reiter: 'mitarbeiter' });
   const zurueck = (onClick: () => void) => (
-    <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-sm font-bold text-indigo-700 hover:underline">
+    <button type="button" onClick={onClick} className={LINK}>
       <ArrowLeft className="h-4 w-4" aria-hidden /> {f ? f.name : 'Zur Firma'}
     </button>
   );
 
-  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-slate-500">Die Beratung wird geladen …</p>;
+  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-mb-schiefer">Die Beratung wird geladen …</p>;
   if (!f || !daten || !r || beratung === null || beratung === 'fehler') {
     return (
       <div className="space-y-3">
@@ -131,11 +131,11 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const props = { firma: f, logo, daten, setze, r, leistung, geheZu };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {zurueck(fertig)}
         <div className="flex items-center gap-3">
-          <span role="status" className="text-xs text-slate-500">
+          <span role="status" className="text-xs text-mb-schiefer">
             {speichern === 'speichert' ? 'Wird gespeichert …' : speichern === 'fehler' ? 'Nicht gespeichert — bitte erneut versuchen.' : geaendert ? 'Nicht gespeichert' : 'Gespeichert'}
           </span>
           <button type="button" onClick={() => void sichern(daten)} disabled={!geaendert || speichern === 'speichert'} className={KNOPF_ZWEIT}>
@@ -146,7 +146,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FirmenZeichen name={f.name} logo={logo} />
-        <p className="text-sm font-bold text-slate-700">{daten.angaben.name || 'Neue Beratung'}</p>
+        <p className="text-sm text-mb-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
       </div>
 
       <nav aria-label="Schritte der Beratung">
@@ -160,15 +160,16 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
                 aria-label={`Schritt ${i + 1}: ${t}`}
                 className="group flex w-full flex-col items-center gap-1"
               >
-                <span className={`h-1.5 w-full rounded-full ${i === schritt ? 'bg-indigo-600' : i < schritt ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <span className={`hidden text-xs font-semibold leading-tight sm:block ${i === schritt ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                {/* Ohne Ampel: erledigt halbe Tinte, aktuell volle Tinte, offen Haarlinie. */}
+                <span className={`h-1 w-full rounded-full ${i === schritt ? 'bg-mb-tinte' : i < schritt ? 'bg-mb-tinte/30' : 'bg-mb-linie'}`} />
+                <span className={`hidden text-xs leading-tight sm:block ${i === schritt ? 'font-medium text-mb-tinte' : 'text-mb-schiefer group-hover:text-mb-tinte'}`}>
                   {t}
                 </span>
               </button>
             </li>
           ))}
         </ol>
-        <p className="mt-2 text-xs font-semibold text-slate-500 sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
+        <p className="mt-2 text-xs text-mb-schiefer sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
       </nav>
 
       {schritt === 0 && <SchrittAngebot {...props} />}
@@ -179,7 +180,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
       {schritt === 6 && <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mb-linie pt-6">
         <button type="button" onClick={() => geheZu(schritt - 1)} disabled={schritt === 0} className={KNOPF_ZWEIT}>
           <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
         </button>

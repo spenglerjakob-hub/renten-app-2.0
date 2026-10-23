@@ -4,7 +4,12 @@ import { firmenAngebotSchema, firmenModellSchema, type FirmenModellDaten } from 
 import { firmaAnlegen, firmaSpeichern, firmenLaden, type Firma } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
 import { TextFeld } from '../components/Feld';
-import { KNOPF, KNOPF_ZWEIT } from './bausteine';
+/*
+ * Das Fenster erscheint auf den Arbeitgeber-Seiten, nicht in der
+ * Mitarbeiterberatung — deshalb im Stil der App, nicht im Stil dieser Seite.
+ */
+const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50';
+const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
 import { MODELL_NAME, regelText } from './texte';
 import { ortSuche } from './ort';
 
