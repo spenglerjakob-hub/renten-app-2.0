@@ -1,12 +1,25 @@
 /**
- * Wortbildmarke des Rentenplaners: drei aufsteigende Balken mit einer
- * Trendlinie darueber. Uebernommen aus dem urspruenglichen Entwurf.
+ * Bildmarke des Rentenplaners: drei aufsteigende Balken mit einer
+ * Trendlinie darueber — die Idee des urspruenglichen Entwurfs, neu gesetzt
+ * im Stil „Seline“ wie ein Diagramm der App: die Balken einfarbig in Stein
+ * (Daten bleiben einfarbig), die Linie in Tinte, nur ihr Endpunkt in Cyan —
+ * die eine Hervorhebung. Die Linie laeuft ueber die Balken, nicht durch sie.
  *
- * Der hohe Balken traegt das Indigo der Oberflaeche (indigo-600, wie Knoepfe
- * und E-Mail-Vorlagen). Vorher Koenigsblau — Logo und App wirkten wie aus
- * zwei Haeusern. Das Gruen der Trendlinie ist das Gruen fuer „gedeckt“.
+ * Feste Farben statt Rollen: Die Marke soll gleich bleiben, auch wenn eine
+ * Seite ihre Rollen anders belegt. public/favicon.svg traegt dieselbe Marke
+ * (dunkle Fassung auf Soot).
  */
-export function Logo({ klasse = 'h-10 w-10' }: { klasse?: string }) {
+const HELL = { balken: ['#D6D3D1', '#A8A29E', '#78716C'], linie: '#0C0A09' };
+/** Auf dunklem Grund: Tinte wird Papier, die Balken eine Stufe heller. */
+const DUNKEL = { balken: ['#57534E', '#78716C', '#A8A29E'], linie: '#FAFAF9' };
+const CYAN = '#3BA6F1';
+
+export function Logo({ klasse = 'h-10 w-10', dunkel = false }: {
+  klasse?: string;
+  /** Fuer dunklen Grund, etwa die Kopfzeile des Rechners */
+  dunkel?: boolean;
+}) {
+  const f = dunkel ? DUNKEL : HELL;
   return (
     <svg
       viewBox="0 0 100 100"
@@ -16,17 +29,17 @@ export function Logo({ klasse = 'h-10 w-10' }: { klasse?: string }) {
       role="img"
       aria-label="JS-Rentenplaner"
     >
-      <rect x="15" y="60" width="16" height="25" rx="4" fill="#94A3B8" />
-      <rect x="42" y="40" width="16" height="45" rx="4" fill="#64748B" />
-      <rect x="69" y="20" width="16" height="65" rx="4" fill="#4F46E5" />
+      <rect x="11" y="67" width="18" height="26" rx="4" fill={f.balken[0]} />
+      <rect x="44" y="51" width="18" height="42" rx="4" fill={f.balken[1]} />
+      <rect x="77" y="37" width="18" height="56" rx="4" fill={f.balken[2]} />
       <path
-        d="M10 50 L40 30 L60 40 L85 10"
-        stroke="#10B981"
-        strokeWidth="6"
+        d="M9 51 L37 35 L57 44 L85 16"
+        stroke={f.linie}
+        strokeWidth="7"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="85" cy="10" r="8" fill="#10B981" />
+      <circle cx="85" cy="16" r="9" fill={CYAN} />
     </svg>
   );
 }
