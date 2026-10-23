@@ -1,10 +1,13 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, Save } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowRight, ChevronDown, Save } from 'lucide-react';
 import { BUNDESLAENDER } from '@renten/engine';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { AuswahlFeld, DatumFeld, Schalter, ZahlFeld, euro, prozent } from '../components/Feld';
-import { Hervor, KNOPF, LINK, Titel } from '../components/stil';
+import {
+  EINLEITUNG, Hervor, Hinweis, Hinweise, KNOPF, Kernsatz, Karte, LINK, SCHWEBEND, Titel, Zahl,
+} from '../components/stil';
+import { LueckenRing, type RingTexte } from '../components/LueckenRing';
 import { KaufkraftKarte } from '../features/KaufkraftKarte';
 import { musterfallMerken } from '../lib/musterfall';
 import { AUFTRITT_LEER, auftrittLeer } from '../features/auftritt';
@@ -31,6 +34,9 @@ const MIT_KONTO = [
   'Paare, Beamte, Selbstständige und privat Versicherte',
   'Vorsorge-Check: Ihr Mandant trägt seine Angaben per Link selbst ein',
 ];
+
+/** Der Ring der Schnellrechnung: das Ziel als Ganzes, das Netto im Ruhestand als gedeckter Teil. */
+const ZIEL_RING: RingTexte = { ganz: 'Ziel', mitte: 'Ihr Ziel', gedeckt: 'Netto im Ruhestand' };
 
 /**
  * DIE SCHNELLRECHNUNG (/schnellrechnung) — ein Fall ohne Anmeldung.
@@ -96,6 +102,12 @@ export function Seite() {
     window.location.href = ziel;
   };
 
+  // Die Rechnung in heutiger Kaufkraft — wie die Luecke in der Mitarbeiterberatung.
+  const nettoHeute = z ? z.nettoMonat / f : 0;
+  const zielHeute = z ? z.zielNettoMonat / f : 0;
+  const lueckeHeute = luecke / f;
+  const deckung = zielHeute > 0 ? Math.round((nettoHeute / zielHeute) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf
@@ -107,131 +119,142 @@ export function Seite() {
         )}
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <Titel gross>
-          Schnellrechnung: Was bleibt im Alter <Hervor>netto</Hervor>?
-        </Titel>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ui-schiefer sm:text-base">
-          Ein Fall in einer Minute, ohne Anmeldung. Gerechnet wird wie im vollen Rechner: Steuer sowie
-          Kranken- und Pflegeversicherung nach aktuellem Rechtsstand.
-        </p>
+      <main className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 sm:py-10">
+        <div>
+          <Titel gross>
+            Schnellrechnung: Was bleibt im Alter <Hervor>netto</Hervor>?
+          </Titel>
+          <p className={`mt-3 ${EINLEITUNG}`}>
+            Ein Fall in einer Minute, ohne Anmeldung. Gerechnet wird wie im vollen Rechner: Steuer sowie
+            Kranken- und Pflegeversicherung nach aktuellem Rechtsstand.
+          </p>
+        </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
-          {/* ---------- Eingaben ---------- */}
-          <section aria-labelledby="schnell-eingaben" className="ui-eingabe p-4 sm:p-5 lg:col-span-5">
-            <h2 id="schnell-eingaben" className="text-base font-medium text-ui-tinte">Ihr Mandant</h2>
-            {istBeispiel && (
-              <p className="mt-2 rounded-lg border border-dashed border-ui-schiefer/60 bg-ui-karte px-3 py-2 text-xs leading-relaxed text-ui-tinte">
-                Beispielwerte — tragen Sie die Zahlen Ihres Mandanten ein.
-              </p>
-            )}
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <DatumFeld
-                label="Geburtsdatum"
-                wert={e.geburtsdatum}
-                onChange={(v) => setze('geburtsdatum', { geburtsdatum: v })}
-                hilfe={r ? `Rentenbeginn ${r.szenario.personen[0]!.rentenbeginn} — Regelaltersgrenze.` : undefined}
-                vorbelegt={angefasst.has('geburtsdatum') ? undefined
-                  : { art: 'beispiel', onPruefen: () => setAngefasst((a) => new Set(a).add('geburtsdatum')) }}
-              />
-              <ZahlFeld
-                label="Bruttogehalt im Monat"
-                wert={e.bruttoMonat}
-                onChange={(n) => setze('brutto', { bruttoMonat: n })}
-                einheit="€"
-                hilfe="Angestellt, 12 Gehälter."
-                vorbelegt={angefasst.has('brutto') ? undefined
-                  : { art: 'beispiel', onPruefen: () => setAngefasst((a) => new Set(a).add('brutto')) }}
-              />
-              <ZahlFeld
-                label="Gesetzliche Rente laut Renteninformation"
-                wert={e.rente ?? r?.rente ?? 0}
-                onChange={(n) => setze('rente', { rente: n })}
-                einheit="€"
-                hilfe={e.rente === null
-                  ? 'Geschätzt aus Einkommen und Alter. Genauer: „Höhe Ihrer künftigen Regelaltersrente“ aus der Renteninformation.'
-                  : 'Aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“.'}
-                vorbelegt={e.rente === null ? { art: 'beispiel', hinweis: 'Geschätzt aus Einkommen und Alter.' } : undefined}
-              />
-              <ZahlFeld
-                label="Zielnetto im Alter (Kaufkraft heute)"
-                wert={e.ziel ?? r?.zielHeute ?? 0}
-                onChange={(n) => setze('ziel', { ziel: n })}
-                einheit="€"
-                hilfe={r && r.nettoHeute > 0
-                  ? (e.ziel === null
-                    ? `Faustregel: ${prozent(ZIEL_FAUSTREGEL, 0)} des heutigen Nettos von ${euro(r.nettoHeute)}.`
-                    : `Das sind ${prozent(r.zielHeute / r.nettoHeute, 0)} des heutigen Nettos von ${euro(r.nettoHeute)}.`)
-                  : undefined}
-                vorbelegt={e.ziel === null
-                  ? { art: 'beispiel', hinweis: 'Faustregel: 80 % des heutigen Nettos.', onPruefen: r ? () => setze('ziel', { ziel: r.zielHeute }) : undefined }
-                  : undefined}
-              />
-              <AuswahlFeld
-                label="Bundesland"
-                wert={e.bundesland}
-                onChange={(v) => setze('bundesland', { bundesland: v })}
-                optionen={laender}
-                hilfe="Für den Kirchensteuersatz."
-                vorbelegt={angefasst.has('bundesland') ? undefined : { art: 'standard' }}
-              />
-              <div className="flex items-end pb-2">
-                <Schalter
-                  label="Kirchensteuerpflichtig"
-                  wert={e.kirchensteuer}
-                  onChange={(b) => setze('kirchensteuer', { kirchensteuer: b })}
-                  vorbelegt={angefasst.has('kirchensteuer') ? undefined : { art: 'standard' }}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/*
+            ---------- Eingaben: eine weisse Karte wie die Berechnungsgrundlagen der Beratung ----------
+            Ab 1280 px laeuft sie mit, damit die Eingaben beim Lesen des Ergebnisses im Blick bleiben —
+            darunter nicht: Einspaltig waere sie hoeher als der Bildschirm und unten nicht mehr erreichbar.
+          */}
+          <Karte titel="Ihr Mandant" klasse="self-start lg:col-span-5 xl:sticky xl:top-6">
+            {istBeispiel && <Hinweis klasse="mb-5">Beispielwerte — tragen Sie die Zahlen Ihres Mandanten ein.</Hinweis>}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <DatumFeld
+                  label="Geburtsdatum"
+                  wert={e.geburtsdatum}
+                  onChange={(v) => setze('geburtsdatum', { geburtsdatum: v })}
+                  hilfe={r ? `Rentenbeginn ${r.szenario.personen[0]!.rentenbeginn} — Regelaltersgrenze.` : undefined}
+                  vorbelegt={angefasst.has('geburtsdatum') ? undefined
+                    : { art: 'beispiel', onPruefen: () => setAngefasst((a) => new Set(a).add('geburtsdatum')) }}
                 />
-              </div>
+                <ZahlFeld
+                  label="Bruttogehalt im Monat"
+                  wert={e.bruttoMonat}
+                  onChange={(n) => setze('brutto', { bruttoMonat: n })}
+                  einheit="€"
+                  hilfe="Angestellt, 12 Gehälter."
+                  vorbelegt={angefasst.has('brutto') ? undefined
+                    : { art: 'beispiel', onPruefen: () => setAngefasst((a) => new Set(a).add('brutto')) }}
+                />
+                <ZahlFeld
+                  label="Gesetzliche Rente laut Renteninformation"
+                  wert={e.rente ?? r?.rente ?? 0}
+                  onChange={(n) => setze('rente', { rente: n })}
+                  einheit="€"
+                  hilfe={e.rente === null
+                    ? 'Geschätzt aus Einkommen und Alter. Genauer: „Höhe Ihrer künftigen Regelaltersrente“ aus der Renteninformation.'
+                    : 'Aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“.'}
+                  vorbelegt={e.rente === null ? { art: 'beispiel', hinweis: 'Geschätzt aus Einkommen und Alter.' } : undefined}
+                />
+                <ZahlFeld
+                  label="Zielnetto im Alter (Kaufkraft heute)"
+                  wert={e.ziel ?? r?.zielHeute ?? 0}
+                  onChange={(n) => setze('ziel', { ziel: n })}
+                  einheit="€"
+                  hilfe={r && r.nettoHeute > 0
+                    ? (e.ziel === null
+                      ? `Faustregel: ${prozent(ZIEL_FAUSTREGEL, 0)} des heutigen Nettos von ${euro(r.nettoHeute)}.`
+                      : `Das sind ${prozent(r.zielHeute / r.nettoHeute, 0)} des heutigen Nettos von ${euro(r.nettoHeute)}.`)
+                    : undefined}
+                  vorbelegt={e.ziel === null
+                    ? { art: 'beispiel', hinweis: 'Faustregel: 80 % des heutigen Nettos.', onPruefen: r ? () => setze('ziel', { ziel: r.zielHeute }) : undefined }
+                    : undefined}
+                />
+                <AuswahlFeld
+                  label="Bundesland"
+                  wert={e.bundesland}
+                  onChange={(v) => setze('bundesland', { bundesland: v })}
+                  optionen={laender}
+                  hilfe="Für den Kirchensteuersatz."
+                  vorbelegt={angefasst.has('bundesland') ? undefined : { art: 'standard' }}
+                />
+                <div className="flex items-end pb-2">
+                  <Schalter
+                    label="Kirchensteuerpflichtig"
+                    wert={e.kirchensteuer}
+                    onChange={(b) => setze('kirchensteuer', { kirchensteuer: b })}
+                    vorbelegt={angefasst.has('kirchensteuer') ? undefined : { art: 'standard' }}
+                  />
+                </div>
             </div>
             {e.rente !== null && (
-              <button type="button" onClick={() => setE((x) => ({ ...x, rente: null }))}
-                className="mt-2 text-xs font-medium text-ui-tinte underline-offset-4 hover:underline">
+              <button type="button" onClick={() => setE((x) => ({ ...x, rente: null }))} className={`mt-3 ${LINK} text-xs`}>
                 Rente wieder schätzen lassen
               </button>
             )}
-          </section>
+          </Karte>
 
-          {/* ---------- Ergebnis ---------- */}
-          <div className="space-y-4 lg:col-span-7">
+          {/* ---------- Ergebnis: Aussage, Ring als schwebendes Stueck, Kernsatz — wie Schritt 3 der Beratung ---------- */}
+          <div className="space-y-6 lg:col-span-7">
             {r && z ? (
-              <section aria-labelledby="schnell-ergebnis" className="ui-karte p-4 sm:p-5">
-                <h2 id="schnell-ergebnis" className="text-base font-medium text-ui-tinte">Ergebnis für das Jahr {z.jahr}</h2>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <Kachel titel="Netto im Ruhestand" wert={euro(z.nettoMonat)} unten={`heute ${euro(z.nettoMonat / f)}`} />
-                  <Kachel titel="Ziel" wert={euro(z.zielNettoMonat)} unten={`heute ${euro(z.zielNettoMonat / f)}`} />
-                  <Kachel
-                    titel="Versorgungslücke"
-                    wert={luecke > 0 ? euro(luecke) : 'Gedeckt'}
-                    unten={luecke > 0 ? `heute ${euro(luecke / f)}` : 'Ziel erreicht'}
-                    ton={luecke > 0 ? 'luecke' : 'gut'}
-                  />
-                </div>
-                {/* Die Luecke in Euro allein sagt nicht, ob sie gross ist —
-                    der Anteil am Ziel ordnet sie ein. */}
-                {z.zielNettoMonat > 0 && <Deckung netto={z.nettoMonat} ziel={z.zielNettoMonat} />}
-                <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-                  Monatsbeträge nach Steuer und Kranken- und Pflegeversicherung, im Geld des Jahres {z.jahr};
-                  „heute“ in heutiger Kaufkraft.
+              <section aria-labelledby="schnell-ergebnis">
+                <Titel als="h2" id="schnell-ergebnis">
+                  {luecke > 0
+                    ? <>Im Alter fehlen <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeHeute)}</Hervor></span> im Monat</>
+                    : <>Das Ziel ist <Hervor>gedeckt</Hervor></>}
+                </Titel>
+                <p className={`mt-2 ${EINLEITUNG}`}>
+                  Ergebnis für das Jahr {z.jahr}, nach Steuer und Kranken- und Pflegeversicherung — in heutiger Kaufkraft.
                 </p>
+                <div className={`${SCHWEBEND} mt-5 p-5 sm:p-7`}>
+                  <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+                    <LueckenRing ganz={zielHeute} gedeckt={Math.min(nettoHeute, zielHeute)} luecke={lueckeHeute}
+                      gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={ZIEL_RING} />
+                    <dl className="space-y-4">
+                      <Zahl etikett="Netto im Ruhestand" punkt="bg-ui-tinte" wert={euro(nettoHeute)} zusatz={`${deckung} %`} />
+                      {luecke > 0 && (
+                        <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(lueckeHeute)}
+                          zusatz={`${100 - deckung} %`} />
+                      )}
+                    </dl>
+                  </div>
+                  <Kernsatz klasse="mt-6">
+                    {deckung < 100
+                      ? <>Das Netto deckt <Hervor>{deckung} %</Hervor> des Ziels.</>
+                      : <>Das Netto erreicht <Hervor>{deckung} %</Hervor> des Ziels.</>}
+                  </Kernsatz>
+                  <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+                    Im Geld des Jahres {z.jahr}: Netto {euro(z.nettoMonat)} und Ziel {euro(z.zielNettoMonat)} im Monat
+                    {luecke > 0 ? `, Lücke ${euro(luecke)}` : ''}.
+                  </p>
+                </div>
               </section>
             ) : (
-              <p className="ui-karte p-4 text-sm text-ui-schiefer">Bitte ein gültiges Geburtsdatum eintragen.</p>
+              <Karte><p className="text-sm text-ui-schiefer">Bitte ein gültiges Geburtsdatum eintragen.</p></Karte>
             )}
 
             {z && <KaufkraftKarte zeile={z} inflation={0.02} standard wo="im vollen Rechner änderbar" />}
 
-            <section aria-labelledby="schnell-annahmen" className="ui-karte p-4 text-sm sm:p-5">
-              <h2 id="schnell-annahmen" className="text-base font-medium text-ui-tinte">Annahmen</h2>
-              <ul className="mt-2 space-y-1 text-ui-schiefer">
-                <li>Rentenbeginn mit der Regelaltersgrenze; Inflation 2 % und Rentenanpassung 1 % pro Jahr.</li>
-                <li>Alleinstehend, angestellt, gesetzlich krankenversichert (KVdR) mit dem durchschnittlichen Zusatzbeitrag.</li>
-                <li>Keine weiteren Verträge — die erfassen Sie im vollen Rechner.</li>
-              </ul>
-              <p className="mt-2 text-xs text-ui-schiefer">
+            <Karte titel="Annahmen">
+              <Hinweise punkte={[
+                'Rentenbeginn mit der Regelaltersgrenze; Inflation 2 % und Rentenanpassung 1 % pro Jahr.',
+                'Alleinstehend, angestellt, gesetzlich krankenversichert (KVdR) mit dem durchschnittlichen Zusatzbeitrag.',
+                'Keine weiteren Verträge — die erfassen Sie im vollen Rechner.',
+              ]} />
+              <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
                 Paare, Beamte, Selbstständige und privat Versicherte rechnen Sie im vollen Rechner.
               </p>
-            </section>
+            </Karte>
 
             {/* ---------- Ihr Logo aufs Gutachten ---------- */}
             <section aria-labelledby="schnell-auftritt" className="ui-karte">
@@ -241,17 +264,17 @@ export function Seite() {
                   onClick={() => setAuftrittOffen((v) => !v)}
                   aria-expanded={auftrittOffen}
                   aria-controls="schnell-auftritt-inhalt"
-                  className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
+                  className="flex w-full items-center justify-between gap-3 p-5 text-left sm:p-7"
                 >
                   <span>
-                    <span className="block text-base font-medium text-ui-tinte">Ihr Logo aufs Gutachten</span>
-                    <span className="block text-xs font-normal text-ui-schiefer">So sieht das Deckblatt für Ihren Mandanten aus</span>
+                    <span className="block text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">Ihr Logo aufs Gutachten</span>
+                    <span className="mt-0.5 block text-sm font-normal text-ui-schiefer">So sieht das Deckblatt für Ihren Mandanten aus</span>
                   </span>
-                  <ChevronDown className={`h-4 w-4 shrink-0 text-ui-schiefer transition-transform ${auftrittOffen ? 'rotate-180' : ''}`} aria-hidden />
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-ui-schiefer transition-transform ${auftrittOffen ? 'rotate-180' : ''}`} aria-hidden />
                 </button>
               </h2>
               {auftrittOffen && (
-                <div id="schnell-auftritt-inhalt" className="space-y-4 border-t border-ui-linie px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
+                <div id="schnell-auftritt-inhalt" className="space-y-5 border-t border-ui-linie px-5 pb-5 pt-5 sm:px-7 sm:pb-7">
                   <AuftrittFormular
                     wert={auftrittVoll}
                     onAendern={(t) => auftrittAendern({
@@ -284,20 +307,13 @@ export function Seite() {
             </section>
 
             {/* ---------- Mit Konto ---------- */}
-            <section aria-labelledby="schnell-konto" className="ui-karte p-4 sm:p-5">
-              <h2 id="schnell-konto" className="text-base font-medium text-ui-tinte">Mit Konto zusätzlich</h2>
-              <ul className="mt-2 space-y-1.5 text-sm text-ui-tinte">
-                {MIT_KONTO.map((x) => (
-                  <li key={x} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden /> {x}
-                  </li>
-                ))}
-              </ul>
+            <Karte titel="Mit Konto zusätzlich">
+              <Hinweise punkte={MIT_KONTO} />
               <button
                 type="button"
                 onClick={() => speichern('/?registrieren')}
                 disabled={!r}
-                className={`mt-4 w-full ${KNOPF}`}
+                className={`mt-6 w-full ${KNOPF}`}
               >
                 <Save className="h-4 w-4" aria-hidden /> Fall speichern
               </button>
@@ -309,15 +325,15 @@ export function Seite() {
                 type="button"
                 onClick={() => speichern('/')}
                 disabled={!r}
-                className={`mt-3 ${LINK} text-left disabled:opacity-50`}
+                className={`mt-4 ${LINK} text-left disabled:opacity-50`}
               >
                 Schon ein Konto? Anmelden und den Fall übernehmen <ArrowRight className="h-4 w-4" aria-hidden />
               </button>
-            </section>
+            </Karte>
           </div>
         </div>
 
-        <p className="mt-8 text-xs leading-relaxed text-ui-schiefer">
+        <p className="text-xs leading-relaxed text-ui-schiefer">
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Rechnung läuft vollständig
           in Ihrem Browser — Ihre Eingaben verlassen dieses Gerät nicht.
         </p>
@@ -326,40 +342,6 @@ export function Seite() {
       <footer className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
         <RechtsLinks />
       </footer>
-    </div>
-  );
-}
-
-function Deckung({ netto, ziel }: { netto: number; ziel: number }) {
-  const anteil = Math.min(1, Math.max(0, netto / ziel));
-  const prozent = Math.round(anteil * 100);
-  return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-ui-tinte">
-        <span>Das Netto deckt <strong className="font-medium tabular-nums">{prozent} %</strong> des Ziels</span>
-        {prozent < 100 && <span className="text-ui-schiefer">es fehlen <strong className="font-medium tabular-nums text-ui-tinte">{100 - prozent} %</strong></span>}
-      </div>
-      {/* Wie der Luecken-Ring der Mitarbeiterberatung: Tinte das Netto, Stein die Luecke. */}
-      <div
-        role="img"
-        aria-label={`Das Netto deckt ${prozent} % des Ziels`}
-        className="mt-1.5 h-2 overflow-hidden rounded-full bg-ui-luecke"
-      >
-        <div className="h-full rounded-full bg-ui-tinte" style={{ width: `${prozent}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function Kachel({ titel, wert, unten, ton }: { titel: string; wert: string; unten: ReactNode; ton?: 'luecke' | 'gut' }) {
-  return (
-    // Die Luecke ist die eine Zahl, auf die es ankommt: Rahmen in Tinte statt Rot — sie ist kein Fehler.
-    <div className={`rounded-lg border p-3 ${ton === 'luecke' ? 'border-ui-tinte bg-ui-karte' : 'border-ui-linie bg-ui-innen'}`}>
-      <div className="text-xs text-ui-schiefer">{titel}</div>
-      <div className="ui-titel mt-0.5 text-2xl font-normal tabular-nums text-ui-tinte">
-        {wert}
-      </div>
-      <div className="text-xs tabular-nums text-ui-schiefer">{unten}</div>
     </div>
   );
 }

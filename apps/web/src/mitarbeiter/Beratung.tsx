@@ -4,7 +4,7 @@ import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
-import { KNOPF, KNOPF_ZWEIT, LINK } from '../components/stil';
+import { Etappen, KNOPF, KNOPF_ZWEIT, LINK } from '../components/stil';
 import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
 import { zeitpunktText } from './unterschrift-daten';
 import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
@@ -172,28 +172,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
       </div>
 
-      <nav aria-label="Schritte der Beratung">
-        <ol className="grid grid-cols-7 gap-1">
-          {SCHRITTE.map((t, i) => (
-            <li key={t}>
-              <button
-                type="button"
-                onClick={() => geheZu(i)}
-                aria-current={i === schritt ? 'step' : undefined}
-                aria-label={`Schritt ${i + 1}: ${t}`}
-                className="group flex w-full flex-col items-center gap-1"
-              >
-                {/* Ohne Ampel: erledigt halbe Tinte, aktuell volle Tinte, offen Haarlinie. */}
-                <span className={`h-1 w-full rounded-full ${i === schritt ? 'bg-ui-tinte' : i < schritt ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
-                <span className={`hidden text-xs leading-tight sm:block ${i === schritt ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
-                  {t}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-2 text-xs text-ui-schiefer sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
-      </nav>
+      <Etappen schritte={SCHRITTE} aktiv={schritt} onWechsel={geheZu} beschriftung="Schritte der Beratung" />
 
       {gesperrt && schritt < 6 && (
         <div role="note" className="ui-innen flex flex-wrap items-center gap-3 p-4">

@@ -1,16 +1,21 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
-import { ClipboardCopy, Check, Coins } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { ClipboardCopy, Check } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
+import { Posten } from '../components/stil';
 import { gespraechssatz, kaufkraft } from './kaufkraft';
+
+/** Ein Betrag, der nicht umbricht — sonst stuende „im Monat“ allein in der naechsten Zeile. */
+const nowrap = (text: string) => <span className="whitespace-nowrap">{text}</span>;
 
 /**
  * „Kaufkraft bis zum Rentenbeginn“ — die Luecke und der Kaufkraftverlust in
  * Euro, beides in beiden Massstaeben und mit der Annahme daneben.
  *
- * SACHLICH GESETZT: alles in Tinte, auch die Luecke — sie ist eine Zahl,
- * keine Warnung, und der Kaufkraftverlust eine Umrechnung. Hervorgehoben
- * wird nur ueber das Gewicht. Kein Countdown, keine Wertung.
+ * SACHLICH GESETZT: eine Aufstellung wie in der Mitarbeiterberatung, alles
+ * in Tinte, auch die Luecke — sie ist eine Zahl, keine Warnung, und der
+ * Kaufkraftverlust eine Umrechnung. Der Satz fuer das Gespraech steht gross
+ * darunter. Kein Countdown, keine Wertung.
  */
 export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = '', wo = 'oben änderbar' }: {
   zeile: Jahreszeile;
@@ -38,44 +43,36 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   };
 
   return (
-    <section aria-labelledby={titelId} className={`ui-karte p-4 sm:p-5 ${klasse}`}>
-      <h3 id={titelId} className="flex items-center gap-2 text-base font-medium text-ui-tinte">
-        <Coins className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> Kaufkraft bis zum Rentenbeginn
+    <section aria-labelledby={titelId} className={`ui-karte p-5 sm:p-7 ${klasse}`}>
+      <h3 id={titelId} className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
+        Kaufkraft bis zum Rentenbeginn
       </h3>
 
-      <dl className="mt-3 space-y-2 text-sm">
-        <Posten label={`Ihr Ziel von ${euro(k.bedarfHeute)} entspricht ${k.jahr}`} wert={`${euro(k.bedarfNominal)} im Monat`} />
-        <Posten label={`Gesamt-Netto ${k.jahr}`} wert={euro(k.nettoNominal)} />
-        <Posten label="… in heutiger Kaufkraft" wert={euro(k.nettoHeute)} />
-        <Posten
-          label={`Kaufkraftverlust bis ${k.jahr}`}
-          wert={`${euro(k.verlustMonat)} im Monat (${prozent(k.verlustQuote, 0)})`}
-          fett
-        />
+      {/* Werte bleiben beisammen; umbrechen darf nur die Luecke mit ihren zwei Teilen. */}
+      <dl className="mt-4 text-sm">
+        <Posten text={`Ihr Ziel von ${euro(k.bedarfHeute)} entspricht ${k.jahr}`} wert={nowrap(`${euro(k.bedarfNominal)} im Monat`)} />
+        <Posten text={`Gesamt-Netto ${k.jahr}`} wert={nowrap(euro(k.nettoNominal))} />
+        <Posten text="… in heutiger Kaufkraft" wert={nowrap(euro(k.nettoHeute))} />
+        <Posten text={`Kaufkraftverlust bis ${k.jahr}`} wert={nowrap(`${euro(k.verlustMonat)} im Monat (${prozent(k.verlustQuote, 0)})`)} />
         {k.lueckeNominal > 0 && (
           <Posten
-            label="Versorgungslücke"
-            wert={<>
-              <span className="whitespace-nowrap">{euro(k.lueckeNominal)} ({k.jahr})</span>{' · '}
-              <span className="whitespace-nowrap">{euro(k.lueckeHeute)} heute</span>
-            </>}
-            ton="luecke"
-            umbruch
+            text="Versorgungslücke"
+            wert={<>{nowrap(`${euro(k.lueckeNominal)} (${k.jahr})`)}{' · '}{nowrap(`${euro(k.lueckeHeute)} heute`)}</>}
           />
         )}
       </dl>
-      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
         Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, {wo}).
         Modellrechnung, keine Zusage.
       </p>
 
-      <div className="ui-innen mt-3 p-3">
-        <p className="text-xs text-ui-schiefer">Für das Gespräch</p>
-        <p className="mt-1 text-sm leading-relaxed text-ui-tinte">{satz}</p>
+      <div className="ui-innen mt-5 p-4 sm:p-5">
+        <p className="text-sm text-ui-schiefer">Für das Gespräch</p>
+        <p className="ui-titel mt-1 text-[18px] leading-[1.45] text-ui-tinte sm:text-[20px]">{satz}</p>
         <button
           type="button"
           onClick={() => void kopieren()}
-          className="mt-2 flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-white px-3 py-1 text-xs font-medium text-ui-tinte hover:bg-ui-innen print:hidden"
+          className="mt-3 flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-white px-3 py-1.5 text-xs font-medium text-ui-tinte hover:bg-ui-innen print:hidden"
         >
           {kopiert
             ? <><Check className="h-3.5 w-3.5" aria-hidden /> Kopiert</>
@@ -83,26 +80,5 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
         </button>
       </div>
     </section>
-  );
-}
-
-function Posten({ label, wert, fett, ton, umbruch = false }: {
-  label: string; wert: ReactNode; fett?: boolean; ton?: 'luecke';
-  /**
-   * Der Wert darf umbrechen — nur fuer die Luecke mit ihren zwei Teilen: Am
-   * Telefon passt „1.706 € (2052) · 1.020 € heute“ nicht in eine Zeile.
-   * Alle anderen Werte bleiben beisammen; dann bricht die Beschriftung um.
-   */
-  umbruch?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-ui-tinte/80">{label}</dt>
-      <dd className={`${umbruch ? 'min-w-0' : 'shrink-0 whitespace-nowrap'} text-right tabular-nums text-ui-tinte ${
-        fett || ton === 'luecke' ? 'font-medium' : 'font-normal'
-      }`}>
-        {wert}
-      </dd>
-    </div>
   );
 }

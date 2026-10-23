@@ -12,9 +12,11 @@ import {
 } from '../components/Feld';
 import { laufzeitText } from '../features/tuev-berechnung';
 import {
-  AKZENT, ETIKETT, FELD_LABEL, Hervor, KNOPF, KNOPF_ZWEIT, Karte, LINK, SCHWEBEND, TextBereich, Titel, Vermerk,
+  AKZENT, Anteile, ETIKETT, FELD_LABEL, Hervor, Hinweise, KNOPF, KNOPF_ZWEIT, Karte, LINK, Posten, SCHWEBEND, TextBereich, Titel,
+  Vermerk, WertKarte, Zahl,
 } from '../components/stil';
-import { FirmenZeichen, LueckenRing, useDrucken } from './bausteine';
+import { LueckenRing } from '../components/LueckenRing';
+import { FirmenZeichen, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, probeabrechnung,
   reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
@@ -60,21 +62,6 @@ const KASSEN = [
   ...KRANKENKASSEN.map((k) => ({ wert: k.name, text: k.name })),
 ];
 const JETZT = new Date().getFullYear();
-
-/** Ein Absatz mit Hinweisen — am Bildschirm wie im Rechner. */
-function Hinweise({ titel, punkte }: { titel: string; punkte: string[] }) {
-  if (punkte.length === 0) return null;
-  return (
-    <div>
-      <h3 className="text-base font-medium text-ui-tinte">{titel}</h3>
-      <ul className="mt-2 space-y-2 text-sm leading-relaxed text-ui-tinte">
-        {punkte.map((p) => (
-          <li key={p} className="flex gap-3"><span aria-hidden className="text-ui-asche">—</span><span>{p}</span></li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 /* --- 1. Angebot der Firma ------------------------------------------------ */
 
@@ -274,25 +261,12 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
           {luecke ? (
             <>
               <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
-                <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
-                  renteProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
+                <LueckenRing ganz={luecke.lohn.nettoMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+                  gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
                 <dl className="space-y-4">
-                  <div>
-                    <dt className="flex items-center gap-2 text-sm text-ui-schiefer">
-                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-ui-tinte" />Netto-Altersrente
-                    </dt>
-                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
-                      {euro(luecke.rente.nettoMonat)} <span className="text-base text-ui-schiefer">· {luecke.renteProzent} %</span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="flex items-center gap-2 text-sm text-ui-schiefer">
-                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-ui-luecke ring-1 ring-ui-tinte/20" />Versorgungslücke
-                    </dt>
-                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
-                      {euro(luecke.lueckeMonat)} <span className="text-base text-ui-schiefer">· {luecke.lueckeProzent} %</span>
-                    </dd>
-                  </div>
+                  <Zahl etikett="Netto-Altersrente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} zusatz={`${luecke.renteProzent} %`} />
+                  <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke.lueckeMonat)}
+                    zusatz={`${luecke.lueckeProzent} %`} />
                 </dl>
               </div>
               {luecke.lueckeProzent > 0 && (
@@ -538,7 +512,6 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
     { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-ui-daten-3' },
     { text: 'Erträge', wert: h.ertrag, farbe: 'bg-ui-luecke' },
   ];
-  const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
   return (
     <Karte titel="Beispielhafte Hochrechnung" rechts={<Vermerk>geschätzt</Vermerk>}>
       <p className="text-sm text-ui-schiefer">
@@ -561,48 +534,13 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
         </div>
       </div>
       <p className={`mt-5 ${ETIKETT}`}>Woraus das Kapital besteht</p>
-      <div className="mt-2 flex h-3 gap-0.5 overflow-hidden rounded-full" aria-hidden>
-        {teile.map((t) => (
-          <div key={t.text} className={t.farbe} style={{ width: `${summe > 0 ? (Math.max(0, t.wert) / summe) * 100 : 0}%` }} />
-        ))}
-      </div>
-      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        {teile.map((t) => (
-          <div key={t.text} className="flex items-center justify-between gap-3">
-            <dt className="flex items-center gap-2 text-ui-schiefer"><span className={`h-2.5 w-2.5 rounded-full ${t.farbe}`} aria-hidden />{t.text}</dt>
-            <dd className="tabular-nums text-ui-tinte">{euro(t.wert)}</dd>
-          </div>
-        ))}
-      </dl>
+      <Anteile teile={teile} format={euro} />
       <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
         Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine
         Zusage. Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab. Die Rente ist brutto, vor
         Kranken- und Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers (nächster Schritt).
       </p>
     </Karte>
-  );
-}
-
-/** Eine Zahl mit Etikett — flach auf Nebel, oder als die eine Akzentkarte. */
-function WertKarte({ titel, wert, unten, akzent = false }: { titel: string; wert: string; unten: string; akzent?: boolean }) {
-  return (
-    <div className={`p-5 sm:p-6 ${akzent ? AKZENT : 'ui-karte text-ui-tinte'}`}>
-      <p className={`text-sm ${akzent ? '' : 'text-ui-schiefer'}`}>{titel}</p>
-      <p className={`mt-1 tabular-nums ${akzent ? 'ui-titel text-[40px] leading-none' : 'text-[28px] font-medium leading-tight'}`}>
-        {akzent ? <Hervor>{wert}</Hervor> : wert}
-      </p>
-      <p className={`mt-2 text-xs ${akzent ? '' : 'text-ui-schiefer'}`}>{unten}</p>
-    </div>
-  );
-}
-
-/** Eine Zeile einer kleinen Aufstellung — die Summe unter einer Linie in Tinte. */
-function Posten({ text, wert, summe = false }: { text: string; wert: string; summe?: boolean }) {
-  return (
-    <div className={`flex justify-between gap-3 py-1 ${summe ? 'mt-1 border-t border-ui-tinte pt-2 font-medium text-ui-tinte' : 'text-ui-schiefer'}`}>
-      <dt>{text}</dt>
-      <dd className={`tabular-nums ${summe ? '' : 'text-ui-tinte'}`}>{wert}</dd>
-    </div>
   );
 }
 

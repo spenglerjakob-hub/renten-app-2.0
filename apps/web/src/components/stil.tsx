@@ -28,11 +28,11 @@ export const FELD = 'ui-feld w-full p-2 text-sm';
 export const FEHLER = 'rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900';
 
 /** Ueberschrift, Gewicht 400, in Inter Tight — die Handschrift der Seite. */
-export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '' }: {
-  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string;
+export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '', id }: {
+  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string; id?: string;
 }) {
   return (
-    <Tag className={`ui-titel text-balance font-normal text-ui-tinte ${
+    <Tag id={id} className={`ui-titel text-balance font-normal text-ui-tinte ${
       gross ? 'text-[34px] leading-[1.15] sm:text-[44px]' : 'text-[26px] leading-[1.2] sm:text-[30px]'
     } ${klasse}`}>
       {children}
@@ -110,5 +110,188 @@ export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilf
         <span className="tabular-nums">{wert.length}/{maxLaenge}</span>
       </div>
     </div>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * DIE BAUSTEINE DER SEITEN — aus der Mitarbeiterberatung, fuer alle Seiten:
+ * Einleitung, Kennzahlen, Aufstellungen, der Kernsatz in der Akzentkarte,
+ * Anteile, Reiter als Pillen und Schritte als duenne Linien.
+ * ------------------------------------------------------------------------ */
+
+/** Die Einleitung unter dem Titel einer Seite oder Ansicht — leise, in Lesebreite. */
+export const EINLEITUNG = 'max-w-3xl text-base leading-relaxed text-ui-schiefer';
+
+/** Ein Absatz mit Hinweisen: Ueberschrift, darunter Punkte mit Gedankenstrich. */
+export function Hinweise({ titel, punkte }: { titel?: string; punkte: readonly ReactNode[] }) {
+  if (punkte.length === 0) return null;
+  return (
+    <div>
+      {titel && <h3 className="text-base font-medium text-ui-tinte">{titel}</h3>}
+      <ul className={`${titel ? 'mt-2 ' : ''}space-y-2 text-sm leading-relaxed text-ui-tinte`}>
+        {punkte.map((p, i) => (
+          <li key={i} className="flex gap-3"><span aria-hidden className="text-ui-asche">—</span><span>{p}</span></li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Eine Zahl mit Etikett — flach auf weisser Karte, oder als die eine Akzentkarte. */
+export function WertKarte({ titel, wert, unten, akzent = false }: { titel: string; wert: string; unten: string; akzent?: boolean }) {
+  return (
+    <div className={`p-5 sm:p-6 ${akzent ? AKZENT : 'ui-karte text-ui-tinte'}`}>
+      <p className={`text-sm ${akzent ? '' : 'text-ui-schiefer'}`}>{titel}</p>
+      <p className={`mt-1 tabular-nums ${akzent ? 'ui-titel text-[40px] leading-none' : 'text-[28px] font-medium leading-tight'}`}>
+        {akzent ? <Hervor>{wert}</Hervor> : wert}
+      </p>
+      <p className={`mt-2 text-xs ${akzent ? '' : 'text-ui-schiefer'}`}>{unten}</p>
+    </div>
+  );
+}
+
+/** Eine Zeile einer kleinen Aufstellung (in einem dl) — die Summe unter einer Linie in Tinte. */
+export function Posten({ text, wert, summe = false }: { text: ReactNode; wert: ReactNode; summe?: boolean }) {
+  return (
+    <div className={`flex justify-between gap-3 py-1 ${summe ? 'mt-1 border-t border-ui-tinte pt-2 font-medium text-ui-tinte' : 'text-ui-schiefer'}`}>
+      <dt>{text}</dt>
+      <dd className={`text-right tabular-nums ${summe ? '' : 'text-ui-tinte'}`}>{wert}</dd>
+    </div>
+  );
+}
+
+/** Eine Kennzahl in einer Liste (dl): leises Etikett, wenn noetig mit dem Punkt der Legende, darunter die Zahl gross. */
+export function Zahl({ etikett, wert, zusatz, punkt }: {
+  etikett: ReactNode; wert: ReactNode;
+  /** Klein hinter der Zahl, etwa der Anteil („· 48 %“) */
+  zusatz?: ReactNode;
+  /** Farbe des Punkts vor dem Etikett — wie im Ring oder Balken daneben */
+  punkt?: string;
+}) {
+  return (
+    <div>
+      <dt className="flex items-center gap-2 text-sm text-ui-schiefer">
+        {punkt && <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${punkt}`} />}{etikett}
+      </dt>
+      <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
+        {wert}{zusatz !== undefined && <> <span className="text-base text-ui-schiefer">· {zusatz}</span></>}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Der Kernsatz einer Ansicht in der Akzentkarte: die Aussage, um die es
+ * geht, in Inter Tight, die Zahl darin hervorgehoben. Hoechstens einer je
+ * Ansicht — wie in der Mitarbeiterberatung die Regel der Firma, die Luecke
+ * und das Fazit.
+ */
+export function Kernsatz({ etikett, children, gross = false, klasse = '' }: {
+  etikett?: ReactNode; children: ReactNode; gross?: boolean; klasse?: string;
+}) {
+  return (
+    <div className={`${AKZENT} ${gross ? 'p-6 sm:p-10' : 'px-5 py-4 sm:px-6 sm:py-5'} ${klasse}`}>
+      {etikett && <p className="text-sm">{etikett}</p>}
+      <p className={`ui-titel text-balance font-normal ${etikett ? 'mt-2 ' : ''}${
+        gross ? 'text-[26px] leading-[1.25] sm:text-[34px]' : 'text-[22px] leading-snug sm:text-[26px]'
+      }`}>
+        {children}
+      </p>
+    </div>
+  );
+}
+
+/** Ein Ganzes und seine Teile: ein Balken, darunter die Legende mit Betraegen — einfarbig abgestuft. */
+export function Anteile({ teile, format }: {
+  teile: readonly { text: string; wert: number; farbe: string }[];
+  format: (n: number) => string;
+}) {
+  const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
+  return (
+    <>
+      <div className="mt-2 flex h-3 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+        {teile.map((t) => (
+          <div key={t.text} className={t.farbe} style={{ width: `${summe > 0 ? (Math.max(0, t.wert) / summe) * 100 : 0}%` }} />
+        ))}
+      </div>
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+        {teile.map((t) => (
+          <div key={t.text} className="flex items-center justify-between gap-3">
+            <dt className="flex items-center gap-2 text-ui-schiefer"><span className={`h-2.5 w-2.5 rounded-full ${t.farbe}`} aria-hidden />{t.text}</dt>
+            <dd className="tabular-nums text-ui-tinte">{format(t.wert)}</dd>
+          </div>
+        ))}
+      </dl>
+    </>
+  );
+}
+
+/** Reiter als Pillen: der aktive gefuellt in Soot, die anderen nur Text. */
+export function Pillen<T extends string>({ reiter, aktiv, onWechsel, beschriftung, kennung }: {
+  reiter: readonly { id: T; inhalt: ReactNode }[];
+  aktiv: T;
+  onWechsel: (id: T) => void;
+  beschriftung: string;
+  /** Kennungen von Reiter und Bereich (aria-controls), wenn die Pillen einen Bereich umschalten */
+  kennung?: (id: T) => { reiter: string; bereich: string };
+}) {
+  return (
+    <div role="tablist" aria-label={beschriftung} className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
+      {reiter.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          role="tab"
+          id={kennung?.(r.id).reiter}
+          aria-selected={aktiv === r.id}
+          aria-controls={kennung?.(r.id).bereich}
+          onClick={() => onWechsel(r.id)}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
+            aktiv === r.id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
+          }`}
+        >
+          {r.inhalt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Schritte als duenne Linien, wie die Schrittleiste der Beratung: aktuell
+ * volle Tinte, erledigt halbe, offen Haarlinie — ohne Ampel. Am Telefon
+ * steht statt der Namen „Schritt 2 von 7: …“.
+ */
+export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt }: {
+  schritte: readonly string[];
+  aktiv: number;
+  onWechsel: (i: number) => void;
+  beschriftung: string;
+  /** Ist ein Schritt erledigt? Ohne Angabe: alle vor dem aktuellen. */
+  erledigt?: (i: number) => boolean;
+}) {
+  const fertig = erledigt ?? ((i: number) => i < aktiv);
+  return (
+    <nav aria-label={beschriftung}>
+      <ol className="grid gap-1" style={{ gridTemplateColumns: `repeat(${schritte.length}, minmax(0, 1fr))` }}>
+        {schritte.map((t, i) => (
+          <li key={t}>
+            <button
+              type="button"
+              onClick={() => onWechsel(i)}
+              aria-current={i === aktiv ? 'step' : undefined}
+              aria-label={`Schritt ${i + 1}: ${t}`}
+              className="group flex w-full flex-col items-center gap-1"
+            >
+              <span className={`h-1 w-full rounded-full ${i === aktiv ? 'bg-ui-tinte' : fertig(i) ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
+              <span className={`hidden text-xs leading-tight sm:block ${i === aktiv ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
+                {t}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-xs text-ui-schiefer sm:hidden">Schritt {aktiv + 1} von {schritte.length}: {schritte[aktiv]}</p>
+    </nav>
   );
 }

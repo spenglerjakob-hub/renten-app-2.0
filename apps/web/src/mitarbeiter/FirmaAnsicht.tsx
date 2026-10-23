@@ -5,7 +5,7 @@ import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
 } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
-import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
+import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, Pillen } from '../components/stil';
 import { FirmenZeichen, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
 import { Uebersicht } from './Uebersicht';
@@ -84,26 +84,19 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
         </p>
       </div>
 
-      {/* Reiter als Pillen: der aktive gefuellt in Tinte, die anderen nur Text. */}
-      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
-        {REITER.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            role="tab"
-            id={`reiter-${r.id}`}
-            aria-selected={reiter === r.id}
-            aria-controls={`bereich-${r.id}`}
-            onClick={() => gehe({ firma: firma.id, beratung: null, reiter: r.id })}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
-              reiter === r.id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
-            }`}
-          >
+      <Pillen
+        beschriftung="Bereiche der Firma"
+        aktiv={reiter}
+        onWechsel={(id) => gehe({ firma: firma.id, beratung: null, reiter: id })}
+        kennung={(id) => ({ reiter: `reiter-${id}`, bereich: `bereich-${id}` })}
+        reiter={REITER.map((r) => ({
+          id: r.id,
+          inhalt: <>
             <span className="sm:hidden">{r.kurz}</span><span className="hidden sm:inline">{r.text}</span>
             {r.id === 'mitarbeiter' && liste.length > 0 ? ` (${liste.length})` : ''}
-          </button>
-        ))}
-      </div>
+          </>,
+        }))}
+      />
 
       <div role="tabpanel" id={`bereich-${reiter}`} aria-labelledby={`reiter-${reiter}`}>
         {reiter === 'mitarbeiter' && (

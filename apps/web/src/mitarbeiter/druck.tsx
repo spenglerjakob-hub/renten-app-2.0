@@ -5,7 +5,7 @@ import type { Firma, UnterschriftPerson } from '../lib/bav-beratung';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import { DeckblattKopf } from '../druck/DeckblattKopf';
 import { laufzeitText } from '../features/tuev-berechnung';
-import { LueckenRing } from './bausteine';
+import { LueckenRing } from '../components/LueckenRing';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
@@ -427,8 +427,8 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
       {luecke && (
         <Abschnitt titel={`${nr()}Ihre Versorgungslücke`}>
           <div className="flex items-center gap-6">
-            <LueckenRing nettolohn={luecke.lohn.nettoMonat} rente={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
-              renteProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
+            <LueckenRing ganz={luecke.lohn.nettoMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+              gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
             <div className="min-w-0 flex-1">
               <Paare zeilen={[
                 ['Ihr Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
