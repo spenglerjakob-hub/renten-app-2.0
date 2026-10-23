@@ -48,6 +48,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource-variable/inter':
+        specifier: 5.2.5
+        version: 5.2.5
+      '@fontsource-variable/inter-tight':
+        specifier: 5.2.5
+        version: 5.2.5
       '@fontsource-variable/source-serif-4':
         specifier: 5.2.5
         version: 5.2.5
@@ -505,6 +511,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/inter-tight@5.2.5':
+    resolution: {integrity: sha512-f7WqR3BQ7YmWT+3i1bR1mqQ1FoIDCfmwKRTENEARFRtkhhR4JPxzF+rB3T75AjZ+dTjIx/nO47LOQDLFWAwJWA==}
+
+  '@fontsource-variable/inter@5.2.5':
+    resolution: {integrity: sha512-TrWffUAFOnT8zroE9YmGybagoOgM/HjRqMQ8k9R0vVgXlnUh/vnpbGPAS/Caz1KIlOPnPGh6fvJbb7DHbFCncA==}
 
   '@fontsource-variable/source-serif-4@5.2.5':
     resolution: {integrity: sha512-pME7tAmvBb9F/fVsiXVQsiaBiAESutwkt+e6ix4BqTlrLZOcZFaGJvBu3oCcw1YKOtBUFcz3+89/WIhn+wjt3A==}
@@ -1675,6 +1687,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.12':
     optional: true
+
+  '@fontsource-variable/inter-tight@5.2.5': {}
+
+  '@fontsource-variable/inter@5.2.5': {}
 
   '@fontsource-variable/source-serif-4@5.2.5': {}
 

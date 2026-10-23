@@ -6,6 +6,10 @@ import { ortAus, ortSuche, type Ort } from './ort';
 import { FirmenListe } from './FirmenListe';
 import { FirmaAnsicht } from './FirmaAnsicht';
 import { BeratungAnsicht } from './Beratung';
+import { STILE, stilLaden, stilMerken, type Stil } from './stil';
+
+/** Der Umschalter zum Vergleichen der Stile — nur auf der Testseite und lokal, nicht live. */
+const STILWAHL_SICHTBAR = import.meta.env.DEV || import.meta.env.VITE_UMGEBUNG === 'test';
 
 /**
  * Die bAV-Mitarbeiterberatung (/mitarbeiterberatung).
@@ -22,6 +26,8 @@ import { BeratungAnsicht } from './Beratung';
  */
 export function Seite() {
   const [ort, setOrt] = useState<Ort>(() => ortAus(window.location.search));
+  const [stil, setStil] = useState<Stil>(() => stilLaden(window.location.search));
+  const waehleStil = (s: Stil) => { stilMerken(s); setStil(s); };
 
   useEffect(() => {
     const zurueck = () => setOrt(ortAus(window.location.search));
@@ -39,12 +45,13 @@ export function Seite() {
   return (
     <DruckBereich>
       {/*
-        Eigener Stil dieser Seite nach der Referenz „Steep“: weisse Flaeche,
-        Serifen-Ueberschriften, Tinte statt Indigo, ein Pfirsich-Akzent je
-        Ansicht. Tokens in tailwind.config.js (mb-*), die gemeinsamen Felder
-        stellt `.mb-steep` in index.css um.
+        Eigener Stil dieser Seite, nach einer von zwei Referenzen (stil.ts):
+        Steep — weisses Papier, Serifen, Tinte, ein Pfirsich-Akzent je
+        Ansicht; Seline — warmer Stein, weisse Karten mit Haarlinie, ein
+        Cyan fuer Hauptaktion und hervorgehobenes Wort. Rollen in
+        tailwind.config.js (mb-*), Werte und gemeinsame Felder in index.css.
       */}
-      <div className="mb-steep min-h-screen bg-white text-mb-tinte">
+      <div className={`mb-thema mb-${stil} min-h-screen bg-mb-flaeche text-mb-tinte`}>
         <SeitenKopf verlinkt hell />
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
           {ort.firma === null ? (
@@ -55,8 +62,21 @@ export function Seite() {
             <BeratungAnsicht key={ort.beratung} firmaId={ort.firma} beratungId={ort.beratung} gehe={gehe} />
           )}
         </main>
-        <footer className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pb-10 sm:px-6">
           <RechtsLinks />
+          {STILWAHL_SICHTBAR && (
+            <div role="group" aria-label="Stil der Seite (Vergleich)" className="flex items-center gap-2 text-xs text-mb-schiefer">
+              Stil zum Vergleich:
+              <span className="inline-flex gap-0.5 rounded-full border border-mb-linie bg-mb-karte p-0.5">
+                {STILE.map((x) => (
+                  <button key={x.id} type="button" aria-pressed={stil === x.id} onClick={() => waehleStil(x.id)}
+                    className={`rounded-full px-3 py-1 ${stil === x.id ? 'bg-mb-dunkel text-white' : 'text-mb-tinte hover:bg-mb-hover'}`}>
+                    {x.text}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
         </footer>
       </div>
     </DruckBereich>

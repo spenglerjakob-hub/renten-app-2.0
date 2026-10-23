@@ -19,27 +19,170 @@
 }
 
 /*
- * bAV-MITARBEITERBERATUNG — der Stil der Seite (Referenz „Steep“) fuer die
- * gemeinsamen Eingabefelder aus `components/Feld.tsx`. Nur unter
- * `.mb-steep`; alle anderen Seiten behalten ihre Felder. Die eigenen
- * Bausteine der Seite tragen ihre Klassen selbst.
+ * bAV-MITARBEITERBERATUNG — zwei Stile zur Wahl, dieselben Rollen.
+ *
+ * Die Seite spricht nur Rollen an (Flaeche, Karte, Innenflaeche, Akzent,
+ * Hervorhebung, Knopf …); was sie bedeuten, legt der Stil an der Huelle
+ * fest: `.mb-steep` (Referenz „Steep“, serif analytics on warm paper) oder
+ * `.mb-seline` (Referenz „Seline“, quiet analyst's desk on warm paper).
+ * Farben als RGB-Kanaele, damit Tailwind-Deckkraft (bg-mb-tinte/30) geht.
+ * Alle anderen Seiten der App beruehrt das nicht.
  */
 @layer components {
-  .mb-steep :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
-    border-radius: 16px;
-    border-color: theme('colors.mb.linie');
+  .mb-steep {
+    --mb-tinte: 23 25 28;          /* Text, Knoepfe — die einzige dunkle Flaeche */
+    --mb-flaeche: 255 255 255;     /* Seite: weisses Papier */
+    --mb-karte: 242 242 243;       /* Karten: Nebelgrau, ohne Rahmen */
+    --mb-innen: 255 255 255;       /* Kaesten in Karten */
+    --mb-linie: 228 228 231;
+    --mb-schiefer: 110 114 124;    /* Steep #777b86, dunkler fuer 4,5:1 */
+    --mb-asche: 151 151 153;
+    --mb-dunkel: 23 25 28;         /* aktiver Reiter */
+    --mb-hover: 235 235 237;
+    --mb-luecke: 251 225 209;      /* Pfirsich: Luecke im Ring, Ertraege */
+    --mb-daten-2: 138 142 152;
+    --mb-daten-3: 207 209 214;
+    --mb-knopf: 23 25 28;
+    --mb-knopf-rand: 23 25 28;
+    --mb-knopf-schrift: 255 255 255;
+    --mb-knopf-hover: 0 0 0;
+    --mb-zweit-rand: 23 25 28;
+    --mb-regler: 23 25 28;
+    --mb-feld-rand: 228 228 231;
+    --mb-r-karte: 24px;
+    --mb-r-innen: 16px;
+    --mb-r-feld: 16px;
+    --mb-r-schwebend: 20px;
+    --mb-karte-rahmen: transparent;
+    --mb-karte-schatten: none;
+    --mb-schwebend-schatten: 0 0 0 1px rgba(4,23,43,0.05), 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+    --mb-akzent-flaeche: #fbe1d1;  /* Pfirsich mit Siena-Schrift — einmal je Ansicht */
+    --mb-akzent-schrift: #5d2a1a;
+    --mb-akzent-rahmen: transparent;
+    --mb-akzent-schatten: none;
+    --mb-hervor-schrift: inherit;  /* Steep hebt nicht farbig hervor */
+    --mb-hervor-flaeche: transparent;
+    --mb-hervor-abstand: 0;
+    --mb-titel-font: "Source Serif 4 Variable", Georgia, serif;
+    --mb-titel-sperrung: -0.015em;
+  }
+  .mb-seline {
+    --mb-tinte: 12 10 9;           /* Ink Black, warm */
+    --mb-flaeche: 250 250 249;     /* Stone Canvas — Papier, nicht Bildschirmweiss */
+    --mb-karte: 255 255 255;       /* weisse Karten mit Haarlinie und weichem Schatten */
+    --mb-innen: 250 250 249;
+    --mb-linie: 232 230 229;
+    --mb-schiefer: 120 113 108;    /* Warm Gray */
+    --mb-asche: 168 162 158;
+    --mb-dunkel: 28 25 23;         /* Soot: aktiver Reiter */
+    --mb-hover: 250 250 249;
+    --mb-luecke: 214 211 209;      /* Stone Muted — Daten bleiben einfarbig */
+    --mb-daten-2: 120 113 108;
+    --mb-daten-3: 168 162 158;
+    --mb-knopf: 59 166 241;        /* Cyan Signal — die einzige farbige Flaeche */
+    --mb-knopf-rand: 51 152 225;
+    --mb-knopf-schrift: 12 10 9;   /* dunkle Schrift: Weiss auf Cyan erreicht nur 2,8:1 */
+    --mb-knopf-hover: 51 152 225;
+    --mb-zweit-rand: 232 230 229;
+    --mb-regler: 59 166 241;
+    --mb-feld-rand: 214 211 209;
+    --mb-r-karte: 10px;
+    --mb-r-innen: 8px;
+    --mb-r-feld: 6px;
+    --mb-r-schwebend: 16px;
+    --mb-karte-rahmen: #e8e6e5;
+    --mb-karte-schatten: 0 4px 16px rgba(0,0,0,0.05);
+    --mb-schwebend-schatten: 0 12px 45px rgba(17,12,46,0.12);
+    --mb-akzent-flaeche: #ffffff;  /* Seline kennt keine Farbflaechen — der Akzent sitzt in der Hervorhebung */
+    --mb-akzent-schrift: #0c0a09;
+    --mb-akzent-rahmen: #e8e6e5;
+    --mb-akzent-schatten: 0 4px 16px rgba(0,0,0,0.05);
+    --mb-hervor-schrift: #1d6aa8;  /* Cyan Edge #3398e1, dunkler: sonst unter 3:1 auf Sky Wash */
+    --mb-hervor-flaeche: #c1e1f7;  /* Sky Wash */
+    --mb-hervor-abstand: 0 0.2em;
+    --mb-titel-font: "Inter Tight Variable", "Inter Variable", system-ui, sans-serif;
+    --mb-titel-sperrung: -0.022em;
+    font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Die Bausteine der Seite — Gestalt aus den Rollen oben. */
+  .mb-karte {
+    background-color: rgb(var(--mb-karte));
+    border: 1px solid var(--mb-karte-rahmen);
+    border-radius: var(--mb-r-karte);
+    box-shadow: var(--mb-karte-schatten);
+  }
+  .mb-innen {
+    background-color: rgb(var(--mb-innen));
+    border-radius: var(--mb-r-innen);
+  }
+  .mb-seline .mb-innen { border: 1px solid #e8e6e5; }
+  .mb-schwebend {
+    background-color: #fff;
+    border-radius: var(--mb-r-schwebend);
+    box-shadow: var(--mb-schwebend-schatten);
+  }
+  .mb-akzentkarte {
+    background-color: var(--mb-akzent-flaeche);
+    color: var(--mb-akzent-schrift);
+    border: 1px solid var(--mb-akzent-rahmen);
+    border-radius: var(--mb-r-karte);
+    box-shadow: var(--mb-akzent-schatten);
+  }
+  /* Ein hervorgehobenes Wort je Ueberschrift (Seline); bei Steep unsichtbar. */
+  .mb-hervor {
+    color: var(--mb-hervor-schrift);
+    background-color: var(--mb-hervor-flaeche);
+    padding: var(--mb-hervor-abstand);
+    border-radius: 4px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .mb-titel { font-family: var(--mb-titel-font); letter-spacing: var(--mb-titel-sperrung); }
+
+  /* Die gemeinsamen Eingabefelder aus components/Feld.tsx */
+  .mb-thema :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+    border-radius: var(--mb-r-feld);
+    border-color: rgb(var(--mb-feld-rand));
     background-color: #fff;
   }
   /* Die Stufen-Knoepfe am rechten Rand folgen der Rundung des Felds. */
-  .mb-steep .rounded-r-md { border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
-  .mb-steep :focus-visible { --tw-ring-color: theme('colors.mb.tinte'); }
-  .mb-steep input[type="checkbox"], .mb-steep input[type="radio"], .mb-steep input[type="range"] {
-    accent-color: theme('colors.mb.tinte');
+  .mb-thema .rounded-r-md {
+    border-top-right-radius: calc(var(--mb-r-feld) - 1px);
+    border-bottom-right-radius: calc(var(--mb-r-feld) - 1px);
   }
+  .mb-thema :focus-visible { --tw-ring-color: rgb(var(--mb-regler)); }
+  .mb-thema :is(input[type="checkbox"], input[type="radio"]) { accent-color: rgb(var(--mb-regler)); }
+  /*
+   * Der Regler selbst gestaltet: helle Spur, gefuellt bis zum Wert (--anteil
+   * setzt die Seite), Knopf in der Reglerfarbe. Der native Regler malte bei
+   * hellem Cyan den Rest der Spur fast schwarz.
+   */
+  .mb-thema input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(to right, rgb(var(--mb-regler)) var(--anteil, 0%), rgb(var(--mb-linie)) var(--anteil, 0%));
+    cursor: pointer;
+  }
+  .mb-thema input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px; border-radius: 9999px;
+    background: #fff; border: 2px solid rgb(var(--mb-regler));
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .mb-thema input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 9999px;
+    background: #fff; border: 2px solid rgb(var(--mb-regler));
+  }
+  /* Grautoene der gemeinsamen Felder in die Grautoene des Stils (Seline ist warm, nicht schieferblau). */
+  .mb-thema :is(.text-slate-400, .text-slate-500) { color: rgb(var(--mb-schiefer)); }
+  .mb-thema :is(.text-slate-600, .text-slate-700, .text-slate-800) { color: rgb(var(--mb-tinte) / 0.8); }
   /* Gemeinsame Bausteine (Kennzahl, Feld-Beschriftungen): kein Fettdruck ueber 500, keine
-     gesperrten Grossbuchstaben — Steep staffelt mit Groesse und Grau, nicht mit Gewicht. */
-  .mb-steep .font-black { font-weight: 500; }
-  .mb-steep .uppercase { text-transform: none; letter-spacing: normal; }
+     gesperrten Grossbuchstaben — beide Referenzen staffeln mit Groesse und Grau, nicht mit Gewicht. */
+  .mb-thema .font-black { font-weight: 500; }
+  .mb-thema .uppercase { text-transform: none; letter-spacing: normal; }
 }
 
 @media (prefers-reduced-motion: reduce) {

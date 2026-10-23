@@ -160,7 +160,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
                 )}
               </>
             )}
-            <p className="rounded-2xl bg-white px-4 py-3 text-sm text-mb-tinte">{regelText(m)}</p>
+            <p className="mb-innen px-4 py-3 text-sm text-mb-tinte">{regelText(m)}</p>
 
             {(m.art !== 'matching' || m.weg === 'dv') && (
               <AuswahlFeld label="Durchführungsweg der Umwandlung" wert={a.durchfuehrungsweg} optionen={WEGE}

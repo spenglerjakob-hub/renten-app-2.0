@@ -56,7 +56,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
       ) : (
         <>
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-2xl bg-white p-4">
+            <div className="mb-innen p-4">
               <dt className="text-sm text-mb-schiefer">Beratungen</dt>
               <dd className="mt-1 text-sm font-medium leading-snug text-mb-tinte">
                 {anzahlText('teilnahme', summen.teilnahmen)}<br />{anzahlText('verzicht', summen.verzichte)}<br />{anzahlText('offen', summen.offen)}
@@ -67,7 +67,7 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
               { titel: 'Arbeitgeber', wert: summen.arbeitgeberMonat },
               { titel: 'In die Vorsorge', wert: summen.gesamtMonat },
             ].map((k) => (
-              <div key={k.titel} className="rounded-2xl bg-white p-4">
+              <div key={k.titel} className="mb-innen p-4">
                 <dt className="text-sm text-mb-schiefer">{k.titel} im Monat</dt>
                 <dd className="mt-1 text-xl font-medium tabular-nums text-mb-tinte">{euroGenau(k.wert)}</dd>
                 <dd className="text-xs tabular-nums text-mb-schiefer">{euroGenau(k.wert * 12)} im Jahr</dd>

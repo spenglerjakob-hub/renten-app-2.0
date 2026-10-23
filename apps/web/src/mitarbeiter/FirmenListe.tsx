@@ -85,11 +85,11 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
                 <button
                   type="button"
                   onClick={() => gehe({ firma: f.id, beratung: null, reiter: 'mitarbeiter' })}
-                  className="group flex h-full w-full items-start gap-3 rounded-3xl bg-mb-nebel p-6 text-left transition-colors hover:bg-[#ebebed]"
+                  className="mb-karte group flex h-full w-full items-start gap-3 p-6 text-left transition-colors hover:border-mb-asche"
                 >
                   <span className="min-w-0 flex-1">
                     <span className={`block ${ETIKETT}`}>{MODELL_NAME[f.angebot.modell.art]}</span>
-                    <span className="mt-1 block break-words text-xl font-medium tracking-[-0.01em] text-mb-tinte">{f.name}</span>
+                    <span className="mt-1 block break-words text-xl font-medium text-mb-tinte">{f.name}</span>
                     <span className="mt-2 block text-sm leading-relaxed text-mb-schiefer">{regelText(f.angebot.modell)}</span>
                     <span className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                       {(['teilnahme', 'verzicht', 'offen'] as const).filter((k) => s[k] > 0).map((k) => (

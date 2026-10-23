@@ -81,7 +81,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
       </div>
 
       {/* Reiter als Pillen: der aktive gefuellt in Tinte, die anderen nur Text. */}
-      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full bg-mb-nebel p-1">
+      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-mb-linie bg-mb-karte p-1">
         {REITER.map((r) => (
           <button
             key={r.id}
@@ -92,7 +92,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
             aria-controls={`bereich-${r.id}`}
             onClick={() => gehe({ firma: firma.id, beratung: null, reiter: r.id })}
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
-              reiter === r.id ? 'bg-mb-tinte text-white' : 'text-mb-schiefer hover:text-mb-tinte'
+              reiter === r.id ? 'bg-mb-dunkel text-white' : 'text-mb-schiefer hover:text-mb-tinte'
             }`}
           >
             <span className="sm:hidden">{r.kurz}</span><span className="hidden sm:inline">{r.text}</span>
