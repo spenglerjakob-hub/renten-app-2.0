@@ -9,6 +9,7 @@ import {
 } from '../components/stil';
 import { LueckenRing, type RingTexte } from '../components/LueckenRing';
 import { KaufkraftKarte } from '../features/KaufkraftKarte';
+import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { musterfallMerken } from '../lib/musterfall';
 import { AUFTRITT_LEER, auftrittLeer } from '../features/auftritt';
 import { AuftrittFormular } from '../features/AuftrittFormular';
@@ -70,6 +71,13 @@ export function Seite() {
   );
   const [auftrittOffen, setAuftrittOffen] = useState(() => offenerAuftrittLokal() !== null);
   const [speicherHinweis, setSpeicherHinweis] = useState<string | null>(null);
+  /*
+    Die Darstellung des Ergebnisses: in heutiger Kaufkraft (wie die Luecke in
+    der Beratung, und wie das Ziel eingegeben wird) oder nominal, im Geld des
+    Rentenjahres — derselbe Schalter wie im Rechner. Die Kaufkraft-Karte
+    zeigt immer beides; sie erklaert ja gerade die Umrechnung.
+  */
+  const [heute, setHeute] = useState(true);
   const auftrittAendern = (teil: Partial<AuftrittEntwurf>) => {
     const neu = { ...auftritt, ...teil };
     setAuftritt(neu);
@@ -102,11 +110,13 @@ export function Seite() {
     window.location.href = ziel;
   };
 
-  // Die Rechnung in heutiger Kaufkraft — wie die Luecke in der Mitarbeiterberatung.
-  const nettoHeute = z ? z.nettoMonat / f : 0;
-  const zielHeute = z ? z.zielNettoMonat / f : 0;
-  const lueckeHeute = luecke / f;
-  const deckung = zielHeute > 0 ? Math.round((nettoHeute / zielHeute) * 100) : 0;
+  // Die Betraege im gewaehlten Massstab; die Fussnote nennt den anderen. Der Anteil ist in beiden derselbe.
+  const gezeigt = (n: number) => (heute ? n / f : n);
+  const anders = (n: number) => (heute ? n : n / f);
+  const netto = z ? gezeigt(z.nettoMonat) : 0;
+  const ziel = z ? gezeigt(z.zielNettoMonat) : 0;
+  const lueckeGezeigt = gezeigt(luecke);
+  const deckung = z && z.zielNettoMonat > 0 ? Math.round((z.nettoMonat / z.zielNettoMonat) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
@@ -210,20 +220,24 @@ export function Seite() {
               <section aria-labelledby="schnell-ergebnis">
                 <Titel als="h2" id="schnell-ergebnis">
                   {luecke > 0
-                    ? <>Im Alter fehlen <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeHeute)}</Hervor></span> im Monat</>
+                    ? <>Im Alter fehlen <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeGezeigt)}</Hervor></span> im Monat</>
                     : <>Das Ziel ist <Hervor>gedeckt</Hervor></>}
                 </Titel>
-                <p className={`mt-2 ${EINLEITUNG}`}>
-                  Ergebnis für das Jahr {z.jahr}, nach Steuer und Kranken- und Pflegeversicherung — in heutiger Kaufkraft.
-                </p>
+                <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                  <p className={`${EINLEITUNG} min-w-0 flex-1 basis-72`}>
+                    Ergebnis für das Jahr {z.jahr}, nach Steuer und Kranken- und Pflegeversicherung
+                    {heute ? ' — in heutiger Kaufkraft.' : ` — nominal, im Geld des Jahres ${z.jahr}.`}
+                  </p>
+                  <KaufkraftSchalter wert={heute} onChange={setHeute} />
+                </div>
                 <div className={`${SCHWEBEND} mt-5 p-5 sm:p-7`}>
                   <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
-                    <LueckenRing ganz={zielHeute} gedeckt={Math.min(nettoHeute, zielHeute)} luecke={lueckeHeute}
+                    <LueckenRing ganz={ziel} gedeckt={Math.min(netto, ziel)} luecke={lueckeGezeigt}
                       gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={ZIEL_RING} />
                     <dl className="space-y-4">
-                      <Zahl etikett="Netto im Ruhestand" punkt="bg-ui-tinte" wert={euro(nettoHeute)} zusatz={`${deckung} %`} />
+                      <Zahl etikett="Netto im Ruhestand" punkt="bg-ui-tinte" wert={euro(netto)} zusatz={`${deckung} %`} />
                       {luecke > 0 && (
-                        <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(lueckeHeute)}
+                        <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(lueckeGezeigt)}
                           zusatz={`${100 - deckung} %`} />
                       )}
                     </dl>
@@ -234,8 +248,8 @@ export function Seite() {
                       : <>Das Netto erreicht <Hervor>{deckung} %</Hervor> des Ziels.</>}
                   </Kernsatz>
                   <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-                    Im Geld des Jahres {z.jahr}: Netto {euro(z.nettoMonat)} und Ziel {euro(z.zielNettoMonat)} im Monat
-                    {luecke > 0 ? `, Lücke ${euro(luecke)}` : ''}.
+                    {heute ? `Im Geld des Jahres ${z.jahr}` : 'In heutiger Kaufkraft'}: Netto {euro(anders(z.nettoMonat))} und
+                    Ziel {euro(anders(z.zielNettoMonat))} im Monat{luecke > 0 ? `, Lücke ${euro(anders(luecke))}` : ''}.
                   </p>
                 </div>
               </section>

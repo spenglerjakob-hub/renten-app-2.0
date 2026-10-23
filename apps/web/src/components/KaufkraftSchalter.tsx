@@ -3,7 +3,8 @@ import { Coins } from 'lucide-react';
 /**
  * „Nominal | Kaufkraft heute“ — derselbe Zustand an zwei Stellen: im
  * Kassenbon (hell) und in der Fussleiste (dunkel). Vorher sass der Schalter
- * nur in der Kopfleiste, und die ist jetzt meist eingeklappt.
+ * nur in der Kopfleiste, und die ist jetzt meist eingeklappt. Hell steht er
+ * auch in der Schnellrechnung — als Pillen wie die Reiter der Beratung.
  *
  * `kompakt` zeigt nur das Symbol als Umschalter — fuer die Fussleiste am
  * Telefon, wo neben drei Kacheln kein Platz fuer zwei Woerter ist.
@@ -32,24 +33,24 @@ export function KaufkraftSchalter({ wert, onChange, ton = 'hell', kompakt = fals
       </button>
     );
   }
-  const knopf = (aktiv: boolean) => `rounded px-2 py-1 transition-colors ${
-    aktiv
-      ? dunkel ? 'bg-slate-600 text-white shadow' : 'bg-white text-slate-900 shadow-sm'
-      : dunkel ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'
-  }`;
+  const knopf = (aktiv: boolean) => (dunkel
+    ? `rounded px-2 py-1 transition-colors ${aktiv ? 'bg-slate-600 text-white shadow' : 'text-slate-400 hover:text-white'}`
+    : `rounded-full px-3 py-1.5 transition-colors ${aktiv ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'}`);
   return (
     <div
       role="group"
       aria-label="Beträge"
-      className={`inline-flex shrink-0 items-center gap-0.5 rounded-md p-0.5 text-xs font-semibold ${
-        dunkel ? 'border border-slate-700 bg-slate-800' : 'bg-slate-100'
+      className={`inline-flex shrink-0 items-center ${
+        dunkel
+          ? 'gap-0.5 rounded-md border border-slate-700 bg-slate-800 p-0.5 text-xs font-semibold'
+          : 'gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 text-sm font-medium'
       } ${klasse}`}
     >
       <button type="button" aria-pressed={!wert} onClick={() => onChange(false)} className={knopf(!wert)}>
         Nominal
       </button>
       <button type="button" aria-pressed={wert} onClick={() => onChange(true)} className={`flex items-center gap-1 ${knopf(wert)}`}>
-        <Coins className="h-3 w-3" aria-hidden /> Kaufkraft heute
+        {dunkel && <Coins className="h-3 w-3" aria-hidden />} Kaufkraft heute
       </button>
     </div>
   );
