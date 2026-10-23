@@ -5,6 +5,7 @@ import {
   anfragePruefen, fruehstartAnfrageSenden,
   type AnfrageAngaben, type AnfrageErgebnis, type AnfrageFehler, type AnfrageFeld,
 } from '../lib/fruehstart-anfrage';
+import { ETIKETT, FEHLER, FELD_LABEL, KNOPF } from '../components/stil';
 
 const LEER: AnfrageAngaben = { name: '', email: '', buero: '', berater: '' };
 
@@ -61,32 +62,32 @@ export function FruehstartAnfrage() {
     <section
       id="early-adopter"
       aria-labelledby={`${id}-titel`}
-      className="mt-10 scroll-mt-6 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm sm:p-6"
+      className="ui-karte mt-10 scroll-mt-6 p-5 sm:p-7"
     >
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">Vor dem Start</p>
-          <h2 id={`${id}-titel`} className="mt-1 text-lg font-black text-slate-900">Early Adopter werden</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          <p className={ETIKETT}>Vor dem Start</p>
+          <h2 id={`${id}-titel`} className="ui-titel mt-1 text-2xl font-normal text-ui-tinte">Early Adopter werden</h2>
+          <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
             Sie möchten den JS-Rentenplaner von Anfang an mitgestalten? Als Early Adopter arbeiten Sie mit dem
             Rechner, bevor das Abo startet — und sagen uns, was in der Beratung hilft und was fehlt.
           </p>
-          <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            <Vorteil>Alle Funktionen <strong>{FRUEHSTART_MONATE} Monate kostenlos</strong> — gezählt ab dem Start des Abos</Vorteil>
-            <Vorteil>Danach <strong>{FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr</strong>, wenn Sie ein Paket buchen</Vorteil>
+          <ul className="mt-3 space-y-2 text-sm text-ui-tinte">
+            <Vorteil>Alle Funktionen <strong className="font-medium">{FRUEHSTART_MONATE} Monate kostenlos</strong> — gezählt ab dem Start des Abos</Vorteil>
+            <Vorteil>Danach <strong className="font-medium">{FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr</strong>, wenn Sie ein Paket buchen</Vorteil>
             <Vorteil>Im Gegenzug alle vier Wochen eine kurze Rückmeldung: was hilft, was fehlt, was stört</Vorteil>
           </ul>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          <p className="mt-3 text-sm leading-relaxed text-ui-schiefer">
             Direkt teilnehmen können Sie nicht: Schicken Sie uns eine Anfrage. Wir melden uns persönlich per
             E-Mail — passt es, mit Ihrem persönlichen Zugang.
           </p>
         </div>
 
         {gesendet ? (
-          <div role="status" className="self-start rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-950">
-            <p className="font-bold">Danke, {gesendet.name}! Ihre Anfrage ist bei uns.</p>
-            <p className="mt-1">
-              Wir melden uns persönlich per E-Mail an <strong className="break-all">{gesendet.email}</strong>. Eine
+          <div role="status" className="ui-innen self-start p-4 text-sm leading-relaxed text-ui-tinte">
+            <p className="font-medium">Danke, {gesendet.name}! Ihre Anfrage ist bei uns.</p>
+            <p className="mt-1 text-ui-schiefer">
+              Wir melden uns persönlich per E-Mail an <strong className="break-all font-medium text-ui-tinte">{gesendet.email}</strong>. Eine
               automatische Bestätigung verschicken wir bewusst nicht.
             </p>
           </div>
@@ -112,18 +113,18 @@ export function FruehstartAnfrage() {
               </label>
             </div>
 
-            {meldung && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
+            {meldung && <p role="alert" className={FEHLER}>{meldung}</p>}
 
             <button
               type="submit"
               disabled={laeuft}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+              className={`w-full ${KNOPF}`}
             >
               <Send className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird gesendet …' : 'Anfrage senden'}
             </button>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-ui-schiefer">
               Ihre Angaben nutzen wir nur für Ihre Anfrage und löschen sie nach sechs Monaten. Mehr in der{' '}
-              <a href="/datenschutz" className="underline underline-offset-2 hover:text-slate-700">Datenschutzerklärung</a>.
+              <a href="/datenschutz" className="underline underline-offset-2 hover:text-ui-tinte">Datenschutzerklärung</a>.
             </p>
           </form>
         )}
@@ -135,7 +136,7 @@ export function FruehstartAnfrage() {
 function Vorteil({ children }: { children: ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden /> <span>{children}</span>
+      <Check className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden /> <span>{children}</span>
     </li>
   );
 }
@@ -146,8 +147,8 @@ function Eingabe({ id, label, wert, onChange, fehler, pflicht = false, typ = 'te
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-bold text-slate-700">
-        {label}{pflicht ? <span className="text-rose-600" aria-hidden> *</span> : <span className="font-normal text-slate-500"> (optional)</span>}
+      <label htmlFor={id} className={FELD_LABEL}>
+        {label}{pflicht ? <span className="text-ui-schiefer" aria-hidden> *</span> : <span className="font-normal text-ui-schiefer"> (optional)</span>}
       </label>
       <input
         id={id}
@@ -161,7 +162,7 @@ function Eingabe({ id, label, wert, onChange, fehler, pflicht = false, typ = 'te
         autoComplete={autoComplete}
         inputMode={inputMode}
         maxLength={maxLength}
-        className={`w-full rounded-lg border p-2 text-sm ${fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'}`}
+        className={`ui-feld w-full p-2 text-sm ${fehler ? 'border-rose-400 bg-rose-50' : ''}`}
       />
       {fehler && <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-700">{fehler}</p>}
     </div>

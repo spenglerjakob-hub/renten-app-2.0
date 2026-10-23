@@ -38,7 +38,7 @@ export interface Werkzeug {
   /** Zweite, kleine Zeile — etwa mit wem man angemeldet ist */
   zusatz?: string;
   symbol: ReactNode;
-  /** Kleine gruene Marke rechts, etwa „2 eingegangen" */
+  /** Kleine dunkle Marke hinter dem Titel, etwa „2 eingegangen" */
   marke?: string;
   onOeffnen: () => void;
 }
@@ -129,26 +129,27 @@ export function Seitenleiste(props: {
       <div
         aria-hidden
         onClick={onSchliessen}
-        className={`fixed inset-0 z-[60] bg-slate-950/50 transition-opacity ${offen ? 'opacity-100' : 'opacity-0'}`}
+        className={`fixed inset-0 z-[60] bg-ui-tinte/40 transition-opacity ${offen ? 'opacity-100' : 'opacity-0'}`}
       />
       <nav
         role="dialog"
         aria-modal="true"
         aria-label="Übersicht"
         aria-hidden={!offen}
-        className={`fixed inset-y-0 left-0 z-[61] flex w-80 max-w-[85vw] flex-col overflow-y-auto bg-slate-900 text-slate-200 shadow-2xl transition-transform ${
-          offen ? 'translate-x-0' : '-translate-x-full'
+        // Der Schatten nur offen: Eingeklappt fiel er sonst als grauer Streifen an den linken Bildrand.
+        className={`fixed inset-y-0 left-0 z-[61] flex w-80 max-w-[85vw] flex-col overflow-y-auto border-r border-ui-linie bg-ui-karte text-ui-tinte transition-transform ${
+          offen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-          <span className="text-sm font-black tracking-tight text-white">Übersicht</span>
+        <div className="flex items-center justify-between border-b border-ui-linie px-4 py-3">
+          <span className="ui-titel text-lg font-normal text-ui-tinte">Übersicht</span>
           <button
             ref={schliessenRef}
             type="button"
             onClick={onSchliessen}
             aria-label="Übersicht schließen"
             tabIndex={offen ? 0 : -1}
-            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-full p-1.5 text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -162,20 +163,20 @@ export function Seitenleiste(props: {
                   type="button"
                   onClick={() => oeffne(w)}
                   tabIndex={offen ? 0 : -1}
-                  className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-slate-800"
+                  className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-ui-innen"
                 >
-                  <span className="mt-0.5 text-amber-400">{w.symbol}</span>
+                  <span className="mt-0.5 text-ui-schiefer">{w.symbol}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-white">
+                    <span className="block text-sm font-medium text-ui-tinte">
                       {w.text}
                       {/* Im Textfluss, nicht rechts daneben: sonst bricht der Titel in drei Zeilen um. */}
                       {w.marke && (
-                        <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 align-middle text-[10px] font-bold leading-none text-white">
+                        <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-ui-dunkel px-2 py-0.5 align-middle text-[10px] font-medium leading-none text-white">
                           {w.marke}
                         </span>
                       )}
                     </span>
-                    {w.zusatz && <span className="block truncate text-xs leading-snug text-slate-400">{w.zusatz}</span>}
+                    {w.zusatz && <span className="block truncate text-xs leading-snug text-ui-schiefer">{w.zusatz}</span>}
                   </span>
                 </button>
               </li>
@@ -190,9 +191,9 @@ export function Seitenleiste(props: {
                 type="button"
                 onClick={() => springe(a)}
                 tabIndex={offen ? 0 : -1}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ui-tinte hover:bg-ui-innen"
               >
-                <span className="text-indigo-400">{a.symbol}</span>
+                <span className="text-ui-schiefer">{a.symbol}</span>
                 {a.text}
               </button>
             </li>
@@ -207,11 +208,11 @@ export function Seitenleiste(props: {
           {ARBEITGEBER.map((s) => <SeitenLink key={s.href} seite={s} fokussierbar={offen} />)}
         </Gruppe>
 
-        <p className="mt-auto px-4 pb-2 pt-6 text-xs leading-relaxed text-slate-500">
+        <p className="mt-auto px-4 pb-2 pt-6 text-xs leading-relaxed text-ui-schiefer">
           Die Seiten öffnen in einem neuen Tab — der Rechner bleibt mit allen Eingaben offen. Ohne Konto
           erreichbar sind nur das Altersvorsorgedepot und der persönliche Link aus den Check-Anfragen.
         </p>
-        <RechtsLinks hell klasse="px-4 pb-4" />
+        <RechtsLinks klasse="px-4 pb-4" />
       </nav>
     </div>
   );
@@ -220,7 +221,7 @@ export function Seitenleiste(props: {
 function Gruppe({ titel, children }: { titel: string; children: ReactNode }) {
   return (
     <div className="px-2 pt-4">
-      <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</h2>
+      <h2 className="px-3 pb-1 text-xs font-medium text-ui-schiefer">{titel}</h2>
       <ul className="space-y-0.5">{children}</ul>
     </div>
   );
@@ -242,14 +243,14 @@ function SeitenLink({ seite, fokussierbar }: { seite: Seite; fokussierbar: boole
         target="_blank"
         rel="noopener"
         tabIndex={fokussierbar ? 0 : -1}
-        className="flex min-w-0 flex-1 items-start gap-2.5 rounded-lg px-3 py-2 hover:bg-slate-800"
+        className="flex min-w-0 flex-1 items-start gap-2.5 rounded-lg px-3 py-2 hover:bg-ui-innen"
       >
-        <span className="mt-0.5 text-emerald-400">{seite.symbol}</span>
+        <span className="mt-0.5 text-ui-schiefer">{seite.symbol}</span>
         <span className="min-w-0">
-          <span className="flex items-center gap-1 text-sm font-bold text-white">
-            {seite.titel} <ExternalLink className="h-3 w-3 text-slate-500" aria-hidden />
+          <span className="flex items-center gap-1 text-sm font-medium text-ui-tinte">
+            {seite.titel} <ExternalLink className="h-3 w-3 text-ui-schiefer" aria-hidden />
           </span>
-          <span className="block text-xs leading-snug text-slate-400">{seite.text}</span>
+          <span className="block text-xs leading-snug text-ui-schiefer">{seite.text}</span>
         </span>
       </a>
       {seite.oeffentlich && <button
@@ -258,9 +259,9 @@ function SeitenLink({ seite, fokussierbar }: { seite: Seite; fokussierbar: boole
         tabIndex={fokussierbar ? 0 : -1}
         aria-label={`Link zu ${seite.titel} kopieren`}
         title={kopiert ? 'Kopiert' : 'Link kopieren'}
-        className="shrink-0 rounded-lg px-2 text-slate-500 hover:bg-slate-800 hover:text-white"
+        className="shrink-0 rounded-lg px-2 text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
       >
-        {kopiert ? <Check className="h-4 w-4 text-emerald-400" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+        {kopiert ? <Check className="h-4 w-4 text-ui-tinte" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
       </button>}
     </li>
   );

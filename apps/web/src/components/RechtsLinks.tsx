@@ -7,17 +7,17 @@
  * Datenschutzerklaerung. Die Landingpages kommen per QR-Code oder Link ohne
  * den Rechner drumherum — deshalb der eigene Baustein.
  */
-export function RechtsLinks({ hell = false, klasse = '' }: { hell?: boolean; klasse?: string }) {
-  const farbe = hell ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800';
+export function RechtsLinks({ klasse = '' }: { klasse?: string }) {
+  const farbe = 'text-ui-schiefer hover:text-ui-tinte';
   return (
     <nav aria-label="Rechtliches" className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs print:hidden ${klasse}`}>
       <a href="/impressum" className={`underline-offset-2 hover:underline ${farbe}`}>Impressum</a>
-      <span aria-hidden className={hell ? 'text-slate-600' : 'text-slate-300'}>·</span>
+      <span aria-hidden className="text-ui-asche">·</span>
       <a href="/datenschutz" className={`underline-offset-2 hover:underline ${farbe}`}>Datenschutz</a>
-      <span aria-hidden className={hell ? 'text-slate-600' : 'text-slate-300'}>·</span>
+      <span aria-hidden className="text-ui-asche">·</span>
       <a href="/nutzungsbedingungen" className={`underline-offset-2 hover:underline ${farbe}`}>Nutzungsbedingungen</a>
       {/* Ohne Trennpunkt davor: Bricht die Zeile hier um, stuende er allein am Ende. */}
-      <span className={hell ? 'text-slate-500' : 'text-slate-400'}>© {new Date().getFullYear()} JS-Rentenplaner</span>
+      <span className="text-ui-schiefer">© {new Date().getFullYear()} JS-Rentenplaner</span>
     </nav>
   );
 }

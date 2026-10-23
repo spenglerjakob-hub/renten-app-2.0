@@ -8,9 +8,9 @@ import { gespraechssatz, kaufkraft } from './kaufkraft';
  * „Kaufkraft bis zum Rentenbeginn“ — die Luecke und der Kaufkraftverlust in
  * Euro, beides in beiden Massstaeben und mit der Annahme daneben.
  *
- * SACHLICH GESETZT: Rot traegt nur die Luecke selbst — ein Minus ist ein
- * Minus. Der Kaufkraftverlust ist keine Warnung, sondern eine Umrechnung.
- * Kein Countdown, keine Wertung.
+ * SACHLICH GESETZT: alles in Tinte, auch die Luecke — sie ist eine Zahl,
+ * keine Warnung, und der Kaufkraftverlust eine Umrechnung. Hervorgehoben
+ * wird nur ueber das Gewicht. Kein Countdown, keine Wertung.
  */
 export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = '', wo = 'oben änderbar' }: {
   zeile: Jahreszeile;
@@ -38,9 +38,9 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   };
 
   return (
-    <section aria-labelledby={titelId} className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
-      <h3 id={titelId} className="flex items-center gap-2 text-sm font-bold text-slate-800">
-        <Coins className="h-4 w-4 shrink-0 text-slate-500" aria-hidden /> Kaufkraft bis zum Rentenbeginn
+    <section aria-labelledby={titelId} className={`ui-karte p-4 sm:p-5 ${klasse}`}>
+      <h3 id={titelId} className="flex items-center gap-2 text-base font-medium text-ui-tinte">
+        <Coins className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> Kaufkraft bis zum Rentenbeginn
       </h3>
 
       <dl className="mt-3 space-y-2 text-sm">
@@ -64,18 +64,18 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
           />
         )}
       </dl>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
         Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, {wo}).
         Modellrechnung, keine Zusage.
       </p>
 
-      <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Für das Gespräch</p>
-        <p className="mt-1 text-sm leading-relaxed text-indigo-950">{satz}</p>
+      <div className="ui-innen mt-3 p-3">
+        <p className="text-xs text-ui-schiefer">Für das Gespräch</p>
+        <p className="mt-1 text-sm leading-relaxed text-ui-tinte">{satz}</p>
         <button
           type="button"
           onClick={() => void kopieren()}
-          className="mt-2 flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100 print:hidden"
+          className="mt-2 flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-white px-3 py-1 text-xs font-medium text-ui-tinte hover:bg-ui-innen print:hidden"
         >
           {kopiert
             ? <><Check className="h-3.5 w-3.5" aria-hidden /> Kopiert</>
@@ -97,9 +97,9 @@ function Posten({ label, wert, fett, ton, umbruch = false }: {
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-slate-600">{label}</dt>
-      <dd className={`${umbruch ? 'min-w-0' : 'shrink-0 whitespace-nowrap'} text-right tabular-nums ${fett ? 'font-bold' : 'font-semibold'} ${
-        ton === 'luecke' ? 'text-rose-600' : 'text-slate-900'
+      <dt className="text-ui-tinte/80">{label}</dt>
+      <dd className={`${umbruch ? 'min-w-0' : 'shrink-0 whitespace-nowrap'} text-right tabular-nums text-ui-tinte ${
+        fett || ton === 'luecke' ? 'font-medium' : 'font-normal'
       }`}>
         {wert}
       </dd>

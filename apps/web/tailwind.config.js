@@ -4,15 +4,22 @@ export default {
   theme: {
     extend: {
       /*
-        Rollen der bAV-Mitarbeiterberatung (/mitarbeiterberatung). Die Werte
-        setzt der gewaehlte Stil als CSS-Variablen (index.css: .mb-steep,
-        .mb-seline). Nur auf dieser Seite verwendet.
+        Die Rollen des Stils „Seline“ fuer die ganze App (Flaeche, Karte,
+        Innenflaeche, Tinte, Linie, Knopf …). Die Werte stehen als
+        CSS-Variablen in index.css (:root) — als RGB-Kanaele, damit
+        Deckkraft geht (bg-ui-tinte/30).
       */
       colors: {
-        mb: Object.fromEntries([
+        ui: Object.fromEntries([
           'tinte', 'flaeche', 'karte', 'innen', 'linie', 'schiefer', 'asche', 'dunkel', 'hover',
           'luecke', 'daten-2', 'daten-3', 'knopf', 'knopf-rand', 'knopf-schrift', 'knopf-hover', 'zweit-rand',
-        ].map((rolle) => [rolle, `rgb(var(--mb-${rolle}) / <alpha-value>)`])),
+          'regler', 'feld-rand',
+        ].map((rolle) => [rolle, `rgb(var(--ui-${rolle}) / <alpha-value>)`])),
+      },
+      // Fliesstext Inter, Ueberschriften Inter Tight — beide selbst ausgeliefert (index.css).
+      fontFamily: {
+        sans: ['"Inter Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        titel: ['"Inter Tight Variable"', '"Inter Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
     },
   },

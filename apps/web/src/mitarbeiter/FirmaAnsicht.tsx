@@ -5,7 +5,8 @@ import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
 } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
-import { ETIKETT, FirmenZeichen, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, StatusChip, useFirmenlogo } from './bausteine';
+import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
+import { FirmenZeichen, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
 import { Uebersicht } from './Uebersicht';
 import { MODELL_NAME, regelText } from './texte';
@@ -47,7 +48,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
       <ArrowLeft className="h-4 w-4" aria-hidden /> Alle Firmen
     </button>
   );
-  if (firma === 'laedt') return <p className="text-sm text-mb-schiefer">Die Firma wird geladen …</p>;
+  if (firma === 'laedt') return <p className="text-sm text-ui-schiefer">Die Firma wird geladen …</p>;
   if (firma === 'fehler' || firma === null) {
     return (
       <div className="space-y-3">
@@ -77,14 +78,14 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
       {zurueck}
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
         <FirmenZeichen name={firma.name} logo={logo} gross />
-        <p className="max-w-md text-sm leading-relaxed text-mb-schiefer">
+        <p className="max-w-md text-sm leading-relaxed text-ui-schiefer">
           <span className={`block ${ETIKETT}`}>{MODELL_NAME[firma.angebot.modell.art]}</span>
-          <span className="text-mb-tinte">{regelText(firma.angebot.modell)}</span>
+          <span className="text-ui-tinte">{regelText(firma.angebot.modell)}</span>
         </p>
       </div>
 
       {/* Reiter als Pillen: der aktive gefuellt in Tinte, die anderen nur Text. */}
-      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-mb-linie bg-mb-karte p-1">
+      <div role="tablist" aria-label="Bereiche der Firma" className="inline-flex max-w-full flex-wrap gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
         {REITER.map((r) => (
           <button
             key={r.id}
@@ -95,7 +96,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
             aria-controls={`bereich-${r.id}`}
             onClick={() => gehe({ firma: firma.id, beratung: null, reiter: r.id })}
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
-              reiter === r.id ? 'bg-mb-dunkel text-white' : 'text-mb-schiefer hover:text-mb-tinte'
+              reiter === r.id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
             }`}
           >
             <span className="sm:hidden">{r.kurz}</span><span className="hidden sm:inline">{r.text}</span>
@@ -114,31 +115,31 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
               </button>
             )}
           >
-            {beratungen === 'laedt' && <p className="text-sm text-mb-schiefer">Beratungen werden geladen …</p>}
+            {beratungen === 'laedt' && <p className="text-sm text-ui-schiefer">Beratungen werden geladen …</p>}
             {beratungen === 'fehler' && <p role="alert" className="text-sm text-rose-800">Die Beratungen konnten nicht geladen werden.</p>}
             {Array.isArray(beratungen) && liste.length === 0 && (
-              <p className="text-sm text-mb-schiefer">
+              <p className="text-sm text-ui-schiefer">
                 Noch keine Beratung. Mit „Neue Beratung“ beginnt das Gespräch mit dem ersten Mitarbeiter.
               </p>
             )}
             {liste.length > 0 && (
-              <ul className="divide-y divide-mb-linie" aria-label="Beratungen">
+              <ul className="divide-y divide-ui-linie" aria-label="Beratungen">
                 {liste.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
                     <button type="button" onClick={() => gehe({ firma: firma.id, beratung: b.id, reiter: 'mitarbeiter' })}
                       className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-left">
-                      <span className="min-w-0 break-words text-base font-medium text-mb-tinte">{b.mitarbeiter || 'Ohne Namen'}</span>
+                      <span className="min-w-0 break-words text-base font-medium text-ui-tinte">{b.mitarbeiter || 'Ohne Namen'}</span>
                       <StatusChip status={b.status} betrag={b.daten.umwandlungMonat} />
                       {unterschrieben[b.id] && (
-                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-mb-tinte">
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-ui-tinte">
                           <Lock className="h-3.5 w-3.5" aria-hidden /> unterschrieben
                         </span>
                       )}
-                      {b.beratenAm && <span className="text-sm text-mb-asche">{datumText(b.beratenAm)}</span>}
-                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-mb-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
+                      {b.beratenAm && <span className="text-sm text-ui-schiefer">{datumText(b.beratenAm)}</span>}
+                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-ui-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </button>
                     <button type="button" onClick={() => setLoeschen(b)} aria-label={`Beratung ${b.mitarbeiter || 'ohne Namen'} löschen`}
-                      className="rounded-full p-2 text-mb-asche hover:bg-rose-50 hover:text-rose-700">
+                      className="rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
                   </li>
@@ -163,7 +164,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
       </div>
 
       <Dialog offen={loeschen !== null} titel="Beratung löschen?" onSchliessen={() => setLoeschen(null)}>
-        <p className="text-sm leading-relaxed text-slate-700">
+        <p className="text-sm leading-relaxed text-ui-tinte">
           Die Beratung von „{loeschen?.mitarbeiter || 'ohne Namen'}“ wird gelöscht
           {loeschen && unterschrieben[loeschen.id] ? ', mit den unterschriebenen Unterlagen' : ''}. Ausgedruckte Unterlagen bleiben
           davon unberührt.

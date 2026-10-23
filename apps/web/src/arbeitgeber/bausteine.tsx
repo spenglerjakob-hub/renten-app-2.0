@@ -276,7 +276,7 @@ export function GehaltVergleich(props: {
 /** Kopf mit Logo — beide Arbeitgeber-Seiten. */
 export function Kopf() {
   return (
-    <SeitenKopf klasse="print:bg-white print:text-slate-900" innen="print:max-w-none print:px-0 print:py-1" />
+    <SeitenKopf innen="print:max-w-none print:px-0 print:py-1" />
   );
 }
 

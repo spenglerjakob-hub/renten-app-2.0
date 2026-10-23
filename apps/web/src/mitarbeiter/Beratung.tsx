@@ -4,7 +4,8 @@ import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
-import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, LINK, useBeraterAuftritt, useFirmenlogo } from './bausteine';
+import { KNOPF, KNOPF_ZWEIT, LINK } from '../components/stil';
+import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
 import { zeitpunktText } from './unterschrift-daten';
 import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
 import {
@@ -108,7 +109,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     </button>
   );
 
-  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-mb-schiefer">Die Beratung wird geladen …</p>;
+  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-ui-schiefer">Die Beratung wird geladen …</p>;
   if (!f || !daten || !r || beratung === null || beratung === 'fehler') {
     return (
       <div className="space-y-3">
@@ -151,12 +152,12 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       <div className="flex flex-wrap items-center justify-between gap-3">
         {zurueck(fertig)}
         {gesperrt ? (
-          <span role="status" className="inline-flex items-center gap-1.5 text-sm text-mb-tinte">
+          <span role="status" className="inline-flex items-center gap-1.5 text-sm text-ui-tinte">
             <Lock className="h-4 w-4" aria-hidden /> Unterschrieben
           </span>
         ) : (
           <div className="flex items-center gap-3">
-            <span role="status" className="text-xs text-mb-schiefer">
+            <span role="status" className="text-xs text-ui-schiefer">
               {speichern === 'speichert' ? 'Wird gespeichert …' : speichern === 'fehler' ? 'Nicht gespeichert — bitte erneut versuchen.' : geaendert ? 'Nicht gespeichert' : 'Gespeichert'}
             </span>
             <button type="button" onClick={() => void sichern(daten)} disabled={!geaendert || speichern === 'speichert'} className={KNOPF_ZWEIT}>
@@ -168,7 +169,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FirmenZeichen name={f.name} logo={logo} />
-        <p className="text-sm text-mb-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
+        <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
       </div>
 
       <nav aria-label="Schritte der Beratung">
@@ -183,20 +184,20 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
                 className="group flex w-full flex-col items-center gap-1"
               >
                 {/* Ohne Ampel: erledigt halbe Tinte, aktuell volle Tinte, offen Haarlinie. */}
-                <span className={`h-1 w-full rounded-full ${i === schritt ? 'bg-mb-tinte' : i < schritt ? 'bg-mb-tinte/30' : 'bg-mb-linie'}`} />
-                <span className={`hidden text-xs leading-tight sm:block ${i === schritt ? 'font-medium text-mb-tinte' : 'text-mb-schiefer group-hover:text-mb-tinte'}`}>
+                <span className={`h-1 w-full rounded-full ${i === schritt ? 'bg-ui-tinte' : i < schritt ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
+                <span className={`hidden text-xs leading-tight sm:block ${i === schritt ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
                   {t}
                 </span>
               </button>
             </li>
           ))}
         </ol>
-        <p className="mt-2 text-xs text-mb-schiefer sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
+        <p className="mt-2 text-xs text-ui-schiefer sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
       </nav>
 
       {gesperrt && schritt < 6 && (
-        <div role="note" className="mb-innen flex flex-wrap items-center gap-3 p-4">
-          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-mb-tinte">
+        <div role="note" className="ui-innen flex flex-wrap items-center gap-3 p-4">
+          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-ui-tinte">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               Unterschrieben am {zeitpunktText(unterlagen.erstelltAm)} — die Angaben sind festgeschrieben. Zum Ändern heben
@@ -222,7 +223,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
           beratungId={beratungId} unterlagen={unterlagen} aktualisieren={aktualisieren} aktuell={aufgeschoben === daten} />
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mb-linie pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ui-linie pt-6">
         <button type="button" onClick={() => geheZu(schritt - 1)} disabled={schritt === 0} className={KNOPF_ZWEIT}>
           <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
         </button>

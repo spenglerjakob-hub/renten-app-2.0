@@ -5,6 +5,7 @@ import { zustimmungDaten } from '../lib/nutzungsbedingungen';
 import { useAuth } from '../store/auth';
 import { Rahmen } from './Anmeldung';
 import { RechtsLinks } from '../components/RechtsLinks';
+import { FEHLER, KNOPF, LINK, Titel } from '../components/stil';
 
 /**
  * Einmalige Zustimmung zu den Nutzungsbedingungen — fuer Konten, die vor
@@ -29,35 +30,35 @@ export function Zustimmung({ onFertig }: { onFertig: () => void }) {
 
   return (
     <Rahmen>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-black tracking-tight text-slate-900">Nutzungsbedingungen</h1>
-        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+      <div className="ui-karte p-6 sm:p-7">
+        <Titel>Nutzungsbedingungen</Titel>
+        <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
           Für den JS-Rentenplaner gelten Nutzungsbedingungen. Bitte lesen Sie sie und stimmen Sie zu — danach
           geht es direkt weiter. Gibt es eine neue Fassung, fragen wir einmal erneut.
         </p>
         <a
           href="/nutzungsbedingungen" target="_blank" rel="noopener"
-          className="mt-3 inline-block text-sm font-bold text-indigo-700 underline"
+          className={`mt-3 ${LINK} underline`}
         >
           Nutzungsbedingungen lesen
         </a>
-        <label className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-slate-700">
+        <label className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
           <input
             type="checkbox" checked={haken} onChange={(e) => setHaken(e.target.checked)}
-            className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300"
+            className="mt-1 h-4 w-4 shrink-0"
           />
           <span>Ich akzeptiere die Nutzungsbedingungen.</span>
         </label>
-        {fehler && <p role="status" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
+        {fehler && <p role="status" className={`mt-3 ${FEHLER}`}>{fehler}</p>}
         <button
           type="button" onClick={() => void zustimmen()} disabled={!haken || laedt}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+          className={`mt-4 w-full ${KNOPF}`}
         >
           <FileCheck className="h-4 w-4" aria-hidden /> Zustimmen und weiter
         </button>
         <button
           type="button" onClick={() => void abmelden()}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
         >
           <LogOut className="h-4 w-4" aria-hidden /> Abmelden
         </button>

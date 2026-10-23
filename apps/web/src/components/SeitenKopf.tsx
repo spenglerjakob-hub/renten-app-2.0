@@ -3,13 +3,16 @@ import { Logo } from './Logo';
 
 /**
  * Die Kopfzeile der Unterseiten (Schnellrechnung, Preise, Arbeitgeber-
- * Seiten, Vorsorge-Check, Rechtstexte, Anmeldung).
+ * Seiten, Vorsorge-Check, Rechtstexte, Anmeldung, Mitarbeiterberatung).
  *
  * EINE Fassung fuer alle: Vorher trugen manche Seiten den Spruch unter dem
  * Namen, andere nicht, und der Name war mal Link, mal nicht. Die Breite
  * folgt dem Inhalt der Seite, damit Logo und Ueberschrift buendig stehen.
+ *
+ * Hell, ohne eigene Flaeche: Der Stil kennt keine dunklen Leisten — der Kopf
+ * steht auf der Flaeche der Seite, wie im Druck.
  */
-export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, klasse = '', innen = '', hell = false }: {
+export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, klasse = '', innen = '' }: {
   /** Tailwind-Klasse der Inhaltsbreite, gleich der von <main> */
   breite?: string;
   /**
@@ -23,21 +26,15 @@ export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, kla
   klasse?: string;
   /** Zusaetzliche Klassen an der inneren Zeile */
   innen?: string;
-  /**
-   * Hell, ohne eigene Flaeche und Rand — fuer die Mitarbeiterberatung, deren
-   * Stile („Steep“, „Seline“) keine dunkle Kopfleiste kennen. Farben aus den
-   * Rollen der Seite (mb-*).
-   */
-  hell?: boolean;
 }) {
-  const name = <span className="text-sm font-black tracking-tight">JS-Rentenplaner</span>;
+  const name = <span className="text-sm font-medium tracking-tight">JS-Rentenplaner</span>;
   return (
-    <header className={`${hell ? 'bg-transparent text-mb-tinte' : 'bg-slate-900 text-white'} ${klasse}`}>
+    <header className={`text-ui-tinte ${klasse}`}>
       <div className={`mx-auto flex ${breite} items-center gap-3 px-4 py-4 sm:px-6 ${innen}`}>
         <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
         <div className="min-w-0 flex-1">
-          {verlinkt ? <a href="/" className="hover:underline">{name}</a> : name}
-          <p className={`text-xs print:hidden ${hell ? 'text-mb-schiefer' : 'text-slate-400'}`}>Ihre Zukunft. Smart geplant.</p>
+          {verlinkt ? <a href="/" className="underline-offset-4 hover:underline">{name}</a> : name}
+          <p className="text-xs text-ui-schiefer print:hidden">Ihre Zukunft. Smart geplant.</p>
         </div>
         {rechts}
       </div>

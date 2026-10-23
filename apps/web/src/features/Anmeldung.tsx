@@ -3,6 +3,7 @@ import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Spa
 import { FRUEHSTART_MONATE } from '@renten/schema/preise';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
+import { FELD, FELD_LABEL, Hinweis, KNOPF, LINK, Titel } from '../components/stil';
 import { useAuth, type MailLink } from '../store/auth';
 import { offenerMusterfall } from '../lib/musterfall';
 import { offenerAuftrittLokal } from '../lib/auftritt-lokal';
@@ -86,9 +87,9 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
 
   return (
     <Rahmen>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-black tracking-tight text-slate-900">{titel}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+      <div className="ui-karte p-6 sm:p-7">
+        <Titel>{titel}</Titel>
+        <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
           {passwortNeu
             ? 'Wählen Sie ein neues Passwort für Ihr Konto.'
             : maske === 'anmelden'
@@ -99,14 +100,13 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
         </p>
 
         {fruehstart && !passwortNeu && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm leading-relaxed text-emerald-950">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+          <Hinweis symbol={Sparkles} klasse="mt-4">
             <span>
-              <strong>Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
+              <strong className="font-medium">Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
               kostenlos — dafür freuen wir uns über Ihre Rückmeldungen. Legen Sie ein Konto an oder melden Sie sich
               mit Ihrem bestehenden an.
             </span>
-          </div>
+          </Hinweis>
         )}
 
         {/*
@@ -115,45 +115,42 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
           keine Frist im Text.
         */}
         {musterfall && !passwortNeu && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">
-            <Save className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+          <Hinweis symbol={Save} klasse="mt-4">
             <span>
-              <strong>Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
+              <strong className="font-medium">Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
               Anmeldung liegt er im Rechner.
               {auftrittWas && <> {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.</>}
               {maske === 'registrieren' && (
                 <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt Ihr Musterfall.</>
               )}
             </span>
-          </div>
+          </Hinweis>
         )}
         {!musterfall && auftrittWas && !passwortNeu && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">
-            <Save className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+          <Hinweis symbol={Save} klasse="mt-4">
             <span>
               {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.
               {maske === 'registrieren' && (
                 <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt der Entwurf.</>
               )}
             </span>
-          </div>
+          </Hinweis>
         )}
 
         {einladung && !passwortNeu && (
-          <div className="mt-4 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-indigo-950">
-            <Users className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+          <Hinweis symbol={Users} klasse="mt-4">
             <span>
-              <strong>Sie wurden in ein Büro eingeladen.</strong> Legen Sie ein Konto an oder melden Sie sich mit
+              <strong className="font-medium">Sie wurden in ein Büro eingeladen.</strong> Legen Sie ein Konto an oder melden Sie sich mit
               Ihrem bestehenden an — danach gehören Sie automatisch dazu.
             </span>
-          </div>
+          </Hinweis>
         )}
 
         {meldung && (
           <div
             role="status"
-            className={`mt-4 rounded-lg px-3 py-2 text-sm leading-relaxed ${
-              meldung.art === 'ok' ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'
+            className={`mt-4 px-3 py-2 text-sm leading-relaxed ${
+              meldung.art === 'ok' ? 'ui-innen text-ui-tinte' : 'rounded-lg bg-rose-50 text-rose-900'
             }`}
           >
             {meldung.text}
@@ -162,7 +159,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
                 type="button"
                 onClick={() => void bestaetigungErneutSenden()}
                 disabled={laedt}
-                className="mt-2 flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-900 hover:bg-rose-100 disabled:opacity-50"
+                className="mt-2 flex items-center gap-1.5 rounded-full border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-900 hover:bg-rose-100 disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" aria-hidden /> Bestätigungsmail erneut senden
               </button>
@@ -181,7 +178,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ihre@adresse.de"
-                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                className={`${FELD} p-2.5`}
               />
             </Feld>
           )}
@@ -195,10 +192,10 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
                 autoComplete={maske === 'anmelden' && !passwortNeu ? 'current-password' : 'new-password'}
                 value={passwort}
                 onChange={(e) => setPasswort(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                className={`${FELD} p-2.5`}
               />
               {(maske === 'registrieren' || passwortNeu) && (
-                <p className={`mt-1 text-xs ${zuKurz ? 'text-rose-600' : 'text-slate-500'}`}>
+                <p className={`mt-1 text-xs ${zuKurz ? 'text-rose-700' : 'text-ui-schiefer'}`}>
                   Mindestens 8 Zeichen.
                 </p>
               )}
@@ -214,27 +211,27 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
                 autoComplete="new-password"
                 value={passwort2}
                 onChange={(e) => setPasswort2(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                className={`${FELD} p-2.5`}
               />
               {ungleich && (
-                <p className="mt-1 text-xs text-rose-600">Die beiden Passwörter stimmen nicht überein.</p>
+                <p className="mt-1 text-xs text-rose-700">Die beiden Passwörter stimmen nicht überein.</p>
               )}
             </Feld>
           )}
 
           {maske === 'registrieren' && !passwortNeu && (
-            <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-ui-schiefer">
               <input
                 type="checkbox" required checked={zustimmung} onChange={(e) => setZustimmung(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+                className="mt-0.5 h-4 w-4 shrink-0"
               />
               <span>
                 Ich akzeptiere die{' '}
-                <a href="/nutzungsbedingungen" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+                <a href="/nutzungsbedingungen" target="_blank" rel="noopener" className="font-medium text-ui-tinte underline">
                   Nutzungsbedingungen
                 </a>
                 . Die{' '}
-                <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+                <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-ui-tinte underline">
                   Datenschutzerklärung
                 </a>{' '}
                 habe ich zur Kenntnis genommen.
@@ -245,7 +242,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
           <button
             type="submit"
             disabled={laedt}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+            className={`w-full ${KNOPF}`}
           >
             {passwortNeu ? <><KeyRound className="h-4 w-4" aria-hidden /> Passwort speichern</>
               : maske === 'anmelden' ? <><LogIn className="h-4 w-4" aria-hidden /> Anmelden</>
@@ -255,21 +252,19 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
         </form>
 
         {!passwortNeu && (
-          <div className="mt-4 border-t border-slate-100 pt-4 text-sm">
+          <div className="mt-4 border-t border-ui-linie pt-4 text-sm">
             {maske === 'anmelden' ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <button type="button" onClick={() => setMaske('registrieren')}
-                  className="font-medium text-indigo-700 hover:underline">
+                <button type="button" onClick={() => setMaske('registrieren')} className={LINK}>
                   Noch kein Konto? Jetzt anlegen
                 </button>
                 <button type="button" onClick={() => setMaske('vergessen')}
-                  className="text-slate-500 hover:underline">
+                  className="text-ui-schiefer underline-offset-4 hover:text-ui-tinte hover:underline">
                   Passwort vergessen
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => setMaske('anmelden')}
-                className="flex items-center gap-1.5 font-medium text-indigo-700 hover:underline">
+              <button type="button" onClick={() => setMaske('anmelden')} className={LINK}>
                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Zurück zur Anmeldung
               </button>
             )}
@@ -277,7 +272,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
         )}
       </div>
 
-      <p className="mt-4 flex gap-2 px-2 text-xs leading-relaxed text-slate-500">
+      <p className="mt-4 flex gap-2 px-2 text-xs leading-relaxed text-ui-schiefer">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <span>
           Ihre Eingaben im Rechner bleiben auf Ihrem Gerät. Nur was Sie ausdrücklich speichern,
@@ -288,15 +283,15 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
       {/* Wert vor Registrierung: erst rechnen, dann entscheiden. */}
       {!musterfall && !passwortNeu && (
         <a href="/schnellrechnung"
-          className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm hover:border-indigo-300 hover:bg-indigo-50/40">
-          <Calculator className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
-          <span>Noch kein Konto? <strong className="text-indigo-700">Rechnen Sie zuerst einen Fall durch — ohne Anmeldung →</strong></span>
+          className="ui-karte mt-4 flex items-center gap-2 px-4 py-3 text-sm text-ui-schiefer hover:border-ui-feld-rand">
+          <Calculator className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+          <span>Noch kein Konto? <strong className="font-medium text-ui-tinte">Rechnen Sie zuerst einen Fall durch — ohne Anmeldung →</strong></span>
         </a>
       )}
 
-      <p className="mt-3 px-2 text-center text-xs text-slate-500">
+      <p className="mt-3 px-2 text-center text-xs text-ui-schiefer">
         Informationen zum{' '}
-        <a href="/altersvorsorgedepot" className="font-medium text-indigo-700 hover:underline">
+        <a href="/altersvorsorgedepot" className="font-medium text-ui-tinte underline-offset-4 hover:underline">
           Altersvorsorgedepot ab 2027
         </a>{' '}
         gibt es ohne Anmeldung.
@@ -309,7 +304,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
 function Feld({ label, id, children }: { label: string; id: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-bold text-slate-700">{label}</label>
+      <label htmlFor={id} className={FELD_LABEL}>{label}</label>
       {children}
     </div>
   );
@@ -318,7 +313,7 @@ function Feld({ label, id, children }: { label: string; id: string; children: Re
 /** Kopf und Rahmen der Maske — gemeinsam fuer Anmeldung und Link-Seite. */
 export function Rahmen({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100">
+    <div className="flex min-h-screen flex-col bg-ui-flaeche text-ui-tinte">
       <SeitenKopf />
 
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
@@ -341,19 +336,19 @@ function LinkEinloesen({ link, laedt, onBestaetigen }: { link: MailLink; laedt: 
       : { titel: 'E-Mail-Adresse bestätigen', info: 'Ein Klick genügt, dann ist Ihr Konto freigeschaltet und Sie sind angemeldet.', knopf: 'E-Mail-Adresse bestätigen' };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 className="text-lg font-black tracking-tight text-slate-900">{text.titel}</h1>
-      <p className="mt-1 text-sm leading-relaxed text-slate-600">{text.info}</p>
+    <div className="ui-karte p-6 sm:p-7">
+      <Titel>{text.titel}</Titel>
+      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">{text.info}</p>
       <button
         type="button"
         onClick={onBestaetigen}
         disabled={laedt}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+        className={`mt-4 w-full ${KNOPF}`}
       >
         {link.typ === 'recovery' ? <KeyRound className="h-4 w-4" aria-hidden /> : <MailCheck className="h-4 w-4" aria-hidden />}
         {laedt ? 'Einen Moment …' : text.knopf}
       </button>
-      <a href="/" className="mt-4 block border-t border-slate-100 pt-4 text-sm text-slate-500 hover:underline">
+      <a href="/" className="mt-4 block border-t border-ui-linie pt-4 text-sm text-ui-schiefer underline-offset-4 hover:text-ui-tinte hover:underline">
         Abbrechen und zur Anmeldung
       </a>
     </div>

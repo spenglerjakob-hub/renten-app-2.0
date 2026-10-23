@@ -36,7 +36,7 @@ export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel, erl
   const index = etappen.findIndex((e) => e.id === aktiv);
   return (
     <nav aria-label="Ablauf der Beratung" className="print:hidden">
-      <ol className="flex items-stretch gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:gap-2 sm:p-2">
+      <ol className="ui-karte flex items-stretch gap-1 p-1.5 sm:gap-2 sm:p-2">
         {etappen.map((e, i) => {
           const ist = i === index;
           const fertig = !ist && (erledigt?.(e.id) ?? false);
@@ -47,17 +47,17 @@ export function JourneyLeiste<T extends string>({ etappen, aktiv, onWechsel, erl
                 onClick={() => onWechsel(e.id)}
                 aria-current={ist ? 'step' : undefined}
                 className={`flex h-full w-full flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-center transition-colors sm:flex-row sm:gap-2.5 sm:px-3 sm:py-2 sm:text-left ${
-                  ist ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-slate-100'
+                  ist ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte'
                 }`}
               >
                 <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black sm:h-7 sm:w-7 sm:text-sm ${
-                    ist ? 'bg-white text-indigo-700' : fertig ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium tabular-nums sm:h-7 sm:w-7 sm:text-sm ${
+                    ist ? 'bg-white text-ui-tinte' : fertig ? 'bg-ui-tinte text-white' : 'bg-ui-linie text-ui-tinte'
                   }`}
                 >
                   {fertig ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
                 </span>
-                <span className="min-w-0 text-xs font-bold leading-tight sm:text-sm">
+                <span className="min-w-0 text-xs font-medium leading-tight sm:text-sm">
                   <span className="sm:hidden">{e.kurz}</span>
                   <span className="hidden sm:inline">{e.text}</span>
                   {fertig && <span className="sr-only"> — erledigt</span>}
@@ -88,7 +88,7 @@ export function JourneyWeiter<T extends string>({ etappen, aktiv, onWechsel, wei
         <button
           type="button"
           onClick={() => onWechsel(zurueck.id)}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
+          className="inline-flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-2 text-xs font-medium text-ui-tinte hover:bg-ui-innen sm:px-5 sm:py-2.5 sm:text-sm"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Zurück:</span> {zurueck.kurz}
         </button>
@@ -97,7 +97,7 @@ export function JourneyWeiter<T extends string>({ etappen, aktiv, onWechsel, wei
         <button
           type="button"
           onClick={() => onWechsel(weiter.id)}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 sm:text-sm"
+          className="inline-flex items-center gap-1.5 rounded-full border border-ui-knopf-rand bg-ui-knopf px-4 py-2 text-xs font-medium text-ui-knopf-schrift hover:bg-ui-knopf-hover sm:px-5 sm:py-2.5 sm:text-sm"
         >
           {weiterText ?? <>Weiter: {weiter.text}</>} <ArrowRight className="h-4 w-4" aria-hidden />
         </button>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { BeratungStatus } from '@renten/schema';
 import { firmenlogoLaden } from '../lib/bav-beratung';
 import type { Auftritt } from '../features/auftritt';
@@ -6,98 +6,10 @@ import { useAuftritt } from '../store/auftritt';
 import { euroText } from './texte';
 
 /*
- * DER STIL DIESER SEITE — zwei Referenzen zur Wahl („Steep“, „Seline“), die
- * Bausteine sprechen nur Rollen an (index.css, .mb-steep / .mb-seline):
- * Knoepfe als Pillen, gefuellt fuer die Hauptaktion, mit Kontur fuer die
- * zweite; Karten flach (Steep: Nebelgrau ohne Rahmen; Seline: weiss mit
- * Haarlinie); eine Akzentkarte je Ansicht (Steep: Pfirsich; Seline: weiss,
- * der Akzent sitzt im hervorgehobenen Wort).
+ * Bausteine der Mitarbeiterberatung: Status, Firmenlogo, Briefkopf, Druck,
+ * Luecken-Ring. Die Bausteine des Stils (Knoepfe, Karten, Titel, Felder)
+ * liegen in components/stil.tsx — sie gelten fuer alle Seiten.
  */
-export const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-mb-knopf-rand bg-mb-knopf px-5 py-2.5 text-sm font-medium text-mb-knopf-schrift hover:bg-mb-knopf-hover disabled:opacity-40';
-export const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-mb-zweit-rand bg-transparent px-5 py-2.5 text-sm font-medium text-mb-tinte hover:bg-mb-hover disabled:border-mb-linie disabled:opacity-40';
-/* Loeschen bleibt rot: Wer etwas unwiderruflich entfernt, soll es nicht mit einem gewoehnlichen Knopf verwechseln. */
-export const KNOPF_GEFAHR = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40';
-/** Textlink mit Pfeil — die leiseste Aktion; unterstrichen erst beim Darueberfahren. */
-export const LINK = 'inline-flex items-center gap-1 text-sm font-medium text-mb-tinte underline-offset-4 hover:underline';
-/** Die eine Akzentkarte je Ansicht. */
-export const AKZENT = 'mb-akzentkarte';
-/** Ein schwebendes Stueck Produkt (Gehaltszettel, Luecken-Ring) — das Einzige mit grossem Schatten. */
-export const SCHWEBEND = 'mb-schwebend';
-/** Etikett ueber Kennzahlen — leise, ohne Grossbuchstaben-Geschrei. */
-export const ETIKETT = 'text-sm text-mb-schiefer';
-
-/** Ueberschrift, Gewicht 400 — die Handschrift der Seite (Steep: Serifen; Seline: Inter Tight). */
-export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '' }: {
-  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string;
-}) {
-  return (
-    <Tag className={`mb-titel text-balance font-normal text-mb-tinte ${
-      gross ? 'text-[34px] leading-[1.15] sm:text-[44px]' : 'text-[26px] leading-[1.2] sm:text-[30px]'
-    } ${klasse}`}>
-      {children}
-    </Tag>
-  );
-}
-
-/**
- * Das eine hervorgehobene Wort einer Ueberschrift — bei Seline Cyan auf
- * hellem Blau (hoechstens eins je Ueberschrift), bei Steep unsichtbar.
- */
-export function Hervor({ children }: { children: ReactNode }) {
-  return <span className="mb-hervor">{children}</span>;
-}
-
-export function Karte({ titel, children, rechts, klasse = '' }: {
-  titel?: ReactNode; children: ReactNode; rechts?: ReactNode; klasse?: string;
-}) {
-  return (
-    <section className={`mb-karte p-5 sm:p-7 ${klasse}`}>
-      {(titel || rechts) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          {titel && <h2 className="text-lg font-medium tracking-[-0.01em] text-mb-tinte sm:text-xl">{titel}</h2>}
-          {rechts}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-/** Ein leiser Vermerk wie „geschätzt“ — Kontur statt Farbe. */
-export function Vermerk({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-mb-linie bg-mb-karte px-2.5 py-0.5 text-xs text-mb-schiefer">
-      {children}
-    </span>
-  );
-}
-
-/** Mehrzeiliges Textfeld — wie `TextFeld`, mit Zeichengrenze. */
-export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilfe, platzhalter }: {
-  label: string; wert: string; onChange: (s: string) => void; maxLaenge: number;
-  zeilen?: number; hilfe?: string; platzhalter?: string;
-}) {
-  const id = useId();
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-600">{label}</label>
-      <textarea
-        id={id}
-        value={wert}
-        rows={zeilen}
-        maxLength={maxLaenge}
-        placeholder={platzhalter}
-        onChange={(e) => onChange(e.target.value)}
-        aria-describedby={hilfe ? `${id}-hilfe` : undefined}
-        className="w-full rounded-2xl border border-mb-linie bg-white p-3 text-sm leading-relaxed"
-      />
-      <div className="mt-1 flex justify-between gap-2 text-xs text-mb-schiefer">
-        <span id={`${id}-hilfe`}>{hilfe}</span>
-        <span className="tabular-nums">{wert.length}/{maxLaenge}</span>
-      </div>
-    </div>
-  );
-}
 
 const STATUS_TEXT: Record<BeratungStatus, string> = { offen: 'offen', teilnahme: 'Teilnahme', verzicht: 'Verzicht' };
 /*
@@ -106,14 +18,14 @@ const STATUS_TEXT: Record<BeratungStatus, string> = { offen: 'offen', teilnahme:
  * auch ohne Farbe.
  */
 export const STATUS_PUNKT: Record<BeratungStatus, string> = {
-  teilnahme: 'bg-mb-tinte',
-  offen: 'bg-mb-asche',
-  verzicht: 'border border-mb-asche bg-mb-karte',
+  teilnahme: 'bg-ui-tinte',
+  offen: 'bg-ui-asche',
+  verzicht: 'border border-ui-asche bg-ui-karte',
 };
 const STATUS_SCHRIFT: Record<BeratungStatus, string> = {
-  teilnahme: 'text-mb-tinte',
-  offen: 'text-mb-schiefer',
-  verzicht: 'text-mb-schiefer',
+  teilnahme: 'text-ui-tinte',
+  offen: 'text-ui-schiefer',
+  verzicht: 'text-ui-schiefer',
 };
 
 /** „Teilnahme 150 €“, „Verzicht“, „offen“. */
@@ -162,8 +74,8 @@ export function FirmenZeichen({ name, logo, gross = false }: { name: string; log
       {logo && (
         <img src={logo} alt={`Logo ${name}`} className={`${gross ? 'h-14 max-w-[10rem]' : 'h-9 max-w-[7rem]'} shrink-0 object-contain`} />
       )}
-      <span className={`min-w-0 break-words text-mb-tinte ${gross
-        ? 'mb-titel text-balance text-[34px] font-normal leading-[1.15] sm:text-[44px]'
+      <span className={`min-w-0 break-words text-ui-tinte ${gross
+        ? 'ui-titel text-balance text-[34px] font-normal leading-[1.15] sm:text-[44px]'
         : 'text-lg font-medium'}`}>{name}</span>
     </div>
   );
@@ -211,9 +123,9 @@ export function DruckBereich({ children }: { children: ReactNode }) {
 
 /**
  * Der Ring der Versorgungsluecke: Tinte die Netto-Rente, die Rolle
- * „Luecke“ (Steep: Pfirsich; Seline: Steingrau) die Luecke — zusammen der
- * Nettolohn heute, der in der Mitte steht. Die Zahlen stehen zusaetzlich als Text daneben; der Ring ist die
- * Anschauung.
+ * „Luecke“ (Steingrau) die Luecke — zusammen der Nettolohn heute, der in
+ * der Mitte steht. Die Zahlen stehen zusaetzlich als Text daneben; der Ring
+ * ist die Anschauung.
  */
 export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProzent }: {
   nettolohn: number; rente: number; luecke: number; renteProzent: number; lueckeProzent: number;
@@ -225,11 +137,11 @@ export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProz
   return (
     <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
       aria-label={`Nettolohn ${ganz(nettolohn)}: davon ${ganz(rente)} Netto-Altersrente (${renteProzent} %) und ${ganz(luecke)} Versorgungslücke (${lueckeProzent} %)`}>
-      <circle cx="60" cy="60" r={r} fill="none" style={{ stroke: 'rgb(var(--mb-luecke))' }} strokeWidth="12" />
-      <circle cx="60" cy="60" r={r} fill="none" style={{ stroke: 'rgb(var(--mb-tinte))' }} strokeWidth="12"
+      <circle cx="60" cy="60" r={r} fill="none" style={{ stroke: 'rgb(var(--ui-luecke))' }} strokeWidth="12" />
+      <circle cx="60" cy="60" r={r} fill="none" style={{ stroke: 'rgb(var(--ui-tinte))' }} strokeWidth="12"
         strokeDasharray={`${anteil * umfang} ${umfang}`} transform="rotate(-90 60 60)" />
-      <text x="60" y="60" textAnchor="middle" fontSize="13" fontWeight="500" style={{ fill: 'rgb(var(--mb-tinte))' }}>{ganz(nettolohn)}</text>
-      <text x="60" y="72" textAnchor="middle" fontSize="7" style={{ fill: 'rgb(var(--mb-schiefer))' }}>Ihr Nettolohn</text>
+      <text x="60" y="60" textAnchor="middle" fontSize="13" fontWeight="500" style={{ fill: 'rgb(var(--ui-tinte))' }}>{ganz(nettolohn)}</text>
+      <text x="60" y="72" textAnchor="middle" fontSize="7" style={{ fill: 'rgb(var(--ui-schiefer))' }}>Ihr Nettolohn</text>
     </svg>
   );
 }

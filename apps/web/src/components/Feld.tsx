@@ -4,6 +4,7 @@ import {
 import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
+import { FELD_LABEL } from './stil';
 
 /**
  * VORBELEGT — der Wert im Feld stammt nicht vom Berater, sondern aus der
@@ -37,7 +38,7 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   if (v.art === 'standard') {
     return (
       <span id={id} title={titel}
-        className={`inline-flex cursor-help items-center text-xs text-slate-400 underline decoration-slate-300 decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
+        className={`inline-flex cursor-help items-center text-xs text-ui-schiefer underline decoration-ui-asche decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
         Standardwert
       </span>
     );
@@ -45,15 +46,16 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   /*
     Kurz, weil die Marke auch in schmalen Spalten (drei Felder je Zeile)
     in eine Zeile passen soll. Dass zu pruefen ist, sagen der Rahmen des
-    Felds, der Knopf daneben und der Tooltip.
+    Felds, der Knopf daneben und der Tooltip. Gestrichelt wie der Rahmen
+    des Felds — vorlaeufig, ohne Ampelfarbe.
   */
   return (
     <span id={id} title={titel}
-      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-800 print:hidden ${klasse}`}>
+      className={`inline-flex flex-wrap items-center gap-x-1.5 rounded-full border border-dashed border-ui-schiefer/60 bg-ui-karte px-2 py-0.5 text-xs font-medium text-ui-tinte print:hidden ${klasse}`}>
       Beispielwert
       {v.onPruefen && (
         <button type="button" onClick={v.onPruefen}
-          className="rounded px-1 font-bold text-amber-900 underline decoration-amber-400 underline-offset-2 hover:bg-amber-100">
+          className="rounded-full px-1 text-ui-tinte underline decoration-ui-asche underline-offset-2 hover:decoration-ui-tinte">
           Stimmt so
         </button>
       )}
@@ -63,11 +65,13 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
 
 /**
  * Rahmen eines Felds mit Beispielwert — sichtbar am Feld selbst, ohne dass es
- * die Hoehe aendert. Nur der Rahmen, keine gelbe Flaeche: Stehen alle Felder
- * einer Spalte auf Beispielwerten, sah die ganze Spalte sonst wie ein
- * Fehlerzustand aus.
+ * die Hoehe aendert. Nur der Rahmen, gestrichelt, keine Farbflaeche: Stehen
+ * alle Felder einer Spalte auf Beispielwerten, sah die ganze Spalte sonst wie
+ * ein Fehlerzustand aus. Rand und Flaeche sonst aus `.ui-feld`.
  */
-const beispielRahmen = (v?: Vorbelegt) => (v?.art === 'beispiel' ? 'border-amber-300 bg-white' : 'border-slate-300 bg-white');
+const beispielRahmen = (v?: Vorbelegt) => (v?.art === 'beispiel' ? 'border-dashed border-ui-schiefer' : '');
+/** Fehlerzustand eines Felds — Rot bleibt fuer Fehler. */
+const FEHLER_RAHMEN = 'border-rose-400 bg-rose-50';
 
 /**
  * Zahleneingabe mit deutscher Notation.
@@ -161,7 +165,7 @@ export function ZahlFeld(props: {
 
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
+      <label htmlFor={id} className={FELD_LABEL}>{label}</label>
       <div className="relative">
         <input
           id={id}
@@ -180,17 +184,17 @@ export function ZahlFeld(props: {
             vorbelegt ? `${id}-vorbelegt` : '',
             fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : '',
           ].filter(Boolean).join(' ') || undefined}
-          className={`w-full rounded-md border font-medium tabular-nums ${
-            gross ? 'p-3 text-xl font-bold' : 'p-2 text-sm'
+          className={`ui-feld w-full font-medium tabular-nums ${
+            gross ? 'p-3 text-xl' : 'p-2 text-sm'
           } ${
-            fehler ? 'border-rose-400 bg-rose-50' : beispielRahmen(vorbelegt)
+            fehler ? FEHLER_RAHMEN : beispielRahmen(vorbelegt)
           } ${einheitWahl ? 'pr-20' : stufen
             ? (einheit ? 'pr-14' : 'pr-8')
             : einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
         />
         {einheitWahl && (
           <span role="radiogroup" aria-label={`${label}: Einheit`}
-            className="absolute inset-y-1 right-1 flex gap-0.5 rounded bg-slate-100 p-0.5">
+            className="absolute inset-y-1 right-1 flex gap-0.5 rounded bg-ui-linie/70 p-0.5">
             {einheitWahl.optionen.map((o) => (
               <button
                 key={o.id}
@@ -200,8 +204,8 @@ export function ZahlFeld(props: {
                 aria-label={o.titel}
                 title={o.titel}
                 onClick={() => einheitWahl.onWechsel(o.id)}
-                className={`min-w-7 rounded px-1.5 text-xs font-bold ${
-                  einheitWahl.aktiv === o.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                className={`min-w-7 rounded px-1.5 text-xs font-medium ${
+                  einheitWahl.aktiv === o.id ? 'bg-white text-ui-tinte shadow-sm' : 'text-ui-tinte/70 hover:text-ui-tinte'
                 }`}
               >
                 {o.text}
@@ -210,7 +214,7 @@ export function ZahlFeld(props: {
           </span>
         )}
         {einheit && !einheitWahl && (
-          <span className={`pointer-events-none absolute text-slate-400 ${
+          <span className={`pointer-events-none absolute text-ui-schiefer ${
             gross ? 'right-4 top-3.5 text-lg' : stufen ? 'right-7 top-2 text-sm' : 'right-3 top-2 text-sm'
           } ${stufen ? 'print:right-3' : ''}`}>
             {einheit}
@@ -223,14 +227,14 @@ export function ZahlFeld(props: {
             dafuer die Pfeiltasten im Feld; zwei zusaetzliche Tab-Stopps pro
             Feld waeren nur Weg.
           */
-          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-md border-l border-slate-200 print:hidden">
+          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-[5px] border-l border-ui-linie print:hidden">
             <button
               type="button"
               tabIndex={-1}
               aria-label={`${label} um ${String(schritt).replace('.', ',')} erhöhen`}
               disabled={wert >= max}
               onClick={() => stufe(1)}
-              className="flex flex-1 items-center justify-center bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex flex-1 items-center justify-center bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronUp className="h-3 w-3" aria-hidden />
             </button>
@@ -240,7 +244,7 @@ export function ZahlFeld(props: {
               aria-label={`${label} um ${String(schritt).replace('.', ',')} verringern`}
               disabled={wert <= min}
               onClick={() => stufe(-1)}
-              className="flex flex-1 items-center justify-center border-t border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex flex-1 items-center justify-center border-t border-ui-linie bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronDown className="h-3 w-3" aria-hidden />
             </button>
@@ -248,8 +252,8 @@ export function ZahlFeld(props: {
         )}
       </div>
       {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
-      {fehler && <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>}
-      {!fehler && hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-slate-500">{hilfe}</p>}
+      {fehler && <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-700">{fehler}</p>}
+      {!fehler && hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-ui-schiefer">{hilfe}</p>}
     </div>
   );
 }
@@ -296,7 +300,7 @@ export function TextFeld(props: {
   const id = `t${useId()}`;
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
+      <label htmlFor={id} className={FELD_LABEL}>{props.label}</label>
       <input
         id={id}
         type={props.typ ?? 'text'}
@@ -306,11 +310,9 @@ export function TextFeld(props: {
         autoComplete={props.autoComplete}
         onChange={(e) => props.onChange(e.target.value)}
         aria-invalid={props.fehler ? true : undefined}
-        className={`w-full rounded-md border p-2 text-sm ${
-          props.fehler ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white'
-        }`}
+        className={`ui-feld w-full p-2 text-sm ${props.fehler ? FEHLER_RAHMEN : ''}`}
       />
-      {props.fehler && <p className="mt-1 text-xs text-rose-600">{props.fehler}</p>}
+      {props.fehler && <p className="mt-1 text-xs text-rose-700">{props.fehler}</p>}
     </div>
   );
 }
@@ -405,7 +407,7 @@ export function DatumFeld(props: {
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-600">{props.label}</label>
+      <label htmlFor={id} className={FELD_LABEL}>{props.label}</label>
       <div className="relative">
         <input
           id={id}
@@ -422,19 +424,19 @@ export function DatumFeld(props: {
           aria-invalid={fehler ? true : undefined}
           aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', fehler ? `${id}-fehler` : '']
             .filter(Boolean).join(' ') || undefined}
-          className={`w-full rounded-md border p-2 text-sm tabular-nums ${
-            fehler ? 'border-rose-400 bg-rose-50' : beispielRahmen(vorbelegt)
+          className={`ui-feld w-full p-2 text-sm tabular-nums ${
+            fehler ? FEHLER_RAHMEN : beispielRahmen(vorbelegt)
           } ${stufen ? 'pr-8' : ''}`}
         />
         {stufen && (
-          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-md border-l border-slate-200 print:hidden">
+          <span className="absolute inset-y-px right-px flex w-6 flex-col overflow-hidden rounded-r-[5px] border-l border-ui-linie print:hidden">
             <button
               type="button"
               tabIndex={-1}
               aria-label={`${props.label} um ein Jahr später`}
               disabled={!basis || basis.jahr >= 2200}
               onClick={() => stufe(1)}
-              className="flex flex-1 items-center justify-center bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex flex-1 items-center justify-center bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronUp className="h-3 w-3" aria-hidden />
             </button>
@@ -444,7 +446,7 @@ export function DatumFeld(props: {
               aria-label={`${props.label} um ein Jahr früher`}
               disabled={!basis || basis.jahr <= 1900}
               onClick={() => stufe(-1)}
-              className="flex flex-1 items-center justify-center border-t border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+              className="flex flex-1 items-center justify-center border-t border-ui-linie bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronDown className="h-3 w-3" aria-hidden />
             </button>
@@ -453,8 +455,8 @@ export function DatumFeld(props: {
       </div>
       {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
       {fehler
-        ? <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-600">{fehler}</p>
-        : props.hilfe && <p className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
+        ? <p id={`${id}-fehler`} className="mt-1 text-xs text-rose-700">{fehler}</p>
+        : props.hilfe && <p className="mt-1 text-xs text-ui-schiefer">{props.hilfe}</p>}
       {props.zusatz}
     </div>
   );
@@ -470,19 +472,19 @@ export function AuswahlFeld<T extends string>(props: {
   const { vorbelegt } = props;
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-slate-600 mb-1">{props.label}</label>
+      <label htmlFor={id} className={FELD_LABEL}>{props.label}</label>
       <select
         id={id}
         value={props.wert}
         onChange={(e) => props.onChange(e.target.value as T)}
         aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', props.hilfe ? `${id}-hilfe` : '']
           .filter(Boolean).join(' ') || undefined}
-        className={`w-full rounded-md border p-2 text-sm ${beispielRahmen(vorbelegt)}`}
+        className={`ui-feld w-full p-2 text-sm ${beispielRahmen(vorbelegt)}`}
       >
         {props.optionen.map((o) => <option key={o.wert} value={o.wert}>{o.text}</option>)}
       </select>
       {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
-      {props.hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-slate-500">{props.hilfe}</p>}
+      {props.hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-ui-schiefer">{props.hilfe}</p>}
     </div>
   );
 }
@@ -490,12 +492,12 @@ export function AuswahlFeld<T extends string>(props: {
 export function Schalter(props: { label: string; wert: boolean; onChange: (b: boolean) => void; vorbelegt?: Vorbelegt }) {
   const id = `c${useId()}`;
   const schalter = (
-    <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-ui-tinte">
       <input
         id={id} type="checkbox" checked={props.wert}
         onChange={(e) => props.onChange(e.target.checked)}
         aria-describedby={props.vorbelegt ? `${id}-vorbelegt` : undefined}
-        className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+        className="h-4 w-4 shrink-0"
       />
       {props.label}
     </label>
@@ -513,12 +515,13 @@ export function Schalter(props: { label: string; wert: boolean; onChange: (b: bo
 /**
  * Eingabe oder Ergebnis — die Grundfarbe einer Karte.
  *
- * Auf der Seite zum Altersvorsorgedepot steht die Eingabespalte seit jeher
- * auf getoentem Grund mit kraeftigem Rand, die Ergebnisse auf weissen
- * Karten. Der Rechner macht es jetzt genauso.
+ * Die Ergebnisse stehen auf weissen Karten mit Haarlinie und weichem
+ * Schatten (`.ui-karte`), die Eingaben auf vertieftem Stein ohne Schatten
+ * (`.ui-eingabe`, index.css) — darauf heben sich die weissen Felder ab. Ohne
+ * Farbton: Der Stil trennt ueber Flaeche und Tiefe, nicht ueber Farbe.
  *
  * Bewusst eine VARIANTE und keine ueber `klasse` nachgeschobene Klasse:
- * `bg-white` und `bg-indigo-50/50` haben dieselbe Spezifitaet, und welche
+ * `.ui-karte` und `.ui-eingabe` haben dieselbe Spezifitaet, und welche
  * von beiden gewinnt, entscheidet dann die Reihenfolge im erzeugten
  * Stylesheet — nicht die Reihenfolge im Klassenstring. Das waere eine
  * Wette, keine Regel.
@@ -533,17 +536,17 @@ export type Ton = 'ergebnis' | 'eingabe';
  * wird.
  */
 export const TON: Record<Ton, string> = {
-  ergebnis: 'border-slate-200 bg-white',
-  eingabe: 'border-2 border-indigo-200 bg-indigo-50/50',
+  ergebnis: 'ui-karte',
+  eingabe: 'ui-eingabe',
 };
 
 export function Karte(props: {
   titel: string; kopfzeile?: ReactNode; children: ReactNode; klasse?: string; ton?: Ton;
 }) {
   return (
-    <section className={`rounded-xl border shadow-sm druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
-      <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h2 className="text-sm font-bold text-slate-700">{props.titel}</h2>
+    <section className={`druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
+      <header className="flex items-center justify-between border-b border-ui-linie px-4 py-3">
+        <h2 className="text-base font-medium text-ui-tinte">{props.titel}</h2>
         {props.kopfzeile}
       </header>
       <div className="p-4">{props.children}</div>
@@ -569,7 +572,7 @@ export function Abschnitt(props: {
   if (!props.einklappbar) {
     return (
       <section className="druckbereich">
-        <h3 className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+        <h3 className="mb-2 border-b border-ui-linie pb-1.5 text-sm font-medium text-ui-schiefer">
           {props.titel}
         </h3>
         {props.children}
@@ -589,13 +592,13 @@ export function Abschnitt(props: {
         type="button"
         onClick={() => setOffen((v) => !v)}
         aria-expanded={offen}
-        className="druck-kopf mb-2 flex w-full items-center justify-between gap-2 border-b border-slate-100 pb-1.5 text-left"
+        className="druck-kopf mb-2 flex w-full items-center justify-between gap-2 border-b border-ui-linie pb-1.5 text-left"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <span className="text-sm font-medium text-ui-schiefer">
           {props.titel}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${offen ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-ui-schiefer transition-transform print:hidden ${offen ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
@@ -624,23 +627,23 @@ export function AkkordeonKarte(props: {
 }) {
   const eingabe = props.ton === 'eingabe';
   return (
-    <section className={`overflow-hidden rounded-xl border shadow-sm druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
+    <section className={`overflow-hidden druckbereich ${TON[props.ton ?? 'ergebnis']} ${props.klasse ?? ''}`}>
       <button
         type="button"
         onClick={props.onUmschalten}
         aria-expanded={props.offen}
-        className={`druck-kopf flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left ${
-          eingabe ? 'border-indigo-100 hover:bg-indigo-100/40' : 'border-slate-100 hover:bg-slate-50'
+        className={`druck-kopf flex w-full items-center justify-between gap-3 border-b border-ui-linie px-4 py-3 text-left ${
+          eingabe ? 'hover:bg-ui-linie/40' : 'hover:bg-ui-innen'
         }`}
       >
-        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700">
+        <h2 className="flex items-center gap-2 text-base font-medium text-ui-tinte">
           {props.symbol}
           {props.titel}
         </h2>
         <span className="flex items-center gap-3">
           {props.kopfzeile}
           <ChevronDown
-            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform print:hidden ${props.offen ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 shrink-0 text-ui-schiefer transition-transform print:hidden ${props.offen ? 'rotate-180' : ''}`}
             aria-hidden
           />
         </span>
@@ -664,14 +667,14 @@ export function Kennzahl(props: {
 }) {
   return (
     <div>
-      <div className="mb-0.5 flex items-center text-[11px] font-bold uppercase tracking-wider text-slate-500 sm:mb-1 sm:text-xs">
+      <div className="mb-0.5 flex items-center text-xs text-ui-schiefer sm:mb-1 sm:text-sm">
         {props.titel}
         {props.info && <InfoPunkt titel={props.titel}>{props.info}</InfoPunkt>}
       </div>
-      <div className={`text-base font-black tabular-nums sm:text-lg ${props.farbe ?? 'text-slate-800'}`}>
+      <div className={`text-base font-medium tabular-nums sm:text-lg ${props.farbe ?? 'text-ui-tinte'}`}>
         {props.wert}
       </div>
-      {props.fussnote && <div className="mt-0.5 text-xs text-slate-500">{props.fussnote}</div>}
+      {props.fussnote && <div className="mt-0.5 text-xs text-ui-schiefer">{props.fussnote}</div>}
     </div>
   );
 }
@@ -686,11 +689,11 @@ export function GegenueberZeile(props: {
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="text-slate-600">
+      <span className="text-ui-tinte/80">
         {props.text}
         {props.info && <InfoPunkt titel={props.text.replace(/^[−=]\s*/, '')}>{props.info}</InfoPunkt>}
       </span>
-      <span className={`shrink-0 font-semibold tabular-nums ${props.farbe ?? 'text-slate-800'}`}>
+      <span className={`shrink-0 font-medium tabular-nums ${props.farbe ?? 'text-ui-tinte'}`}>
         {props.wert}
       </span>
     </div>
@@ -852,7 +855,7 @@ export function InfoPunkt(props: {
         onMouseLeave={() => setOffen(false)}
         onFocus={() => setOffen(true)}
         onBlur={() => setOffen(false)}
-        className="ml-1 inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 hover:border-slate-400 hover:text-slate-700"
+        className="ml-1 inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-ui-feld-rand bg-white text-[10px] font-medium leading-none text-ui-schiefer hover:border-ui-schiefer hover:text-ui-tinte"
       >
         ?
       </button>
@@ -873,9 +876,9 @@ export function InfoPunkt(props: {
           id={id}
           role="tooltip"
           style={{ top: lage?.top ?? 0, left: lage?.left ?? 0, visibility: lage ? 'visible' : 'hidden' }}
-          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-slate-300 bg-white p-2.5 text-left text-xs font-normal leading-relaxed text-slate-700 shadow-lg print:hidden sm:w-72"
+          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-ui-linie bg-white p-3 text-left text-xs font-normal leading-relaxed text-ui-tinte/80 shadow-lg print:hidden sm:w-72"
         >
-          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="mb-1 block text-xs font-medium text-ui-tinte">
             {props.titel}
           </span>
           {props.children}

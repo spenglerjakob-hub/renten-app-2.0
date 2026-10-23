@@ -87,7 +87,7 @@ export function Seite() {
   const g = r.gehalt;
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 print:min-h-0 print:bg-white">
+    <div className="min-h-screen bg-ui-flaeche text-slate-800 print:min-h-0 print:bg-white">
       <Kopf />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">

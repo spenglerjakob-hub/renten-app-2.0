@@ -4,6 +4,7 @@ import {
   PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, gesamtpreis, ersparnis,
   type Intervall, type PaketId,
 } from '@renten/schema/preise';
+import { FEHLER, KNOPF } from './stil';
 
 /**
  * Bausteine der Paketwahl: Zahlweise, Nutzerzahl, Preis eines Pakets.
@@ -12,7 +13,8 @@ import {
  * steht keine Zahl — gerechnet wird ausschliesslich mit preise.ts aus
  * `@renten/schema`. Beides schlank gehalten, ueber den Unterpfad `/preise`
  * und ohne `components/Feld`: Sonst zoegen Szenario-Pruefung (zod) bzw. die
- * ganze Rechenlogik in die Preisseite.
+ * ganze Rechenlogik in die Preisseite. Der Stil kommt aus `./stil` — der
+ * zieht nichts nach.
  */
 
 const euroFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -31,7 +33,7 @@ export const EMPFOHLEN_GRUND = 'wenn Sie Privat- und Firmenkunden beraten';
 export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWechsel: (i: Intervall) => void }) {
   const gratis = 12 - JAHR_MONATE;
   return (
-    <div role="radiogroup" aria-label="Zahlweise" className="inline-flex max-w-full rounded-lg border border-slate-200 bg-slate-100 p-1">
+    <div role="radiogroup" aria-label="Zahlweise" className="inline-flex max-w-full gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
       {([['monat', 'Monatlich'], ['jahr', 'Jährlich']] as const).map(([id, text]) => (
         <button
           key={id}
@@ -40,13 +42,15 @@ export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWech
           aria-checked={wert === id}
           onClick={() => onWechsel(id)}
           // Wird es eng, rutscht "2 Monate gratis" unter "Jaehrlich" statt aus dem Bild.
-          className={`flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-md px-3 py-1.5 text-sm font-bold ${
-            wert === id ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'
+          className={`flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            wert === id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
           }`}
         >
           {text}
           {id === 'jahr' && gratis > 0 && (
-            <span className="whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
+            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+              wert === id ? 'bg-white/15 text-white' : 'bg-ui-innen text-ui-tinte'
+            }`}>
               {gratis} Monate gratis
             </span>
           )}
@@ -61,14 +65,14 @@ export function NutzerWahl({ wert, onWechsel }: { wert: number; onWechsel: (n: n
   const setze = (n: number) => onWechsel(Math.min(MAX_NUTZER, Math.max(1, Math.round(n) || 1)));
   return (
     <div className="inline-flex items-center gap-2">
-      <label htmlFor={id} className="text-sm font-bold text-slate-700">Nutzer</label>
-      <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white">
+      <label htmlFor={id} className="text-sm font-medium text-ui-tinte">Nutzer</label>
+      <div className="inline-flex items-center rounded-full border border-ui-feld-rand bg-white">
         <button
           type="button"
           aria-label="Ein Nutzer weniger"
           onClick={() => setze(wert - 1)}
           disabled={wert <= 1}
-          className="rounded-l-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+          className="rounded-l-full py-2 pl-3 pr-2 text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte disabled:opacity-30"
         >
           <Minus className="h-4 w-4" aria-hidden />
         </button>
@@ -80,14 +84,14 @@ export function NutzerWahl({ wert, onWechsel }: { wert: number; onWechsel: (n: n
           max={MAX_NUTZER}
           value={wert}
           onChange={(e) => setze(Number(e.target.value))}
-          className="w-14 border-x border-slate-200 py-1.5 text-center text-sm font-bold tabular-nums [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="w-14 border-x border-ui-linie py-1.5 text-center text-sm font-medium tabular-nums text-ui-tinte [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <button
           type="button"
           aria-label="Ein Nutzer mehr"
           onClick={() => setze(wert + 1)}
           disabled={wert >= MAX_NUTZER}
-          className="rounded-r-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+          className="rounded-r-full py-2 pl-2 pr-3 text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte disabled:opacity-30"
         >
           <Plus className="h-4 w-4" aria-hidden />
         </button>
@@ -105,19 +109,19 @@ export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: 
   return (
     <div>
       <p className="flex flex-wrap items-baseline gap-x-1.5">
-        <span className="text-4xl font-black tabular-nums text-slate-900">{preisText(je)}</span>
-        <span className="text-sm text-slate-500">je Nutzer und {zeitraum}</span>
+        <span className="ui-titel text-4xl font-normal tabular-nums text-ui-tinte">{preisText(je)}</span>
+        <span className="text-sm text-ui-schiefer">je Nutzer und {zeitraum}</span>
       </p>
       {intervall === 'jahr' && (
-        <p className="mt-0.5 text-xs text-slate-500">entspricht {preisText(Math.round((je / 12) * 100) / 100)} im Monat</p>
+        <p className="mt-0.5 text-xs text-ui-schiefer">entspricht {preisText(Math.round((je / 12) * 100) / 100)} im Monat</p>
       )}
       {nutzer > 1 && (
-        <p className="mt-1.5 text-sm text-slate-700">
-          {nutzer} Nutzer: <strong className="tabular-nums">{preisText(summe)}</strong> im {zeitraum}
+        <p className="mt-1.5 text-sm text-ui-tinte">
+          {nutzer} Nutzer: <strong className="font-medium tabular-nums">{preisText(summe)}</strong> im {zeitraum}
         </p>
       )}
       {spart > 0 && (
-        <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+        <p className="mt-0.5 text-xs font-medium text-ui-tinte">
           Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
         </p>
       )}
@@ -175,36 +179,36 @@ export function PaketBuchung({
               aria-labelledby={`${k}-name`}
               aria-describedby={`${k}-preis ${k}-kurz${p.empfohlen ? ` ${k}-tipp` : ''}`}
               onClick={() => setPaket(p.id)}
-              className={`relative flex flex-col rounded-xl border-2 p-3 text-left transition-colors ${
-                aktiv ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-slate-300'
+              className={`relative flex flex-col rounded-[10px] border-2 bg-white p-3 text-left transition-colors ${
+                aktiv ? 'border-ui-tinte' : 'border-ui-linie hover:border-ui-feld-rand'
               }`}
             >
               {p.empfohlen && (
                 <span id={`${k}-tipp`} title={EMPFOHLEN_GRUND}
-                  className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
+                  className="ui-marke absolute -top-2.5 right-3 px-2 py-0.5 text-xs font-medium">
                   Empfohlen<span className="sr-only">, {EMPFOHLEN_GRUND}</span>
                 </span>
               )}
-              <span id={`${k}-name`} className="text-sm font-black text-slate-900">{p.name}</span>
-              <span id={`${k}-kurz`} className="mt-0.5 text-xs leading-snug text-slate-600">{p.kurz}</span>
+              <span id={`${k}-name`} className="text-sm font-medium text-ui-tinte">{p.name}</span>
+              <span id={`${k}-kurz`} className="mt-0.5 text-xs leading-snug text-ui-schiefer">{p.kurz}</span>
               <span id={`${k}-preis`} className="mt-auto flex flex-col pt-2">
-                <span className="text-lg font-black tabular-nums text-slate-900">
+                <span className="ui-titel text-xl font-normal tabular-nums text-ui-tinte">
                   {preisText(preisJeNutzer(p.id, intervall, nutzer))}
                 </span>
-                <span className="text-xs text-slate-500">je Nutzer und {zeitraum}</span>
+                <span className="text-xs text-ui-schiefer">je Nutzer und {zeitraum}</span>
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+      <div className="ui-innen mt-4 px-4 py-3 text-sm text-ui-tinte">
         <p>
           {paketVon(paket).name}, {nutzer} Nutzer:{' '}
-          <strong className="tabular-nums text-slate-900">{preisText(summe)}</strong> im {zeitraum}, {UST_HINWEIS}
+          <strong className="font-medium tabular-nums">{preisText(summe)}</strong> im {zeitraum}, {UST_HINWEIS}
         </p>
         {spart > 0 && (
-          <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+          <p className="mt-0.5 text-xs font-medium text-ui-tinte">
             Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
           </p>
         )}
@@ -214,14 +218,14 @@ export function PaketBuchung({
         type="button"
         onClick={() => onBuchen(paket, intervall, nutzer)}
         disabled={!bereit || laedt}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`mt-4 w-full ${KNOPF} disabled:cursor-not-allowed`}
       >
         <CreditCard className="h-4 w-4" aria-hidden />
         {laedt ? 'Einen Moment …' : 'Weiter zur Zahlung'}
       </button>
-      {!bereit && <p className="mt-2 text-center text-xs font-semibold text-slate-600">{gesperrtText}</p>}
-      {fehler && <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
-      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+      {!bereit && <p className="mt-2 text-center text-xs font-medium text-ui-schiefer">{gesperrtText}</p>}
+      {fehler && <p role="alert" className={`mt-2 ${FEHLER}`}>{fehler}</p>}
+      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
         Sie bezahlen sicher über unseren Zahlungsdienstleister Stripe; Rechnungsadresse und USt-IdNr. geben Sie
         dort an. Ein monatliches Abo ist zum Ende des Monats kündbar, ein jährliches zum Ende des Jahres.
         Weitere Kollegen laden Sie nach der Buchung unter „Abo & Team“ ein.

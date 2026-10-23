@@ -10,6 +10,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   EMPFOHLEN_GRUND, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
 } from '../components/PaketWahl';
+import { FELD_LABEL, KNOPF, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
 
 /**
  * Die Preisseite (/preise).
@@ -62,8 +63,8 @@ function BuendelVorteil({ intervall, nutzer }: { intervall: Intervall; nutzer: n
   const spart = einzeln - preisJeNutzer('alles', intervall, nutzer);
   if (spart <= 0) return null;
   return (
-    <p className="mt-4 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-      Beide Pakete in einem — <strong className="tabular-nums">{preisText(spart)}</strong> günstiger
+    <p className="ui-innen mt-4 px-3 py-2 text-sm text-ui-tinte">
+      Beide Pakete in einem — <strong className="font-medium tabular-nums">{preisText(spart)}</strong> günstiger
       als einzeln ({preisText(einzeln)})
     </p>
   );
@@ -136,26 +137,26 @@ function ZeitRechnung() {
   const h = zahl(stundensatz);
   const gegenwert = m > 0 && h > 0 ? Math.round((m / 60) * h * 100) / 100 : null;
   return (
-    <details className="mt-4 max-w-2xl rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <summary className="cursor-pointer text-sm font-bold text-slate-800">Mit Ihrer Zeit rechnen</summary>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+    <details className="ui-karte mt-4 max-w-2xl px-4 py-3">
+      <summary className="cursor-pointer text-sm font-medium text-ui-tinte">Mit Ihrer Zeit rechnen</summary>
+      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
         Eine Zeitersparnis nennen wir bewusst nicht — die kennen nur Sie. Wenn Sie schätzen möchten:
       </p>
       <div className="mt-3 flex flex-wrap items-end gap-4">
         <div>
-          <label htmlFor={`${id}-min`} className="mb-1 block text-xs font-bold text-slate-700">Gesparte Minuten je Fall</label>
+          <label htmlFor={`${id}-min`} className={FELD_LABEL}>Gesparte Minuten je Fall</label>
           <input id={`${id}-min`} inputMode="numeric" value={minuten} onChange={(e) => setMinuten(e.target.value)}
-            className="w-28 rounded-lg border border-slate-300 p-2 text-sm tabular-nums" />
+            className="ui-feld w-28 p-2 text-sm tabular-nums" />
         </div>
         <div>
-          <label htmlFor={`${id}-satz`} className="mb-1 block text-xs font-bold text-slate-700">Ihr Stundensatz (€)</label>
+          <label htmlFor={`${id}-satz`} className={FELD_LABEL}>Ihr Stundensatz (€)</label>
           <input id={`${id}-satz`} inputMode="decimal" value={stundensatz} onChange={(e) => setStundensatz(e.target.value)}
-            className="w-28 rounded-lg border border-slate-300 p-2 text-sm tabular-nums" />
+            className="ui-feld w-28 p-2 text-sm tabular-nums" />
         </div>
       </div>
       {gegenwert !== null && (
-        <p role="status" className="mt-3 text-sm text-slate-800">
-          Gegenwert Ihrer gesparten Zeit: <strong className="tabular-nums">{preisText(gegenwert)}</strong> je Fall.
+        <p role="status" className="mt-3 text-sm text-ui-tinte">
+          Gegenwert Ihrer gesparten Zeit: <strong className="font-medium tabular-nums">{preisText(gegenwert)}</strong> je Fall.
         </p>
       )}
     </details>
@@ -170,20 +171,20 @@ export function Seite() {
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf verlinkt />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Preise</h1>
-        <p className="mt-2 max-w-2xl text-base leading-relaxed text-slate-600">
+        <Titel gross>Preise</Titel>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-ui-schiefer">
           Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
           allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
         </p>
-        <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          <a href="/schnellrechnung" className="font-semibold text-indigo-700 hover:underline">
+        <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+          <a href="/schnellrechnung" className={LINK}>
             Erst ausprobieren? Schnellrechnung ohne Anmeldung →
           </a>
-          <a href="#early-adopter" className="font-semibold text-indigo-700 hover:underline">
+          <a href="#early-adopter" className={LINK}>
             Vor dem Start: Early Adopter werden →
           </a>
         </p>
@@ -191,7 +192,7 @@ export function Seite() {
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
           <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
           <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
-          <p className="text-xs text-slate-500">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
+          <p className="text-xs text-ui-schiefer">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
@@ -199,12 +200,10 @@ export function Seite() {
             <section
               key={p.id}
               aria-labelledby={`paket-${p.id}`}
-              className={`relative flex flex-col rounded-2xl border bg-white p-5 shadow-sm sm:p-6 ${
-                p.empfohlen ? 'border-indigo-400 ring-2 ring-indigo-400' : 'border-slate-200'
-              }`}
+              className={`ui-karte relative flex flex-col p-5 sm:p-6 ${p.empfohlen ? 'border-ui-tinte' : ''}`}
             >
               {p.empfohlen && (
-                <span className="absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white">
+                <span className="ui-marke absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs font-medium">
                   {/* Kurz genug fuer eine Zeile: Der volle Satz brach um und
                       lag ueber dem Paketnamen. Der ganze Satz steht im Tooltip. */}
                   <Sparkles className="h-3 w-3" aria-hidden />
@@ -213,50 +212,46 @@ export function Seite() {
                   </span>
                 </span>
               )}
-              <h2 id={`paket-${p.id}`} className="text-lg font-black text-slate-900">{p.name}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">{p.kurz}</p>
+              <h2 id={`paket-${p.id}`} className="ui-titel text-2xl font-normal text-ui-tinte">{p.name}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">{p.kurz}</p>
               <div className="mt-4">
                 <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} />
               </div>
               {p.id === 'alles' && <BuendelVorteil intervall={intervall} nutzer={nutzer} />}
-              <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-700">
+              <ul className="mt-4 flex-1 space-y-2 text-sm text-ui-tinte">
                 {LEISTUNGEN[p.id].map((l) => (
                   <li key={l} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden /> {l}
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden /> {l}
                   </li>
                 ))}
               </ul>
               <a
                 href="/?registrieren"
-                className={`mt-5 block rounded-lg px-4 py-2.5 text-center text-sm font-bold ${
-                  p.empfohlen
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                    : 'border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
-                }`}
+                className={`mt-5 w-full ${p.empfohlen ? KNOPF : KNOPF_ZWEIT}`}
               >
                 {TESTTAGE} Tage kostenlos testen
               </a>
             </section>
           ))}
         </div>
-        <p className="mt-3 text-xs text-slate-500">Alle Preise netto, {UST_HINWEIS}</p>
+        <p className="mt-3 text-xs text-ui-schiefer">Alle Preise netto, {UST_HINWEIS}</p>
 
         <ZeitRechnung />
 
         <FruehstartAnfrage />
 
         <section aria-labelledby="staffel" className="mt-10">
-          <h2 id="staffel" className="text-lg font-black text-slate-900">Mengenrabatt</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <h2 id="staffel" className="ui-titel text-2xl font-normal text-ui-tinte">Mengenrabatt</h2>
+          <p className="mt-1 text-sm text-ui-schiefer">
             Preis je Nutzer und {zeitraum} — der Preis der erreichten Staffel gilt für alle Nutzer im Büro.
           </p>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="ui-karte mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-ui-innen text-xs text-ui-schiefer">
                 <tr>
-                  <th scope="col" className="px-3 py-2.5 font-bold sm:px-4">Nutzer</th>
+                  <th scope="col" className="px-3 py-2.5 font-medium sm:px-4">Nutzer</th>
                   {PAKETE.map((p) => (
-                    <th key={p.id} scope="col" className="px-3 py-2.5 text-right font-bold sm:px-4">
+                    <th key={p.id} scope="col" className="px-3 py-2.5 text-right font-medium sm:px-4">
                       <span className="sm:hidden" aria-hidden>{KURZNAME[p.id]}</span>
                       <span className="sr-only sm:not-sr-only">{p.name}</span>
                     </th>
@@ -268,9 +263,9 @@ export function Seite() {
                   <tr
                     key={spanne}
                     aria-current={i === staffel ? 'true' : undefined}
-                    className={`border-t border-slate-100 ${i === staffel ? 'bg-indigo-50 font-bold text-indigo-900' : ''}`}
+                    className={`border-t border-ui-linie ${i === staffel ? 'bg-ui-knopf/10 font-medium text-ui-tinte' : ''}`}
                   >
-                    <th scope="row" className="px-3 py-2.5 font-semibold sm:px-4">{spanne}</th>
+                    <th scope="row" className="px-3 py-2.5 font-medium sm:px-4">{spanne}</th>
                     {PAKETE.map((p) => (
                       <td key={p.id} className="px-3 py-2.5 text-right tabular-nums sm:px-4">
                         {preisText(preisJeNutzer(p.id, intervall, STAFFEL_AB[i]!))}
@@ -284,15 +279,15 @@ export function Seite() {
         </section>
 
         <section aria-labelledby="fragen" className="mt-10 max-w-3xl">
-          <h2 id="fragen" className="text-lg font-black text-slate-900">Häufige Fragen</h2>
-          <div className="mt-3 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <h2 id="fragen" className="ui-titel text-2xl font-normal text-ui-tinte">Häufige Fragen</h2>
+          <div className="ui-karte mt-3 divide-y divide-ui-linie">
             {FRAGEN.map((f) => (
               <details key={f.frage} className="group px-4 py-3">
-                <summary className="cursor-pointer list-none text-sm font-bold text-slate-800 marker:hidden">
-                  <span className="mr-2 inline-block text-indigo-600 transition-transform group-open:rotate-90">›</span>
+                <summary className="cursor-pointer list-none text-sm font-medium text-ui-tinte marker:hidden">
+                  <span className="mr-2 inline-block text-ui-schiefer transition-transform group-open:rotate-90">›</span>
                   {f.frage}
                 </summary>
-                <p className="mt-2 pl-5 text-sm leading-relaxed text-slate-600">{f.antwort}</p>
+                <p className="mt-2 pl-5 text-sm leading-relaxed text-ui-schiefer">{f.antwort}</p>
               </details>
             ))}
           </div>

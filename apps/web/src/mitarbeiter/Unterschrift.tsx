@@ -6,7 +6,7 @@ import { TextFeld } from '../components/Feld';
 import {
   unterlageHtmlLaden, unterschriftenAufheben, type UnterlagenArt, type Unterlagen, type Unterschrift, type UnterschriftPerson,
 } from '../lib/bav-beratung';
-import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK } from './bausteine';
+import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
 import { UnterschriebeneUnterlage, mitUnterschriften, pruefsummeVon } from './festschreiben';
 import {
   ZUG_BREITE, dokumenteFuer, dokumenteText, tinteGenug, zeitpunktText, zugAusStrichen, zugGueltig, zugRahmen, type Strich,
@@ -138,11 +138,11 @@ function UnterschriftFeld({ striche, setStriche, beschriftung }: {
         onPointerMove={weiter}
         onPointerUp={fertig}
         onPointerCancel={fertig}
-        className="block w-full cursor-crosshair touch-none rounded-2xl border border-mb-linie bg-white"
+        className="block w-full cursor-crosshair touch-none rounded-2xl border border-ui-linie bg-white"
         style={{ aspectRatio: `${FELD_VERHAELTNIS}` }}
       />
       {/* Die Linie zum Unterschreiben — nur zur Orientierung, nicht Teil der Unterschrift. */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-6 bottom-[22%] flex items-end gap-2 border-b border-mb-asche/60 pb-1 text-mb-asche">
+      <div aria-hidden className="pointer-events-none absolute inset-x-6 bottom-[22%] flex items-end gap-2 border-b border-ui-asche/60 pb-1 text-ui-asche">
         <span className="text-lg leading-none">×</span>
       </div>
     </div>
@@ -205,25 +205,25 @@ function UnterschriftDialog({ offen, wer, status, onSchliessen, onUnterschreiben
   return (
     <Dialog offen={offen} titel={`Unterschrift ${wer.rolle}`} onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
       <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-slate-700">
+        <p className="text-sm leading-relaxed text-ui-tinte">
           Ihre Unterschrift gilt für: <strong>{fuer}</strong>. Mit „Unterschreiben“ bestätigen Sie diese Unterlagen in der
           Fassung, die Sie im Gespräch gesehen haben.
         </p>
         {wer.nameFest ? (
-          <p className="text-sm text-slate-700"><span className="text-slate-500">Name:</span> <strong>{name}</strong></p>
+          <p className="text-sm text-ui-tinte"><span className="text-ui-schiefer">Name:</span> <strong>{name}</strong></p>
         ) : (
           <TextFeld label="Name" wert={name} onChange={setName} maxLaenge={120} autoComplete="name" />
         )}
         <UnterschriftFeld striche={striche} setStriche={setStriche}
           beschriftung={`Unterschriftsfeld für ${name || wer.rolle}: mit Finger, Stift oder Maus unterschreiben`} />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Mit Finger, Stift oder Maus im Feld unterschreiben.</p>
+          <p className="text-xs text-ui-schiefer">Mit Finger, Stift oder Maus im Feld unterschreiben.</p>
           <button type="button" onClick={() => setStriche([])} disabled={striche.length === 0 || laeuft} className={KNOPF_ZWEIT}>
             <Eraser className="h-4 w-4" aria-hidden /> Neu
           </button>
         </div>
         {fehler && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
           <button type="button" onClick={onSchliessen} disabled={laeuft} className={KNOPF_ZWEIT}>Abbrechen</button>
           <button type="button" onClick={() => void abschicken()} disabled={!bereit} className={KNOPF}>
             <PenLine className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird unterschrieben …' : 'Unterschreiben'}
@@ -263,7 +263,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
   if (status === 'offen') {
     return (
       <Karte titel="Unterschrift am Bildschirm">
-        <p className="text-sm leading-relaxed text-mb-schiefer">
+        <p className="text-sm leading-relaxed text-ui-schiefer">
           Unterschrieben wird nach der Entscheidung. Solange sie offen ist, gibt es die Gesprächsunterlagen zum Mitnehmen.
         </p>
       </Karte>
@@ -276,13 +276,13 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
     return (
       <li key={wer.person} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <div className="min-w-0">
-          <p className="text-base font-medium text-mb-tinte">{wer.rolle}{u ? ` · ${u.name}` : wer.name ? ` · ${wer.name}` : ''}</p>
+          <p className="text-base font-medium text-ui-tinte">{wer.rolle}{u ? ` · ${u.name}` : wer.name ? ` · ${wer.name}` : ''}</p>
           <p className={ETIKETT}>für {dokumenteText(dokumenteFuer(status, wer.person))}</p>
         </div>
         {u ? (
           <div className="flex min-w-0 items-center gap-3">
             <UnterschriftBild zug={u.zug} name={u.name} klasse="h-10 max-w-[10rem]" />
-            <p className="flex items-center gap-1.5 text-sm text-mb-tinte">
+            <p className="flex items-center gap-1.5 text-sm text-ui-tinte">
               <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden /> unterschrieben am {zeitpunktText(u.unterschriebenAm)}
             </p>
           </div>
@@ -298,7 +298,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
 
   return (
     <Karte titel="Unterschrift am Bildschirm">
-      <p className="text-sm leading-relaxed text-mb-schiefer">
+      <p className="text-sm leading-relaxed text-ui-schiefer">
         Mitarbeiter und Berater unterschreiben hier mit Finger, Stift oder Maus. Die Unterschriften stehen dann in den
         Unterlagen; der Arbeitgeber unterschreibt auf Papier.
       </p>
@@ -309,7 +309,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
         </p>
       )}
       {offeneLuecken.length > 0 && (
-        <div className="mb-innen mt-4 p-4 text-sm text-mb-tinte">
+        <div className="ui-innen mt-4 p-4 text-sm text-ui-tinte">
           <p>Vor dem Unterschreiben fehlt noch:</p>
           <ul className="mt-1 space-y-1">
             {offeneLuecken.map((l) => (
@@ -321,13 +321,13 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
         </div>
       )}
 
-      <ul className="mt-2 divide-y divide-mb-linie" aria-label="Unterschriften">
+      <ul className="mt-2 divide-y divide-ui-linie" aria-label="Unterschriften">
         {unterzeichner.map(zeile)}
       </ul>
 
       {fest && (
-        <div className="mb-innen mt-2 flex flex-wrap items-center gap-3 p-4">
-          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-mb-tinte">
+        <div className="ui-innen mt-2 flex flex-wrap items-center gap-3 p-4">
+          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-ui-tinte">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               Die Unterlagen sind seit {zeitpunktText(fest.erstelltAm)} festgeschrieben, die Beratung ist gesperrt. Muss noch
@@ -339,7 +339,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
       )}
       {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
 
-      <p className="mt-5 text-xs leading-relaxed text-mb-schiefer">
+      <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
         Einfache elektronische Signatur: geeignet für Protokoll und Erklärungen ohne gesetzliche Schriftform. Ob Versicherer
         oder Unterstützungskasse sie für die Vereinbarung annehmen, klären Sie bitte vorab.
       </p>
@@ -350,7 +350,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
       )}
 
       <Dialog offen={aufheben} titel="Unterschriften aufheben?" onSchliessen={() => setAufheben(false)}>
-        <p className="text-sm leading-relaxed text-slate-700">
+        <p className="text-sm leading-relaxed text-ui-tinte">
           Die Unterschriften und die festgeschriebenen Unterlagen werden gelöscht. Ausgedruckte oder gespeicherte Exemplare
           bleiben davon unberührt. Danach lässt sich die Beratung wieder ändern; unterschrieben wird neu.
         </p>

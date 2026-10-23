@@ -12,8 +12,9 @@ import {
 } from '../components/Feld';
 import { laufzeitText } from '../features/tuev-berechnung';
 import {
-  AKZENT, ETIKETT, FirmenZeichen, Hervor, KNOPF, KNOPF_ZWEIT, Karte, LINK, LueckenRing, SCHWEBEND, TextBereich, Titel, Vermerk, useDrucken,
-} from './bausteine';
+  AKZENT, ETIKETT, FELD_LABEL, Hervor, KNOPF, KNOPF_ZWEIT, Karte, LINK, SCHWEBEND, TextBereich, Titel, Vermerk,
+} from '../components/stil';
+import { FirmenZeichen, LueckenRing, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, probeabrechnung,
   reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
@@ -65,10 +66,10 @@ function Hinweise({ titel, punkte }: { titel: string; punkte: string[] }) {
   if (punkte.length === 0) return null;
   return (
     <div>
-      <h3 className="text-base font-medium text-mb-tinte">{titel}</h3>
-      <ul className="mt-2 space-y-2 text-sm leading-relaxed text-mb-tinte">
+      <h3 className="text-base font-medium text-ui-tinte">{titel}</h3>
+      <ul className="mt-2 space-y-2 text-sm leading-relaxed text-ui-tinte">
         {punkte.map((p) => (
-          <li key={p} className="flex gap-3"><span aria-hidden className="text-mb-asche">—</span><span>{p}</span></li>
+          <li key={p} className="flex gap-3"><span aria-hidden className="text-ui-asche">—</span><span>{p}</span></li>
         ))}
       </ul>
     </div>
@@ -99,16 +100,16 @@ export function SchrittAngebot({ firma, logo }: SchrittProps) {
 
   return (
     <div className="space-y-8">
-      {/* Der Einstieg fuer den Mitarbeiter: grosser Name in Serifen auf Weiss, die Regel als Akzentkarte. */}
+      {/* Der Einstieg fuer den Mitarbeiter: grosser Name in Inter Tight, die Regel als Akzentkarte. */}
       <div>
         <FirmenZeichen name={firma.name} logo={logo} gross />
-        <p className="mt-4 max-w-3xl whitespace-pre-line text-lg leading-relaxed text-mb-schiefer">
+        <p className="mt-4 max-w-3xl whitespace-pre-line text-lg leading-relaxed text-ui-schiefer">
           {a.begruessung.trim() || `${firma.name} unterstützt Ihre Altersvorsorge mit einer Betriebsrente.`}
         </p>
       </div>
       <div className={`${AKZENT} p-6 sm:p-10`}>
         <p className="text-sm">Ihr Angebot</p>
-        <p className="mb-titel mt-2 max-w-3xl text-balance text-[26px] font-normal leading-[1.25] sm:text-[34px]">
+        <p className="ui-titel mt-2 max-w-3xl text-balance text-[26px] font-normal leading-[1.25] sm:text-[34px]">
           <RegelMitKern modell={a.modell} />
         </p>
         <p className="mt-4 max-w-3xl text-base leading-relaxed">
@@ -123,7 +124,7 @@ export function SchrittAngebot({ firma, logo }: SchrittProps) {
           {vertraege.map((w) => (
             <div key={w}>
               <dt className={ETIKETT}>{vertragName(w, a)}</dt>
-              <dd className="mt-0.5 text-base text-mb-tinte">{traegerText(w, a) || 'Anbieter wird im Gespräch genannt'}</dd>
+              <dd className="mt-0.5 text-base text-ui-tinte">{traegerText(w, a) || 'Anbieter wird im Gespräch genannt'}</dd>
             </div>
           ))}
         </dl>
@@ -174,7 +175,7 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
           )}
           <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
           <div>
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Kinder</span>
+            <span className={FELD_LABEL}>Kinder</span>
             <div className="space-y-2">
               {a.kinder.map((k, i) => (
                 <div key={i} className="flex items-end gap-2">
@@ -183,7 +184,7 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
                       onChange={(geburtsjahr) => setzeA({ kinder: a.kinder.map((x, j) => (j === i ? { ...x, geburtsjahr: Math.round(geburtsjahr) } : x)) })} />
                   </div>
                   <button type="button" aria-label={`Kind ${i + 1} entfernen`} onClick={() => setzeA({ kinder: a.kinder.filter((_, j) => j !== i) })}
-                    className="mb-1 rounded-full p-2 text-mb-asche hover:bg-rose-50 hover:text-rose-700">
+                    className="mb-1 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
                 </div>
@@ -194,7 +195,7 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
                 </button>
               )}
             </div>
-            <p className="mt-1 text-xs text-mb-schiefer">Kinder senken den Beitrag zur Pflegeversicherung — heute und im Alter.</p>
+            <p className="mt-1 text-xs text-ui-schiefer">Kinder senken den Beitrag zur Pflegeversicherung — heute und im Alter.</p>
           </div>
         </div>
       </Karte>
@@ -224,7 +225,7 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
         <div className="space-y-3">
           <ZahlFeld label="Bestehende Betriebsrente: Beitrag im Monat" wert={a.bavBestandMonat} onChange={(bavBestandMonat) => setzeA({ bavBestandMonat })} einheit="€" schritt={10}
             hilfe="Direktversicherung oder Pensionskasse, Mitarbeiter und Arbeitgeber zusammen. Sie belegt die Freigrenzen zuerst." />
-          <p className="text-xs leading-relaxed text-mb-schiefer">
+          <p className="text-xs leading-relaxed text-ui-schiefer">
             Die gesetzliche Rente folgt im nächsten Schritt — aus dem Gehalt geschätzt und mit der Renteninformation anpassbar.
           </p>
         </div>
@@ -247,7 +248,7 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
   if (!rentenbeginn || a.jahresbrutto <= 0) {
     return (
       <Karte>
-        <p className="text-sm text-mb-tinte">Für die Versorgungslücke fehlen Geburtsdatum und Bruttogehalt (Schritt 2).</p>
+        <p className="text-sm text-ui-tinte">Für die Versorgungslücke fehlen Geburtsdatum und Bruttogehalt (Schritt 2).</p>
       </Karte>
     );
   }
@@ -261,7 +262,7 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
             ? <>Ihre gesetzliche Rente im Vergleich zum <Hervor>Nettolohn</Hervor></>
             : <>Ihre gesetzliche Rente <Hervor>reicht nicht aus</Hervor></>}
         </Titel>
-        <p className="mt-3 max-w-3xl text-base leading-relaxed text-mb-schiefer">
+        <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
           Im Alter brauchen die meisten etwas weniger Geld als heute — trotzdem reicht die gesetzliche Rente oft nicht. Die
           Differenz zum heutigen Nettolohn heißt Versorgungslücke. Eine Betriebsrente kann sie verkleinern.
         </p>
@@ -277,36 +278,36 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
                   renteProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
                 <dl className="space-y-4">
                   <div>
-                    <dt className="flex items-center gap-2 text-sm text-mb-schiefer">
-                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-mb-tinte" />Netto-Altersrente
+                    <dt className="flex items-center gap-2 text-sm text-ui-schiefer">
+                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-ui-tinte" />Netto-Altersrente
                     </dt>
-                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-mb-tinte">
-                      {euro(luecke.rente.nettoMonat)} <span className="text-base text-mb-schiefer">· {luecke.renteProzent} %</span>
+                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
+                      {euro(luecke.rente.nettoMonat)} <span className="text-base text-ui-schiefer">· {luecke.renteProzent} %</span>
                     </dd>
                   </div>
                   <div>
-                    <dt className="flex items-center gap-2 text-sm text-mb-schiefer">
-                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-mb-luecke ring-1 ring-mb-tinte/20" />Versorgungslücke
+                    <dt className="flex items-center gap-2 text-sm text-ui-schiefer">
+                      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-ui-luecke ring-1 ring-ui-tinte/20" />Versorgungslücke
                     </dt>
-                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-mb-tinte">
-                      {euro(luecke.lueckeMonat)} <span className="text-base text-mb-schiefer">· {luecke.lueckeProzent} %</span>
+                    <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
+                      {euro(luecke.lueckeMonat)} <span className="text-base text-ui-schiefer">· {luecke.lueckeProzent} %</span>
                     </dd>
                   </div>
                 </dl>
               </div>
               {luecke.lueckeProzent > 0 && (
                 <div className={`${AKZENT} mt-6 px-5 py-4`}>
-                  <p className="mb-titel text-[22px] leading-snug sm:text-[26px]">
+                  <p className="ui-titel text-[22px] leading-snug sm:text-[26px]">
                     Im Alter fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
                   </p>
                 </div>
               )}
-              <p className="mt-3 text-xs leading-relaxed text-mb-schiefer">
+              <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
                 Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
               </p>
             </>
           ) : (
-            <p className="text-sm text-mb-schiefer">Wird gerechnet …</p>
+            <p className="text-sm text-ui-schiefer">Wird gerechnet …</p>
           )}
         </div>
 
@@ -329,7 +330,7 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
             </div>
           </div>
           {luecke && (
-            <dl className={`mt-4 divide-y divide-mb-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
+            <dl className={`mt-4 divide-y divide-ui-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
               {([
                 ['Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
                 ['Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
@@ -341,18 +342,18 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
                 ['− Steuer', euro(luecke.rente.steuerMonat)],
               ] as const).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 py-1.5">
-                  <dt className="text-mb-schiefer">{k}</dt><dd className="shrink-0 tabular-nums text-mb-tinte">{v}</dd>
+                  <dt className="text-ui-schiefer">{k}</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{v}</dd>
                 </div>
               ))}
               <div className="flex justify-between gap-3 py-2 font-medium">
-                <dt className="text-mb-tinte">= Netto-Altersrente</dt><dd className="shrink-0 tabular-nums text-mb-tinte">{euro(luecke.rente.nettoMonat)}</dd>
+                <dt className="text-ui-tinte">= Netto-Altersrente</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{euro(luecke.rente.nettoMonat)}</dd>
               </div>
             </dl>
           )}
         </Karte>
       </div>
 
-      <p className="max-w-4xl text-xs leading-relaxed text-mb-schiefer">
+      <p className="max-w-4xl text-xs leading-relaxed text-ui-schiefer">
         Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
         mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
         Der Nettolohn rechnet die Steuer als Monatsanteil der Jahressteuer
@@ -396,12 +397,12 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
     <Karte>
       <Titel als="h2">Wie viel möchten Sie <Hervor>netto</Hervor> wandeln?</Titel>
       {fehltGehalt ? (
-        <p className="mt-3 text-sm text-mb-tinte">Für die Rechnung fehlt das Bruttogehalt (Schritt 2).</p>
+        <p className="mt-3 text-sm text-ui-tinte">Für die Rechnung fehlt das Bruttogehalt (Schritt 2).</p>
       ) : (
         <>
-          {/* Die eine Zahl, um die es im Gespraech geht — in Serifen, gross wie eine Schlagzeile. */}
-          <p className="mt-4 text-[56px] font-normal leading-none tabular-nums text-mb-tinte sm:text-[72px]">
-            <span className="mb-titel">{euro(netto)}</span> <span className="text-base text-mb-schiefer">netto im Monat</span>
+          {/* Die eine Zahl, um die es im Gespraech geht — gross wie eine Schlagzeile. */}
+          <p className="mt-4 text-[56px] font-normal leading-none tabular-nums text-ui-tinte sm:text-[72px]">
+            <span className="ui-titel">{euro(netto)}</span> <span className="text-base text-ui-schiefer">netto im Monat</span>
           </p>
           <div className="mt-4">
             <input type="range" min={0} max={ende} step={1} value={Math.min(netto, ende)} disabled={ohneRahmen}
@@ -409,16 +410,16 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
               aria-label="Netto-Aufwand im Monat"
               aria-valuetext={`${netto} Euro netto, ${Math.round(r.umwandlungMonat)} Euro Umwandlung brutto`}
               style={{ '--anteil': `${(Math.min(netto, ende) / ende) * 100}%` } as CSSProperties}
-              className="block w-full disabled:opacity-50" />
+              className="ui-regler block w-full" />
           </div>
-          <div className="mt-1 flex justify-between text-xs tabular-nums text-mb-schiefer">
+          <div className="mt-1 flex justify-between text-xs tabular-nums text-ui-schiefer">
             <span>0 €</span><span>{euro(ende / 2)}</span><span>{euro(ende)} · Rahmen voll</span>
           </div>
-          <p className="mt-4 text-base leading-relaxed text-mb-tinte">
+          <p className="mt-4 text-base leading-relaxed text-ui-tinte">
             = <strong className="font-medium tabular-nums">{euroGenau(r.umwandlungMonat)}</strong> Umwandlung brutto · + {euroGenau(r.arbeitgeberMonat)} vom
             Arbeitgeber · <strong className="font-medium tabular-nums">{euroGenau(r.gesamtMonat)}</strong> in Ihre Vorsorge
           </p>
-          <p className="mt-2 max-w-4xl text-xs leading-relaxed text-mb-schiefer">
+          <p className="mt-2 max-w-4xl text-xs leading-relaxed text-ui-schiefer">
             {ohneRahmen
               ? 'Der Rahmen, der frei von Sozialabgaben bleibt, ist schon voll — durch den Beitrag des Arbeitgebers oder eine bestehende Betriebsrente.'
               : `Der Regler reicht bis zum Rahmen, der frei von Sozialabgaben bleibt: 4 % der Beitragsbemessungsgrenze, ${euro(grenzen.rahmenMonat)} im Monat`
@@ -427,7 +428,7 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
                 + (m.art === 'matching' ? ' Der Beitrag des Arbeitgebers in die Unterstützungskasse kommt obendrauf.' : '')}
           </p>
           {darueber && (
-            <p role="status" className="mb-innen mt-3 px-4 py-3 text-xs leading-relaxed text-mb-tinte">
+            <p role="status" className="ui-innen mt-3 px-4 py-3 text-xs leading-relaxed text-ui-tinte">
               Eingetragen sind {euroGenau(daten.umwandlungMonat)} Umwandlung — mehr als der Rahmen frei von Sozialabgaben.{' '}
               <button type="button" onClick={() => setzeU(grenzen.maxUmwandlung)} className="font-medium underline underline-offset-4">
                 Auf {euroGenau(grenzen.maxUmwandlung)} setzen
@@ -458,12 +459,12 @@ function AbrechnungsZeile({ text, ohne, mit, art = 'normal', zusatz }: {
   text: string; ohne: number | null; mit: number | null; art?: 'normal' | 'abzug' | 'info' | 'summe'; zusatz?: string;
 }) {
   const wert = (x: number | null) => (x === null ? '—' : `${art === 'abzug' && x > 0.004 ? '− ' : ''}${euroGenau(x)}`);
-  const farbe = art === 'info' ? 'text-mb-asche' : art === 'summe' ? 'font-medium text-mb-tinte' : 'text-mb-tinte';
+  const farbe = art === 'info' ? 'text-ui-schiefer' : art === 'summe' ? 'font-medium text-ui-tinte' : 'text-ui-tinte';
   return (
-    <tr className={`${art === 'summe' ? 'border-t border-mb-tinte' : 'border-t border-mb-linie'} ${farbe}`}>
+    <tr className={`${art === 'summe' ? 'border-t border-ui-tinte' : 'border-t border-ui-linie'} ${farbe}`}>
       <td className="py-2 pr-2">
         {text}
-        {zusatz && <span className="block text-xs font-normal text-mb-schiefer">{zusatz}</span>}
+        {zusatz && <span className="block text-xs font-normal text-ui-schiefer">{zusatz}</span>}
       </td>
       <td className="py-2 pl-2 text-right tabular-nums">{wert(ohne)}</td>
       <td className="py-2 pl-2 text-right tabular-nums">{wert(mit)}</td>
@@ -477,13 +478,13 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
   return (
     /* Wie ein Gehaltszettel, der ueber der Seite liegt — das schwebende Artefakt dieses Schritts. */
     <section className={`${SCHWEBEND} p-5 sm:p-7`}>
-      <h2 className="mb-4 text-lg font-medium text-mb-tinte sm:text-xl">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</h2>
+      <h2 className="mb-4 text-lg font-medium text-ui-tinte sm:text-xl">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</h2>
       <table className="w-full text-[13px] sm:text-sm">
         <thead>
-          <tr className="text-xs text-mb-schiefer">
+          <tr className="text-xs text-ui-schiefer">
             <th className="pb-2 text-left font-normal" />
             <th className="pb-2 pl-2 text-right font-normal">ohne bAV</th>
-            <th className="pb-2 pl-2 text-right font-medium text-mb-tinte">mit bAV</th>
+            <th className="pb-2 pl-2 text-right font-medium text-ui-tinte">mit bAV</th>
           </tr>
         </thead>
         <tbody>
@@ -497,22 +498,22 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
           <AbrechnungsZeile text="Netto" ohne={a.netto.ohne} mit={a.netto.mit} art="summe" />
         </tbody>
       </table>
-      <div className="mb-innen mt-5 p-4">
+      <div className="ui-innen mt-5 p-4">
         <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-          <p className="text-sm text-mb-schiefer">
+          <p className="text-sm text-ui-schiefer">
             Eigenbeteiligung aus dem Nettolohn
-            <span className="block text-2xl font-medium tabular-nums text-mb-tinte">{euroGenau(a.eigenbeteiligungMonat)}</span>
+            <span className="block text-2xl font-medium tabular-nums text-ui-tinte">{euroGenau(a.eigenbeteiligungMonat)}</span>
           </p>
-          <p className="text-right text-sm text-mb-schiefer">
+          <p className="text-right text-sm text-ui-schiefer">
             Gesamtbeitrag
-            <span className="block text-2xl font-medium tabular-nums text-mb-tinte">{euroGenau(a.gesamtMonat)}</span>
+            <span className="block text-2xl font-medium tabular-nums text-ui-tinte">{euroGenau(a.gesamtMonat)}</span>
           </p>
         </div>
-        <div className="mt-3 h-1.5 rounded-full bg-mb-luecke" aria-hidden>
-          <div className="h-1.5 rounded-full bg-mb-tinte" style={{ width: `${anteil * 100}%` }} />
+        <div className="mt-3 h-1.5 rounded-full bg-ui-luecke" aria-hidden>
+          <div className="h-1.5 rounded-full bg-ui-tinte" style={{ width: `${anteil * 100}%` }} />
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-mb-schiefer">
+      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
         ¹ Als Monatsanteil der Jahressteuer. Auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je nach Steuerklasse
         anders; über das Jahr gleicht die Steuererklärung das aus.
       </p>
@@ -531,31 +532,31 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
 }) {
   if (h.monate <= 0) return null;
   const teile = [
-    // Abgestufte Grautoene fuer das Eingezahlte, die Rolle „Luecke“ fuer die Ertraege (Steep: Pfirsich; Seline: Stein).
-    { text: 'Ihr Netto-Aufwand', wert: h.nettoSumme, farbe: 'bg-mb-tinte' },
-    { text: 'Steuer- und SV-Ersparnis', wert: h.ersparnisSumme, farbe: 'bg-mb-daten-2' },
-    { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-mb-daten-3' },
-    { text: 'Erträge', wert: h.ertrag, farbe: 'bg-mb-luecke' },
+    // Abgestufte Grautoene fuer das Eingezahlte, die Rolle „Luecke“ (Stein) fuer die Ertraege.
+    { text: 'Ihr Netto-Aufwand', wert: h.nettoSumme, farbe: 'bg-ui-tinte' },
+    { text: 'Steuer- und SV-Ersparnis', wert: h.ersparnisSumme, farbe: 'bg-ui-daten-2' },
+    { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-ui-daten-3' },
+    { text: 'Erträge', wert: h.ertrag, farbe: 'bg-ui-luecke' },
   ];
   const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
   return (
     <Karte titel="Beispielhafte Hochrechnung" rechts={<Vermerk>geschätzt</Vermerk>}>
-      <p className="text-sm text-mb-schiefer">
+      <p className="text-sm text-ui-schiefer">
         {euro(h.beitragMonat)} im Monat in Ihre Vorsorge, {laufzeitText(h.monate)} bis zum Rentenbeginn{rentenbeginn ? ` am ${rentenbeginn}` : ''}.
       </p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ProzentFeld label="Angenommene Rendite" wert={h.annahmen.renditeAnsparphase} onChange={setzeRendite}
           hilfe="Wertentwicklung im Jahr bis zum Rentenbeginn." />
       </div>
-      <div className="mb-innen mt-5 grid grid-cols-2 gap-3 p-4">
+      <div className="ui-innen mt-5 grid grid-cols-2 gap-3 p-4">
         <div>
           <div className={ETIKETT}>Kapital bei Rentenbeginn</div>
-          <div className="mt-0.5 text-2xl font-medium tabular-nums text-mb-tinte">{euro(h.kapital)}</div>
+          <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">{euro(h.kapital)}</div>
         </div>
         <div>
           <div className={ETIKETT}>Geschätzte Rente brutto</div>
-          <div className="mt-0.5 text-2xl font-medium tabular-nums text-mb-tinte">
-            {euro(h.renteMonat)} <span className="text-sm font-normal text-mb-schiefer">/ Monat</span>
+          <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">
+            {euro(h.renteMonat)} <span className="text-sm font-normal text-ui-schiefer">/ Monat</span>
           </div>
         </div>
       </div>
@@ -568,12 +569,12 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
       <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
         {teile.map((t) => (
           <div key={t.text} className="flex items-center justify-between gap-3">
-            <dt className="flex items-center gap-2 text-mb-schiefer"><span className={`h-2.5 w-2.5 rounded-full ${t.farbe}`} aria-hidden />{t.text}</dt>
-            <dd className="tabular-nums text-mb-tinte">{euro(t.wert)}</dd>
+            <dt className="flex items-center gap-2 text-ui-schiefer"><span className={`h-2.5 w-2.5 rounded-full ${t.farbe}`} aria-hidden />{t.text}</dt>
+            <dd className="tabular-nums text-ui-tinte">{euro(t.wert)}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-4 text-xs leading-relaxed text-mb-schiefer">
+      <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
         Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine
         Zusage. Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab. Die Rente ist brutto, vor
         Kranken- und Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers (nächster Schritt).
@@ -585,12 +586,12 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
 /** Eine Zahl mit Etikett — flach auf Nebel, oder als die eine Akzentkarte. */
 function WertKarte({ titel, wert, unten, akzent = false }: { titel: string; wert: string; unten: string; akzent?: boolean }) {
   return (
-    <div className={`p-5 sm:p-6 ${akzent ? AKZENT : 'mb-karte text-mb-tinte'}`}>
-      <p className={`text-sm ${akzent ? '' : 'text-mb-schiefer'}`}>{titel}</p>
-      <p className={`mt-1 tabular-nums ${akzent ? 'mb-titel text-[40px] leading-none' : 'text-[28px] font-medium leading-tight'}`}>
+    <div className={`p-5 sm:p-6 ${akzent ? AKZENT : 'ui-karte text-ui-tinte'}`}>
+      <p className={`text-sm ${akzent ? '' : 'text-ui-schiefer'}`}>{titel}</p>
+      <p className={`mt-1 tabular-nums ${akzent ? 'ui-titel text-[40px] leading-none' : 'text-[28px] font-medium leading-tight'}`}>
         {akzent ? <Hervor>{wert}</Hervor> : wert}
       </p>
-      <p className={`mt-2 text-xs ${akzent ? '' : 'text-mb-schiefer'}`}>{unten}</p>
+      <p className={`mt-2 text-xs ${akzent ? '' : 'text-ui-schiefer'}`}>{unten}</p>
     </div>
   );
 }
@@ -598,9 +599,9 @@ function WertKarte({ titel, wert, unten, akzent = false }: { titel: string; wert
 /** Eine Zeile einer kleinen Aufstellung — die Summe unter einer Linie in Tinte. */
 function Posten({ text, wert, summe = false }: { text: string; wert: string; summe?: boolean }) {
   return (
-    <div className={`flex justify-between gap-3 py-1 ${summe ? 'mt-1 border-t border-mb-tinte pt-2 font-medium text-mb-tinte' : 'text-mb-schiefer'}`}>
+    <div className={`flex justify-between gap-3 py-1 ${summe ? 'mt-1 border-t border-ui-tinte pt-2 font-medium text-ui-tinte' : 'text-ui-schiefer'}`}>
       <dt>{text}</dt>
-      <dd className={`tabular-nums ${summe ? '' : 'text-mb-tinte'}`}>{wert}</dd>
+      <dd className={`tabular-nums ${summe ? '' : 'text-ui-tinte'}`}>{wert}</dd>
     </div>
   );
 }
@@ -637,13 +638,13 @@ export function SchrittRechnung(props: SchrittProps) {
               <Posten text="= in Ihre Vorsorge" wert={euro(r.gesamtMonat)} summe />
             </dl>
             {r.vertraege.length > 1 && r.vertraege.map((v) => (
-              <p key={v.weg} className="mt-1 flex justify-between gap-2 pl-3 text-xs text-mb-schiefer">
+              <p key={v.weg} className="mt-1 flex justify-between gap-2 pl-3 text-xs text-ui-schiefer">
                 <span>davon {vertragName(v.weg, firma.angebot)}</span><span className="tabular-nums">{euro(v.beitragMonat)}</span>
               </p>
             ))}
           </Karte>
           {r.hinweise.map((h2) => (
-            <p key={h2} className="mb-karte px-4 py-3 text-xs leading-relaxed text-mb-tinte">{h2}</p>
+            <p key={h2} className="ui-karte px-4 py-3 text-xs leading-relaxed text-ui-tinte">{h2}</p>
           ))}
         </div>
       </div>
@@ -659,15 +660,15 @@ export function SchrittRechnung(props: SchrittProps) {
 function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | null; kk: number }) {
   if (!w) return null;
   return (
-    <div className="mb-innen p-4">
-      <h4 className="text-base font-medium text-mb-tinte">{titel}</h4>
+    <div className="ui-innen p-4">
+      <h4 className="text-base font-medium text-ui-tinte">{titel}</h4>
       <dl className="mt-2 text-[13px]">
         <Posten text="Rente brutto" wert={euro(w.bruttoMonat)} />
         <Posten text="− Kranken- und Pflegeversicherung" wert={euro(w.kvPvMonat)} />
         <Posten text="− Steuer" wert={euro(w.steuerMonat)} />
         <Posten text="= netto im Monat" wert={euro(w.nettoMonat)} summe />
       </dl>
-      <p className="mt-2 text-xs text-mb-schiefer">in heutiger Kaufkraft rund {euro(w.nettoMonat / kk)}</p>
+      <p className="mt-2 text-xs text-ui-schiefer">in heutiger Kaufkraft rund {euro(w.nettoMonat / kk)}</p>
     </div>
   );
 }
@@ -678,23 +679,23 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
  */
 function BelastungKasten({ treppe }: { treppe: BelastungsTreppe }) {
   return (
-    <div className="mb-innen p-4">
-      <h4 className="text-base font-medium text-mb-tinte">Ihre Belastung</h4>
-      <p className="text-xs text-mb-schiefer">Ansparphase, im Monat</p>
+    <div className="ui-innen p-4">
+      <h4 className="text-base font-medium text-ui-tinte">Ihre Belastung</h4>
+      <p className="text-xs text-ui-schiefer">Ansparphase, im Monat</p>
       <div className="mt-3 space-y-1.5">
         <GegenueberZeile text="Gesamtbeitrag" wert={euroGenau(treppe.zufluss)} />
         {treppe.zeilen.map((z) => (
           z.art === 'summe' ? (
-            <div key={z.text} className="!mt-2 border-t border-mb-linie pt-2">
+            <div key={z.text} className="!mt-2 border-t border-ui-linie pt-2">
               <GegenueberZeile text={z.text} wert={euroGenau(z.betrag)} />
             </div>
           ) : (
-            <GegenueberZeile key={z.text} text={z.text} wert={euroGenau(z.betrag)} farbe="text-mb-tinte" info={z.erklaerung} />
+            <GegenueberZeile key={z.text} text={z.text} wert={euroGenau(z.betrag)} farbe="text-ui-tinte" info={z.erklaerung} />
           )
         ))}
-        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-mb-tinte pt-2">
-          <span className="text-sm font-medium text-mb-tinte">Kostet Sie wirklich</span>
-          <span className="text-xl font-medium tabular-nums text-mb-tinte">{euroGenau(treppe.aufwand)}</span>
+        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2">
+          <span className="text-sm font-medium text-ui-tinte">Kostet Sie wirklich</span>
+          <span className="text-xl font-medium tabular-nums text-ui-tinte">{euroGenau(treppe.aufwand)}</span>
         </div>
       </div>
     </div>
@@ -721,7 +722,7 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
   return (
     <Karte titel="Kennzahlen und Fazit">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="max-w-xl text-sm leading-relaxed text-mb-schiefer">
+        <p className="max-w-xl text-sm leading-relaxed text-ui-schiefer">
           Ihr Netto-Aufwand gegen die Netto-Auszahlung — der Vertrag allein,{' '}
           {istKapital ? `mit der ${k.geschaetzt ? 'geschätzten ' : ''}Kapitalauszahlung`
             : haupt.art === 'prognose' ? (k.geschaetzt ? 'mit der geschätzten Rente aus der Hochrechnung' : 'mit der prognostizierten Rente')
@@ -734,9 +735,9 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
       </div>
 
       {/* Ohne Ampel: Ob sich der Vertrag rechnet, sagen die Zahlen und das Fazit — nicht Gruen oder Rot. */}
-      <div className={`mb-innen mt-4 p-4 sm:p-5 ${aktuell ? '' : 'opacity-60'}`}>
+      <div className={`ui-innen mt-4 p-4 sm:p-5 ${aktuell ? '' : 'opacity-60'}`}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Kennzahl titel="Netto-Hebel" wert={`${zahl(haupt.nettoHebel)} ×`} farbe="text-mb-tinte"
+          <Kennzahl titel="Netto-Hebel" wert={`${zahl(haupt.nettoHebel)} ×`} farbe="text-ui-tinte"
             fussnote="Auszahlung je Euro Einzahlung"
             info={(
               <>
@@ -745,7 +746,7 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
                 Steuer- und Sozialabgabenersparnis. Ohne Verzinsung gerechnet — was das Geld dann wert ist, sagt die Rendite daneben.
               </>
             )} />
-          <Kennzahl titel="Nettorendite" wert={`${zahl(haupt.rendite * 100)} %`} farbe="text-mb-tinte"
+          <Kennzahl titel="Nettorendite" wert={`${zahl(haupt.rendite * 100)} %`} farbe="text-ui-tinte"
             fussnote="p. a. nach allen Abzügen"
             info={(
               <>
@@ -754,16 +755,16 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
                 <strong>berücksichtigt er, wann</strong> jeder Euro fließt.
               </>
             )} />
-          <Kennzahl titel="Netto-Gewinn" wert={euro(haupt.echterGewinn)} farbe="text-mb-tinte"
+          <Kennzahl titel="Netto-Gewinn" wert={euro(haupt.echterGewinn)} farbe="text-ui-tinte"
             fussnote={istKapital ? 'mit der Kapitalauszahlung' : `bis ${k.lebenserwartung}`} />
           {!istKapital && (
             <Kennzahl titel="Amortisation" wert={`${zahl(haupt.amortisationsJahre, 1)} J.`} fussnote="ab Rentenbeginn" />
           )}
         </div>
-        <div className="mt-4 space-y-1.5 border-t border-mb-linie pt-3">
-          <GegenueberZeile text={`Eingezahlt, netto (${laufzeit})`} wert={euro(haupt.summeEinzahlung)} farbe="text-mb-tinte" />
+        <div className="mt-4 space-y-1.5 border-t border-ui-linie pt-3">
+          <GegenueberZeile text={`Eingezahlt, netto (${laufzeit})`} wert={euro(haupt.summeEinzahlung)} farbe="text-ui-tinte" />
           <GegenueberZeile text={istKapital ? 'Ausgezahlt, netto (einmalig)' : `Ausgezahlt, netto (${k.jahreAuszahlung} Jahre bis ${k.lebenserwartung})`}
-            wert={euro(haupt.summeAuszahlung)} farbe="text-mb-tinte" />
+            wert={euro(haupt.summeAuszahlung)} farbe="text-ui-tinte" />
         </div>
       </div>
 
@@ -771,12 +772,12 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[20rem] text-sm">
             <thead>
-              <tr className="text-mb-schiefer">
+              <tr className="text-ui-schiefer">
                 <th className="py-2 text-left font-normal" />
                 {wege.map((w) => <th key={w.art} className="py-2 pl-2 text-right font-normal">{WEG_TITEL[w.art]}</th>)}
               </tr>
             </thead>
-            <tbody className="tabular-nums text-mb-tinte">
+            <tbody className="tabular-nums text-ui-tinte">
               {([
                 ['Netto', (w: KennzahlenWeg) => (w.art === 'kapital' ? euro(w.netto) : `${euro(w.netto)} / Mon.`)],
                 ['Netto-Hebel', (w: KennzahlenWeg) => `${zahl(w.nettoHebel)} ×`],
@@ -784,8 +785,8 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
                 ['Netto-Gewinn', (w: KennzahlenWeg) => euro(w.echterGewinn)],
                 ['Amortisation', (w: KennzahlenWeg) => (w.art === 'kapital' ? '—' : `${zahl(w.amortisationsJahre, 1)} J.`)],
               ] as const).map(([text, wert]) => (
-                <tr key={text} className="border-t border-mb-linie">
-                  <td className="py-2 text-mb-schiefer">{text}</td>
+                <tr key={text} className="border-t border-ui-linie">
+                  <td className="py-2 text-ui-schiefer">{text}</td>
                   {wege.map((w) => <td key={w.art} className="py-2 pl-2 text-right">{wert(w)}</td>)}
                 </tr>
               ))}
@@ -797,7 +798,7 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
       {/* Das Fazit ist die Aussage dieses Schritts — die eine Akzentkarte. */}
       <div className={`${AKZENT} mt-6 p-6 sm:p-8`}>
         <p className="text-sm">Fazit</p>
-        <p className="mb-titel mt-2 max-w-4xl text-[20px] leading-[1.45] sm:text-[24px]">{fazitText(k)}</p>
+        <p className="ui-titel mt-2 max-w-4xl text-[20px] leading-[1.45] sm:text-[24px]">{fazitText(k)}</p>
       </div>
     </Karte>
   );
@@ -815,11 +816,11 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   const h = hochrechnung(firma.angebot, daten, r);
 
   if (r.vertraege.length === 0) {
-    return <Karte><p className="text-sm text-mb-tinte">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
+    return <Karte><p className="text-sm text-ui-tinte">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
   }
   return (
     <div className="space-y-6">
-      <p className="max-w-4xl text-base leading-relaxed text-mb-schiefer">
+      <p className="max-w-4xl text-base leading-relaxed text-ui-schiefer">
         Tragen Sie die Werte aus dem Angebot des Versicherers ein — oder übernehmen Sie die geschätzte Hochrechnung aus „Ihre
         Rechnung“. Daraus wird die Rente nach Kranken- und Pflegeversicherung und Steuer im ersten
         Rentenjahr{leistung ? ` (${leistung.rentenbeginnJahr})` : ''}.
@@ -850,19 +851,19 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                 <ZahlFeld label="Kapital zum Rentenbeginn (Prognose)" wert={w.prognoseKapital} onChange={(prognoseKapital) => setzePrognose(v.weg, { prognoseKapital })} einheit="€" schritt={1000} />
                 <ProzentFeld label="Dynamik des Beitrags" wert={w.dynamik} onChange={(dynamik) => setzeW(v.weg, { dynamik })} max={10} />
                 {schaetzung && (!w.ausHochrechnung || veraltet) && (
-                  <div className="mb-innen p-4">
+                  <div className="ui-innen p-4">
                     <button type="button" onClick={uebernehmen} className={KNOPF_ZWEIT}>
                       <Wand2 className="h-4 w-4" aria-hidden /> {veraltet ? 'Hochrechnung erneut übernehmen' : 'Geschätzte Hochrechnung übernehmen'}
                     </button>
-                    <p className="mt-2 text-xs leading-relaxed text-mb-schiefer">
-                      {veraltet ? <strong className="font-medium text-mb-tinte">Die Hochrechnung hat sich seit der Übernahme geändert. </strong> : ''}
+                    <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+                      {veraltet ? <strong className="font-medium text-ui-tinte">Die Hochrechnung hat sich seit der Übernahme geändert. </strong> : ''}
                       Aus „Ihre Rechnung“: Kapital {euro(schaetzung.kapital)} und Rente {euro(schaetzung.renteMonat)} im Monat — als
                       Prognose, gekennzeichnet als geschätzt.
                     </p>
                   </div>
                 )}
                 {w.ausHochrechnung && !veraltet && (
-                  <p className="text-xs leading-relaxed text-mb-schiefer">
+                  <p className="text-xs leading-relaxed text-ui-schiefer">
                     Rente und Kapital stammen aus der geschätzten Hochrechnung — keine Zusage. Liegt das Angebot des Versicherers vor,
                     tragen Sie dessen Werte einfach darüber ein.
                   </p>
@@ -878,11 +879,11 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                     )}
                   </div>
                 )}
-                {ohneGeburt && <p className="text-sm text-mb-tinte">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
-                {!ohneGeburt && !l && <p className="text-sm text-mb-schiefer">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
+                {ohneGeburt && <p className="text-sm text-ui-tinte">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
+                {!ohneGeburt && !l && <p className="text-sm text-ui-schiefer">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
                 {l?.kapital && (
-                  <div className="mb-innen p-4">
-                    <h4 className="text-base font-medium text-mb-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
+                  <div className="ui-innen p-4">
+                    <h4 className="text-base font-medium text-ui-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
                     <dl className="mt-2 text-[13px]">
                       <Posten text="Kapital brutto" wert={euro(l.kapital.brutto)} />
                       <Posten text="− Steuer" wert={euro(l.kapital.steuer)} />
@@ -890,7 +891,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                       <Posten text="= netto" wert={euro(l.kapital.netto)} summe />
                     </dl>
                     {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins) && (
-                      <p className="mt-2 text-xs text-mb-schiefer">
+                      <p className="mt-2 text-xs text-ui-schiefer">
                         Die Rente holt das Kapital mit rund {Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.
                       </p>
                     )}
@@ -939,7 +940,7 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
             <button key={w.status} type="button" role="radio" aria-checked={e.status === w.status}
               onClick={() => waehle(w.status)}
               className={`flex items-center gap-2 rounded-full border px-5 py-3 text-left text-sm font-medium transition-colors ${
-                e.status === w.status ? 'border-mb-dunkel bg-mb-dunkel text-white' : 'border-mb-linie bg-mb-karte text-mb-tinte hover:border-mb-tinte'
+                e.status === w.status ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-linie bg-ui-karte text-ui-tinte hover:border-ui-tinte'
               }`}>
               {w.symbol}{w.text}
             </button>
@@ -949,8 +950,8 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
         {e.status === 'teilnahme' && (
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div>
-              <span className="mb-1 block text-xs font-semibold text-slate-600">Umwandlung im Monat</span>
-              <p className="mb-titel text-[34px] leading-tight tabular-nums text-mb-tinte">{euroGenau(r.umwandlungMonat)}</p>
+              <span className={FELD_LABEL}>Umwandlung im Monat</span>
+              <p className="ui-titel text-[34px] leading-tight tabular-nums text-ui-tinte">{euroGenau(r.umwandlungMonat)}</p>
               <button type="button" onClick={() => geheZu(3)} className={`${LINK} text-xs`}>Betrag ändern →</button>
             </div>
             <div>
@@ -971,8 +972,8 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
           </div>
         )}
         {e.status === 'offen' && (
-          <div className="mb-innen mt-6 flex flex-wrap items-center gap-3 p-4">
-            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-mb-tinte">
+          <div className="ui-innen mt-6 flex flex-wrap items-center gap-3 p-4">
+            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-ui-tinte">
               Bedenkzeit? Geben Sie die Gesprächsunterlagen mit — alles aus dem Gespräch zum Nachlesen, mit Ihrem Kontakt für
               Rückfragen.
             </p>
@@ -1057,7 +1058,7 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
         beratungId={beratungId} />
 
       <Karte titel="Unterlagen">
-        <p className="text-sm leading-relaxed text-mb-schiefer">
+        <p className="text-sm leading-relaxed text-ui-schiefer">
           {fest
             ? 'Die Unterlagen tragen die Unterschriften vom Bildschirm. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
               + `Arbeitgeber unterschreibt auf Papier. Dann gehen sie an die Personalabteilung, eine Kopie bekommt ${name || 'der Mitarbeiter'}.`
@@ -1074,12 +1075,12 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
         </div>
         {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
         {status === 'offen' && (
-          <p className="mt-3 text-sm text-mb-schiefer">
+          <p className="mt-3 text-sm text-ui-schiefer">
             Noch keine Entscheidung — die Gesprächsunterlagen bekommt {name || 'der Mitarbeiter'} zum Nachlesen mit,
             das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
           </p>
         )}
-        <p className="mt-5 text-xs leading-relaxed text-mb-schiefer">
+        <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
           Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der
           Versorgungsordnung der Firma abgleichen.
         </p>

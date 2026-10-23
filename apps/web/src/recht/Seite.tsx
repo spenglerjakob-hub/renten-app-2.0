@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
+import { Hinweis, Titel } from '../components/stil';
 
 /**
  * Impressum, Datenschutzerklaerung und Nutzungsbedingungen.
@@ -10,8 +11,8 @@ import { RechtsLinks } from '../components/RechtsLinks';
  * Daten wohin gehen, wer sie sieht, wie lange sie bleiben. Rechtlich
  * geprueft sind sie nicht: Alles in [eckigen Klammern] muss der Betreiber
  * ausfuellen, und vor der Veroeffentlichung gehoert beides in die Hand eines
- * Anwalts oder eines Generators mit Abmahnschutz. Der gelbe Vermerk oben
- * bleibt, bis `ENTWURF` auf false steht.
+ * Anwalts oder eines Generators mit Abmahnschutz. Der Vermerk oben bleibt,
+ * bis `ENTWURF` auf false steht.
  *
  * Aendert sich die Verarbeitung (neuer Dienst, neue Daten), muss die
  * Datenschutzerklaerung mitgezogen werden. Aendern sich die
@@ -25,20 +26,19 @@ export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
 
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf breite="max-w-3xl" verlinkt />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {ENTWURF && (
-          <div role="note" className="mb-6 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <Hinweis symbol={AlertTriangle} klasse="mb-6">
             <p>
-              <strong>Entwurf.</strong> Angaben in [eckigen Klammern] sind noch auszufüllen. Vor der
+              <strong className="font-medium">Entwurf.</strong> Angaben in [eckigen Klammern] sind noch auszufüllen. Vor der
               Veröffentlichung rechtlich prüfen lassen.
             </p>
-          </div>
+          </Hinweis>
         )}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <article className="ui-karte p-5 sm:p-8 [&_strong]:font-medium [&_strong]:text-ui-tinte">
           {seite === 'impressum' ? <Impressum /> : seite === 'datenschutz' ? <Datenschutz /> : <Nutzungsbedingungen />}
         </article>
         <RechtsLinks klasse="mt-6 justify-center" />
@@ -48,16 +48,16 @@ export function Seite({ seite }: { seite: RechtsSeite }) {
 }
 
 function H1({ children }: { children: ReactNode }) {
-  return <h1 className="text-2xl font-black tracking-tight text-slate-900">{children}</h1>;
+  return <Titel>{children}</Titel>;
 }
 function H2({ children }: { children: ReactNode }) {
-  return <h2 className="mt-7 text-base font-black text-slate-900">{children}</h2>;
+  return <h2 className="ui-titel mt-8 text-xl font-normal text-ui-tinte">{children}</h2>;
 }
 function P({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-sm leading-relaxed text-slate-700">{children}</p>;
+  return <p className="mt-2 text-sm leading-relaxed text-ui-tinte/80">{children}</p>;
 }
 function Liste({ children }: { children: ReactNode }) {
-  return <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-700">{children}</ul>;
+  return <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ui-tinte/80 marker:text-ui-asche">{children}</ul>;
 }
 
 function Impressum() {
@@ -110,12 +110,12 @@ function Datenschutz() {
   return (
     <>
       <H1>Datenschutzerklärung</H1>
-      <p className="mt-1 text-xs text-slate-500">Stand: {STAND}</p>
+      <p className="mt-1 text-xs text-ui-schiefer">Stand: {STAND}</p>
 
       <H2>1. Verantwortlicher</H2>
       <P>
         [Vor- und Nachname bzw. Firma], [Anschrift], E-Mail: info@js-rentenplaner.de. Die vollständigen Angaben
-        stehen im <a href="/impressum" className="text-indigo-700 underline">Impressum</a>.
+        stehen im <a href="/impressum" className="text-ui-tinte underline underline-offset-2">Impressum</a>.
       </P>
 
       <H2>2. Überblick</H2>
@@ -307,7 +307,7 @@ function Datenschutz() {
         DSGVO). Stripe kann Daten an die Stripe, Inc. in den USA übermitteln. Grundlage dafür ist das
         EU-US Data Privacy Framework, ergänzend gelten EU-Standardvertragsklauseln. Mehr dazu in der
         Datenschutzerklärung von Stripe:{' '}
-        <a href="https://stripe.com/de/privacy" className="text-indigo-700 underline" target="_blank" rel="noopener">stripe.com/de/privacy</a>.
+        <a href="https://stripe.com/de/privacy" className="text-ui-tinte underline underline-offset-2" target="_blank" rel="noopener">stripe.com/de/privacy</a>.
         [Rolle von Stripe — Auftragsverarbeiter bzw. eigener Verantwortlicher — und Angaben zur Übermittlung
         anhand des aktuellen Stripe-DPA prüfen.]
       </P>
@@ -400,14 +400,14 @@ function Nutzungsbedingungen() {
   return (
     <>
       <H1>Nutzungsbedingungen</H1>
-      <p className="mt-1 text-xs text-slate-500">Fassung vom 20. Oktober 2026</p>
+      <p className="mt-1 text-xs text-ui-schiefer">Fassung vom 20. Oktober 2026</p>
 
       <H2>1. Geltungsbereich</H2>
       <P>
         Diese Bedingungen gelten für die Nutzung des JS-Rentenplaners unter js-rentenplaner.de — des Rechners,
         der Arbeitgeber-Seiten, des Vorsorge-Checks und aller weiteren Inhalte. Anbieter ist [Vor- und Nachname
         bzw. Firma, Anschrift] (im Folgenden „Anbieter“), siehe{' '}
-        <a href="/impressum" className="text-indigo-700 underline">Impressum</a>. Mit der Registrierung bzw. der
+        <a href="/impressum" className="text-ui-tinte underline underline-offset-2">Impressum</a>. Mit der Registrierung bzw. der
         Zustimmung im Konto akzeptieren Sie diese Bedingungen.
       </P>
 
@@ -441,7 +441,7 @@ function Nutzungsbedingungen() {
         </li>
         <li>
           <strong>Pakete und Preise.</strong> Es gelten die Pakete und Preise, die bei der Buchung auf der{' '}
-          <a href="/preise" className="text-indigo-700 underline">Preisseite</a> und auf der Bestellseite genannt
+          <a href="/preise" className="text-ui-tinte underline underline-offset-2">Preisseite</a> und auf der Bestellseite genannt
           sind. Alle Preise verstehen sich je Nutzer und zuzüglich der gesetzlichen Umsatzsteuer. Der Preis je
           Nutzer richtet sich nach der Zahl der gebuchten Plätze; der Preis der erreichten Staffel gilt für alle
           Plätze des Büros.
