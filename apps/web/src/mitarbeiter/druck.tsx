@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { MitarbeiterBav } from '@renten/engine';
 import type { BeratungDaten } from '@renten/schema';
-import type { Firma } from '../lib/bav-beratung';
+import type { Firma, UnterschriftPerson } from '../lib/bav-beratung';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import { DeckblattKopf } from '../druck/DeckblattKopf';
 import { laufzeitText } from '../features/tuev-berechnung';
@@ -75,13 +75,25 @@ function Betrag({ text, wert, summe = false }: { text: string; wert: number; sum
   );
 }
 
-function Unterschriften({ links, rechts, ort }: { links: string; rechts: string; ort: string }) {
+/**
+ * Eine Zeile zum Unterschreiben. Mit `feld` kann die Person am Bildschirm
+ * unterschreiben: Der Druck der festgeschriebenen Fassung setzt Unterschrift
+ * und Vermerk in die Platzhalter (festschreiben.tsx). Leer bleibt die Zeile
+ * fuer Papier — wie die des Arbeitgebers.
+ */
+interface UnterschriftsZeile { wer: string; feld?: UnterschriftPerson }
+
+function Unterschriften({ links, rechts, ort }: { links: UnterschriftsZeile; rechts: UnterschriftsZeile; ort: string }) {
   return (
-    <div className="mt-10 grid grid-cols-2 gap-10 text-[9pt] text-slate-700 break-inside-avoid">
-      {[links, rechts].map((wer) => (
-        <div key={wer}>
-          <p className="h-6">{ort}</p>
-          <p className="border-t border-slate-500 pt-1">Ort, Datum, Unterschrift {wer}</p>
+    <div className="mt-6 grid grid-cols-2 gap-10 text-[9pt] text-slate-700 break-inside-avoid">
+      {[links, rechts].map((z) => (
+        <div key={z.wer}>
+          <div className="flex h-[16mm] items-end justify-between gap-3">
+            <p className="shrink-0">{ort}</p>
+            {z.feld && <div data-unterschrift={z.feld} className="flex h-full min-w-0 flex-1 items-end justify-end" />}
+          </div>
+          <p className="border-t border-slate-500 pt-1">Ort, Datum, Unterschrift {z.wer}</p>
+          {z.feld && <p data-vermerk={z.feld} className="text-[7.5pt] leading-snug text-slate-500" />}
         </div>
       ))}
     </div>
@@ -309,7 +321,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         </p>
       </Abschnitt>
 
-      <Unterschriften links="Mitarbeiter" rechts="Berater" ort={ortDatum(daten)} />
+      <Unterschriften links={{ wer: 'Mitarbeiter', feld: 'mitarbeiter' }} rechts={{ wer: 'Berater', feld: 'berater' }} ort={ortDatum(daten)} />
       <p className="mt-6 text-[8pt] text-slate-500">
         Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
         mit den Regeln von heute fortgeschrieben.
@@ -633,7 +645,7 @@ export function Vereinbarung({ firma, logo, daten, r }: DokumentProps) {
         beitragspflichtige Entgelt; daraus können sich geringere Leistungen der gesetzlichen Sozialversicherung ergeben.
       </p>
 
-      <Unterschriften links="Arbeitgeber" rechts="Arbeitnehmer" ort={ortDatum(daten)} />
+      <Unterschriften links={{ wer: 'Arbeitgeber' }} rechts={{ wer: 'Arbeitnehmer', feld: 'mitarbeiter' }} ort={ortDatum(daten)} />
       <Muster />
     </article>
   );
@@ -665,7 +677,7 @@ export function Verzicht({ firma, logo, daten, r }: DokumentProps) {
       </p>
       {e.grund.trim() && <p className="mt-3"><span className="text-slate-600">Grund (freiwillig):</span> {e.grund.trim()}</p>}
 
-      <Unterschriften links="Arbeitnehmer" rechts="Arbeitgeber (Kenntnisnahme)" ort={ortDatum(daten)} />
+      <Unterschriften links={{ wer: 'Arbeitnehmer', feld: 'mitarbeiter' }} rechts={{ wer: 'Arbeitgeber (Kenntnisnahme)' }} ort={ortDatum(daten)} />
       <Muster />
     </article>
   );

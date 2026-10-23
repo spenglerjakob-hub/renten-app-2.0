@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Lock, Plus, Trash2 } from 'lucide-react';
 import { beratungDatenSchema } from '@renten/schema';
 import {
-  beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, type Beratung, type Firma,
+  beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
 } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
 import { ETIKETT, FirmenZeichen, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, StatusChip, useFirmenlogo } from './bausteine';
@@ -27,14 +27,17 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const [loeschen, setLoeschen] = useState<Beratung | null>(null);
+  // Welche Beratungen am Bildschirm unterschrieben sind — fehlt der Stand, entfaellt nur der Hinweis.
+  const [unterschrieben, setUnterschrieben] = useState<Record<string, UnterschriftPerson[]>>({});
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
 
   useEffect(() => {
     let aktiv = true;
-    void Promise.all([firmaLaden(firmaId), beratungenLaden(firmaId)]).then(([f, b]) => {
+    void Promise.all([firmaLaden(firmaId), beratungenLaden(firmaId), unterschriebeneLaden(firmaId)]).then(([f, b, u]) => {
       if (!aktiv) return;
       setFirma(f);
       setBeratungen(b);
+      setUnterschrieben(u === 'fehler' ? {} : u);
     });
     return () => { aktiv = false; };
   }, [firmaId]);
@@ -126,6 +129,11 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
                       className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-left">
                       <span className="min-w-0 break-words text-base font-medium text-mb-tinte">{b.mitarbeiter || 'Ohne Namen'}</span>
                       <StatusChip status={b.status} betrag={b.daten.umwandlungMonat} />
+                      {unterschrieben[b.id] && (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-mb-tinte">
+                          <Lock className="h-3.5 w-3.5" aria-hidden /> unterschrieben
+                        </span>
+                      )}
                       {b.beratenAm && <span className="text-sm text-mb-asche">{datumText(b.beratenAm)}</span>}
                       <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-mb-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </button>
@@ -156,7 +164,9 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
 
       <Dialog offen={loeschen !== null} titel="Beratung löschen?" onSchliessen={() => setLoeschen(null)}>
         <p className="text-sm leading-relaxed text-slate-700">
-          Die Beratung von „{loeschen?.mitarbeiter || 'ohne Namen'}“ wird gelöscht. Ausgedruckte Unterlagen bleiben davon unberührt.
+          Die Beratung von „{loeschen?.mitarbeiter || 'ohne Namen'}“ wird gelöscht
+          {loeschen && unterschrieben[loeschen.id] ? ', mit den unterschriebenen Unterlagen' : ''}. Ausgedruckte Unterlagen bleiben
+          davon unberührt.
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setLoeschen(null)} className={KNOPF_ZWEIT}>Abbrechen</button>

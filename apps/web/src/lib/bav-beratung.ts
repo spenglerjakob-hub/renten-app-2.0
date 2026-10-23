@@ -15,6 +15,11 @@ import { zufallsname } from './check';
  *
  * Ein Logo liegt unter <Nutzer-ID>/<Firma>-<24 hex>.png|webp. Ein neues
  * bekommt einen neuen Namen — die Policies erlauben kein Ueberschreiben.
+ *
+ * Die Unterschrift am Bildschirm (Migration 20261023120000): Bei der ersten
+ * Unterschrift werden die Unterlagen festgeschrieben (`bav_unterlagen`), die
+ * Unterschriften stehen in `bav_unterschriften`. Geaendert wird dort nichts,
+ * nur als Ganzes geloescht.
  */
 export const FIRMENLOGO_BUCKET = 'bav-firmenlogos';
 
@@ -40,6 +45,29 @@ export interface Beratung {
 
 /** Stand der Beratungen einer Firma — fuer die Liste. */
 export type Stand = Record<BeratungStatus, number>;
+
+export type UnterschriftPerson = 'mitarbeiter' | 'berater';
+export type UnterlagenArt = 'protokoll' | 'vereinbarung' | 'verzicht';
+
+export interface Unterschrift {
+  person: UnterschriftPerson;
+  name: string;
+  /** Der Linienzug als SVG-Pfad */
+  zug: string;
+  /** Welche Unterlagen sie abdeckt — von der Datenbank gesetzt */
+  dokumente: UnterlagenArt[];
+  /** Zeitpunkt der Datenbank */
+  unterschriebenAm: string;
+}
+
+/** Die festgeschriebenen Unterlagen einer Beratung — ohne das HTML, das kommt erst zum Drucken. */
+export interface Unterlagen {
+  beratung: string;
+  erstelltAm: string;
+  /** SHA-256 je Dokument, von der Datenbank gerechnet */
+  pruefsummen: Partial<Record<UnterlagenArt, string>>;
+  unterschriften: Unterschrift[];
+}
 
 const FIRMA_SPALTEN = 'id, name, angebot, logo, geaendert_am';
 const BERATUNG_SPALTEN = 'id, firma, mitarbeiter, status, beraten_am, daten, geaendert_am';
@@ -80,6 +108,8 @@ async function nutzerId(): Promise<string | null> {
  */
 const laufend = new Set<Promise<boolean>>();
 const laufendeAbwarten = () => Promise.allSettled([...laufend]);
+/** Vor dem Festschreiben: Keine aeltere Speicherung darf den neuesten Stand noch ueberholen. */
+export const speicherungenAbwarten = laufendeAbwarten;
 
 /** Ein Name auf die Grenze der Datenbank gekappt — leer wird er abgewiesen. */
 const name120 = (s: string) => s.trim().slice(0, 120);
@@ -292,5 +322,118 @@ export async function firmenlogosAufraeumen(firma: string, behalten: string | nu
     if (weg.length > 0) await supabase.storage.from(FIRMENLOGO_BUCKET).remove(weg);
   } catch {
     /* naechstes Mal */
+  }
+}
+
+// --- Unterschriften --------------------------------------------------------
+
+const PERSONEN: readonly UnterschriftPerson[] = ['mitarbeiter', 'berater'];
+const ARTEN: readonly UnterlagenArt[] = ['protokoll', 'vereinbarung', 'verzicht'];
+const istPerson = (x: unknown): x is UnterschriftPerson => (PERSONEN as readonly unknown[]).includes(x);
+const istArt = (x: unknown): x is UnterlagenArt => (ARTEN as readonly unknown[]).includes(x);
+
+interface UnterschriftZeile { person: unknown; name: string; zug: string; dokumente: unknown; unterschrieben_am: string }
+interface UnterlagenZeile { beratung: string; erstellt_am: string; pruefsummen: unknown; bav_unterschriften: UnterschriftZeile[] | null }
+
+const unterschriftAus = (z: UnterschriftZeile): Unterschrift | null => (istPerson(z.person) ? {
+  person: z.person, name: z.name, zug: z.zug,
+  dokumente: Array.isArray(z.dokumente) ? z.dokumente.filter(istArt) : [],
+  unterschriebenAm: z.unterschrieben_am,
+} : null);
+
+function unterlagenAus(z: UnterlagenZeile): Unterlagen {
+  const p = z.pruefsummen && typeof z.pruefsummen === 'object' ? z.pruefsummen as Record<string, unknown> : {};
+  const pruefsummen: Unterlagen['pruefsummen'] = {};
+  for (const a of ARTEN) {
+    const wert = p[a];
+    if (typeof wert === 'string') pruefsummen[a] = wert;
+  }
+  const unterschriften = (z.bav_unterschriften ?? [])
+    .map(unterschriftAus)
+    .filter((u): u is Unterschrift => u !== null)
+    .sort((a, b) => PERSONEN.indexOf(a.person) - PERSONEN.indexOf(b.person));
+  return { beratung: z.beratung, erstelltAm: z.erstellt_am, pruefsummen, unterschriften };
+}
+
+const UNTERLAGEN_SPALTEN = 'beratung, erstellt_am, pruefsummen, bav_unterschriften(person, name, zug, dokumente, unterschrieben_am)';
+
+/** Der Stand der Unterschriften einer Beratung, ohne das HTML — null: nicht unterschrieben. */
+export async function unterlagenLaden(beratung: string): Promise<Unterlagen | null | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.from('bav_unterlagen').select(UNTERLAGEN_SPALTEN).eq('beratung', beratung).maybeSingle();
+    if (error) return 'fehler';
+    return data ? unterlagenAus(data as unknown as UnterlagenZeile) : null;
+  } catch {
+    return 'fehler';
+  }
+}
+
+/** Das festgeschriebene HTML eines Dokuments — erst zum Drucken geladen. */
+export async function unterlageHtmlLaden(beratung: string, art: UnterlagenArt): Promise<string | null | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.from('bav_unterlagen').select(art).eq('beratung', beratung).maybeSingle();
+    if (error) return 'fehler';
+    const html = (data as Record<string, unknown> | null)?.[art];
+    return typeof html === 'string' ? html : null;
+  } catch {
+    return 'fehler';
+  }
+}
+
+/** Was bei der ersten Unterschrift festgeschrieben wird: das Protokoll und Vereinbarung oder Verzicht. */
+export interface UnterlagenHtml { protokoll: string; vereinbarung?: string; verzicht?: string }
+
+/**
+ * Unterschreiben (RPC `bav_unterschreiben`). Gibt es noch keine
+ * festgeschriebenen Unterlagen, schreibt die erste Unterschrift `unterlagen`
+ * fest — in derselben Transaktion; spaeter bleibt `unterlagen` unbeachtet.
+ * 'doppelt': Diese Person hat schon unterschrieben.
+ */
+export async function unterschreiben(
+  beratung: string, person: UnterschriftPerson, name: string, zug: string, unterlagen: UnterlagenHtml | null,
+): Promise<Unterschrift | 'doppelt' | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.rpc('bav_unterschreiben', {
+      p_beratung: beratung, p_person: person, p_name: name120(name), p_zug: zug,
+      p_protokoll: unterlagen?.protokoll ?? null,
+      p_vereinbarung: unterlagen?.vereinbarung ?? null,
+      p_verzicht: unterlagen?.verzicht ?? null,
+    });
+    if (error) return error.code === '23505' ? 'doppelt' : 'fehler';
+    return (data && typeof data === 'object' ? unterschriftAus(data as UnterschriftZeile) : null) ?? 'fehler';
+  } catch {
+    return 'fehler';
+  }
+}
+
+/** Die Unterschriften aufheben: Die Unterlagen werden geloescht, ihre Unterschriften gehen mit (Kaskade). */
+export async function unterschriftenAufheben(beratung: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase.from('bav_unterlagen').delete().eq('beratung', beratung);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/** Welche Beratungen einer Firma unterschrieben sind, mit den Personen — fuer die Liste. */
+export async function unterschriebeneLaden(firma: string): Promise<Record<string, UnterschriftPerson[]> | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.from('bav_unterlagen')
+      .select('beratung, bav_beratungen!inner(firma), bav_unterschriften(person)')
+      .eq('bav_beratungen.firma', firma);
+    if (error) return 'fehler';
+    const stand: Record<string, UnterschriftPerson[]> = {};
+    for (const z of data as unknown as { beratung: string; bav_unterschriften: { person: unknown }[] | null }[]) {
+      stand[z.beratung] = (z.bav_unterschriften ?? []).map((u) => u.person).filter(istPerson);
+    }
+    return stand;
+  } catch {
+    return 'fehler';
   }
 }

@@ -208,9 +208,16 @@ function Datenschutz() {
         sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
         Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
         betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
-        im Browser; gespeichert werden nur die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
+        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
         sichtbar, das sie angelegt hat; das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen
         Speicher bei Supabase in der EU.
+      </P>
+      <P>
+        Unterschreiben Mitarbeiter und Berater am Bildschirm, speichern wir die Unterlagen so, wie sie unterschrieben
+        wurden (Beratungsprotokoll und Vereinbarung oder Verzichtserklärung, mit den Zahlen darin), dazu je
+        Unterschrift den Linienzug, den Namen und den Zeitpunkt. Vom Linienzug speichern wir nur die Form — keine
+        Schreibdynamik wie Druck oder Tempo. Danach lässt sich die Beratung nicht mehr ändern, bis der Berater die
+        Unterschriften aufhebt.
       </P>
       <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
@@ -220,8 +227,9 @@ function Datenschutz() {
         Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
       </P>
       <P>
-        Gelöscht wird eine Beratung, sobald der Berater sie löscht. Mit einer Firma werden ihre Beratungen und ihr
-        Logo gelöscht, mit dem Konto alles.
+        Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen und
+        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Mit einer Firma werden ihre Beratungen
+        und ihr Logo gelöscht, mit dem Konto alles.
       </P>
 
       <H2>8. Vorsorge-Check</H2>
@@ -339,8 +347,9 @@ function Datenschutz() {
       <H2>14. Speicherdauer im Überblick</H2>
       <Liste>
         <li>
-          Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung, Ihr Auftritt im Gutachten
-          und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht vorher löschen.
+          Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung samt unterschriebener
+          Unterlagen, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht
+          vorher löschen.
         </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>

@@ -190,6 +190,12 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
           <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
         </button>
       </div>
+      {beratungen > 0 && (
+        <p className="text-xs leading-relaxed text-mb-schiefer">
+          Änderungen am Angebot gelten für alle Beratungen, die noch nicht unterschrieben sind. Unterschriebene Unterlagen
+          bleiben, wie sie unterschrieben wurden.
+        </p>
+      )}
       {meldung && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
 
       <Dialog offen={loeschen} titel="Firma löschen?" onSchliessen={() => setLoeschen(false)}>

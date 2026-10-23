@@ -2,7 +2,9 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import type { BeratungAngaben, BeratungDaten, BeratungStatus, VersichererWerte } from '@renten/schema';
-import type { Firma } from '../lib/bav-beratung';
+import {
+  speicherungenAbwarten, unterschreiben, type Firma, type UnterlagenArt, type Unterlagen, type UnterlagenHtml, type UnterschriftPerson,
+} from '../lib/bav-beratung';
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
@@ -20,6 +22,8 @@ import {
 } from './rechnung';
 import { fazitText, festePunkte, firmenHinweise, regelKern, regelText, traegerText, vertragName } from './texte';
 import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
+import { unterlageErfassen } from './festschreiben';
+import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzeichner } from './Unterschrift';
 
 /** Was zum Drucken der Unterlagen gebraucht wird — in der Entscheidung und bei den Unterlagen. */
 interface UnterlagenProps {
@@ -27,6 +31,16 @@ interface UnterlagenProps {
   sichern: (d: BeratungDaten) => Promise<boolean>;
   luecke: Versorgungsluecke | null;
   kennzahlen: KennzahlenErgebnis | null;
+}
+
+/** Fuer die Unterschrift am Bildschirm — nur bei den Unterlagen. */
+interface UnterschriftProps {
+  beratungId: string;
+  /** null: noch nicht unterschrieben */
+  unterlagen: Unterlagen | null | 'fehler';
+  aktualisieren: () => Promise<void>;
+  /** Die aufgeschobenen Projektionen sind auf dem neuesten Stand — erst dann wird festgeschrieben. */
+  aktuell: boolean;
 }
 
 export interface SchrittProps {
@@ -986,43 +1000,90 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
 
 /* --- 7. Unterlagen ---------------------------------------------------------- */
 
-export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps) {
-  const { firma, logo, daten, r, leistung, auftritt, sichern, luecke, kennzahlen } = props;
+export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & UnterschriftProps) {
+  const {
+    firma, logo, daten, r, leistung, geheZu, auftritt, sichern, luecke, kennzahlen, beratungId, unterlagen, aktualisieren, aktuell,
+  } = props;
   const drucken = useDrucken();
+  const [meldung, setMeldung] = useState<string | null>(null);
   const status = daten.entscheidung.status;
   const dok = { firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen };
+  const fest = unterlagen && typeof unterlagen === 'object' ? unterlagen : null;
+  const name = daten.angaben.name.trim();
 
-  const knopf = (text: string, symbol: ReactNode, inhalt: ReactNode, haupt = false) => (
+  // Festgeschrieben druckt die unterschriebene Fassung; sonst wie bisher die aktuelle.
+  const knopf = (text: string, symbol: ReactNode, inhalt: ReactNode, haupt = false, art?: UnterlagenArt) => (
     <button type="button" className={`${haupt ? KNOPF : KNOPF_ZWEIT} max-w-full text-left`}
-      onClick={() => { void sichern(daten); drucken(inhalt); }}>
-      {symbol}{text}
+      onClick={() => {
+        setMeldung(null);
+        if (fest && art) { void festgeschriebenDrucken(beratungId, fest, art, drucken).then(setMeldung); return; }
+        void sichern(daten);
+        drucken(inhalt);
+      }}>
+      {symbol}{text}{fest && art ? ' (unterschrieben)' : ''}
     </button>
   );
 
+  const unterzeichner: Unterzeichner[] = [
+    { person: 'mitarbeiter', rolle: 'Mitarbeiter', name, nameFest: true },
+    { person: 'berater', rolle: 'Berater', name: auftritt?.berater.trim() ?? '', nameFest: false },
+  ];
+  const luecken: Luecke[] = [
+    ...(name ? [] : [{ text: 'der Name des Mitarbeiters', schritt: 1 }]),
+    ...(daten.entscheidung.ort.trim() ? [] : [{ text: 'der Ort der Beratung', schritt: 5 }]),
+    ...(status === 'teilnahme' && r.umwandlungMonat <= 0 ? [{ text: 'eine Umwandlung über 0 €', schritt: 3 }] : []),
+  ];
+
+  // Die erste Unterschrift schreibt die Unterlagen fest: erst speichern, dann genau das, was gedruckt wuerde.
+  const unterschreibenUndFestschreiben = async (person: UnterschriftPerson, n: string, zug: string): Promise<true | string> => {
+    let html: UnterlagenHtml | null = null;
+    if (!fest) {
+      await speicherungenAbwarten();
+      if (!(await sichern(daten))) return 'Die Beratung konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.';
+      const protokoll = await unterlageErfassen(<Protokoll {...dok} />);
+      html = status === 'teilnahme'
+        ? { protokoll, vereinbarung: await unterlageErfassen(<Vereinbarung {...dok} />) }
+        : { protokoll, verzicht: await unterlageErfassen(<Verzicht {...dok} />) };
+    }
+    const u = await unterschreiben(beratungId, person, n, zug, html);
+    await aktualisieren();
+    return u === 'fehler' ? 'Die Unterschrift konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.' : true;
+  };
+
   return (
-    <Karte titel="Unterlagen">
-      <p className="text-sm leading-relaxed text-mb-schiefer">
-        Drucken Sie die Unterlagen aus oder speichern Sie sie als PDF. Unterschrieben gehen sie an die Personalabteilung,
-        eine Kopie bekommt {daten.angaben.name || 'der Mitarbeiter'}.
-      </p>
-      {/* Das weiche Trennzeichen bricht das lange Wort auf dem Telefon, statt es ueber den Rand ragen zu lassen. */}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
-        {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen')}
-        {status === 'teilnahme' && knopf('Entgeltumwandlungs\u00ADvereinbarung', <FileSignature className="h-4 w-4" aria-hidden />, <Vereinbarung {...dok} />)}
-        {status === 'verzicht' && knopf('Verzichtserklärung', <FileSignature className="h-4 w-4" aria-hidden />, <Verzicht {...dok} />)}
-        {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
-      </div>
-      {status === 'offen' && (
-        <p className="mt-3 text-sm text-mb-schiefer">
-          Noch keine Entscheidung — die Gesprächsunterlagen bekommt {daten.angaben.name || 'der Mitarbeiter'} zum Nachlesen mit,
-          das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
+    <div className="space-y-6">
+      <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
+        bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben} onAufgehoben={aktualisieren}
+        beratungId={beratungId} />
+
+      <Karte titel="Unterlagen">
+        <p className="text-sm leading-relaxed text-mb-schiefer">
+          {fest
+            ? 'Die Unterlagen tragen die Unterschriften vom Bildschirm. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
+              + `Arbeitgeber unterschreibt auf Papier. Dann gehen sie an die Personalabteilung, eine Kopie bekommt ${name || 'der Mitarbeiter'}.`
+            : 'Drucken Sie die Unterlagen aus oder speichern Sie sie als PDF. Unterschrieben gehen sie an die Personalabteilung, '
+              + `eine Kopie bekommt ${name || 'der Mitarbeiter'}.`}
         </p>
-      )}
-      <p className="mt-5 text-xs leading-relaxed text-mb-schiefer">
-        Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der
-        Versorgungsordnung der Firma abgleichen.
-      </p>
-    </Karte>
+        {/* Das weiche Trennzeichen bricht das lange Wort auf dem Telefon, statt es ueber den Rand ragen zu lassen. */}
+        <div className="mt-5 flex flex-wrap gap-2">
+          {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
+          {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen', 'protokoll')}
+          {status === 'teilnahme' && knopf('Entgeltumwandlungs\u00ADvereinbarung', <FileSignature className="h-4 w-4" aria-hidden />, <Vereinbarung {...dok} />, false, 'vereinbarung')}
+          {status === 'verzicht' && knopf('Verzichtserklärung', <FileSignature className="h-4 w-4" aria-hidden />, <Verzicht {...dok} />, false, 'verzicht')}
+          {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
+        </div>
+        {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
+        {status === 'offen' && (
+          <p className="mt-3 text-sm text-mb-schiefer">
+            Noch keine Entscheidung — die Gesprächsunterlagen bekommt {name || 'der Mitarbeiter'} zum Nachlesen mit,
+            das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
+          </p>
+        )}
+        <p className="mt-5 text-xs leading-relaxed text-mb-schiefer">
+          Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der
+          Versorgungsordnung der Firma abgleichen.
+        </p>
+      </Karte>
+    </div>
   );
 }
