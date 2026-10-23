@@ -26,6 +26,7 @@ insert into ids values
   ('teilnahme_a', 'a3a3a3a3-0000-4000-8000-0000000000ab'),
   ('offen_a',     'a4a4a4a4-0000-4000-8000-0000000000ac'),
   ('verzicht_a',  'a5a5a5a5-0000-4000-8000-0000000000ad'),
+  ('zweite_a',    'a6a6a6a6-0000-4000-8000-0000000000ae'),
   ('firma_b',     'b2b2b2b2-0000-4000-8000-0000000000ba'),
   ('teilnahme_b', 'b6b6b6b6-0000-4000-8000-0000000000bb');
 
@@ -48,7 +49,10 @@ insert into public.bav_beratungen (id, firma, mitarbeiter, status, daten) values
   ((select id from ids where name = 'offen_a'), (select id from ids where name = 'firma_a'), 'Otto Offen', 'offen',
    '{"schritt":6,"angaben":{"name":"Otto Offen"}}'),
   ((select id from ids where name = 'verzicht_a'), (select id from ids where name = 'firma_a'), 'Vera Verzicht', 'verzicht',
-   '{"schritt":6,"angaben":{"name":"Vera Verzicht"}}');
+   '{"schritt":6,"angaben":{"name":"Vera Verzicht"}}'),
+  -- Entschieden und ohne Unterlagen — damit Pruefung 14 an der Besitzer-Regel scheitert, nicht an einer frueheren
+  ((select id from ids where name = 'zweite_a'), (select id from ids where name = 'firma_a'), 'Zora Zweite', 'teilnahme',
+   '{"schritt":6,"angaben":{"name":"Zora Zweite"}}');
 
 set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-4000-8000-0000000000e2"}';
 insert into public.bav_firmen (id, name) values ((select id from ids where name = 'firma_b'), 'Fremd AG');
@@ -183,7 +187,7 @@ select 13, 'Mitgeschickte Zeiten und Pruefsummen gelten nicht', 'Server-Werte',
 do $$
 begin
   insert into public.bav_unterlagen (beratung, besitzer, protokoll, vereinbarung)
-  values ((select id from ids where name = 'offen_a'), 'bbbbbbbb-0000-4000-8000-0000000000e2',
+  values ((select id from ids where name = 'zweite_a'), 'bbbbbbbb-0000-4000-8000-0000000000e2',
           (select inhalt from html where name = 'protokoll'), (select inhalt from html where name = 'vereinbarung'));
   insert into ergebnis values (14, 'A legt Unterlagen im Namen von B an', 'abgewiesen', 'DURCHGEGANGEN', false);
 exception when others then
