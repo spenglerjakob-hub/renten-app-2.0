@@ -16,11 +16,12 @@ import { Untertitel } from './Bausteine';
  * JS-Rentenplaner“ bleibt klein dabei — der Mandant soll sehen, womit
  * gerechnet wurde.
  *
- * Der Balken nimmt die Akzentfarbe (`--akzent-linie`), sonst das Gruen von
- * bisher.
+ * Der Balken nimmt die Akzentfarbe (`--akzent-linie`), sonst Tinte wie die
+ * Trendlinie im Logo. Vorher Gruen — die Farbe des alten Logos, das es im
+ * Stil „Seline“ nicht mehr gibt.
  */
 export function DeckblattKopf({ auftritt }: { auftritt?: Auftritt | null }) {
-  const balken = 'border-b-4 border-[color:var(--akzent-linie,#10b981)] pb-5';
+  const balken = 'border-b-4 border-[color:var(--akzent-linie,#0c0a09)] pb-5';
   if (!auftritt || !auftrittSichtbar(auftritt)) {
     return (
       <div className={`flex items-center gap-5 ${balken}`}>

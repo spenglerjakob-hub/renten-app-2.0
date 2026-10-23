@@ -165,7 +165,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
           <label className="flex items-center gap-1.5 text-xs font-medium text-ui-tinte/80">
             <input
               type="color"
-              value={wert.farbe ?? '#10b981'}
+              value={wert.farbe ?? '#0c0a09'}
               onChange={(e) => onAendern({ farbe: farbeNormal(e.target.value) })}
               className="h-7 w-9 cursor-pointer rounded border border-ui-feld-rand bg-white p-0.5"
             />
