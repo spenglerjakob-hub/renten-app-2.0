@@ -100,29 +100,37 @@ export function NutzerWahl({ wert, onWechsel }: { wert: number; onWechsel: (n: n
   );
 }
 
-/** Preis je Nutzer, Summe fuer das Buero und was der Mengenrabatt spart. */
-export function PaketPreis({ id, intervall, nutzer }: { id: PaketId; intervall: Intervall; nutzer: number }) {
+/**
+ * Preis je Nutzer, Summe fuer das Buero und was der Mengenrabatt spart.
+ * `akzent`: der Preis des empfohlenen Pakets, hervorgehoben wie die Zahl im
+ * Kernsatz der Mitarbeiterberatung.
+ */
+export function PaketPreis({ id, intervall, nutzer, akzent = false }: {
+  id: PaketId; intervall: Intervall; nutzer: number; akzent?: boolean;
+}) {
   const je = preisJeNutzer(id, intervall, nutzer);
   const summe = gesamtpreis(id, intervall, nutzer);
   const spart = ersparnis(id, intervall, nutzer);
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
   return (
     <div>
-      <p className="flex flex-wrap items-baseline gap-x-1.5">
-        <span className="ui-titel text-4xl font-normal tabular-nums text-ui-tinte">{preisText(je)}</span>
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="ui-titel text-[40px] font-normal leading-none tabular-nums text-ui-tinte">
+          {akzent ? <span className="ui-hervor">{preisText(je)}</span> : preisText(je)}
+        </span>
         <span className="text-sm text-ui-schiefer">je Nutzer und {zeitraum}</span>
       </p>
       {intervall === 'jahr' && (
-        <p className="mt-0.5 text-xs text-ui-schiefer">entspricht {preisText(Math.round((je / 12) * 100) / 100)} im Monat</p>
+        <p className="mt-2 text-xs text-ui-schiefer">entspricht {preisText(Math.round((je / 12) * 100) / 100)} im Monat</p>
       )}
       {nutzer > 1 && (
-        <p className="mt-1.5 text-sm text-ui-tinte">
+        <p className="mt-3 text-sm text-ui-tinte">
           {nutzer} Nutzer: <strong className="font-medium tabular-nums">{preisText(summe)}</strong> im {zeitraum}
         </p>
       )}
       {spart > 0 && (
-        <p className="mt-0.5 text-xs font-medium text-ui-tinte">
-          Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
+        <p className="mt-0.5 text-xs text-ui-schiefer">
+          Mengenrabatt: <span className="font-medium text-ui-tinte">{preisText(spart)}</span> gespart im {zeitraum}
         </p>
       )}
     </div>

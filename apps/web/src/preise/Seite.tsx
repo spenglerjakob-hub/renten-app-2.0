@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Check, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import {
   PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS,
   preisJeNutzer, staffelIndex, type Intervall, type PaketId,
@@ -10,7 +10,9 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import {
   EMPFOHLEN_GRUND, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
 } from '../components/PaketWahl';
-import { FELD_LABEL, KNOPF, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
+import {
+  EINLEITUNG, FELD_LABEL, Hinweise, KNOPF, KNOPF_ZWEIT, LINK, Titel, Zahl,
+} from '../components/stil';
 
 /**
  * Die Preisseite (/preise).
@@ -63,7 +65,7 @@ function BuendelVorteil({ intervall, nutzer }: { intervall: Intervall; nutzer: n
   const spart = einzeln - preisJeNutzer('alles', intervall, nutzer);
   if (spart <= 0) return null;
   return (
-    <p className="ui-innen mt-4 px-3 py-2 text-sm text-ui-tinte">
+    <p className="ui-innen mt-5 px-4 py-3 text-sm leading-relaxed text-ui-tinte">
       Beide Pakete in einem — <strong className="font-medium tabular-nums">{preisText(spart)}</strong> günstiger
       als einzeln ({preisText(einzeln)})
     </p>
@@ -137,28 +139,33 @@ function ZeitRechnung() {
   const h = zahl(stundensatz);
   const gegenwert = m > 0 && h > 0 ? Math.round((m / 60) * h * 100) / 100 : null;
   return (
-    <details className="ui-karte mt-4 max-w-2xl px-4 py-3">
-      <summary className="cursor-pointer text-sm font-medium text-ui-tinte">Mit Ihrer Zeit rechnen</summary>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-        Eine Zeitersparnis nennen wir bewusst nicht — die kennen nur Sie. Wenn Sie schätzen möchten:
-      </p>
-      <div className="mt-3 flex flex-wrap items-end gap-4">
-        <div>
-          <label htmlFor={`${id}-min`} className={FELD_LABEL}>Gesparte Minuten je Fall</label>
-          <input id={`${id}-min`} inputMode="numeric" value={minuten} onChange={(e) => setMinuten(e.target.value)}
-            className="ui-feld w-28 p-2 text-sm tabular-nums" />
-        </div>
-        <div>
-          <label htmlFor={`${id}-satz`} className={FELD_LABEL}>Ihr Stundensatz (€)</label>
-          <input id={`${id}-satz`} inputMode="decimal" value={stundensatz} onChange={(e) => setStundensatz(e.target.value)}
-            className="ui-feld w-28 p-2 text-sm tabular-nums" />
+    <details className="group ui-karte max-w-3xl">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 sm:px-7 [&::-webkit-details-marker]:hidden">
+        <span className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">Mit Ihrer Zeit rechnen</span>
+        <ChevronDown className="h-5 w-5 shrink-0 text-ui-schiefer transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="border-t border-ui-linie px-5 pb-5 pt-5 sm:px-7 sm:pb-7">
+        <p className="text-sm leading-relaxed text-ui-schiefer">
+          Eine Zeitersparnis nennen wir bewusst nicht — die kennen nur Sie. Wenn Sie schätzen möchten:
+        </p>
+        <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-4">
+          <div>
+            <label htmlFor={`${id}-min`} className={FELD_LABEL}>Gesparte Minuten je Fall</label>
+            <input id={`${id}-min`} inputMode="numeric" value={minuten} onChange={(e) => setMinuten(e.target.value)}
+              className="ui-feld w-32 p-2 text-sm tabular-nums" />
+          </div>
+          <div>
+            <label htmlFor={`${id}-satz`} className={FELD_LABEL}>Ihr Stundensatz (€)</label>
+            <input id={`${id}-satz`} inputMode="decimal" value={stundensatz} onChange={(e) => setStundensatz(e.target.value)}
+              className="ui-feld w-32 p-2 text-sm tabular-nums" />
+          </div>
+          {gegenwert !== null && (
+            <dl role="status" className="min-w-0">
+              <Zahl etikett="Gegenwert Ihrer gesparten Zeit" wert={preisText(gegenwert)} zusatz="je Fall" />
+            </dl>
+          )}
         </div>
       </div>
-      {gegenwert !== null && (
-        <p role="status" className="mt-3 text-sm text-ui-tinte">
-          Gegenwert Ihrer gesparten Zeit: <strong className="font-medium tabular-nums">{preisText(gegenwert)}</strong> je Fall.
-        </p>
-      )}
     </details>
   );
 }
@@ -174,84 +181,90 @@ export function Seite() {
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf verlinkt />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <Titel gross>Preise</Titel>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-ui-schiefer">
-          Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
-          allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
-        </p>
-        <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          <a href="/schnellrechnung" className={LINK}>
-            Erst ausprobieren? Schnellrechnung ohne Anmeldung →
-          </a>
-          <a href="#early-adopter" className={LINK}>
-            Vor dem Start: Early Adopter werden →
-          </a>
-        </p>
-
-        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
-          <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
-          <p className="text-xs text-ui-schiefer">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
+      {/* Wie eine Ansicht der Mitarbeiterberatung: Ueberschrift und Einleitung ueber den Karten, viel Luft. */}
+      <main className="mx-auto max-w-6xl space-y-14 px-4 py-6 sm:px-6 sm:py-10">
+        <div>
+          <Titel gross>Preise</Titel>
+          <p className={`mt-3 ${EINLEITUNG}`}>
+            Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
+            allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
+          </p>
+          <p className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+            <a href="/schnellrechnung" className={LINK}>
+              Erst ausprobieren? Schnellrechnung ohne Anmeldung →
+            </a>
+            <a href="#early-adopter" className={LINK}>
+              Vor dem Start: Early Adopter werden →
+            </a>
+          </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
-          {PAKETE.map((p) => (
-            <section
-              key={p.id}
-              aria-labelledby={`paket-${p.id}`}
-              className={`ui-karte relative flex flex-col p-5 sm:p-6 ${p.empfohlen ? 'border-ui-tinte' : ''}`}
-            >
-              {p.empfohlen && (
-                <span className="ui-marke absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs font-medium">
-                  {/* Kurz genug fuer eine Zeile: Der volle Satz brach um und
-                      lag ueber dem Paketnamen. Der ganze Satz steht im Tooltip. */}
-                  <Sparkles className="h-3 w-3" aria-hidden />
-                  <span title={`Empfohlen, ${EMPFOHLEN_GRUND}`}>
-                    Empfohlen für Privat- und Firmenkunden
-                  </span>
-                </span>
-              )}
-              <h2 id={`paket-${p.id}`} className="ui-titel text-2xl font-normal text-ui-tinte">{p.name}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">{p.kurz}</p>
-              <div className="mt-4">
-                <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} />
-              </div>
-              {p.id === 'alles' && <BuendelVorteil intervall={intervall} nutzer={nutzer} />}
-              <ul className="mt-4 flex-1 space-y-2 text-sm text-ui-tinte">
-                {LEISTUNGEN[p.id].map((l) => (
-                  <li key={l} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden /> {l}
-                  </li>
-                ))}
-              </ul>
-              <a
-                href="/?registrieren"
-                className={`mt-5 w-full ${p.empfohlen ? KNOPF : KNOPF_ZWEIT}`}
+        <section aria-label="Pakete" className="space-y-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
+            <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
+            <p className="text-sm text-ui-schiefer">Ab 3, 5 und 8 Nutzern günstiger — für alle im Büro.</p>
+          </div>
+
+          {/*
+            Drei Karten; das empfohlene Paket ist die eine Akzentkarte der
+            Ansicht — sein Preis hervorgehoben wie die Zahl im Kernsatz der
+            Beratung, darueber die Marke.
+          */}
+          <div className="grid grid-cols-1 gap-6 pt-2 md:grid-cols-3 md:gap-5">
+            {PAKETE.map((p) => (
+              <section
+                key={p.id}
+                aria-labelledby={`paket-${p.id}`}
+                className={`${p.empfohlen ? 'ui-akzentkarte' : 'ui-karte'} relative flex flex-col p-5 sm:p-7`}
               >
-                {TESTTAGE} Tage kostenlos testen
-              </a>
-            </section>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-ui-schiefer">Alle Preise netto, {UST_HINWEIS}</p>
+                {p.empfohlen && (
+                  <span className="ui-marke absolute -top-3 left-5 flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-xs font-medium sm:left-7">
+                    {/* Kurz genug fuer eine Zeile: Der volle Satz brach um und
+                        lag ueber dem Paketnamen. Der ganze Satz steht im Tooltip. */}
+                    <Sparkles className="h-3 w-3" aria-hidden />
+                    <span title={`Empfohlen, ${EMPFOHLEN_GRUND}`}>
+                      Empfohlen für Privat- und Firmenkunden
+                    </span>
+                  </span>
+                )}
+                <h2 id={`paket-${p.id}`} className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{p.name}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">{p.kurz}</p>
+                <div className="mt-5">
+                  <PaketPreis id={p.id} intervall={intervall} nutzer={nutzer} akzent={p.empfohlen} />
+                </div>
+                {p.id === 'alles' && <BuendelVorteil intervall={intervall} nutzer={nutzer} />}
+                <div className="mt-6 flex-1 border-t border-ui-linie pt-5">
+                  <Hinweise punkte={LEISTUNGEN[p.id]} />
+                </div>
+                <a
+                  href="/?registrieren"
+                  className={`mt-6 w-full ${p.empfohlen ? KNOPF : KNOPF_ZWEIT}`}
+                >
+                  {TESTTAGE} Tage kostenlos testen
+                </a>
+              </section>
+            ))}
+          </div>
+          <p className="text-xs text-ui-schiefer">Alle Preise netto, {UST_HINWEIS}</p>
 
-        <ZeitRechnung />
+          <ZeitRechnung />
+        </section>
 
         <FruehstartAnfrage />
 
-        <section aria-labelledby="staffel" className="mt-10">
-          <h2 id="staffel" className="ui-titel text-2xl font-normal text-ui-tinte">Mengenrabatt</h2>
-          <p className="mt-1 text-sm text-ui-schiefer">
+        <section aria-labelledby="staffel">
+          <Titel als="h2" id="staffel">Mengenrabatt</Titel>
+          <p className={`mt-2 ${EINLEITUNG}`}>
             Preis je Nutzer und {zeitraum} — der Preis der erreichten Staffel gilt für alle Nutzer im Büro.
           </p>
-          <div className="ui-karte mt-3 overflow-x-auto">
+          <div className="ui-karte mt-5 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-ui-innen text-xs text-ui-schiefer">
+              <thead className="text-sm text-ui-schiefer">
                 <tr>
-                  <th scope="col" className="px-3 py-2.5 font-medium sm:px-4">Nutzer</th>
+                  <th scope="col" className="px-4 pb-3 pt-5 font-normal sm:px-7">Nutzer</th>
                   {PAKETE.map((p) => (
-                    <th key={p.id} scope="col" className="px-3 py-2.5 text-right font-medium sm:px-4">
+                    <th key={p.id} scope="col" className="px-4 pb-3 pt-5 text-right font-normal sm:px-7">
                       <span className="sm:hidden" aria-hidden>{KURZNAME[p.id]}</span>
                       <span className="sr-only sm:not-sr-only">{p.name}</span>
                     </th>
@@ -263,11 +276,11 @@ export function Seite() {
                   <tr
                     key={spanne}
                     aria-current={i === staffel ? 'true' : undefined}
-                    className={`border-t border-ui-linie ${i === staffel ? 'bg-ui-knopf/10 font-medium text-ui-tinte' : ''}`}
+                    className={`border-t border-ui-linie text-ui-tinte ${i === staffel ? 'bg-ui-knopf/10 font-medium' : ''}`}
                   >
-                    <th scope="row" className="px-3 py-2.5 font-medium sm:px-4">{spanne}</th>
+                    <th scope="row" className="px-4 py-3 font-medium sm:px-7">{spanne}</th>
                     {PAKETE.map((p) => (
-                      <td key={p.id} className="px-3 py-2.5 text-right tabular-nums sm:px-4">
+                      <td key={p.id} className="px-4 py-3 text-right tabular-nums sm:px-7">
                         {preisText(preisJeNutzer(p.id, intervall, STAFFEL_AB[i]!))}
                       </td>
                     ))}
@@ -278,16 +291,16 @@ export function Seite() {
           </div>
         </section>
 
-        <section aria-labelledby="fragen" className="mt-10 max-w-3xl">
-          <h2 id="fragen" className="ui-titel text-2xl font-normal text-ui-tinte">Häufige Fragen</h2>
-          <div className="ui-karte mt-3 divide-y divide-ui-linie">
+        <section aria-labelledby="fragen" className="max-w-3xl">
+          <Titel als="h2" id="fragen">Häufige Fragen</Titel>
+          <div className="ui-karte mt-5 divide-y divide-ui-linie">
             {FRAGEN.map((f) => (
-              <details key={f.frage} className="group px-4 py-3">
-                <summary className="cursor-pointer list-none text-sm font-medium text-ui-tinte marker:hidden">
-                  <span className="mr-2 inline-block text-ui-schiefer transition-transform group-open:rotate-90">›</span>
+              <details key={f.frage} className="group px-5 py-4 sm:px-7">
+                <summary className="flex cursor-pointer list-none items-start gap-3 text-base font-medium text-ui-tinte [&::-webkit-details-marker]:hidden">
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-ui-schiefer transition-transform group-open:rotate-90" aria-hidden />
                   {f.frage}
                 </summary>
-                <p className="mt-2 pl-5 text-sm leading-relaxed text-ui-schiefer">{f.antwort}</p>
+                <p className="mt-2 pl-7 text-sm leading-relaxed text-ui-schiefer">{f.antwort}</p>
               </details>
             ))}
           </div>
