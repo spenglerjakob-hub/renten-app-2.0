@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
-import { Hinweis, Titel } from '../components/stil';
+import { Hinweis } from '../components/stil';
 
 /**
  * Impressum, Datenschutzerklaerung und Nutzungsbedingungen.
@@ -24,40 +24,63 @@ const STAND = '[Datum eintragen]';
 
 export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
 
+/*
+ * GESTALT: ein Blatt Papier auf dem Stein der Seite — Titel in Inter Tight
+ * wie in der Mitarbeiterberatung, Abschnitte mit Luft, Lesetext in
+ * Lesebreite, Listen mit Gedankenstrich wie die Hinweise der Beratung.
+ *
+ * Gestaltet wird nur hier, in Rahmen und Helfern (H1, H2, P, Liste) — nicht
+ * in den Texten selbst: Auf `live` haelt ein eigener Commit die
+ * Nutzungsbedingungen in einer aelteren Fassung, und jede Zeile, die beide
+ * Seiten aendern, wuerde beim Zusammenfuehren zum Konflikt.
+ */
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf breite="max-w-3xl" verlinkt />
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-10">
         {ENTWURF && (
-          <Hinweis symbol={AlertTriangle} klasse="mb-6">
+          <Hinweis symbol={AlertTriangle}>
             <p>
               <strong className="font-medium">Entwurf.</strong> Angaben in [eckigen Klammern] sind noch auszufüllen. Vor der
               Veröffentlichung rechtlich prüfen lassen.
             </p>
           </Hinweis>
         )}
-        <article className="ui-karte p-5 sm:p-8 [&_strong]:font-medium [&_strong]:text-ui-tinte">
+        <article className="ui-karte px-5 py-8 sm:px-12 sm:py-12 [&_strong]:font-medium [&_strong]:text-ui-tinte">
           {seite === 'impressum' ? <Impressum /> : seite === 'datenschutz' ? <Datenschutz /> : <Nutzungsbedingungen />}
         </article>
-        <RechtsLinks klasse="mt-6 justify-center" />
+        <RechtsLinks klasse="justify-center pb-4" />
       </main>
     </div>
   );
 }
 
+/*
+ * Am Telefon kleiner als `Titel gross`: „Datenschutzerklärung“ ist ein
+ * einziges langes Wort und lief in 34 px ueber den Rand des Blatts. Die
+ * Silbentrennung faengt ab, was noch laenger waere.
+ */
 function H1({ children }: { children: ReactNode }) {
-  return <Titel>{children}</Titel>;
+  return (
+    <h1 className="ui-titel text-balance break-words text-[28px] font-normal leading-[1.15] text-ui-tinte hyphens-auto sm:text-[44px]">
+      {children}
+    </h1>
+  );
 }
 function H2({ children }: { children: ReactNode }) {
-  return <h2 className="ui-titel mt-8 text-xl font-normal text-ui-tinte">{children}</h2>;
+  return <h2 className="ui-titel mt-10 text-[22px] font-normal leading-snug text-ui-tinte sm:text-2xl">{children}</h2>;
 }
 function P({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-sm leading-relaxed text-ui-tinte/80">{children}</p>;
+  return <p className="mt-3 text-[15px] leading-[1.7] text-ui-tinte/80">{children}</p>;
 }
 function Liste({ children }: { children: ReactNode }) {
-  return <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ui-tinte/80 marker:text-ui-asche">{children}</ul>;
+  return (
+    <ul className="mt-3 space-y-2 text-[15px] leading-[1.7] text-ui-tinte/80 [&>li]:relative [&>li]:pl-7 [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:text-ui-asche [&>li]:before:content-['—']">
+      {children}
+    </ul>
+  );
 }
 
 function Impressum() {
