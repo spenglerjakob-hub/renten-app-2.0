@@ -468,7 +468,7 @@ export default function App() {
     GESAMT ODER EINZELN.
 
     Die ganze rechte Spalte haengt an EINEM Aufruf. Wird dort ein anderes
-    Szenario uebergeben, folgen Kopfzahlen, Kassenbon, Verlauf, Steuer-Engine,
+    Szenario uebergeben, folgen Titel, Ring, Kassenbon, Verlauf, Steuer-Engine,
     Sparrechner, Foerdercheck und Vertrags-Pruefung von selbst — genau das ist
     gewollt: wirklich nur die Vertraege und Einkuenfte einer Person.
 
@@ -690,7 +690,7 @@ export default function App() {
 
   /*
     GESAMT ODER EINZELN — der Umschalter steht oben in jeder Etappe, die
-    rechnet, weil er alles darunter betrifft: Kopfzahlen, Kassenbon, Verlauf,
+    rechnet, weil er alles darunter betrifft: Titel, Ring, Kassenbon, Verlauf,
     Steuer, Sparrechner, Vertrags-Pruefung und den Ausdruck. Gerechnet wird
     dafuer nicht anders, sondern ein anderes Szenario.
   */
@@ -724,31 +724,6 @@ export default function App() {
           : 'Beide Partner zusammen, wie bisher: eine Veranlagung mit Splittingtarif.'}
       </p>
     </section>
-  );
-
-  const kopfzahlen = (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-      <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
-        <h3 className="mb-0.5 text-xs font-semibold leading-tight text-slate-500 sm:mb-1 sm:text-sm">
-          Bedarf im Jahr {zeile.jahr}
-        </h3>
-        <p className="text-lg font-bold tabular-nums sm:text-3xl">
-          {euro(zeile.zielNettoMonat * faktor)}
-        </p>
-      </div>
-      <div
-        className={`flex flex-col justify-center rounded-xl border bg-white p-3 shadow-sm sm:p-6 ${
-          luecke > 0 ? 'border-rose-200 text-rose-600' : 'border-emerald-200 text-emerald-600'
-        }`}
-      >
-        <h3 className="mb-0.5 text-xs font-semibold leading-tight sm:mb-1 sm:text-sm">
-          Versorgungslücke
-        </h3>
-        <p className="text-lg font-bold tabular-nums sm:text-3xl">
-          {luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
-        </p>
-      </div>
-    </div>
   );
 
   /*
@@ -1317,18 +1292,22 @@ export default function App() {
         {/* ---------- 3. SPARRECHNER ---------- */}
         {schritt === 'sparen' && (
           <>
+            {/*
+              Der Titel sagt, was der Sparrechner darunter ausrechnet: den
+              Beitrag ab heute — er folgt seinen Annahmen. Ohne Luecke oder
+              Ergebnis der ruhige Titel.
+            */}
             <EtappenKopf
-              titel="Die Lücke schließen"
+              titel={ergebnis && luecke > 0 && sparrate !== null
+                ? <>Mit <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(sparrate)}</Hervor></span> im Monat schließen Sie die Lücke</>
+                : 'Die Lücke schließen'}
               text="Wie viel Sie ab heute monatlich zurücklegen müssten, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten."
             />
             {paarUmschalter}
             {beispielHinweis}
-            {ergebnis ? (
-              <div className="space-y-4 sm:space-y-6">
-                {kopfzahlen}
-                <Sparrechner zeile={zeile} immerOffen onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
-              </div>
-            ) : rechnetText}
+            {ergebnis
+              ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
+              : rechnetText}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Womit? Lösungen vergleichen" />
           </>
         )}
