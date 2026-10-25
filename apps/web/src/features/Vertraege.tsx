@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Trash2, PlusCircle, ChevronDown } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import {
   parameterFuer, parseDatum,
   type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
@@ -12,6 +12,17 @@ import {
   VERRENTUNG_JAHRE, VERRENTUNG_RENDITE,
 } from './vertragsarten';
 import { personNameAus } from './personen';
+import { KNOPF_ZWEIT } from '../components/stil';
+
+/** Ein Ergebnis im Vertrag: leises Etikett, darunter der Betrag in Tinte. */
+function Wert({ etikett, children }: { etikett: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs text-ui-schiefer">{etikett}</div>
+      <div className="text-base font-medium tabular-nums text-ui-tinte">{children}</div>
+    </div>
+  );
+}
 
 /**
  * Die eine Zahl, die eine zugeklappte Karte kenntlich macht.
@@ -66,47 +77,46 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
   return (
     /*
-      Weiss auf getoentem Grund, nicht umgekehrt. Die Karte steht in der
-      Eingabespalte, die seit der Farbtrennung indigo hinterlegt ist — und
-      IN dieser Karte ist Indigo bereits die Ergebnisfarbe (Depotwert,
-      AVD-Werte, Kinder-Block weiter unten). Bliebe die Karte getoent,
-      verschwaenden genau diese Bloecke im Untergrund.
+      Eine weisse Karte mit Haarlinie in der Karte des Schritts — die
+      Ergebnisse darin (Depotwert, Zulagen, Auszahlung) stehen in der
+      Innenflaeche, ohne Farbton.
     */
-    <div className="rounded-lg border border-indigo-100 bg-white">
+    <div className="rounded-[10px] border border-ui-linie bg-ui-karte">
       <div className="flex items-center gap-1 p-2 sm:p-3">
         <button
           type="button"
           onClick={() => setOffen((x) => !x)}
           aria-expanded={offen}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-50"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-ui-innen"
         >
           <ChevronDown
-            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 shrink-0 text-ui-schiefer transition-transform ${offen ? 'rotate-180' : ''}`}
             aria-hidden
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-slate-800">
+            <span className="block truncate text-sm font-medium text-ui-tinte">
               {v.name || 'Ohne Bezeichnung'}
             </span>
-            <span className="block truncate text-xs text-slate-500">{typText(v.typ)}</span>
+            <span className="block truncate text-xs text-ui-schiefer">{typText(v.typ)}</span>
           </span>
           {betrag && (
-            <span className="shrink-0 whitespace-nowrap text-xs font-bold tabular-nums text-slate-700">
+            <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-ui-tinte">
               {betrag}
             </span>
           )}
         </button>
+        {/* Loeschen bleibt rot — erst beim Darueberfahren, damit die Liste ruhig bleibt. */}
         <button
           type="button"
           onClick={() => vertragEntfernen(v.id)}
           aria-label={`Vertrag ${v.name || 'ohne Namen'} entfernen`}
-          className="shrink-0 rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+          className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700"
         >
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
       </div>
 
-      <div className={`border-t border-indigo-100 p-3 ${offen ? 'block' : 'hidden'}`}>
+      <div className={`border-t border-ui-linie p-3 sm:p-4 ${offen ? 'block' : 'hidden'}`}>
       <div className="mb-3 grid gap-3 sm:grid-cols-2">
         <AuswahlFeld label="Vertragsart" wert={v.typ}
           onChange={(t) => vertragAendern(v.id, { typ: t })}
@@ -204,12 +214,12 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               der auch der Vertrags-TUEV und die Zeitachse rechnen. Zwei
               Listen fuer dieselben Kinder waeren zwei Wahrheiten.
             */}
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2.5 sm:col-span-2">
-              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">
+            <div className="ui-innen p-3 sm:col-span-2 sm:p-4">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-xs font-medium text-ui-tinte">
                   Kinder — für die Kinderzulage
                 </span>
-                <span className="text-xs text-indigo-700">Aus Ihren Basisdaten</span>
+                <span className="text-xs text-ui-schiefer">Aus Ihren Basisdaten</span>
               </div>
               <ZahlFeld
                 label="Kinder mit Kindergeldanspruch"
@@ -225,7 +235,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 jetzt={jetzt}
               />
               <KinderHinweis a={avdParam} />
-              <p className="mt-1 text-xs leading-relaxed text-indigo-800">
+              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
                 Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch
                 in den Basisdaten und im Vertrags-TÜV.
               </p>
@@ -299,14 +309,11 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         wird — und muss deshalb sichtbar sein, nicht im Ergebnis verschwinden.
       */}
       {v.strategie === 'verrenten' && verrentung && (
-        <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Verrentung über {verrentung.dauerJahre} Jahre ab {verrentung.startjahr}
-          </div>
-          <div className="text-sm font-black tabular-nums text-emerald-800">
-            {euro(verrentung.bruttoMonat)} <span className="text-xs font-normal">brutto / Monat</span>
-          </div>
-          <div className="mt-0.5 text-xs leading-relaxed text-slate-500">
+        <div className="ui-innen mt-3 px-3 py-2.5">
+          <Wert etikett={`Verrentung über ${verrentung.dauerJahre} Jahre ab ${verrentung.startjahr}`}>
+            {euro(verrentung.bruttoMonat)} <span className="text-xs font-normal text-ui-schiefer">brutto / Monat</span>
+          </Wert>
+          <div className="mt-1 text-xs leading-relaxed text-ui-schiefer">
             Kapital {euro(verrentung.bruttoKapital)} − Steuer im Auszahlungsjahr{' '}
             {euro(verrentung.steuerEinmal)} = {euro(verrentung.nettoKapital)}, verteilt auf{' '}
             {verrentung.dauerJahre} Jahre.
@@ -320,14 +327,11 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           beim Zufluss ab; die Verteilung der Bemessung auf 120 Monate
           (§ 229 SGB V) ist eine Rechengroesse, kein Zahlungsweg.
         */
-        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Einmalige Kapitalauszahlung {auszahlung.jahr}
-          </div>
-          <div className="text-sm font-black tabular-nums text-indigo-900">
+        <div className="ui-innen mt-3 px-3 py-2.5">
+          <Wert etikett={`Einmalige Kapitalauszahlung ${auszahlung.jahr}`}>
             {euro(auszahlung.nettoKapital)} netto
-          </div>
-          <div className="mt-0.5 text-xs leading-relaxed text-slate-500">
+          </Wert>
+          <div className="mt-1 text-xs leading-relaxed text-ui-schiefer">
             Brutto {euro(auszahlung.bruttoKapital)} − Steuer {euro(auszahlung.steuer)}
             {auszahlung.kvPvGesamt > 0
               && ` − ${euro(auszahlung.kvPvGesamt)} Kranken- und Pflegeversicherung`}.
@@ -337,14 +341,11 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
       )}
 
       {v.typ === 'etf' && v.strategie === 'kapital' && auszahlung && (
-        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Einmalige Kapitalauszahlung {auszahlung.jahr}
-          </div>
-          <div className="text-sm font-black tabular-nums text-indigo-900">
+        <div className="ui-innen mt-3 px-3 py-2.5">
+          <Wert etikett={`Einmalige Kapitalauszahlung ${auszahlung.jahr}`}>
             {euro(auszahlung.nettoKapital)} netto
-          </div>
-          <div className="mt-0.5 text-xs text-slate-500">
+          </Wert>
+          <div className="mt-1 text-xs text-ui-schiefer">
             Brutto {euro(auszahlung.bruttoKapital)} − Abgeltungsteuer {euro(auszahlung.steuer)}.
             Zählt nicht zum monatlichen Netto.
           </div>
@@ -352,58 +353,37 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
       )}
 
       {v.typ === 'etf' && v.strategie !== 'kapital' && depot && depot.endkapital > 0 && (
-        <div className="mt-3 grid grid-cols-2 gap-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Depotwert bei Rentenbeginn
-            </div>
-            <div className="text-sm font-black tabular-nums text-emerald-800">
-              {euro(depot.endkapital)}
-            </div>
-          </div>
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Entnahme brutto
-            </div>
-            <div className="text-sm font-black tabular-nums text-emerald-800">
-              {euro(depot.bruttoMonat)} <span className="text-xs font-normal">/ Monat</span>
-            </div>
-          </div>
+        <div className="ui-innen mt-3 grid grid-cols-2 gap-3 px-3 py-2.5">
+          <Wert etikett="Depotwert bei Rentenbeginn">{euro(depot.endkapital)}</Wert>
+          <Wert etikett="Entnahme brutto">
+            {euro(depot.bruttoMonat)} <span className="text-xs font-normal text-ui-schiefer">/ Monat</span>
+          </Wert>
         </div>
       )}
 
       {v.typ === 'avd' && avd && avd.endkapital > 0 && (
-        <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+        <div className="ui-innen mt-3 px-3 py-2.5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Zulagen im 1. Jahr</div>
-              <div className="text-sm font-black tabular-nums text-emerald-800">
-                {euro(avd.grundzulageJahr1 + avd.kinderzulageJahr1)}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Zulagen gesamt</div>
-              <div className="text-sm font-black tabular-nums text-emerald-800">{euro(avd.zulagenGesamt)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Kapital bei Rentenbeginn</div>
-              <div className="text-sm font-black tabular-nums text-emerald-800">{euro(avd.endkapital)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Auszahlung brutto</div>
-              <div className="text-sm font-black tabular-nums text-emerald-800">
-                {euro(avd.bruttoJahr / 12)} <span className="text-xs font-normal">/ Monat</span>
-              </div>
-            </div>
+            <Wert etikett="Zulagen im 1. Jahr">{euro(avd.grundzulageJahr1 + avd.kinderzulageJahr1)}</Wert>
+            <Wert etikett="Zulagen gesamt">{euro(avd.zulagenGesamt)}</Wert>
+            <Wert etikett="Kapital bei Rentenbeginn">{euro(avd.endkapital)}</Wert>
+            <Wert etikett="Auszahlung brutto">
+              {euro(avd.bruttoJahr / 12)} <span className="text-xs font-normal text-ui-schiefer">/ Monat</span>
+            </Wert>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
             Eigenbeitrag {euro(avd.eigenbeitraege)} über die Laufzeit, dazu {euro(avd.zulagenGesamt)} Zulagen
             vom Staat. Die Auszahlung ist voll mit Ihrem persönlichen Steuersatz zu versteuern —
             nicht mit der Abgeltungsteuer.
           </p>
-          {avd.hinweise.map((h) => (
-            <p key={h} className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">{h}</p>
-          ))}
+          {/* Die Hinweise des Rechenkerns als Liste mit Gedankenstrich — lesen, nicht erschrecken. */}
+          {avd.hinweise.length > 0 && (
+            <ul className="mt-2 space-y-1 border-t border-ui-linie pt-2 text-xs leading-relaxed text-ui-tinte">
+              {avd.hinweise.map((h) => (
+                <li key={h} className="flex gap-2"><span aria-hidden className="text-ui-asche">—</span><span>{h}</span></li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -416,7 +396,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
         Zeitachse setzt dort folgerichtig `kvArt: null`.
       */}
       {istKapital(v) && !v.altvertrag && (
-        <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600">
+        <p className="ui-innen mt-3 px-3 py-2.5 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           {v.typ === 'prvRente' ? (
             <>
               Steuerpflichtig ist nicht die Auszahlung, sondern nur der <strong>Ertrag</strong> —
@@ -472,7 +452,7 @@ export function Vertraege({
     <Abschnitt titel={SCHICHT_TITEL[schicht]}>
       <div className="space-y-3">
         {vertraege.length === 0 && (
-          <p className="rounded-lg border border-dashed border-indigo-300 px-4 py-6 text-center text-sm text-slate-500">
+          <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
             Noch kein Vertrag in dieser Schicht.
           </p>
         )}
@@ -486,12 +466,9 @@ export function Vertraege({
             verrentung={verrentungen.find((x) => x.vertragId === v.id)}
           />
         ))}
-        <button
-          type="button"
-          onClick={() => vertragHinzufuegen(schicht)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-indigo-300 bg-white/60 py-2 text-sm font-medium text-slate-600 hover:border-indigo-500 hover:text-indigo-700"
-        >
-          <PlusCircle className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
+        {/* Wie „Kind hinzufügen“ in der Beratung: der zweite Knopf mit Plus. */}
+        <button type="button" onClick={() => vertragHinzufuegen(schicht)} className={KNOPF_ZWEIT}>
+          <Plus className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
         </button>
       </div>
     </Abschnitt>

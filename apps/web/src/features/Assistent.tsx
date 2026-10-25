@@ -5,6 +5,7 @@ import { Basisdaten, type BasisTeil } from './Basisdaten';
 import { useSzenario } from '../store/szenario';
 import { eintragVon, offenePfade, relevant } from './vorbelegung';
 import type { FallSchrittId } from './fortschritt';
+import { Etappen, KNOPF, KNOPF_ZWEIT } from '../components/stil';
 
 /**
  * DER ASSISTENT fuer die erste Etappe: dieselben Angaben wie im Formular,
@@ -159,47 +160,34 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
   const s = SCHRITTE[i] ?? SCHRITTE[0]!;
   const letzter = i === SCHRITTE.length - 1;
 
+  /*
+    Wie die Schritte der Mitarbeiterberatung: duenne Linien, ein leerer
+    Kreis, wo noch Beispielwerte stehen (bei den Vertraegen: noch nichts
+    erfasst), darunter der Schritt und am Ende „Zurueck“ und „Weiter“ unter
+    einer Haarlinie. Die Linien stehen IN der Karte: Ueber ihr stuende eine
+    zweite Leiste, die genauso aussieht wie die Etappen der Seite.
+  */
   return (
-    <div className="mx-auto max-w-3xl">
-      {/* Fuenf Punkte, jeder anklickbar. */}
-      <ol className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Schritte des Assistenten">
-        {SCHRITTE.map((x, n) => (
-          <li key={x.titel}>
-            <button
-              type="button"
-              onClick={() => geheZu(n)}
-              aria-current={n === i ? 'step' : undefined}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors ${
-                n === i ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-              }`}
-            >
-              <span>{n + 1}.</span>
-              <span className={n === i ? '' : 'hidden sm:inline'}>{x.titel}</span>
-              {beispielOffen(x) && (
-                <>
-                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  <span className="sr-only">
-                    {x.teil === 'vertraege' ? ' — noch nicht erfasst' : ' — Beispielwerte offen'}
-                  </span>
-                </>
-              )}
-            </button>
-          </li>
-        ))}
-      </ol>
+    <section aria-labelledby="assistent-titel" className="ui-karte p-5 sm:p-7">
+      <Etappen
+        schritte={SCHRITTE.map((x) => x.titel)}
+        aktiv={i}
+        onWechsel={geheZu}
+        beschriftung="Schritte des Assistenten"
+        erledigt={() => false}
+        offen={(n) => beispielOffen(SCHRITTE[n]!)}
+        offenText={(n) => (SCHRITTE[n]!.teil === 'vertraege' ? 'noch nicht erfasst' : 'Beispielwerte offen')}
+      />
 
-      <section className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 shadow-sm sm:p-5">
-        <h3 className="text-base font-black text-slate-900 sm:text-lg">
-          <span className="text-indigo-600">{i + 1}.</span> {s.titel}
-        </h3>
-        <div className="mt-2 flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-          <p className="text-xs leading-relaxed text-amber-900">
-            <span className="font-bold">Das brauchen Sie: </span>{s.unterlage}
-          </p>
-        </div>
+      <div className="mt-6 sm:mt-8">
+        <h3 id="assistent-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{s.titel}</h3>
+        {/* Die Unterlage als leiser Satz unter dem Titel — wie die Hilfetexte der Beratung, kein gelber Kasten. */}
+        <p className="mt-2 flex max-w-3xl gap-2.5 text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+          <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span><span className="font-medium text-ui-tinte">Das brauchen Sie: </span>{s.unterlage}</span>
+        </p>
 
-        <div className="mt-4">
+        <div className="mt-6">
           {s.teil === 'vertraege'
             ? (
               <>
@@ -212,12 +200,12 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
                   <button
                     type="button"
                     onClick={() => { pruefen('vertraege'); geheZu(i + 1); }}
-                    className="mb-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
+                    className={`mb-5 ${KNOPF_ZWEIT}`}
                   >
                     <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
                   </button>
                 ) : (
-                  <p className="mb-3 text-xs text-slate-600">Vermerkt: keine bestehenden Verträge.</p>
+                  <p className="mb-5 text-sm text-ui-schiefer">Vermerkt: keine bestehenden Verträge.</p>
                 ))}
                 {vertraege}
               </>
@@ -225,26 +213,18 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
             : <Basisdaten teil={s.teil} ergebnis={ergebnis} onEhepartnerDialog={onEhepartnerDialog} />}
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-ui-linie pt-6">
           {i > 0 ? (
-            <button
-              type="button"
-              onClick={() => geheZu(i - 1)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
-            >
+            <button type="button" onClick={() => geheZu(i - 1)} className={KNOPF_ZWEIT}>
               <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
             </button>
           ) : <span />}
-          <button
-            type="button"
-            onClick={() => (letzter ? onFertig() : geheZu(i + 1))}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 sm:text-sm"
-          >
+          <button type="button" onClick={() => (letzter ? onFertig() : geheZu(i + 1))} className={`ml-auto ${KNOPF}`}>
             {letzter ? 'Fertig — zum Ergebnis' : `Weiter: ${SCHRITTE[i + 1]!.titel}`}
-            <ArrowRight className="h-4 w-4" aria-hidden />
+            <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
           </button>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }

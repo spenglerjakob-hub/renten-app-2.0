@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen,
+  ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
   PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
 } from 'lucide-react';
@@ -53,7 +53,8 @@ import { Dialog } from './components/Dialog';
 import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
 import { RechtsLinks } from './components/RechtsLinks';
 import { personName, personNameAus } from './features/personen';
-import { AkkordeonKarte, euro, TON } from './components/Feld';
+import { AkkordeonKarte, euro } from './components/Feld';
+import { EINLEITUNG, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
 
 type Reiter = 's1' | 's2' | 's3' | 'planer';
 type Ansicht = 'kassenbon' | 'verlauf';
@@ -98,36 +99,68 @@ function StartKarte({ symbol, titel, text, marke, onClick }: {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 sm:px-4 sm:py-3"
+      className="ui-karte flex w-full items-center gap-4 p-4 text-left transition-colors hover:border-ui-feld-rand sm:px-5"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">{symbol}</span>
+      <span className="ui-innen flex h-10 w-10 shrink-0 items-center justify-center text-ui-tinte">{symbol}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-slate-900">{titel}</span>
-        <span className="block text-xs leading-snug text-slate-500">{text}</span>
+        <span className="block text-sm font-medium text-ui-tinte">{titel}</span>
+        <span className="block text-xs leading-snug text-ui-schiefer">{text}</span>
         {/* Auf dem Telefon unter dem Text — rechts daneben bliebe dem Titel zu wenig Breite. */}
         {marke && (
-          <span className="mt-1 inline-block rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white sm:hidden">{marke}</span>
+          <span className="ui-marke mt-1.5 inline-block px-2 py-0.5 text-xs font-medium sm:hidden">{marke}</span>
         )}
       </span>
       {marke && (
-        <span className="hidden shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white sm:inline-block">{marke}</span>
+        <span className="ui-marke hidden shrink-0 px-2 py-0.5 text-xs font-medium sm:inline-block">{marke}</span>
       )}
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+      <ChevronRight className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
     </button>
   );
 }
 
-/** Ueberschrift einer Etappe: Nummer, Titel, ein Satz, worum es geht. */
-function EtappenKopf({ nr, titel, text }: { nr: number; titel: string; text: string }) {
+/**
+ * Der Einstieg einer Etappe wie eine Seite der Beratung: der Titel gross, in
+ * Inter Tight, darunter ein Satz, worum es geht. Die Nummer steht in der
+ * Etappenleiste darueber, nicht mehr im Titel.
+ */
+function EtappenKopf({ titel, text }: { titel: React.ReactNode; text: string }) {
   return (
-    <div className="px-1">
-      <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-2xl">
-        <span className="text-indigo-600">{nr}.</span> {titel}
-      </h2>
-      <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">{text}</p>
+    <div>
+      <Titel gross als="h2">{titel}</Titel>
+      <p className={`mt-3 ${EINLEITUNG}`}>{text}</p>
     </div>
   );
 }
+
+/**
+ * Ein Band ueber der Etappe: eine Frage oder Meldung, darunter zwei
+ * gleichwertige Knoepfe — in der neutralen Innenflaeche wie ein Hinweis,
+ * nicht in einer Signalfarbe.
+ */
+function Band({ children, knoepfe }: { children: React.ReactNode; knoepfe: React.ReactNode }) {
+  return (
+    <div role="status" className="ui-innen px-4 py-3 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
+      {children}
+      <div className="mt-3 flex flex-wrap gap-2">{knoepfe}</div>
+    </div>
+  );
+}
+
+/** Eine Zahl der Fussleiste: leises Etikett, darunter der Betrag — `dunkel` fuer die Luecke. */
+function LeistenZahl({ etikett, wert, dunkel = false }: { etikett: React.ReactNode; wert: string; dunkel?: boolean }) {
+  return (
+    <div className={`min-w-0 flex-1 sm:flex-none ${dunkel ? 'rounded-[10px] bg-ui-dunkel px-3 py-1.5 text-white sm:px-4' : 'text-ui-tinte'}`}>
+      <div className={`whitespace-nowrap text-xs ${dunkel ? 'text-white/70' : 'text-ui-schiefer'}`}>{etikett}</div>
+      {/* Nie abgeschnitten: Ein Betrag mit Auslassungspunkten waere ein falscher Betrag. */}
+      <div className="whitespace-nowrap text-base font-medium tabular-nums sm:text-xl">{wert}</div>
+    </div>
+  );
+}
+
+/** Ein Symbolknopf im Kopf: eine Pille mit Kontur, wie der zweite Knopf des Stils. */
+const KOPF_KNOPF = 'relative inline-flex shrink-0 items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-ui-karte p-2 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover';
+/** Ein Textknopf in der ausgeklappten Kopfzeile — die leiseste Aktion. */
+const KOPF_TEXT = 'inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-innen';
 
 /**
  * Rueckfallebene, wenn der Rechenkern keine Zeitachse liefern kann — etwa
@@ -149,47 +182,44 @@ const LEERE_ZEILE: Jahreszeile = {
 };
 
 /**
- * Kleine Auswahl in der dunklen Kopfleiste.
+ * Kleine Auswahl in der Kopfleiste.
  *
  * `standard`: Der Wert ist noch die Vorbelegung — dann steht „Standard“
  * dabei, mit der Begruendung im Tooltip (siehe `features/vorbelegung.ts`).
  */
 /*
   Die Annahmen im Kopf sind Einstellungen, keine Ergebnisse — deshalb
-  neutral. Gruen und Indigo als Flaechen zogen den Blick staerker an als die
-  Versorgungsluecke selbst.
+  neutral: ein Feld wie jedes andere, ohne Farbflaeche, die den Blick
+  staerker anzoege als die Versorgungsluecke selbst.
 */
 function KopfAuswahl({
   titel, wert, onChange, standard,
 }: { titel: string; wert: number; onChange: (n: number) => void; standard?: string }) {
   return (
-    <span
-      title={standard}
-      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400"
-    >
+    <span title={standard} className="flex items-center gap-2 text-xs text-ui-schiefer">
       <span>{titel}</span>
       <select
         value={wert}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={`${titel} pro Jahr${standard ? ' (Standardwert, anpassbar)' : ''}`}
-        className="cursor-pointer rounded bg-slate-700 px-1 font-bold text-white outline-none hover:bg-slate-600"
+        className="ui-feld cursor-pointer py-1 pl-2 pr-7 text-xs font-medium tabular-nums"
       >
         {QUOTEN.map((q) => (
-          <option key={q} value={q} className="text-slate-900">
+          <option key={q} value={q}>
             {(q * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %
           </option>
         ))}
       </select>
       {/* Zwischen md und xl steht die Kopfleiste einzeilig und knapp — dort traegt nur der Tooltip die Marke. */}
-      {standard && <span aria-hidden className="text-xs font-normal text-slate-500 md:hidden xl:inline">Standard</span>}
+      {standard && <span aria-hidden className="md:hidden xl:inline">Standard</span>}
     </span>
   );
 }
 
 /**
- * EIN Druckknopf mit Auswahl statt zweier roter Knoepfe. Rot ist auf dieser
- * Seite der Versorgungsluecke vorbehalten; zwei rote Druckknoepfe waren das
- * Lauteste im ganzen Kopf.
+ * EIN Druckknopf mit Auswahl statt zweier roter Knoepfe — die waren das
+ * Lauteste im ganzen Kopf. Mit Kontur, nicht gefuellt: Die Hauptaktion
+ * jeder Etappe ist „Weiter“, nicht das Drucken.
  */
 function DruckMenue({ onDrucke, kompakt = false }: {
   onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void;
@@ -213,7 +243,7 @@ function DruckMenue({ onDrucke, kompakt = false }: {
   }, [offen]);
 
   const wahl = (umfang: 'kurz' | 'ausfuehrlich') => { setOffen(false); onDrucke(umfang); };
-  const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 focus-visible:bg-slate-100';
+  const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-ui-innen focus-visible:bg-ui-innen';
 
   return (
     <div ref={huelle} className={`relative flex ${kompakt ? '' : 'flex-1 sm:flex-none'}`}>
@@ -225,7 +255,7 @@ function DruckMenue({ onDrucke, kompakt = false }: {
           aria-controls={menueId}
           aria-label="Gutachten drucken"
           title="Gutachten drucken"
-          className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700"
+          className={KOPF_KNOPF}
         >
           <Printer className="h-4 w-4" aria-hidden />
         </button>
@@ -235,7 +265,7 @@ function DruckMenue({ onDrucke, kompakt = false }: {
         onClick={() => setOffen((v) => !v)}
         aria-expanded={offen}
         aria-controls={menueId}
-        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-500 sm:flex-none"
+        className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover sm:flex-none"
       >
         <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
@@ -245,7 +275,7 @@ function DruckMenue({ onDrucke, kompakt = false }: {
       {offen && (
         <div
           id={menueId}
-          className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-lg border border-slate-200 bg-white p-1 text-sm text-slate-800 shadow-lg"
+          className="ui-karte absolute right-0 top-full z-50 mt-2 w-64 p-1 text-sm text-ui-tinte shadow-lg"
         >
           {/*
             Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
@@ -254,12 +284,12 @@ function DruckMenue({ onDrucke, kompakt = false }: {
             in beiden Faellen mit.
           */}
           <button type="button" className={eintrag} onClick={() => wahl('kurz')}>
-            <span className="block font-semibold">Kurzfassung</span>
-            <span className="block text-xs text-slate-500">Für das Gespräch: Angaben und Renteneinkünfte</span>
+            <span className="block font-medium">Kurzfassung</span>
+            <span className="block text-xs text-ui-schiefer">Für das Gespräch: Angaben und Renteneinkünfte</span>
           </button>
           <button type="button" className={eintrag} onClick={() => wahl('ausfuehrlich')}>
-            <span className="block font-semibold">Ausführlich</span>
-            <span className="block text-xs text-slate-500">Zum Mitgeben: alle Abschnitte des Gutachtens</span>
+            <span className="block font-medium">Ausführlich</span>
+            <span className="block text-xs text-ui-schiefer">Zum Mitgeben: alle Abschnitte des Gutachtens</span>
           </button>
         </div>
       )}
@@ -594,15 +624,17 @@ export default function App() {
   /*
     Solange Beispielwerte im Fall stehen, sagt es jede rechnende Etappe —
     sonst wirkte ein Ergebnis aus dem Beispiel wie eines aus dem Mandanten.
+    Gestrichelt wie die Marke „Beispielwert“ am Feld: vorlaeufig, aber
+    kein Fehler — ohne Ampelfarbe.
   */
   const beispielHinweis = offeneBeispielTexte.length > 0 && (
-    <div role="status" className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 print:hidden sm:text-sm">
+    <div role="status" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[8px] border border-dashed border-ui-schiefer/60 bg-ui-karte px-4 py-2.5 text-sm text-ui-tinte print:hidden">
       <span>
         Das Ergebnis rechnet noch mit {offeneBeispielTexte.length === 1 ? 'einem Beispielwert' : `${offeneBeispielTexte.length} Beispielwerten`}:{' '}
         {offeneBeispielTexte.join(', ')}.
       </span>
-      <button type="button" onClick={() => { setBasisOffen(true); geheZu('daten'); }} className="font-bold underline">
-        Zu den Angaben
+      <button type="button" onClick={() => { setBasisOffen(true); geheZu('daten'); }} className={LINK}>
+        Zu den Angaben <ArrowRight className="h-3.5 w-3.5" aria-hidden />
       </button>
     </div>
   );
@@ -774,48 +806,54 @@ export default function App() {
     </div>
   );
 
+  /*
+    DIE VERSORGUNGSSCHICHTEN: Reiter als Pillen wie in der Beratung, darunter
+    die Vertraege der Schicht. Ohne eigenen Kasten — der Assistent und das
+    Formular stellen sie in ihre Karte; ein Kasten darin waere einer zu viel.
+  */
   const schichten = (
-    <section id="vertraege" className={`scroll-mt-28 overflow-hidden rounded-xl border shadow-sm ${TON.eingabe}`}>
-      <Reiterleiste
-        reiter={REITER}
+    <div id="vertraege" className="scroll-mt-28 space-y-5">
+      <Pillen
+        reiter={REITER.map((r) => ({ id: r.id, inhalt: r.text }))}
         aktiv={reiter}
         onWechsel={setReiter}
         beschriftung="Versorgungsschichten"
+        kennung={(id) => ({ reiter: `schicht-reiter-${id}`, bereich: 'schicht-bereich' })}
       />
-      {/* Kein eigener Grundton: die Flaeche traegt den der Karte, damit
-          die weissen Vertragskarten darauf hervortreten. */}
-      <div className="min-h-[300px] p-3 sm:min-h-[400px] sm:p-4">
+      <div role="tabpanel" id="schicht-bereich" aria-labelledby={`schicht-reiter-${reiter}`}>
         {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
         {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
         {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
         {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
       </div>
-    </section>
+    </div>
   );
 
   const rechnetText = (
-    <p className="rounded-lg bg-white px-4 py-8 text-center text-sm text-slate-500">
+    <p className="ui-karte px-4 py-8 text-center text-sm text-ui-schiefer">
       Berechnung läuft …
     </p>
   );
 
   return (
     /*
-      Grauer Seitengrund wie auf der Landingpage (`avd/Seite.tsx`), nicht
-      fast-weiss. Er ist die Voraussetzung dafuer, dass die Farbtrennung
-      ueberhaupt traegt: erst gegen ein graues Blatt heben sich die weissen
-      Ergebniskarten rechts UND der getoente Eingabegrund links ab. Auf
-      `slate-50` verschwammen beide mit der Seite.
+      Der Seitengrund aller Seiten: warmer Stein, darauf weisse Karten mit
+      Haarlinie. Eingaben und Ergebnisse trennt nicht mehr ein Farbton,
+      sondern die Etappe — wie in der Mitarbeiterberatung.
     */
-    <div className="min-h-screen bg-slate-100 pb-24 text-slate-800 sm:pb-36 print:pb-0">
-      {/* KOPFZEILE */}
+    <div className="min-h-screen bg-ui-flaeche pb-28 text-ui-tinte sm:pb-32 print:pb-0">
+      {/*
+        KOPFZEILE — hell wie der Kopf der anderen Seiten (`SeitenKopf`), aber
+        mitlaufend: Seiten, Konto und Drucken braucht man in jeder Etappe.
+        Eine Haarlinie trennt sie vom Inhalt, der darunter durchlaeuft.
+      */}
       <header
-        className={`sticky top-0 z-50 bg-slate-900 text-white shadow-md transition-all print:hidden ${
-          kopfEingeklappt ? 'py-2 sm:py-3' : 'p-2 sm:p-4'
+        className={`sticky top-0 z-50 border-b border-ui-linie bg-ui-flaeche text-ui-tinte print:hidden ${
+          kopfEingeklappt ? 'py-2 sm:py-3' : 'py-2 sm:py-4'
         }`}
       >
         <div
-          className={`relative mx-auto flex min-h-[40px] max-w-6xl px-1 sm:px-0 ${
+          className={`relative mx-auto flex min-h-[40px] max-w-6xl px-4 sm:px-6 ${
             kopfEingeklappt ? 'items-center' : 'flex-col justify-between md:flex-row md:items-center'
           }`}
         >
@@ -827,8 +865,9 @@ export default function App() {
           */}
           {/* Eingeklappt links buendig statt mittig: rechts stehen jetzt Konto,
               Drucken und der Pfeil — mittig lag der Name am Telefon darunter. */}
-          <div className={`flex items-center md:shrink-0 ${kopfEingeklappt ? 'w-full justify-between gap-2' : 'w-full justify-between md:w-auto md:gap-3'}`}>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <div className={`flex items-center md:shrink-0 ${kopfEingeklappt ? 'w-full justify-between gap-2' : 'w-full justify-between gap-2 md:w-auto md:gap-3'}`}>
+            {/* min-w-0: Der Name darf am Telefon umbrechen, statt die Knoepfe rechts aus dem Bild zu schieben. */}
+            <div className="flex min-w-0 items-center gap-3">
               {/* Uebersicht ueber alle Seiten — auch bei eingeklappter Kopfleiste da. */}
               <button
                 type="button"
@@ -837,27 +876,24 @@ export default function App() {
                 aria-label={neueEingaenge > 0
                   ? `Übersicht aller Seiten öffnen — ${neueEingaenge} Vorsorge-Check${neueEingaenge > 1 ? 's' : ''} eingegangen`
                   : 'Übersicht aller Seiten öffnen'}
-                className="relative flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
+                className={`${KOPF_KNOPF} sm:px-3`}
               >
                 <PanelLeft className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Seiten</span>
                 {/* Ein Kunde hat geantwortet — sichtbar auch bei eingeklappter Kopfzeile. */}
                 {neueEingaenge > 0 && (
                   <span
                     aria-hidden
-                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black leading-none text-white ring-2 ring-slate-900"
+                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-ui-dunkel px-1 text-[10px] font-medium leading-none text-white ring-2 ring-ui-flaeche"
                   >
                     {neueEingaenge}
                   </span>
                 )}
               </button>
-              <Logo dunkel klasse={kopfEingeklappt ? 'h-8 w-8 sm:h-10 sm:w-10' : 'h-10 w-10 sm:h-14 sm:w-14'} />
-              <div className="text-left">
-                <h1 className={`font-extrabold leading-tight tracking-tight ${kopfEingeklappt ? 'text-base sm:text-xl' : 'text-lg sm:text-2xl'}`}>
-                  JS-Rentenplaner
-                </h1>
-                <p className={`mt-0.5 font-medium text-slate-400 ${kopfEingeklappt ? 'hidden text-xs sm:block' : 'text-xs'}`}>
-                  Ihre Zukunft. Smart geplant.
-                </p>
+              <Logo klasse="h-9 w-9" />
+              <div className="min-w-0 text-left">
+                <h1 className="text-sm font-medium tracking-tight">JS-Rentenplaner</h1>
+                {/* Am Telefon nur der Name — der Spruch braeche dort in zwei Zeilen und machte den Kopf hoch. */}
+                <p className="hidden text-xs text-ui-schiefer sm:block">Ihre Zukunft. Smart geplant.</p>
               </div>
             </div>
 
@@ -867,10 +903,10 @@ export default function App() {
                 onClick={() => setKontoOffen(true)}
                 aria-label={angemeldet ? `Konto — angemeldet als ${angemeldet}` : 'Konto — Pläne speichern und laden'}
                 title={angemeldet ? `Angemeldet als ${angemeldet}` : 'Konto'}
-                className={`relative rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 ${kopfEingeklappt ? '' : 'md:hidden'}`}
+                className={`${KOPF_KNOPF} ${kopfEingeklappt ? '' : 'md:hidden'}`}
               >
                 <Wallet className="h-4 w-4" aria-hidden />
-                {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-slate-900" />}
+                {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-ui-tinte ring-2 ring-ui-flaeche" />}
               </button>
               {kopfEingeklappt && <DruckMenue onDrucke={drucke} kompakt />}
               {!kopfEingeklappt && (
@@ -878,7 +914,8 @@ export default function App() {
                   type="button"
                   onClick={() => setMenueOffen((v) => !v)}
                   aria-expanded={menueOffen}
-                  className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 p-2 text-xs font-bold text-slate-300 hover:bg-slate-700 md:hidden"
+                  aria-label="Menü"
+                  className={`${KOPF_KNOPF} sm:px-3 md:hidden`}
                 >
                   <Settings className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Menü</span>
                 </button>
@@ -888,7 +925,7 @@ export default function App() {
                 onClick={() => setKopfEingeklappt((v) => !v)}
                 aria-expanded={!kopfEingeklappt}
                 title={kopfEingeklappt ? 'Kopfzeile ausklappen' : 'Kopfzeile einklappen'}
-                className="rounded-full border border-slate-700 bg-slate-800 p-2 text-slate-300 shadow-sm hover:bg-slate-700 hover:text-white"
+                className={KOPF_KNOPF}
               >
                 {kopfEingeklappt
                   ? <ChevronDown className="h-4 w-4" aria-hidden />
@@ -899,7 +936,7 @@ export default function App() {
 
           {!kopfEingeklappt && (
             <div className={`${menueOffen ? 'flex' : 'hidden'} mt-3 w-full flex-col items-stretch gap-2 md:mt-0 md:flex md:w-auto md:flex-row md:items-center`}>
-              <div className="flex flex-wrap justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-[10px] border border-ui-linie bg-ui-karte px-3 py-2">
                 <KopfAuswahl
                   titel="Inflation"
                   wert={szenario.annahmen.inflation}
@@ -919,29 +956,22 @@ export default function App() {
                 */}
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
+              {/* Die Aktionen ohne Kasten: Textknoepfe, das Drucken mit Kontur. */}
+              <div className="flex flex-wrap items-center justify-center gap-1">
                 <input ref={dateiRef} type="file" accept=".json" onChange={importieren} className="hidden" />
                 <button
                   type="button"
                   onClick={() => setKontoOffen(true)}
                   title={angemeldet ? `Angemeldet als ${angemeldet}` : 'Pläne speichern und laden'}
-                  className="hidden items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white md:flex"
+                  className={`${KOPF_TEXT} hidden md:inline-flex`}
                 >
                   <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden /> Konto
-                  {angemeldet && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                  {angemeldet && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-ui-tinte" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => dateiRef.current?.click()}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none"
-                >
+                <button type="button" onClick={() => dateiRef.current?.click()} className={`${KOPF_TEXT} flex-1 sm:flex-none`}>
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" aria-hidden /> Laden
                 </button>
-                <button
-                  type="button"
-                  onClick={exportieren}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white sm:flex-none"
-                >
+                <button type="button" onClick={exportieren} className={`${KOPF_TEXT} flex-1 sm:flex-none`}>
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
                 <DruckMenue onDrucke={drucke} />
@@ -949,7 +979,8 @@ export default function App() {
                   type="button"
                   onClick={zuruecksetzen}
                   aria-label="Alle Eingaben zurücksetzen"
-                  className="rounded-md p-1.5 text-slate-400 hover:bg-slate-700 hover:text-white"
+                  title="Alle Eingaben zurücksetzen"
+                  className="rounded-full p-2 text-ui-schiefer transition-colors hover:bg-ui-innen hover:text-ui-tinte"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                 </button>
@@ -976,42 +1007,59 @@ export default function App() {
       />
 
       {importMeldung && (
-        <div
-          role="status"
-          className={`mx-auto mt-3 max-w-6xl rounded-lg px-4 py-3 text-sm print:hidden ${
-            importMeldung.art === 'ok' ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'
-          }`}
-        >
-          <strong>{importMeldung.art === 'ok' ? 'Geladen.' : 'Datei konnte nicht geladen werden.'}</strong>
-          <ul className="mt-1 list-inside list-disc">
-            {importMeldung.texte.map((t, i) => <li key={i}>{t}</li>)}
-          </ul>
+        <div className="mx-auto mt-4 max-w-6xl px-4 print:hidden sm:px-6">
+          <div
+            role="status"
+            className={`px-4 py-3 text-sm ${importMeldung.art === 'ok' ? 'ui-innen text-ui-tinte' : 'rounded-lg bg-rose-50 text-rose-900'}`}
+          >
+            <strong className="font-medium">{importMeldung.art === 'ok' ? 'Geladen.' : 'Datei konnte nicht geladen werden.'}</strong>
+            <ul className="mt-1 list-inside list-disc">
+              {importMeldung.texte.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </div>
         </div>
       )}
 
-      <main id="journey" className="mx-auto max-w-6xl scroll-mt-28 space-y-4 p-2 sm:space-y-6 sm:p-6 print:hidden">
+      {/* Rand und Abstaende wie die Mitarbeiterberatung: 16 px am Telefon, Bloecke mit Luft dazwischen. */}
+      <main id="journey" className="mx-auto max-w-6xl scroll-mt-28 space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8 print:hidden">
         {musterfall && (
-          <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-950">
+          <Band knoepfe={(
+            <>
+              <button type="button" onClick={() => musterfallLaden(musterfall)} className={KNOPF_ZWEIT}>Übernehmen</button>
+              <button type="button" onClick={() => { musterfallVerwerfen(); setMusterfall(null); }} className={KNOPF_ZWEIT}>
+                Verwerfen
+              </button>
+            </>
+          )}>
             <p>
               <strong>Musterfall aus der Schnellrechnung übernehmen?</strong>{' '}
               {musterfall.kurz && <>({musterfall.kurz}) </>}
               Ihr aktueller Fall in diesem Browser wird dabei ersetzt — sichern Sie ihn vorher im Konto, wenn Sie
               ihn behalten möchten.
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" onClick={() => musterfallLaden(musterfall)}
-                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                Übernehmen
-              </button>
-              <button type="button" onClick={() => { musterfallVerwerfen(); setMusterfall(null); }}
-                className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                Verwerfen
-              </button>
-            </div>
-          </div>
+          </Band>
         )}
         {auftrittBand && (auftrittBand === 'uebernommen' || auftrittLokal) && (
-          <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-950">
+          <Band knoepfe={auftrittBand === 'uebernommen' ? (
+            <>
+              <button type="button" onClick={() => { setAuftrittBand(null); setAuftrittOffen(true); }} className={KNOPF_ZWEIT}>
+                Auftritt ansehen
+              </button>
+              <button type="button" onClick={() => setAuftrittBand(null)} className={KNOPF_ZWEIT}>Schließen</button>
+            </>
+          ) : (
+            <>
+              <button type="button"
+                onClick={() => { if (auftrittLokal) void auftrittUebernehmen(auftrittLokal).then((ok) => setAuftrittBand(ok ? 'uebernommen' : 'fehler')); }}
+                className={KNOPF_ZWEIT}>
+                Übernehmen
+              </button>
+              <button type="button" onClick={() => { auftrittLokalVerwerfen(); setAuftrittLokal(null); setAuftrittBand(null); }}
+                className={KNOPF_ZWEIT}>
+                Verwerfen
+              </button>
+            </>
+          )}>
             {auftrittBand === 'uebernommen' ? (
               <p>
                 <strong>
@@ -1028,46 +1076,24 @@ export default function App() {
                   : 'Was Sie dort eingetragen haben, ersetzt das Gespeicherte; Name und Kontakt bleiben.'}
               </p>
             )}
-            <div className="mt-2 flex flex-wrap gap-2">
-              {auftrittBand === 'uebernommen' ? (
-                <>
-                  <button type="button" onClick={() => { setAuftrittBand(null); setAuftrittOffen(true); }}
-                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                    Auftritt ansehen
-                  </button>
-                  <button type="button" onClick={() => setAuftrittBand(null)}
-                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                    Schließen
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button"
-                    onClick={() => { if (auftrittLokal) void auftrittUebernehmen(auftrittLokal).then((ok) => setAuftrittBand(ok ? 'uebernommen' : 'fehler')); }}
-                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                    Übernehmen
-                  </button>
-                  <button type="button" onClick={() => { auftrittLokalVerwerfen(); setAuftrittLokal(null); setAuftrittBand(null); }}
-                    className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-                    Verwerfen
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          </Band>
         )}
-        <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} erledigt={etappeErledigt} />
-        <FallFortschritt schritte={fallSchritte} onSprung={springeZu} />
+        {/* Etappenleiste und Fortschritt dicht beieinander — beide sagen, wo der Fall steht. */}
+        <div className="space-y-3">
+          <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} erledigt={etappeErledigt} />
+          <FallFortschritt schritte={fallSchritte} onSprung={springeZu} />
+        </div>
 
         {fehler && (
-          <div role="alert" className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900">
+          <div role="alert" className={`px-4 py-3 ${FEHLER}`}>
             Die Berechnung ist fehlgeschlagen: {fehler}
           </div>
         )}
 
         {hinweise.length > 0 && schritt !== 'daten' && (
-          <div role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <ul className="list-inside list-disc space-y-1">
+          <div role="status" className="ui-innen flex gap-2.5 px-4 py-3 text-sm leading-relaxed text-ui-tinte">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+            <ul className="space-y-1">
               {hinweise.map((h, i) => <li key={i}>{h}</li>)}
             </ul>
           </div>
@@ -1077,15 +1103,12 @@ export default function App() {
         {schritt === 'daten' && (
           <>
             <EtappenKopf
-              nr={1}
-              titel="Ihre Daten und Ihr Ziel"
+              titel={<>Ihre Daten und <Hervor>Ihr Ziel</Hervor></>}
               text="Wer Sie sind, was Sie verdienen, was schon an Vorsorge da ist — und mit wie viel Geld im Monat Sie im Ruhestand leben möchten."
             />
             {/*
-              LINKS die Angaben zur Person, RECHTS die Vertraege. Getoenter
-              Grund mit kraeftigem Rand, wie auf der Seite zum
-              Altersvorsorgedepot: Hier traegt man ein; die Ergebnisse stehen
-              in den folgenden Etappen auf weissen Karten.
+              LINKS die Angaben zur Person, RECHTS die Vertraege — auf weissen
+              Karten wie die Angaben der Mitarbeiterberatung.
             */}
             {/*
               VORSORGE-CHECK am Anfang der Angaben — von dort kommen Faelle
@@ -1095,7 +1118,7 @@ export default function App() {
               dem ersten Eingabefeld.
             */}
             {checkMoeglich && (
-              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 print:hidden">
+              <div className="grid gap-3 sm:grid-cols-2 print:hidden">
                 <StartKarte
                   symbol={<Inbox className="h-5 w-5" aria-hidden />}
                   titel="Vorsorge-Check an Kunden senden"
@@ -1110,19 +1133,24 @@ export default function App() {
               ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
               nennt die Unterlage, das Formular zeigt alles auf einen Blick.
               Beide schreiben in denselben Speicher — umschalten verliert nichts.
+              Als Pillen wie der Kaufkraft-Schalter; am Telefon kuerzer, sonst
+              passen beide nicht nebeneinander.
             */}
-            <div className="flex rounded-lg border border-slate-200 bg-slate-200/50 p-1 print:hidden" role="group" aria-label="Art der Eingabe">
-              {([['assistent', 'Schritt für Schritt'], ['formular', 'Alle Angaben auf einen Blick']] as const).map(([id, text]) => (
+            <div role="group" aria-label="Art der Eingabe"
+              className="inline-flex max-w-full gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 text-sm font-medium print:hidden">
+              {([['assistent', 'Schritt für Schritt', 'Schritt für Schritt'], ['formular', 'Alle Angaben auf einen Blick', 'Auf einen Blick']] as const).map(([id, text, kurz]) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setEingabeArt(id)}
                   aria-pressed={eingabeArt === id}
-                  className={`flex-1 rounded-md py-1.5 text-xs font-bold sm:py-2 ${
-                    eingabeArt === id ? 'bg-white text-indigo-700 shadow' : 'text-slate-500 hover:text-slate-700'
+                  // Derselbe Name auf jedem Geraet; die Kurzform am Telefon ist ein Teil davon.
+                  aria-label={text}
+                  className={`rounded-full px-3 py-1.5 transition-colors sm:px-4 ${
+                    eingabeArt === id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
                   }`}
                 >
-                  {text}
+                  <span className="sm:hidden">{kurz}</span><span className="hidden sm:inline">{text}</span>
                 </button>
               ))}
             </div>
@@ -1137,14 +1165,13 @@ export default function App() {
                 onSchritt={assistentZu}
               />
             ) : (
-            <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
+            <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
               <div id="eingaben" className="scroll-mt-28 lg:col-span-6">
                 <AkkordeonKarte
                   titel="Allgemeine Daten & Ziel"
                   offen={basisOffen}
                   onUmschalten={() => setBasisOffen((v) => !v)}
-                  symbol={<User className="h-4 w-4 text-indigo-400" aria-hidden />}
-                  ton="eingabe"
+                  symbol={<User className="h-4 w-4 text-ui-schiefer" aria-hidden />}
                 >
                   <Basisdaten
                     ergebnis={ergebnis ?? null}
@@ -1154,18 +1181,16 @@ export default function App() {
                 </AkkordeonKarte>
               </div>
 
-              <div className="space-y-4 sm:space-y-6 lg:col-span-6">
-                {/* Wie im Assistenten: „keine Vertraege“ ist eine Antwort, die man geben muss. */}
-                {szenario.vertraege.length === 0 && offenePfade(szenario).includes('vertraege') && (
-                  <button
-                    type="button"
-                    onClick={() => pruefen('vertraege')}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 sm:text-sm"
-                  >
-                    <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
-                  </button>
-                )}
-                {schichten}
+              <div className="lg:col-span-6">
+                <Karte titel="Bestehende Vorsorge">
+                  {/* Wie im Assistenten: „keine Vertraege“ ist eine Antwort, die man geben muss. */}
+                  {szenario.vertraege.length === 0 && offenePfade(szenario).includes('vertraege') && (
+                    <button type="button" onClick={() => pruefen('vertraege')} className={`mb-5 ${KNOPF_ZWEIT}`}>
+                      <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
+                    </button>
+                  )}
+                  {schichten}
+                </Karte>
               </div>
             </div>
             )}
@@ -1180,7 +1205,6 @@ export default function App() {
         {schritt === 'ergebnis' && (
           <>
             <EtappenKopf
-              nr={2}
               titel="Ihr Ergebnis"
               text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
             />
@@ -1287,7 +1311,6 @@ export default function App() {
         {schritt === 'sparen' && (
           <>
             <EtappenKopf
-              nr={3}
               titel="Die Lücke schließen"
               text="Wie viel Sie ab heute monatlich zurücklegen müssten, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten."
             />
@@ -1307,7 +1330,6 @@ export default function App() {
         {schritt === 'loesungen' && (
           <>
             <EtappenKopf
-              nr={4}
               titel="Vertrags-TÜV & Lösungen"
               text="Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den Sie neu in die Altersvorsorge stecken."
             />
@@ -1333,7 +1355,7 @@ export default function App() {
             {tuevReiter === 'loesungen' ? (
               <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
             ) : (
-              <div className="-mx-2 sm:-mx-6">
+              <div className="-mx-4 sm:-mx-6">
                 <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
               </div>
             )}
@@ -1343,7 +1365,7 @@ export default function App() {
 
         {/* Nur waehrend gerechnet wird. „berechnet in 6 ms“ war ein Hinweis
             fuer Entwickler — fuer Berater Rauschen unter jeder Seite. */}
-        <p className="min-h-[1rem] text-right text-xs text-slate-400 print:hidden" aria-live="polite">
+        <p className="min-h-[1rem] text-right text-xs text-ui-schiefer print:hidden" aria-live="polite">
           {rechnet ? 'rechnet …' : ''}
         </p>
       </main>
@@ -1371,22 +1393,23 @@ export default function App() {
       )}
 
       <Dialog offen={druckFrage !== null} titel="Noch Beispielwerte im Fall" onSchliessen={schliesseDruckFrage}>
-        <p className="text-sm leading-relaxed text-slate-700">
-          Diese Angaben sind noch Beispielwerte: <strong>{offeneBeispielTexte.join(', ')}</strong>. Im
+        <p className="text-sm leading-relaxed text-ui-tinte/80">
+          Diese Angaben sind noch Beispielwerte: <strong className="font-medium text-ui-tinte">{offeneBeispielTexte.join(', ')}</strong>. Im
           Gutachten stehen sie gekennzeichnet.
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {/* Zwei gleichwertige Knoepfe: Drucken darf man trotzdem. */}
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => { setDruckFrage(null); setBasisOffen(true); geheZu('daten'); }}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+            className={KNOPF_ZWEIT}
           >
             Angaben prüfen
           </button>
           <button
             type="button"
             onClick={() => { const u = druckFrage; setDruckFrage(null); if (u) druckeJetzt(u); }}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50"
+            className={KNOPF_ZWEIT}
           >
             Trotzdem drucken
           </button>
@@ -1405,7 +1428,7 @@ export default function App() {
 
       <Seitenleiste offen={leisteOffen} onSchliessen={schliesseLeiste} abschnitte={abschnitte} werkzeuge={werkzeuge} />
 
-      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-slate-500 print:hidden">
+      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ui-schiefer print:hidden sm:px-6">
         <p>
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Die Berechnung läuft
           vollständig in Ihrem Browser — ohne Anmeldung verlassen Ihre Eingaben dieses Gerät nicht.
@@ -1422,62 +1445,40 @@ export default function App() {
         gerechnet wird.
       */}
       {zeile && !(schritt === 'daten' && offeneBeispielTexte.length > 0) && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-800 bg-slate-900 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.3)] print:hidden">
+        /*
+          Hell wie die Karten, mit Haarlinie und einem leichten Schatten nach
+          oben. Die Luecke steht als einzige Kachel dunkel — hervorgehoben
+          durch Tinte, nicht durch Rot oder Gruen; „Gedeckt“ steht in
+          derselben Kachel.
+        */
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-ui-linie bg-ui-karte shadow-[0_-4px_16px_rgba(0,0,0,0.05)] print:hidden">
           {/*
             Die Rechenzeichen "−" und "=" entfallen auf dem Telefon. Sie
-            erklaeren einen Zusammenhang, den die drei Kacheln von links nach
+            erklaeren einen Zusammenhang, den die drei Zahlen von links nach
             rechts ohnehin erzaehlen, und kosten dort Breite, die den
             Beschriftungen fehlt.
           */}
-          <div className="mx-auto max-w-6xl px-2 py-1.5 sm:px-4 sm:py-3">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-4">
-              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
-                <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
-                  Zielbedarf
-                </div>
-                <div className="text-base font-bold tabular-nums text-white sm:text-xl">
-                  {euro(zeile.zielNettoMonat * faktor)}
-                </div>
-              </div>
-
-              <div className="hidden font-black text-slate-500 sm:block sm:text-sm">−</div>
-
-              <div className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-1.5 py-1 text-center sm:p-2.5">
-                <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:mb-1 sm:text-xs">
-                  {/* Am Telefon kurz, sonst bricht die Kachel um und die Leiste wird hoeher. */}
-                  <span className="sm:hidden">Netto</span><span className="hidden sm:inline">Gesamt-Netto</span>
-                </div>
-                <div className="text-base font-bold tabular-nums text-indigo-400 sm:text-xl">
-                  {euro(zeile.nettoMonat * faktor)}
-                </div>
-              </div>
-
-              <div className="hidden font-black text-slate-500 sm:block sm:text-sm">=</div>
-
-              <div
-                className={`flex-1 rounded-lg border px-1.5 py-1 text-center shadow-inner sm:p-2.5 ${
-                  luecke > 0
-                    ? 'border-rose-700/50 bg-rose-900/30 text-rose-400'
-                    : 'border-emerald-700/50 bg-emerald-900/30 text-emerald-400'
-                }`}
-              >
-                <div className={`mb-0.5 text-[11px] font-bold uppercase tracking-wider sm:mb-1 sm:text-xs ${luecke > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  {/* Am Telefon kuerzer: Neben dem Kaufkraft-Symbol passt
-                      „Versorgungsluecke“ nicht mehr in eine Zeile. */}
-                  <span className="sm:hidden">Lücke</span><span className="hidden sm:inline">Versorgungslücke</span>
-                </div>
-                <div className="text-base font-black tabular-nums sm:text-xl">
-                  {luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
-                </div>
-              </div>
-
-              {/* In derselben Zeile wie die Kacheln, damit die Leiste nicht
-                  hoeher wird: am PC mit Worten, am Telefon nur das Symbol. */}
-              <KaufkraftSchalter wert={kaufkraftHeute} onChange={setKaufkraftHeute} kompakt klasse="sm:hidden" />
-              <KaufkraftSchalter
-                wert={kaufkraftHeute} onChange={setKaufkraftHeute} ton="dunkel"
-                klasse="hidden sm:inline-flex sm:flex-col sm:items-stretch"
+          {/* Ab der kleinen Breite stehen die Zahlen dicht als Rechnung beieinander, der Schalter rechts. */}
+          <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6 sm:py-3">
+            <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+              <LeistenZahl etikett="Zielbedarf" wert={euro(zeile.zielNettoMonat * faktor)} />
+              <span aria-hidden className="hidden text-lg text-ui-asche sm:block">−</span>
+              <LeistenZahl
+                // Bis zur mittleren Breite kurz, sonst bricht die Beschriftung um und die Leiste wird hoeher.
+                etikett={<><span className="md:hidden">Netto</span><span className="hidden md:inline">Gesamt-Netto</span></>}
+                wert={euro(zeile.nettoMonat * faktor)}
               />
+              <span aria-hidden className="hidden text-lg text-ui-asche sm:block">=</span>
+              <LeistenZahl
+                dunkel
+                etikett={<><span className="md:hidden">Lücke</span><span className="hidden md:inline">Versorgungslücke</span></>}
+                wert={luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
+              />
+
+              {/* In derselben Zeile wie die Zahlen, damit die Leiste nicht
+                  hoeher wird: breit mit Worten, sonst nur das Symbol. */}
+              <KaufkraftSchalter wert={kaufkraftHeute} onChange={setKaufkraftHeute} kompakt klasse="md:hidden sm:ml-auto" />
+              <KaufkraftSchalter wert={kaufkraftHeute} onChange={setKaufkraftHeute} klasse="hidden md:ml-auto md:inline-flex" />
             </div>
           </div>
         </div>

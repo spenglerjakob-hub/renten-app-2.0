@@ -261,16 +261,26 @@ export function Pillen<T extends string>({ reiter, aktiv, onWechsel, beschriftun
  * Schritte als duenne Linien, wie die Schrittleiste der Beratung: aktuell
  * volle Tinte, erledigt halbe, offen Haarlinie — ohne Ampel. Am Telefon
  * steht statt der Namen „Schritt 2 von 7: …“.
+ *
+ * `offen` markiert Schritte, in denen noch etwas fehlt, mit einem leeren
+ * Kreis hinter dem Namen — derselbe wie bei offenen Schritten des Falls
+ * (FallFortschritt). Ohne die Angabe bleibt die Leiste, wie sie in der
+ * Beratung steht.
  */
-export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt }: {
+export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt, offen, offenText = 'noch offen' }: {
   schritte: readonly string[];
   aktiv: number;
   onWechsel: (i: number) => void;
   beschriftung: string;
-  /** Ist ein Schritt erledigt? Ohne Angabe: alle vor dem aktuellen. */
+  /** Ist ein Schritt erledigt? Ohne Angabe: alle vor dem aktuellen. Mit Angabe sagt es auch der Vorlesetext. */
   erledigt?: (i: number) => boolean;
+  offen?: (i: number) => boolean;
+  /** Was der leere Kreis bedeutet — fuer den Vorlesetext und die Zeile am Telefon; je Schritt, wenn er dort anderes heisst */
+  offenText?: string | ((i: number) => string);
 }) {
   const fertig = erledigt ?? ((i: number) => i < aktiv);
+  const offenWort = (i: number) => (typeof offenText === 'function' ? offenText(i) : offenText);
+  const zusatz = (i: number) => (offen?.(i) ? ` — ${offenWort(i)}` : i !== aktiv && erledigt?.(i) ? ' — erledigt' : '');
   return (
     <nav aria-label={beschriftung}>
       <ol className="grid gap-1" style={{ gridTemplateColumns: `repeat(${schritte.length}, minmax(0, 1fr))` }}>
@@ -280,18 +290,21 @@ export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt }: 
               type="button"
               onClick={() => onWechsel(i)}
               aria-current={i === aktiv ? 'step' : undefined}
-              aria-label={`Schritt ${i + 1}: ${t}`}
+              aria-label={`Schritt ${i + 1}: ${t}${zusatz(i)}`}
               className="group flex w-full flex-col items-center gap-1"
             >
               <span className={`h-1 w-full rounded-full ${i === aktiv ? 'bg-ui-tinte' : fertig(i) ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
               <span className={`hidden text-xs leading-tight sm:block ${i === aktiv ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
                 {t}
+                {offen?.(i) && <span aria-hidden className="ml-1.5 inline-block h-2 w-2 rounded-full border border-ui-schiefer align-middle" />}
               </span>
             </button>
           </li>
         ))}
       </ol>
-      <p className="mt-2 text-xs text-ui-schiefer sm:hidden">Schritt {aktiv + 1} von {schritte.length}: {schritte[aktiv]}</p>
+      <p className="mt-2 text-xs text-ui-schiefer sm:hidden">
+        Schritt {aktiv + 1} von {schritte.length}: {schritte[aktiv]}{offen?.(aktiv) && ` · ${offenWort(aktiv)}`}
+      </p>
     </nav>
   );
 }

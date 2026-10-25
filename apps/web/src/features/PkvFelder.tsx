@@ -57,8 +57,8 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
     schreibe({ ...pkv, bet: { ...pkv.bet, ...teil } });
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+    <div className="ui-innen mt-4 p-3 sm:p-4">
+      <p className="mb-3 text-xs font-medium text-ui-tinte">
         {titel ?? 'Ihre private Krankenversicherung'}
       </p>
 
@@ -112,7 +112,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
           wert={pkv.zuschlagEnthalten}
           onChange={(b) => setze({ zuschlagEnthalten: b })}
         />
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+        <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
           Er wird bis zum Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}. Geburtstags erhoben und entfällt
           danach (§ 149 VAG) — der Beitrag sinkt dann einmalig um gut 9 %. Wer die Grenze schon
           überschritten hat, lässt den Haken weg.
@@ -126,7 +126,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
         Netto-Hebel und Nettorendite bei ihm eine andere Bedeutung als bei
         jedem anderen Vertrag.
       */}
-      <div className="mt-3 border-t border-slate-100 pt-3">
+      <div className="mt-3 border-t border-ui-linie pt-3">
         <Schalter
           label="Beitragsentlastungstarif vorhanden"
           wert={pkv.bet.aktiv}
@@ -185,9 +185,10 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
               />
             </div>
             {pkv.bet.beitragMonat > pkv.praemieMonat && (
-              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+              /* Ein Eingabefehler, kein Hinweis — deshalb rot. */
+              <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-900">
                 Der Entlastungstarif ist größer als der Gesamtbeitrag oben. Tragen Sie oben den
-                <strong> vollen </strong> Beitrag ein — Kranken-, Pflege- und Entlastungstarif
+                <strong className="font-medium"> vollen </strong> Beitrag ein — Kranken-, Pflege- und Entlastungstarif
                 zusammen.
               </p>
             )}

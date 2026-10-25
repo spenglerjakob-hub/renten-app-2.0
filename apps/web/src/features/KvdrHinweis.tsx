@@ -51,15 +51,16 @@ export function KvdrHinweis({ szenario }: { szenario: SzenarioParsed }) {
   if (!unterschied || unterschied.mehr <= 1) return null;
 
   return (
-    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/60 p-2.5">
-      <p className="text-xs leading-relaxed text-amber-900">
+    /* Neutral wie jeder Hinweis — die Zahlen darin sprechen fuer sich. */
+    <div className="ui-innen mt-3 p-3 sm:p-4 [&_strong]:font-medium [&_strong]:text-ui-tinte">
+      <p className="text-xs leading-relaxed text-ui-tinte/80">
         <strong>Die KVdR ist eine Annahme, keine Selbstverständlichkeit.</strong> In sie kommt
         nur, wer in der zweiten Hälfte seines Erwerbslebens zu neun Zehnteln gesetzlich versichert
         war — eine freiwillige Mitgliedschaft zählt dabei mit. Wird die Zeit nicht erreicht,
         bleiben Sie im Alter freiwillig versichert, und dann sind{' '}
         <strong>alle</strong> Ihre Einkünfte beitragspflichtig, auch eine Rürup- oder Privatrente.
       </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-amber-900">
+      <p className="mt-1.5 text-xs leading-relaxed text-ui-tinte/80">
         In Ihrem Fall wären das{' '}
         <strong>{euro(unterschied.kvPvOhne)} statt {euro(unterschied.kvPvMit)}</strong> im Monat —
         ein Unterschied von <strong>{euro(unterschied.mehr)}</strong>, um den Ihre

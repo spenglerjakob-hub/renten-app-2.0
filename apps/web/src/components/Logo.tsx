@@ -16,7 +16,7 @@ const CYAN = '#3BA6F1';
 
 export function Logo({ klasse = 'h-10 w-10', dunkel = false }: {
   klasse?: string;
-  /** Fuer dunklen Grund, etwa die Kopfzeile des Rechners */
+  /** Fuer dunklen Grund wie im Favicon; die Kopfzeile des Rechners ist seit dem Umbau hell */
   dunkel?: boolean;
 }) {
   const f = dunkel ? DUNKEL : HELL;

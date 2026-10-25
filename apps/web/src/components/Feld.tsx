@@ -614,6 +614,9 @@ export function Abschnitt(props: {
  * traegt der Knopf die Klasse `druck-kopf` — die Druckregeln in index.css
  * nehmen ihn davon aus, dass Bedienelemente ausgeblendet werden. Der Inhalt
  * ist im Druck immer sichtbar, unabhaengig vom Zustand am Bildschirm.
+ *
+ * Abstaende und Titel wie die Karten der Mitarbeiterberatung (`Karte` aus
+ * stil): Der Titel steht ueber dem Inhalt, ohne Trennlinie dazwischen.
  */
 export function AkkordeonKarte(props: {
   titel: string;
@@ -632,11 +635,11 @@ export function AkkordeonKarte(props: {
         type="button"
         onClick={props.onUmschalten}
         aria-expanded={props.offen}
-        className={`druck-kopf flex w-full items-center justify-between gap-3 border-b border-ui-linie px-4 py-3 text-left ${
+        className={`druck-kopf flex w-full items-center justify-between gap-3 px-5 py-5 text-left sm:px-7 sm:py-6 ${
           eingabe ? 'hover:bg-ui-linie/40' : 'hover:bg-ui-innen'
         }`}
       >
-        <h2 className="flex items-center gap-2 text-base font-medium text-ui-tinte">
+        <h2 className="flex items-center gap-2.5 text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
           {props.symbol}
           {props.titel}
         </h2>
@@ -648,7 +651,7 @@ export function AkkordeonKarte(props: {
           />
         </span>
       </button>
-      <div className={`p-4 ${props.offen ? 'block' : 'hidden'} druck-inhalt`}>{props.children}</div>
+      <div className={`px-5 pb-5 sm:px-7 sm:pb-7 ${props.offen ? 'block' : 'hidden'} druck-inhalt`}>{props.children}</div>
     </section>
   );
 }
