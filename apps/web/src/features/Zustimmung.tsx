@@ -5,7 +5,7 @@ import { zustimmungDaten } from '../lib/nutzungsbedingungen';
 import { useAuth } from '../store/auth';
 import { Rahmen } from './Anmeldung';
 import { RechtsLinks } from '../components/RechtsLinks';
-import { FEHLER, KNOPF, LINK, Titel } from '../components/stil';
+import { EINLEITUNG, FEHLER, KNOPF, LINK, Titel } from '../components/stil';
 
 /**
  * Einmalige Zustimmung zu den Nutzungsbedingungen — fuer Konten, die vor
@@ -30,19 +30,20 @@ export function Zustimmung({ onFertig }: { onFertig: () => void }) {
 
   return (
     <Rahmen>
-      <div className="ui-karte p-6 sm:p-7">
-        <Titel>Nutzungsbedingungen</Titel>
-        <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-          Für den JS-Rentenplaner gelten Nutzungsbedingungen. Bitte lesen Sie sie und stimmen Sie zu — danach
-          geht es direkt weiter. Gibt es eine neue Fassung, fragen wir einmal erneut.
-        </p>
+      {/* Wie die Anmeldung: Titel und Einleitung ueber der Karte, in der Karte nur, was zu tun ist. */}
+      <Titel>Nutzungsbedingungen</Titel>
+      <p className={`mt-2 ${EINLEITUNG}`}>
+        Für den JS-Rentenplaner gelten Nutzungsbedingungen. Bitte lesen Sie sie und stimmen Sie zu — danach
+        geht es direkt weiter. Gibt es eine neue Fassung, fragen wir einmal erneut.
+      </p>
+      <div className="ui-karte mt-6 p-6 sm:p-7">
         <a
           href="/nutzungsbedingungen" target="_blank" rel="noopener"
-          className={`mt-3 ${LINK} underline`}
+          className={`${LINK} underline`}
         >
           Nutzungsbedingungen lesen
         </a>
-        <label className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
+        <label className="mt-5 flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
           <input
             type="checkbox" checked={haken} onChange={(e) => setHaken(e.target.checked)}
             className="mt-1 h-4 w-4 shrink-0"
@@ -52,7 +53,7 @@ export function Zustimmung({ onFertig }: { onFertig: () => void }) {
         {fehler && <p role="status" className={`mt-3 ${FEHLER}`}>{fehler}</p>}
         <button
           type="button" onClick={() => void zustimmen()} disabled={!haken || laedt}
-          className={`mt-4 w-full ${KNOPF}`}
+          className={`mt-5 w-full ${KNOPF}`}
         >
           <FileCheck className="h-4 w-4" aria-hidden /> Zustimmen und weiter
         </button>

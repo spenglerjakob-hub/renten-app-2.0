@@ -3,7 +3,7 @@ import { LogIn, UserPlus, KeyRound, ArrowLeft, ShieldCheck, MailCheck, Send, Spa
 import { FRUEHSTART_MONATE } from '@renten/schema/preise';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
-import { FELD, FELD_LABEL, Hinweis, KNOPF, LINK, Titel } from '../components/stil';
+import { EINLEITUNG, FELD, FELD_LABEL, Hinweis, KNOPF, LINK, Titel } from '../components/stil';
 import { useAuth, type MailLink } from '../store/auth';
 import { offenerMusterfall } from '../lib/musterfall';
 import { offenerAuftrittLokal } from '../lib/auftritt-lokal';
@@ -85,71 +85,75 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
     : maske === 'registrieren' ? 'Konto anlegen'
     : 'Passwort zurücksetzen';
 
+  /*
+    Wie eine Ansicht der Mitarbeiterberatung: Titel, Einleitung und Hinweise
+    ueber der Karte, in der Karte nur das Formular.
+  */
   return (
     <Rahmen>
-      <div className="ui-karte p-6 sm:p-7">
-        <Titel>{titel}</Titel>
-        <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-          {passwortNeu
-            ? 'Wählen Sie ein neues Passwort für Ihr Konto.'
-            : maske === 'anmelden'
-              ? 'Der Rentenplaner steht angemeldeten Nutzern offen.'
-              : maske === 'registrieren'
-                ? 'Mit E-Mail-Adresse und Passwort — mehr brauchen wir nicht.'
-                : 'Wir schicken Ihnen einen Link, mit dem Sie ein neues Passwort vergeben können.'}
-        </p>
+      <Titel>{titel}</Titel>
+      <p className={`mt-2 ${EINLEITUNG}`}>
+        {passwortNeu
+          ? 'Wählen Sie ein neues Passwort für Ihr Konto.'
+          : maske === 'anmelden'
+            ? 'Der Rentenplaner steht angemeldeten Nutzern offen.'
+            : maske === 'registrieren'
+              ? 'Mit E-Mail-Adresse und Passwort — mehr brauchen wir nicht.'
+              : 'Wir schicken Ihnen einen Link, mit dem Sie ein neues Passwort vergeben können.'}
+      </p>
 
-        {fruehstart && !passwortNeu && (
-          <Hinweis symbol={Sparkles} klasse="mt-4">
-            <span>
-              <strong className="font-medium">Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
-              kostenlos — dafür freuen wir uns über Ihre Rückmeldungen. Legen Sie ein Konto an oder melden Sie sich
-              mit Ihrem bestehenden an.
-            </span>
-          </Hinweis>
-        )}
+      {fruehstart && !passwortNeu && (
+        <Hinweis symbol={Sparkles} klasse="mt-5">
+          <span>
+            <strong className="font-medium">Sie sind als Early Adopter eingeladen:</strong> {FRUEHSTART_MONATE} Monate alle Funktionen
+            kostenlos — dafür freuen wir uns über Ihre Rückmeldungen. Legen Sie ein Konto an oder melden Sie sich
+            mit Ihrem bestehenden an.
+          </span>
+        </Hinweis>
+      )}
 
-        {/*
-          DER MUSTERFALL — was hier passiert, steht da: Er liegt in diesem
-          Browser und kommt nach der Anmeldung in den Rechner. Kein Druck,
-          keine Frist im Text.
-        */}
-        {musterfall && !passwortNeu && (
-          <Hinweis symbol={Save} klasse="mt-4">
-            <span>
-              <strong className="font-medium">Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
-              Anmeldung liegt er im Rechner.
-              {auftrittWas && <> {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.</>}
-              {maske === 'registrieren' && (
-                <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt Ihr Musterfall.</>
-              )}
-            </span>
-          </Hinweis>
-        )}
-        {!musterfall && auftrittWas && !passwortNeu && (
-          <Hinweis symbol={Save} klasse="mt-4">
-            <span>
-              {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.
-              {maske === 'registrieren' && (
-                <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt der Entwurf.</>
-              )}
-            </span>
-          </Hinweis>
-        )}
+      {/*
+        DER MUSTERFALL — was hier passiert, steht da: Er liegt in diesem
+        Browser und kommt nach der Anmeldung in den Rechner. Kein Druck,
+        keine Frist im Text.
+      */}
+      {musterfall && !passwortNeu && (
+        <Hinweis symbol={Save} klasse="mt-5">
+          <span>
+            <strong className="font-medium">Ihr Musterfall ist vorgemerkt</strong>{musterfall.kurz ? <>: {musterfall.kurz}</> : null}. Nach der
+            Anmeldung liegt er im Rechner.
+            {auftrittWas && <> {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.</>}
+            {maske === 'registrieren' && (
+              <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt Ihr Musterfall.</>
+            )}
+          </span>
+        </Hinweis>
+      )}
+      {!musterfall && auftrittWas && !passwortNeu && (
+        <Hinweis symbol={Save} klasse="mt-5">
+          <span>
+            {auftrittWas} aus der Schnellrechnung kommt mit ins Konto.
+            {maske === 'registrieren' && (
+              <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt der Entwurf.</>
+            )}
+          </span>
+        </Hinweis>
+      )}
 
-        {einladung && !passwortNeu && (
-          <Hinweis symbol={Users} klasse="mt-4">
-            <span>
-              <strong className="font-medium">Sie wurden in ein Büro eingeladen.</strong> Legen Sie ein Konto an oder melden Sie sich mit
-              Ihrem bestehenden an — danach gehören Sie automatisch dazu.
-            </span>
-          </Hinweis>
-        )}
+      {einladung && !passwortNeu && (
+        <Hinweis symbol={Users} klasse="mt-5">
+          <span>
+            <strong className="font-medium">Sie wurden in ein Büro eingeladen.</strong> Legen Sie ein Konto an oder melden Sie sich mit
+            Ihrem bestehenden an — danach gehören Sie automatisch dazu.
+          </span>
+        </Hinweis>
+      )}
 
+      <div className="ui-karte mt-6 p-6 sm:p-7">
         {meldung && (
           <div
             role="status"
-            className={`mt-4 px-3 py-2 text-sm leading-relaxed ${
+            className={`mb-5 px-3 py-2 text-sm leading-relaxed ${
               meldung.art === 'ok' ? 'ui-innen text-ui-tinte' : 'rounded-lg bg-rose-50 text-rose-900'
             }`}
           >
@@ -167,7 +171,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
           </div>
         )}
 
-        <form onSubmit={absenden} className="mt-4 space-y-3">
+        <form onSubmit={absenden} className="space-y-4">
           {!passwortNeu && (
             <Feld label="E-Mail-Adresse" id="anm-email">
               <input
@@ -252,7 +256,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
         </form>
 
         {!passwortNeu && (
-          <div className="mt-4 border-t border-ui-linie pt-4 text-sm">
+          <div className="mt-6 border-t border-ui-linie pt-5 text-sm">
             {maske === 'anmelden' ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button type="button" onClick={() => setMaske('registrieren')} className={LINK}>
@@ -272,7 +276,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
         )}
       </div>
 
-      <p className="mt-4 flex gap-2 px-2 text-xs leading-relaxed text-ui-schiefer">
+      <p className="mt-5 flex gap-2 px-1 text-xs leading-relaxed text-ui-schiefer">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <span>
           Ihre Eingaben im Rechner bleiben auf Ihrem Gerät. Nur was Sie ausdrücklich speichern,
@@ -283,8 +287,8 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
       {/* Wert vor Registrierung: erst rechnen, dann entscheiden. */}
       {!musterfall && !passwortNeu && (
         <a href="/schnellrechnung"
-          className="ui-karte mt-4 flex items-center gap-2 px-4 py-3 text-sm text-ui-schiefer hover:border-ui-feld-rand">
-          <Calculator className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+          className="ui-karte mt-5 flex items-center gap-3 px-5 py-4 text-sm text-ui-schiefer hover:border-ui-feld-rand">
+          <Calculator className="h-5 w-5 shrink-0 text-ui-schiefer" aria-hidden />
           <span>Noch kein Konto? <strong className="font-medium text-ui-tinte">Rechnen Sie zuerst einen Fall durch — ohne Anmeldung →</strong></span>
         </a>
       )}
@@ -336,21 +340,23 @@ function LinkEinloesen({ link, laedt, onBestaetigen }: { link: MailLink; laedt: 
       : { titel: 'E-Mail-Adresse bestätigen', info: 'Ein Klick genügt, dann ist Ihr Konto freigeschaltet und Sie sind angemeldet.', knopf: 'E-Mail-Adresse bestätigen' };
 
   return (
-    <div className="ui-karte p-6 sm:p-7">
+    <>
       <Titel>{text.titel}</Titel>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">{text.info}</p>
-      <button
-        type="button"
-        onClick={onBestaetigen}
-        disabled={laedt}
-        className={`mt-4 w-full ${KNOPF}`}
-      >
-        {link.typ === 'recovery' ? <KeyRound className="h-4 w-4" aria-hidden /> : <MailCheck className="h-4 w-4" aria-hidden />}
-        {laedt ? 'Einen Moment …' : text.knopf}
-      </button>
-      <a href="/" className="mt-4 block border-t border-ui-linie pt-4 text-sm text-ui-schiefer underline-offset-4 hover:text-ui-tinte hover:underline">
-        Abbrechen und zur Anmeldung
-      </a>
-    </div>
+      <p className={`mt-2 ${EINLEITUNG}`}>{text.info}</p>
+      <div className="ui-karte mt-6 p-6 sm:p-7">
+        <button
+          type="button"
+          onClick={onBestaetigen}
+          disabled={laedt}
+          className={`w-full ${KNOPF}`}
+        >
+          {link.typ === 'recovery' ? <KeyRound className="h-4 w-4" aria-hidden /> : <MailCheck className="h-4 w-4" aria-hidden />}
+          {laedt ? 'Einen Moment …' : text.knopf}
+        </button>
+        <a href="/" className="mt-5 block border-t border-ui-linie pt-5 text-sm text-ui-schiefer underline-offset-4 hover:text-ui-tinte hover:underline">
+          Abbrechen und zur Anmeldung
+        </a>
+      </div>
+    </>
   );
 }

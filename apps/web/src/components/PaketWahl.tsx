@@ -168,12 +168,12 @@ export function PaketBuchung({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <IntervallSchalter wert={intervall} onWechsel={setIntervall} />
         <NutzerWahl wert={nutzer} onWechsel={setNutzer} />
       </div>
 
-      <div role="radiogroup" aria-label="Paket" className="mt-4 grid gap-2 sm:grid-cols-3">
+      <div role="radiogroup" aria-label="Paket" className="mt-6 grid gap-3 sm:grid-cols-3">
         {PAKETE.map((p) => {
           const aktiv = p.id === paket;
           // Name ist der Paketname; Beschreibung, Preis und "Empfohlen" kommen als Erlaeuterung dazu.
@@ -187,7 +187,7 @@ export function PaketBuchung({
               aria-labelledby={`${k}-name`}
               aria-describedby={`${k}-preis ${k}-kurz${p.empfohlen ? ` ${k}-tipp` : ''}`}
               onClick={() => setPaket(p.id)}
-              className={`relative flex flex-col rounded-[10px] border-2 bg-white p-3 text-left transition-colors ${
+              className={`relative flex flex-col rounded-[10px] border-2 bg-white p-4 text-left transition-colors ${
                 aktiv ? 'border-ui-tinte' : 'border-ui-linie hover:border-ui-feld-rand'
               }`}
             >
@@ -197,27 +197,27 @@ export function PaketBuchung({
                   Empfohlen<span className="sr-only">, {EMPFOHLEN_GRUND}</span>
                 </span>
               )}
-              <span id={`${k}-name`} className="text-sm font-medium text-ui-tinte">{p.name}</span>
-              <span id={`${k}-kurz`} className="mt-0.5 text-xs leading-snug text-ui-schiefer">{p.kurz}</span>
-              <span id={`${k}-preis`} className="mt-auto flex flex-col pt-2">
-                <span className="ui-titel text-xl font-normal tabular-nums text-ui-tinte">
+              <span id={`${k}-name`} className="text-base font-medium text-ui-tinte">{p.name}</span>
+              <span id={`${k}-kurz`} className="mt-1 text-xs leading-snug text-ui-schiefer">{p.kurz}</span>
+              <span id={`${k}-preis`} className="mt-auto flex flex-col pt-4">
+                <span className="ui-titel text-[28px] font-normal leading-none tabular-nums text-ui-tinte">
                   {preisText(preisJeNutzer(p.id, intervall, nutzer))}
                 </span>
-                <span className="text-xs text-ui-schiefer">je Nutzer und {zeitraum}</span>
+                <span className="mt-1 text-xs text-ui-schiefer">je Nutzer und {zeitraum}</span>
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="ui-innen mt-4 px-4 py-3 text-sm text-ui-tinte">
+      <div className="ui-innen mt-6 px-4 py-3 text-sm text-ui-tinte">
         <p>
           {paketVon(paket).name}, {nutzer} Nutzer:{' '}
           <strong className="font-medium tabular-nums">{preisText(summe)}</strong> im {zeitraum}, {UST_HINWEIS}
         </p>
         {spart > 0 && (
-          <p className="mt-0.5 text-xs font-medium text-ui-tinte">
-            Mengenrabatt: {preisText(spart)} gespart im {zeitraum}
+          <p className="mt-0.5 text-xs text-ui-schiefer">
+            Mengenrabatt: <span className="font-medium text-ui-tinte">{preisText(spart)}</span> gespart im {zeitraum}
           </p>
         )}
       </div>
@@ -226,7 +226,7 @@ export function PaketBuchung({
         type="button"
         onClick={() => onBuchen(paket, intervall, nutzer)}
         disabled={!bereit || laedt}
-        className={`mt-4 w-full ${KNOPF} disabled:cursor-not-allowed`}
+        className={`mt-6 w-full ${KNOPF} disabled:cursor-not-allowed`}
       >
         <CreditCard className="h-4 w-4" aria-hidden />
         {laedt ? 'Einen Moment …' : 'Weiter zur Zahlung'}

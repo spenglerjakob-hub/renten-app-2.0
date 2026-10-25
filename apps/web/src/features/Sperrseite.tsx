@@ -1,11 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, LineChart, LogOut, Users } from 'lucide-react';
 import {
   FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT, paketVon, preisJeNutzer, type Bereich,
 } from '@renten/schema/preise';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { SeitenKopf } from '../components/SeitenKopf';
-import { ETIKETT, FEHLER, KNOPF, KNOPF_ZWEIT, Titel } from '../components/stil';
+import {
+  AKZENT, EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF, KNOPF_ZWEIT, Karte, Titel,
+} from '../components/stil';
 import { ARBEITGEBER, KUNDEN, type Seite } from '../components/Seitenleiste';
 import { PaketBuchung, preisText } from '../components/PaketWahl';
 import { supabase } from '../lib/supabase';
@@ -41,7 +43,8 @@ export function Sperrseite({ bereich, zugang }: { bereich: Bereich; zugang: Zuga
   return (
     <div className="flex min-h-screen flex-col bg-ui-flaeche text-ui-tinte">
       <Kopf mitBuero={zugang.buero !== null} />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
+      {/* Wie eine Ansicht der Mitarbeiterberatung: Titel und Einleitung ueber den Karten. */}
+      <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-6 sm:px-6 sm:py-10">
         {inhalt}
         <KontoKasten />
       </main>
@@ -73,10 +76,6 @@ function Kopf({ mitBuero }: { mitBuero: boolean }) {
   );
 }
 
-function Kasten({ children }: { children: ReactNode }) {
-  return <section className="ui-karte p-5 sm:p-7">{children}</section>;
-}
-
 /** Kein Paket: Testphase oder Early-Adopter-Zeit vorbei, Abo beendet. */
 function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const { laedt, fehler, los } = useWeiterleitung();
@@ -95,10 +94,12 @@ function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
     : `${z.testBis ? `Ihre kostenlose Testphase endete am ${datum(z.testBis)}. ` : ''}`
       + 'Wählen Sie ein Paket, um weiterzuarbeiten — Ihre gespeicherten Szenarien sind noch da.';
   return (
-    <Kasten>
-      <Titel>{titel}</Titel>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">{text}</p>
-      <div className="mt-5">
+    <section className="space-y-6">
+      <div>
+        <Titel gross>{titel}</Titel>
+        <p className={`mt-3 ${EINLEITUNG}`}>{text}</p>
+      </div>
+      <Karte titel="Paket wählen">
         <PaketBuchung
           bereit={z.zahlungBereit && !vorschau}
           gesperrtText={vorschau ? 'In der Vorschau wird nichts gebucht.' : undefined}
@@ -108,8 +109,8 @@ function PaketWaehlen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
           fehler={fehler}
           onBuchen={(paket, intervall, nutzer) => void los(() => zurKasse(paket, intervall, nutzer))}
         />
-      </div>
-    </Kasten>
+      </Karte>
+    </section>
   );
 }
 
@@ -150,37 +151,41 @@ function OhnePlatz({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   };
 
   return (
-    <Kasten>
-      <Titel>
-        {aboLaeuft ? 'Für Sie ist gerade kein Platz frei' : 'Das Abo Ihres Büros ist beendet'}
-      </Titel>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-        Sie gehören {buero}.{' '}
-        {aboLaeuft && z.abo
-          ? <>Das Abo umfasst {z.abo.plaetze} {z.abo.plaetze === 1 ? 'Platz' : 'Plätze'}, eingetragen sind {z.abo.belegt} Personen — für Sie bleibt gerade keiner. Bitten Sie {wer}, einen Platz dazuzubuchen.</>
-          : <>Bitten Sie {wer}, das Abo zu verlängern.</>}
-      </p>
-      <p className="mt-3 text-sm leading-relaxed text-ui-schiefer">
-        Sie möchten lieber selbst buchen? Dann treten Sie aus dem Büro aus — Ihre gespeicherten Szenarien
-        behalten Sie.
-      </p>
-      {!frage ? (
-        <button type="button" onClick={() => setFrage(true)} disabled={vorschau} className={`mt-3 ${KNOPF_ZWEIT}`}>
-          Büro verlassen …
-        </button>
-      ) : (
-        <div className="ui-innen mt-3 flex flex-wrap items-center gap-2 p-3 text-sm">
-          <span className="font-medium text-ui-tinte">Wirklich austreten?</span>
-          <button type="button" onClick={() => void verlassen()} disabled={laeuft} className={KNOPF}>
-            Ja, Büro verlassen
+    <section className="space-y-6">
+      <div>
+        <Titel gross>
+          {aboLaeuft ? 'Für Sie ist gerade kein Platz frei' : 'Das Abo Ihres Büros ist beendet'}
+        </Titel>
+        <p className={`mt-3 ${EINLEITUNG}`}>
+          Sie gehören {buero}.{' '}
+          {aboLaeuft && z.abo
+            ? <>Das Abo umfasst {z.abo.plaetze} {z.abo.plaetze === 1 ? 'Platz' : 'Plätze'}, eingetragen sind {z.abo.belegt} Personen — für Sie bleibt gerade keiner. Bitten Sie {wer}, einen Platz dazuzubuchen.</>
+            : <>Bitten Sie {wer}, das Abo zu verlängern.</>}
+        </p>
+      </div>
+      <Karte>
+        <p className="text-sm leading-relaxed text-ui-tinte">
+          Sie möchten lieber selbst buchen? Dann treten Sie aus dem Büro aus — Ihre gespeicherten Szenarien
+          behalten Sie.
+        </p>
+        {!frage ? (
+          <button type="button" onClick={() => setFrage(true)} disabled={vorschau} className={`mt-5 ${KNOPF_ZWEIT}`}>
+            Büro verlassen …
           </button>
-          <button type="button" onClick={() => setFrage(false)} className={KNOPF_ZWEIT}>
-            Abbrechen
-          </button>
-        </div>
-      )}
-      {fehler && <p role="alert" className={`mt-2 ${FEHLER}`}>{fehler}</p>}
-    </Kasten>
+        ) : (
+          <div className="ui-innen mt-5 flex flex-wrap items-center gap-3 p-4 text-sm">
+            <span className="font-medium text-ui-tinte">Wirklich austreten?</span>
+            <button type="button" onClick={() => void verlassen()} disabled={laeuft} className={KNOPF}>
+              Ja, Büro verlassen
+            </button>
+            <button type="button" onClick={() => setFrage(false)} className={KNOPF_ZWEIT}>
+              Abbrechen
+            </button>
+          </div>
+        )}
+        {fehler && <p role="alert" className={`mt-3 ${FEHLER}`}>{fehler}</p>}
+      </Karte>
+    </section>
   );
 }
 
@@ -203,50 +208,55 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
   const inhaber = z.rolle === 'inhaber';
 
   return (
-    <Kasten>
-      <p className={ETIKETT}>Ihr Paket: {paket.name}</p>
-      <Titel klasse="mt-1">
-        {bereich === 'rente' ? 'Die Rentenplanung gehört nicht zu Ihrem Paket' : 'Die Arbeitgeber-Vorsorgemodelle gehören nicht zu Ihrem Paket'}
-      </Titel>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">Enthalten sind diese Seiten:</p>
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-        {seiten.map((s) => (
-          <li key={s.href}>
-            <a href={s.href}
-              className="flex h-full items-start gap-3 rounded-lg border border-ui-linie p-3 hover:border-ui-feld-rand hover:bg-ui-innen">
-              <span className="mt-0.5 text-ui-schiefer">{s.symbol}</span>
-              <span>
-                <span className="block text-sm font-medium text-ui-tinte">{s.titel}</span>
-                <span className="block text-xs text-ui-schiefer">{s.text}</span>
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
+    <section className="space-y-6">
+      <div>
+        <p className={ETIKETT}>Ihr Paket: {paket.name}</p>
+        <Titel gross klasse="mt-1">
+          {bereich === 'rente' ? 'Die Rentenplanung gehört nicht zu Ihrem Paket' : 'Die Arbeitgeber-Vorsorgemodelle gehören nicht zu Ihrem Paket'}
+        </Titel>
+      </div>
 
-      <div className="ui-innen mt-5 p-4">
-        <p className="text-sm font-medium text-ui-tinte">Beides nutzen?</p>
-        <p className="mt-0.5 text-sm leading-relaxed text-ui-schiefer">
-          Mit „All inklusive“ für {preisText(preisJeNutzer('alles', intervall, plaetze))} statt{' '}
+      <Karte titel="Enthalten sind diese Seiten">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {seiten.map((s) => (
+            <li key={s.href}>
+              <a href={s.href}
+                className="flex h-full items-start gap-3 rounded-lg border border-ui-linie p-4 hover:border-ui-feld-rand hover:bg-ui-innen">
+                <span className="mt-0.5 text-ui-schiefer">{s.symbol}</span>
+                <span>
+                  <span className="block text-base font-medium text-ui-tinte">{s.titel}</span>
+                  <span className="mt-0.5 block text-sm text-ui-schiefer">{s.text}</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Karte>
+
+      {/* Die eine Akzentkarte: was „All inklusive“ kostet, der Preis hervorgehoben. */}
+      <div className={`${AKZENT} p-6 sm:p-8`}>
+        <p className="text-sm">Beides nutzen?</p>
+        <p className="ui-titel mt-2 text-balance text-[22px] font-normal leading-snug sm:text-[26px]">
+          Mit „All inklusive“ für <Hervor>{preisText(preisJeNutzer('alles', intervall, plaetze))}</Hervor> statt{' '}
           {preisText(preisJeNutzer(paket.id, intervall, plaetze))} je Nutzer und {zeitraum}, {' '}
           {plaetze === 1 ? 'bei einem Nutzer' : `bei ${plaetze} Nutzern`}.
         </p>
         {inhaber ? (
           <>
             <button type="button" onClick={() => void los(zumPortal)}
-              disabled={!z.zahlungBereit || vorschau || laedt} className={`mt-3 ${KNOPF} disabled:cursor-not-allowed`}>
+              disabled={!z.zahlungBereit || vorschau || laedt} className={`mt-6 ${KNOPF} disabled:cursor-not-allowed`}>
               {laedt ? 'Einen Moment …' : 'Paket wechseln'}
             </button>
             {!z.zahlungBereit && !vorschau && (
               <p className="mt-2 text-xs text-ui-schiefer">Der Wechsel wird gerade eingerichtet und startet in Kürze.</p>
             )}
-            {fehler && <p role="alert" className={`mt-2 ${FEHLER}`}>{fehler}</p>}
+            {fehler && <p role="alert" className={`mt-3 ${FEHLER}`}>{fehler}</p>}
           </>
         ) : (
-          <p className="mt-2 text-sm text-ui-schiefer">Bitten Sie die Person, die das Abo verwaltet, das Paket zu wechseln.</p>
+          <p className="mt-4 text-sm text-ui-schiefer">Bitten Sie die Person, die das Abo verwaltet, das Paket zu wechseln.</p>
         )}
       </div>
-    </Kasten>
+    </section>
   );
 }
 
@@ -254,17 +264,16 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
 function KontoKasten() {
   const email = useAuth((s) => s.email);
   return (
-    <Kasten>
-      <h2 className="text-lg font-medium text-ui-tinte">Ihr Konto</h2>
-      <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">
+    <Karte titel="Ihr Konto">
+      <p className="text-sm leading-relaxed text-ui-schiefer">
         Angemeldet als <strong className="font-medium text-ui-tinte">{email}</strong>. Ihre gespeicherten Szenarien bleiben
         erhalten — mit einem Paket geht es genau dort weiter, wo Sie aufgehört haben.
       </p>
       <SzenarienSichern />
-      <div className="mt-4 border-t border-ui-linie pt-3">
+      <div className="mt-6 border-t border-ui-linie pt-4">
         <KontoLoeschen sicherung="Sichern Sie Ihre Szenarien vorher mit „Szenarien herunterladen“." />
       </div>
-    </Kasten>
+    </Karte>
   );
 }
 
