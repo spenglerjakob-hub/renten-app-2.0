@@ -174,7 +174,7 @@ export function Zahl({ etikett, wert, zusatz, punkt }: {
         {punkt && <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${punkt}`} />}{etikett}
       </dt>
       <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
-        {wert}{zusatz !== undefined && <> <span className="text-base text-ui-schiefer">· {zusatz}</span></>}
+        {wert}{zusatz !== undefined && <> <span className="whitespace-nowrap text-base text-ui-schiefer">· {zusatz}</span></>}
       </dd>
     </div>
   );

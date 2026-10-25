@@ -337,7 +337,7 @@ export function Gutachten({
             tarifIndex={szenario.annahmen.tarifIndex}
             rentendynamik={szenario.annahmen.rentendynamik}
             inflation={szenario.annahmen.inflation}
-            ohneTitel
+            imGutachten
           />
         </Seite>
       ),

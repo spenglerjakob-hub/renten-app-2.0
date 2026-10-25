@@ -4,6 +4,7 @@ import type { ProjektionsErgebnis } from '@renten/engine';
 import { BASISJAHR } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ProzentFeld, prozent } from '../components/Feld';
+import { LINK } from '../components/stil';
 
 /**
  * Erlaeuterung des verwendeten Rechtsstands und der Fortschreibungsannahme.
@@ -12,14 +13,18 @@ import { ProzentFeld, prozent } from '../components/Feld';
  * nachvollziehbar ist, worauf die Zahlen beruhen.
  */
 export function Rechtsstand({
-  ergebnis, tarifIndex, rentendynamik, inflation, ohneTitel = false,
+  ergebnis, tarifIndex, rentendynamik, inflation, imGutachten = false,
 }: {
   ergebnis: ProjektionsErgebnis;
   tarifIndex: number;
   rentendynamik: number;
   inflation: number;
-  /** Im Gutachten steht die Ueberschrift schon im Seitenkopf. */
-  ohneTitel?: boolean;
+  /**
+   * Im Gutachten: ohne Ueberschrift (sie steht schon im Seitenkopf) und in
+   * der Gestalt des Drucks. Den Druck gestaltet ein eigener Schritt neu; bis
+   * dahin bleibt er, wie er ist — die Karte am Bildschirm folgt dem Stil.
+   */
+  imGutachten?: boolean;
 }) {
   const setzeAnnahmen = useSzenario((s) => s.setzeAnnahmen);
   const [reglerOffen, setReglerOffen] = useState(false);
@@ -29,15 +34,17 @@ export function Rechtsstand({
   const vollIndexiert = Math.abs(tarifIndex - rentendynamik) < 0.0005;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm druckbereich">
-      {!ohneTitel && (
-        <h2 className="mb-2 text-sm font-bold text-slate-700">Rechtsstand und Annahmen</h2>
+    <section className={imGutachten
+      ? 'rounded-xl border border-slate-200 bg-white p-4 text-sm druckbereich'
+      : 'ui-karte p-5 text-sm druckbereich sm:p-7'}>
+      {!imGutachten && (
+        <h2 className="mb-3 text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">Rechtsstand und Annahmen</h2>
       )}
 
-      <p className="text-slate-600">
+      <p className={imGutachten ? 'text-slate-600' : 'text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte'}>
         Berechnet nach <strong>Rechtsstand {r.basisjahr}</strong>
         {r.fortgeschriebenAb && (
-          <> ; ab {r.fortgeschriebenAb} mit <strong>{prozent(tarifIndex)} p. a.</strong> fortgeschrieben.</>
+          <>; ab {r.fortgeschriebenAb} mit <strong>{prozent(tarifIndex)} p. a.</strong> fortgeschrieben.</>
         )}
       </p>
 
@@ -140,19 +147,19 @@ export function Rechtsstand({
         den realistischeren Fall sehen will (Tarif waechst langsamer als die
         Bezuege, die Steuerquote steigt), setzt sie hier abweichend.
       */}
-      <div className="mt-3 border-t border-slate-100 pt-3 print:hidden">
+      <div className="mt-4 border-t border-ui-linie pt-4 print:hidden">
         <button
           type="button"
           onClick={() => setReglerOffen((v) => !v)}
           aria-expanded={reglerOffen}
-          className="flex items-center gap-1.5 text-xs font-medium text-indigo-700 hover:underline"
+          className={LINK}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+          <SlidersHorizontal className="h-4 w-4" aria-hidden />
           {reglerOffen ? 'Steuertarif-Indexierung schließen' : 'Kalte Progression durchrechnen'}
         </button>
 
         {reglerOffen && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="ui-innen mt-4 p-4">
             <ProzentFeld
               label="Steuertarif-Indexierung p. a."
               wert={tarifIndex}
@@ -160,8 +167,8 @@ export function Rechtsstand({
               max={10}
               hilfe="0 % = keinerlei Ausgleich der kalten Progression. Gleich der Rentendynamik = voller Ausgleich."
             />
-            <p className="mt-2 text-xs text-slate-600">
-              Die Rentendynamik liegt bei <strong>{prozent(rentendynamik)}</strong>.{' '}
+            <p className="mt-2 text-xs text-ui-schiefer">
+              Die Rentendynamik liegt bei <strong className="font-medium text-ui-tinte">{prozent(rentendynamik)}</strong>.{' '}
               {vollIndexiert
                 ? 'Der Tarif wächst genauso schnell — die Steuerquote bleibt über die Jahre stabil.'
                 : 'Der Tarif wächst langsamer — die Steuerquote steigt im Zeitverlauf.'}
@@ -170,7 +177,7 @@ export function Rechtsstand({
               <button
                 type="button"
                 onClick={() => setzeAnnahmen({ rentendynamik })}
-                className="mt-2 text-xs font-medium text-indigo-700 hover:underline"
+                className="mt-2 text-xs font-medium text-ui-tinte underline-offset-4 hover:underline"
               >
                 Wieder an die Rentendynamik koppeln
               </button>
@@ -179,13 +186,20 @@ export function Rechtsstand({
         )}
       </div>
 
-      {ergebnis.hinweise.length > 0 && (
+      {/* Die Hinweise des Rechenkerns: am Bildschirm als Liste mit Gedankenstrich — lesen, nicht erschrecken. */}
+      {ergebnis.hinweise.length > 0 && (imGutachten ? (
         <ul className="mt-3 space-y-1">
           {ergebnis.hinweise.map((h, i) => (
             <li key={i} className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">{h}</li>
           ))}
         </ul>
-      )}
+      ) : (
+        <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-ui-tinte">
+          {ergebnis.hinweise.map((h, i) => (
+            <li key={i} className="flex gap-2"><span aria-hidden className="text-ui-asche">—</span><span>{h}</span></li>
+          ))}
+        </ul>
+      ))}
     </section>
   );
 }

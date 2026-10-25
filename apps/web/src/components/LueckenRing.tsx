@@ -11,13 +11,15 @@ export interface RingTexte {
 }
 
 const NETTOLOHN: RingTexte = { ganz: 'Nettolohn', mitte: 'Ihr Nettolohn', gedeckt: 'Netto-Altersrente' };
+/** Gemessen am Ziel statt am Nettolohn — Schnellrechnung und Ergebnis des Rechners. */
+export const ZIEL_RING: RingTexte = { ganz: 'Ziel', mitte: 'Ihr Ziel', gedeckt: 'Netto im Ruhestand' };
 
 /**
  * Der Ring der Versorgungsluecke: Tinte der gedeckte Teil, die Rolle
  * „Luecke“ (Steingrau) die Luecke — zusammen das Ganze, das in der Mitte
  * steht. In der Mitarbeiterberatung Nettolohn und Netto-Altersrente, in der
- * Schnellrechnung Ziel und Netto im Ruhestand. Die Zahlen stehen
- * zusaetzlich als Text daneben; der Ring ist die Anschauung.
+ * Schnellrechnung und im Ergebnis des Rechners Ziel und Netto im Ruhestand.
+ * Die Zahlen stehen zusaetzlich als Text daneben; der Ring ist die Anschauung.
  */
 export function LueckenRing({ ganz, gedeckt, luecke, gedecktProzent, lueckeProzent, texte = NETTOLOHN }: {
   ganz: number; gedeckt: number; luecke: number; gedecktProzent: number; lueckeProzent: number; texte?: RingTexte;

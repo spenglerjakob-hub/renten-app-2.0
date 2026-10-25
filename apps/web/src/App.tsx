@@ -24,6 +24,7 @@ import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
 import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
+import { ErgebnisKopf, ErgebnisRing } from './features/ErgebnisKern';
 import { nettoHeuteMonat } from './features/bezug';
 import { musterfallVerwerfen, offenerMusterfall, type Musterfall } from './lib/musterfall';
 import { auftrittLokalVerwerfen, offenerAuftrittLokal, type AuftrittEntwurf } from './lib/auftritt-lokal';
@@ -54,7 +55,7 @@ import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyL
 import { RechtsLinks } from './components/RechtsLinks';
 import { personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro } from './components/Feld';
-import { EINLEITUNG, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
+import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
 
 type Reiter = 's1' | 's2' | 's3' | 'planer';
 type Ansicht = 'kassenbon' | 'verlauf';
@@ -693,33 +694,36 @@ export default function App() {
     Steuer, Sparrechner, Vertrags-Pruefung und den Ausdruck. Gerechnet wird
     dafuer nicht anders, sondern ein anderes Szenario.
   */
+  /* Als Pillen wie die Reiter der Beratung; die Person waehlt eine zweite Reihe daneben. */
   const paarUmschalter = paar && (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
-      <Reiterleiste
-        reiter={[
-          { id: 'haushalt' as const, text: 'Gesamt' },
-          { id: 'einzeln' as const, text: 'Einzeln' },
-        ]}
-        aktiv={betrachtung}
-        onWechsel={setBetrachtung}
-        beschriftung="Haushalt oder einzelne Person"
-      />
-      {betrachtung === 'einzeln' && (
-        <Reiterleiste
-          reiter={szenario.personen
-            .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
-            .map((p) => ({ id: p.id, text: personName(p) }))}
-          aktiv={wer}
-          onWechsel={setWer}
-          beschriftung="Welche Person"
+    <section aria-label="Betrachtung" className="ui-karte p-5 print:hidden sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <Pillen
+          reiter={[
+            { id: 'haushalt' as const, inhalt: 'Gesamt' },
+            { id: 'einzeln' as const, inhalt: 'Einzeln' },
+          ]}
+          aktiv={betrachtung}
+          onWechsel={setBetrachtung}
+          beschriftung="Haushalt oder einzelne Person"
         />
-      )}
-      <p className="px-3 py-2 text-xs leading-relaxed text-slate-500">
+        {betrachtung === 'einzeln' && (
+          <Pillen
+            reiter={szenario.personen
+              .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
+              .map((p) => ({ id: p.id, inhalt: personName(p) }))}
+            aktiv={wer}
+            onWechsel={setWer}
+            beschriftung="Welche Person"
+          />
+        )}
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-ui-schiefer">
         {betrachtung === 'einzeln'
           ? `Nur die Verträge und Einkünfte von ${personNameAus(szenario.personen, wer)} — allein veranlagt, mit Grundtarif statt Splitting.`
           : 'Beide Partner zusammen, wie bisher: eine Veranlagung mit Splittingtarif.'}
       </p>
-    </div>
+    </section>
   );
 
   const kopfzahlen = (
@@ -752,58 +756,56 @@ export default function App() {
     Person faellt der erste mit dem einzigen Rentenbeginn zusammen; ein Regler
     haette dort nichts zu zeigen ausser spaeteren Jahren derselben Rente.
   */
+  const letztesJahr = zeilenAbRuhestand[zeilenAbRuhestand.length - 1]?.jahr ?? 0;
+  const jahrKnopf = 'rounded-full border border-ui-zweit-rand bg-ui-karte p-1.5 text-ui-tinte transition-colors hover:bg-ui-hover disabled:opacity-40';
   const jahrRegler = paar && !einzeln && ersterRuhestand !== null && zeilenAbRuhestand.length > 1 && (
-    <div className="rounded-lg border border-slate-200 bg-white p-2.5 print:hidden sm:p-3">
+    <section aria-label="Angezeigtes Jahr" className="ui-karte p-5 print:hidden sm:p-6">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-          Angezeigtes Jahr
-        </span>
-        <div className="flex items-center gap-1">
+        <span className={ETIKETT}>Angezeigtes Jahr</span>
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setJahrWahl(Math.max(ersterRuhestand, (gezeigtesJahr ?? ersterRuhestand) - 1))}
             aria-label="Ein Jahr zurück"
-            className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+            className={jahrKnopf}
             disabled={(gezeigtesJahr ?? ersterRuhestand) <= ersterRuhestand}
           >
-            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+            <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
-          <span className="min-w-[3.5rem] text-center text-sm font-black tabular-nums text-slate-900">
+          <span className="min-w-[3.5rem] text-center text-lg font-medium tabular-nums text-ui-tinte">
             {zeile.jahr}
           </span>
           <button
             type="button"
-            onClick={() => setJahrWahl(Math.min(
-              zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr,
-              (gezeigtesJahr ?? ersterRuhestand) + 1,
-            ))}
+            onClick={() => setJahrWahl(Math.min(letztesJahr, (gezeigtesJahr ?? ersterRuhestand) + 1))}
             aria-label="Ein Jahr vor"
-            className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-            disabled={(gezeigtesJahr ?? ersterRuhestand)
-              >= zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+            className={jahrKnopf}
+            disabled={(gezeigtesJahr ?? ersterRuhestand) >= letztesJahr}
           >
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            <ChevronRight className="h-4 w-4" aria-hidden />
           </button>
         </div>
       </div>
+      {/* Der Regler des Stils (index.css: .ui-regler), gefuellt bis zum gezeigten Jahr. */}
       <input
         type="range"
         min={ersterRuhestand}
-        max={zeilenAbRuhestand[zeilenAbRuhestand.length - 1]!.jahr}
+        max={letztesJahr}
         step={1}
         value={gezeigtesJahr ?? ersterRuhestand}
         onChange={(e) => setJahrWahl(Number(e.target.value))}
         aria-label="Jahr der Übersicht"
-        className="mt-2 w-full accent-indigo-600"
+        className="ui-regler mt-4 w-full"
+        style={{ '--anteil': `${(((gezeigtesJahr ?? ersterRuhestand) - ersterRuhestand) / Math.max(1, letztesJahr - ersterRuhestand)) * 100}%` } as React.CSSProperties}
       />
       {/* Ohne diesen Satz wirkt das hohe Netto einer gemischten Phase wie
           ein Rechenfehler: Da laeuft noch ein Gehalt. */}
-      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+      <p className="mt-3 text-sm leading-relaxed text-ui-schiefer">
         {zeile.gemischtePhase
           ? 'Ein Partner arbeitet noch — im Netto steckt daher weiter ein Gehalt.'
           : 'Beide im Ruhestand.'}
       </p>
-    </div>
+    </section>
   );
 
   /*
@@ -1204,35 +1206,42 @@ export default function App() {
         {/* ---------- 2. ERGEBNIS ---------- */}
         {schritt === 'ergebnis' && (
           <>
-            <EtappenKopf
-              titel="Ihr Ergebnis"
-              text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
-            />
-            {paarUmschalter}
+            {/*
+              DER EINSTIEG WIE IN SCHRITT 3 DER BERATUNG: die Luecke als
+              Aussage im Titel, daneben der Schalter fuer das Geld, in dem
+              gerechnet wird. Ohne Ergebnis der ruhige Titel.
+            */}
+            {ergebnis
+              ? <ErgebnisKopf zeile={zeile} kaufkraftHeute={kaufkraftHeute} onKaufkraftHeute={setKaufkraftHeute} />
+              : (
+                <EtappenKopf
+                  titel="Ihr Ergebnis"
+                  text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
+                />
+              )}
+            {/* Was die Zahlen darunter bestimmt — wessen Fall, welches Jahr — steht vor ihnen. */}
+            {(paarUmschalter || jahrRegler) && (
+              <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
+                {paarUmschalter}
+                {jahrRegler}
+              </div>
+            )}
             {beispielHinweis}
             {ergebnis ? (
-              <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
+              <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
                 {/* flex + gap statt space-y: Ein ausgeblendetes Kind bekaeme
                     sonst trotzdem seinen Abstand, und die Spalten begannen
                     nicht auf einer Hoehe. */}
-                <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-5">
-                  {/* Am Telefon zuerst, am PC oben rechts (siehe dort). */}
-                  <div className="lg:hidden">{kopfzahlen}</div>
-                  <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
+                <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
+                  {/* Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz. */}
+                  <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} />
                   {/*
-                    Die Praemie im Ruhestand ist fuer einen privat Versicherten
-                    oft der groesste einzelne Posten der Luecke. Bei gesetzlich
-                    Versicherten faellt der Block stillschweigend weg.
-                  */}
-                  <PkvRechner zeile={zeile} />
-                  {jahrRegler}
-                  {/*
-                    DIE ZAHLEN FUER DAS GESPRAECH, links untereinander: was die
-                    Luecke bedeutet, darunter Luecke und Kaufkraftverlust in
-                    Euro. Rechts steht die Aufstellung (Kassenbon oder
-                    Verlauf). Am Telefon kommen beide vor dem Kassenbon.
-                    Nicht mehr mitlaufend (sticky): Zusammen sind beide Karten
-                    hoeher als der Bildschirm.
+                    DIE ZAHLEN FUER DAS GESPRAECH: links unter dem Ring, was die
+                    Luecke bedeutet; rechts die Aufstellung (Kassenbon oder
+                    Verlauf) und darunter Luecke und Kaufkraftverlust in Euro
+                    — so stehen beide Spalten ungefaehr gleich hoch. Nicht
+                    mitlaufend (sticky): Die Karten sind hoeher als der
+                    Bildschirm.
                   */}
                   <LueckeBedeutung
                     zeile={zeile}
@@ -1240,57 +1249,55 @@ export default function App() {
                     onSparen={() => geheZu('sparen')}
                     nettoHeute={nettoHeute}
                   />
-                  <KaufkraftKarte
-                    zeile={zeile}
-                    inflation={szenario.annahmen.inflation}
-                    standard={offenePfade(szenario).includes('annahmen.inflation')}
-                  />
-                </div>
-                <div className="flex flex-col gap-4 sm:gap-6 lg:col-span-7">
+                  <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
                   {/*
-                    Die Kopfzahlen am PC oben RECHTS: Links stehen schon
-                    Steuer-Engine, Luecke und Kaufkraft — mit den Kennzahlen
-                    dort war die linke Spalte fast doppelt so hoch wie die
-                    rechte.
+                    Die Praemie im Ruhestand ist fuer einen privat Versicherten
+                    oft der groesste einzelne Posten der Luecke. Bei gesetzlich
+                    Versicherten faellt der Block stillschweigend weg.
                   */}
-                  <div className="hidden lg:block">{kopfzahlen}</div>
-                  <div className="flex rounded border border-slate-200 bg-slate-200/50 p-1 print:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setAnsicht('kassenbon')}
-                      aria-pressed={ansicht === 'kassenbon'}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-bold sm:gap-2 sm:py-2 ${
-                        ansicht === 'kassenbon' ? 'bg-white shadow' : 'text-slate-500'
-                      }`}
-                    >
-                      <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Kassenbon
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAnsicht('verlauf')}
-                      aria-pressed={ansicht === 'verlauf'}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-bold sm:gap-2 sm:py-2 ${
-                        ansicht === 'verlauf' ? 'bg-white shadow' : 'text-slate-500'
-                      }`}
-                    >
-                      <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden /> Verlauf
-                    </button>
+                  <PkvRechner zeile={zeile} />
+                </div>
+                <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-7">
+                  {/* Zwei Ansichten derselben Zahlen — als Pillen wie die Reiter der Beratung.
+                      Die Huelle haelt sie so breit wie ihr Inhalt; die Spalte zoege sie sonst auf volle Breite. */}
+                  <div>
+                  <Pillen
+                    reiter={[
+                      { id: 'kassenbon' as const, inhalt: <span className="inline-flex items-center gap-1.5"><List className="h-4 w-4" aria-hidden /> Kassenbon</span> },
+                      { id: 'verlauf' as const, inhalt: <span className="inline-flex items-center gap-1.5"><TrendingUp className="h-4 w-4" aria-hidden /> Verlauf</span> },
+                    ]}
+                    aktiv={ansicht}
+                    onWechsel={setAnsicht}
+                    beschriftung="Aufstellung oder Verlauf"
+                    kennung={(id) => ({ reiter: `ansicht-reiter-${id}`, bereich: `ansicht-${id}` })}
+                  />
                   </div>
 
-                  <div className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
+                  {/*
+                    Der Schalter „Nominal | Kaufkraft heute“ steht im Titel und
+                    in der Fussleiste; der Kassenbon nennt nur, in welchem Geld
+                    er rechnet — ein dritter Schalter waere einer zu viel.
+                  */}
+                  <div id="ansicht-kassenbon" role="tabpanel" aria-labelledby="ansicht-reiter-kassenbon"
+                    className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
                     <Kassenbon
                       ergebnis={ergebnis}
                       zeile={zeile}
                       szenario={ansichtSzenario}
                       kaufkraftHeute={kaufkraftHeute}
-                      onKaufkraftHeute={setKaufkraftHeute}
                       person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
                     />
                   </div>
-                  <div className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
+                  <div id="ansicht-verlauf" role="tabpanel" aria-labelledby="ansicht-reiter-verlauf"
+                    className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
                     <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
                   </div>
 
+                  <KaufkraftKarte
+                    zeile={zeile}
+                    inflation={szenario.annahmen.inflation}
+                    standard={offenePfade(szenario).includes('annahmen.inflation')}
+                  />
                   <Rechtsstand
                     ergebnis={ergebnis}
                     tarifIndex={szenario.annahmen.tarifIndex}

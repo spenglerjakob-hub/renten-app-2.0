@@ -7,7 +7,7 @@ import { AuswahlFeld, DatumFeld, Schalter, ZahlFeld, euro, prozent } from '../co
 import {
   EINLEITUNG, Hervor, Hinweis, Hinweise, KNOPF, Kernsatz, Karte, LINK, SCHWEBEND, Titel, Zahl,
 } from '../components/stil';
-import { LueckenRing, type RingTexte } from '../components/LueckenRing';
+import { LueckenRing, ZIEL_RING } from '../components/LueckenRing';
 import { KaufkraftKarte } from '../features/KaufkraftKarte';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { musterfallMerken } from '../lib/musterfall';
@@ -35,9 +35,6 @@ const MIT_KONTO = [
   'Paare, Beamte, Selbstständige und privat Versicherte',
   'Vorsorge-Check: Ihr Mandant trägt seine Angaben per Link selbst ein',
 ];
-
-/** Der Ring der Schnellrechnung: das Ziel als Ganzes, das Netto im Ruhestand als gedeckter Teil. */
-const ZIEL_RING: RingTexte = { ganz: 'Ziel', mitte: 'Ihr Ziel', gedeckt: 'Netto im Ruhestand' };
 
 /**
  * DIE SCHNELLRECHNUNG (/schnellrechnung) — ein Fall ohne Anmeldung.

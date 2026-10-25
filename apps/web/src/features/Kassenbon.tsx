@@ -9,19 +9,18 @@ import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
 import { personNameAus } from './personen';
 
 /**
- * Die drei Schichten. Farben aus der Palette der Oberflaeche: Indigo wie
- * Knoepfe und Logo, Gruen wie „gedeckt“, dazwischen ein helles Violett.
- * Vorher Blau, Lila und Gruen mit farbigen Ueberschriften je Block — der
- * Kassenbon sah aus wie aus einer anderen Anwendung.
+ * Die drei Schichten — einfarbig abgestuft wie alle Daten des Stils: Tinte,
+ * Warm Gray, Asche. Die Luecke im Balken ist Stein, wie im Ring daneben.
+ * Vorher Indigo, Violett und Gruen; der Balken las sich wie eine Ampel.
  */
 const SCHICHT = {
-  1: { titel: 'Schicht 1', zusatz: 'Basis / Pension', punkt: 'bg-indigo-600' },
-  2: { titel: 'Schicht 2', zusatz: 'Zusatz', punkt: 'bg-violet-400' },
-  3: { titel: 'Schicht 3', zusatz: 'Privat', punkt: 'bg-emerald-500' },
+  1: { titel: 'Schicht 1', zusatz: 'Basis / Pension', punkt: 'bg-ui-tinte' },
+  2: { titel: 'Schicht 2', zusatz: 'Zusatz', punkt: 'bg-ui-daten-2' },
+  3: { titel: 'Schicht 3', zusatz: 'Privat', punkt: 'bg-ui-daten-3' },
 } as const;
 
 /** Die beiden Personen und der Haushalt — dieselbe Machart wie die Schichten. */
-const PERSON_PUNKT = ['bg-sky-500', 'bg-amber-500', 'bg-slate-400'] as const;
+const PERSON_PUNKT = ['bg-ui-tinte', 'bg-ui-daten-2', 'bg-ui-daten-3'] as const;
 
 /** Spalten, die am Telefon in die Zeile unter dem Namen wandern. */
 const NEBEN = 'hidden px-2 text-right sm:table-cell';
@@ -45,40 +44,40 @@ function Gruppe({
 }) {
   return (
     <tbody className="break-inside-avoid">
-      <tr className="border-t border-slate-200">
+      <tr className="border-t border-ui-linie">
         {/* Keine colSpan ueber die Nebenspalten: Am Telefon sind die
             ausgeblendet, und eine Zelle ueber vier Spalten legte dort
             Phantomspalten an — Netto rutschte in die Mitte. */}
-        <th scope="rowgroup" className="pb-1 pt-3 text-left font-bold text-slate-900">
+        <th scope="rowgroup" className="pb-1 pt-3 text-left font-medium text-ui-tinte">
           <span className="flex items-center gap-2">
             <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${punkt}`} />
             {titel}
-            {zusatz && <span className="font-normal text-slate-500">{zusatz}</span>}
+            {zusatz && <span className="font-normal text-ui-schiefer">{zusatz}</span>}
           </span>
         </th>
         <td colSpan={3} className="hidden sm:table-cell" />
-        <td className="pb-1 pt-3 text-right font-bold tabular-nums text-slate-900">{w(netto)}</td>
+        <td className="pb-1 pt-3 text-right font-medium tabular-nums text-ui-tinte">{w(netto)}</td>
       </tr>
       {posten.length === 0 && leerText && (
         <tr>
-          <td className="pb-2 pl-[1.125rem] text-xs text-slate-500">{leerText}</td>
+          <td className="pb-2 pl-[1.125rem] text-xs text-ui-schiefer">{leerText}</td>
           <td colSpan={3} className="hidden sm:table-cell" />
           <td />
         </tr>
       )}
       {posten.map((p) => (
-        <tr key={p.id} className="align-top text-slate-700">
+        <tr key={p.id} className="align-top text-ui-tinte/80">
           <td className="py-1 pl-[1.125rem] pr-2">
             {p.bezeichnung}
             {/* Am Telefon fehlen die Spalten — die Zahlen stehen dann hier. */}
-            <span className="block text-xs tabular-nums text-slate-500 sm:hidden">
+            <span className="block text-xs tabular-nums text-ui-schiefer sm:hidden">
               Brutto {w(p.bruttoJahr)} · KV/PV {w(p.kvPvJahr)} · Steuer {w(p.steuerJahr)}
             </span>
           </td>
-          <td className={`${NEBEN} py-1 tabular-nums text-slate-600`}>{w(p.bruttoJahr)}</td>
-          <td className={`${NEBEN} py-1 tabular-nums text-slate-500`}>{w(p.kvPvJahr)}</td>
-          <td className={`${NEBEN} py-1 tabular-nums text-slate-500`}>{w(p.steuerJahr)}</td>
-          <td className="py-1 pl-2 text-right tabular-nums text-slate-900">{w(p.nettoJahr)}</td>
+          <td className={`${NEBEN} py-1 tabular-nums text-ui-schiefer`}>{w(p.bruttoJahr)}</td>
+          <td className={`${NEBEN} py-1 tabular-nums text-ui-schiefer`}>{w(p.kvPvJahr)}</td>
+          <td className={`${NEBEN} py-1 tabular-nums text-ui-schiefer`}>{w(p.steuerJahr)}</td>
+          <td className="py-1 pl-2 text-right tabular-nums text-ui-tinte">{w(p.nettoJahr)}</td>
         </tr>
       ))}
     </tbody>
@@ -161,15 +160,15 @@ export function Kassenbon({
   const deckung = Math.round(Math.min(1, zeile.nettoMonat / Math.max(1, zeile.zielNettoMonat)) * 100);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm druckbereich sm:p-6">
+    <div className="ui-karte p-5 druckbereich sm:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-bold text-slate-900">
+        <h2 className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
           {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
         </h2>
         {onKaufkraftHeute ? (
           <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} klasse="print:hidden" />
         ) : (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ui-schiefer">
             Monatsbeträge, {kaufkraftHeute ? 'in heutiger Kaufkraft' : 'nominal'}
           </span>
         )}
@@ -179,18 +178,19 @@ export function Kassenbon({
         Wie viel des Ziels gedeckt ist — gestapelt nach Schicht. Gleiche
         Machart wie in der Schnellrechnung: Satz, schmaler Balken, Legende.
       */}
-      <div className="mt-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-slate-700">
+      <div className="mt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-ui-tinte/80">
           <span>
             {luecke > 0
-              ? <>Das Netto deckt <strong className="tabular-nums">{deckung} %</strong> des Ziels</>
-              : <strong className="text-emerald-700">Ziel erreicht</strong>}
+              ? <>Das Netto deckt <strong className="font-medium tabular-nums text-ui-tinte">{deckung} %</strong> des Ziels</>
+              : <strong className="font-medium text-ui-tinte">Ziel erreicht</strong>}
           </span>
           {luecke > 0 && (
-            <span className="text-rose-700">es fehlen <strong className="tabular-nums">{100 - deckung} %</strong></span>
+            <span className="text-ui-schiefer">es fehlen <strong className="font-medium tabular-nums text-ui-tinte">{100 - deckung} %</strong></span>
           )}
         </div>
-        <div className={`mt-1.5 flex h-2 w-full overflow-hidden rounded-full ${luecke > 0 ? 'bg-rose-100' : 'bg-slate-100'}`}>
+        {/* Die Luecke als Stein hinter den Schichten — wie im Ring. */}
+        <div className="mt-2 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-ui-luecke">
           {nachSchicht.map(({ schicht, netto }) =>
             netto <= 0 ? null : (
               <div
@@ -201,7 +201,7 @@ export function Kassenbon({
             ),
           )}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ui-schiefer">
           {nachSchicht.map(({ schicht }) => (
             <span key={schicht} className="flex items-center gap-1.5">
               <span aria-hidden className={`h-2 w-2 rounded-full ${SCHICHT[schicht].punkt}`} />
@@ -210,7 +210,7 @@ export function Kassenbon({
           ))}
           {luecke > 0 && (
             <span className="flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-rose-100 ring-1 ring-rose-200" />
+              <span aria-hidden className="h-2 w-2 rounded-full bg-ui-luecke ring-1 ring-ui-tinte/20" />
               Lücke
             </span>
           )}
@@ -223,13 +223,13 @@ export function Kassenbon({
         Haushalts, nicht einer Person.
       */}
       {paar && (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:hidden">
+        <div className="ui-innen mt-5 px-4 py-3 print:hidden">
           <Schalter
             label="Je Person aufschlüsseln"
             wert={jePersonAnsicht}
             onChange={setJePersonAnsicht}
           />
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
             {jePersonAnsicht
               ? 'Dieselben Zahlen, nach Inhaber sortiert statt nach Schicht.'
               : 'Zeigt getrennt, womit jeder von Ihnen beiden dasteht.'}
@@ -237,15 +237,15 @@ export function Kassenbon({
         </div>
       )}
 
-      <table className="mt-4 w-full border-collapse text-sm">
+      <table className="mt-5 w-full border-collapse text-sm">
         <caption className="sr-only">Einkünfte im Monat, nach {getrennt ? 'Person' : 'Schicht'}</caption>
         <thead>
-          <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            <th scope="col" className="pb-2 text-left font-semibold">Posten</th>
-            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>Brutto</th>
-            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>KV/PV</th>
-            <th scope="col" className={`${NEBEN} pb-2 font-semibold`}>Steuer</th>
-            <th scope="col" className="pb-2 pl-2 text-right font-semibold">Netto</th>
+          <tr className="text-xs text-ui-schiefer">
+            <th scope="col" className="pb-2 text-left font-medium">Posten</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-medium`}>Brutto</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-medium`}>KV/PV</th>
+            <th scope="col" className={`${NEBEN} pb-2 font-medium`}>Steuer</th>
+            <th scope="col" className="pb-2 pl-2 text-right font-medium">Netto</th>
           </tr>
         </thead>
         {getrennt
@@ -280,24 +280,25 @@ export function Kassenbon({
             ),
           )}
         <tfoot>
-          <tr className="border-t-2 border-slate-900 text-slate-900">
-            <th scope="row" className="pt-3 text-left text-base font-black">Gesamt-Netto</th>
-            <td className={`${NEBEN} pt-3 tabular-nums text-slate-600`}>{w(zeile.bruttoGesamt)}</td>
-            <td className={`${NEBEN} pt-3 tabular-nums text-slate-500`}>{w(zeile.kvPvGesamt)}</td>
-            <td className={`${NEBEN} pt-3 tabular-nums text-slate-500`}>{w(zeile.steuerGesamt)}</td>
-            <td className="pl-2 pt-3 text-right text-lg font-black tabular-nums">{w(zeile.nettoGesamt)}</td>
+          {/* Die Summe unter einer Linie in Tinte — wie die Aufstellungen der Beratung. */}
+          <tr className="border-t border-ui-tinte text-ui-tinte">
+            <th scope="row" className="pt-3 text-left text-base font-medium">Gesamt-Netto</th>
+            <td className={`${NEBEN} pt-3 tabular-nums text-ui-schiefer`}>{w(zeile.bruttoGesamt)}</td>
+            <td className={`${NEBEN} pt-3 tabular-nums text-ui-schiefer`}>{w(zeile.kvPvGesamt)}</td>
+            <td className={`${NEBEN} pt-3 tabular-nums text-ui-schiefer`}>{w(zeile.steuerGesamt)}</td>
+            <td className="pl-2 pt-3 text-right text-xl font-medium tabular-nums">{w(zeile.nettoGesamt)}</td>
           </tr>
         </tfoot>
       </table>
 
-      <div className="mt-4 space-y-2 empty:hidden">
+      <div className="mt-5 space-y-2 empty:hidden [&_strong]:font-medium [&_strong]:text-ui-tinte">
         {/*
           Der Satz, ohne den die Aufteilung mehr verspricht, als sie haelt.
           Er steht nur in der getrennten Ansicht — dort, wo die Zahl steht,
           die er einordnet.
         */}
         {getrennt && (
-          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <p className="ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte/80">
             <strong>Die Steuer je Person ist ein Anteil, keine eigene Rechnung.</strong>{' '}
             Verheiratete werden zusammen veranlagt; die gemeinsame Steuer wird hier nach dem
             Beitrag zum zu versteuernden Einkommen aufgeteilt. Allein veranlagt zahlte jeder
@@ -314,7 +315,7 @@ export function Kassenbon({
           weil die beiden Naeherungen sonst nirgends benannt waeren.
         */}
         {person && (
-          <p className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-relaxed text-sky-900">
+          <p className="ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte/80">
             <strong>Allein gerechnet, nicht anteilig.</strong> Hier stehen nur die eigenen
             Verträge und Einkünfte von {person} — mit dem <strong>Grundtarif</strong> statt des
             Splittings, mit einfachen Pauschbeträgen, und ohne die beitragsfreie Mitversicherung
@@ -329,7 +330,7 @@ export function Kassenbon({
         )}
 
         {geteilt && (
-          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <p className="ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte/80">
             <strong>Mehrere Betriebsrenten zählen zusammen.</strong> Der Freibetrag von{' '}
             <strong>{freibetragText(geteilt.betragMonat)}</strong> im Monat steht{' '}
             {geteilt.personen.length > 1 ? 'jeder Person' : geteilt.personen[0]} nur{' '}
@@ -347,22 +348,22 @@ export function Kassenbon({
         oben springen.
       */}
       {ergebnis.kapitalauszahlungen.length > 0 && (
-        <div className="mt-5 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 sm:mt-6 sm:p-4">
-          <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-indigo-900 sm:text-xs">
+        <div className="ui-innen mt-6 p-4">
+          <h3 className="mb-3 text-sm font-medium text-ui-tinte">
             Einmalige Kapitalauszahlungen
           </h3>
           <div className="space-y-2">
             {ergebnis.kapitalauszahlungen.map((a) => (
-              <div key={a.vertragId} className="rounded-md bg-white px-3 py-2">
+              <div key={a.vertragId} className="rounded-[8px] border border-ui-linie bg-ui-karte px-3 py-2.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-indigo-900 sm:text-sm">
-                    {a.bezeichnung} <span className="font-normal text-slate-500">({a.jahr})</span>
+                  <span className="truncate text-xs font-medium text-ui-tinte sm:text-sm">
+                    {a.bezeichnung} <span className="font-normal text-ui-schiefer">({a.jahr})</span>
                   </span>
-                  <span className="whitespace-nowrap text-xs font-bold tabular-nums text-slate-800 sm:text-base">
+                  <span className="whitespace-nowrap text-xs font-medium tabular-nums text-ui-tinte sm:text-base">
                     {euro(a.nettoKapital * kaufkraft(a.jahr))}
                   </span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-xs text-slate-500">
+                <div className="mt-0.5 flex flex-wrap justify-between gap-x-3 text-xs text-ui-schiefer">
                   <span>Brutto: {euro(a.bruttoKapital * kaufkraft(a.jahr))}</span>
                   {/*
                     NICHT "Abgeltungsteuer": beim Depot stimmt das, bei einer
@@ -370,7 +371,7 @@ export function Kassenbon({
                     an (§ 22 Nr. 5 EStG), bei der privaten Kapitalwahl je nach
                     Laufzeit das eine oder das andere.
                   */}
-                  <span className="text-rose-500">
+                  <span>
                     Steuer: {euro(a.steuer * kaufkraft(a.jahr))}
                   </span>
                 </div>
@@ -381,7 +382,7 @@ export function Kassenbon({
                   eine Rechengroesse, kein Zahlungsweg.
                 */}
                 {a.kvPvGesamt > 0 && (
-                  <div className="mt-0.5 text-right text-xs text-rose-500">
+                  <div className="mt-0.5 text-right text-xs text-ui-schiefer">
                     Kranken- und Pflegeversicherung: {euro(a.kvPvGesamt * kaufkraft(a.jahr))}
                   </div>
                 )}
@@ -392,11 +393,11 @@ export function Kassenbon({
                   dazwischen geblieben sind.
                 */}
                 {a.wachstumJahre > 0 && (
-                  <div className="mt-1 border-t border-indigo-100 pt-1 text-xs leading-relaxed text-indigo-900">
+                  <div className="mt-1 border-t border-ui-linie pt-1 text-xs leading-relaxed text-ui-tinte/80">
                     Bis zum Rentenbeginn in {a.wachstumJahre} Jahren daraus:{' '}
-                    <strong>{euro(a.wertBeiRentenbeginn * kaufkraft(a.jahr + a.wachstumJahre))}</strong>
+                    <strong className="font-medium text-ui-tinte">{euro(a.wertBeiRentenbeginn * kaufkraft(a.jahr + a.wachstumJahre))}</strong>
                     {a.steuerWachstum > 0 && (
-                      <span className="text-slate-500">
+                      <span className="text-ui-schiefer">
                         {' '}(nach {euro(a.steuerWachstum * kaufkraft(a.jahr + a.wachstumJahre))} Abgeltungsteuer)
                       </span>
                     )}
@@ -405,8 +406,8 @@ export function Kassenbon({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">
-            Einmalbeträge — im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
+          <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+            Einmalbeträge — im monatlichen Netto oben sind sie <strong className="font-medium text-ui-tinte">nicht</strong> enthalten.
           </p>
         </div>
       )}
