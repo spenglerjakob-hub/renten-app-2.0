@@ -1,7 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import {
-  Building2, CircleCheck, HeartPulse, ListChecks, Printer, Stethoscope, TriangleAlert, Wallet,
-} from 'lucide-react';
+import { Building2, CircleCheck, ListChecks, Printer, Stethoscope, TriangleAlert } from 'lucide-react';
 import {
   bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, type BkvWeg, type BkvWegId,
 } from '@renten/engine';
@@ -232,24 +230,21 @@ export function Seite() {
             </p>
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
-                symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Kostet Sie netto" betrag={ag.nettoKostenMonat}
                 unten={kostenText(aktiv)}
               />
               <Kachel
-                symbol={<HeartPulse className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
                 titel="Vorteil beim Mitarbeiter" betrag={ma.vorteilMonat} genau={ma.abzuegeMonat < 0.005}
                 unten={ma.belastungMonat < 0.005
                   ? 'Versicherungsschutz, ohne Steuer und Abgaben'
                   : `Schutz für ${euroGenau(aktiv.schutzMonat)}, davon trägt er ${euroGenau(ma.belastungMonat)}`}
               />
               <Kachel
-                symbol={<Wallet className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
                 titel="Gespart gegenüber Gehalt" betrag={aktiv.ersparnisGegenGehaltMonat}
                 unten={!g ? 'kein Vergleich — Sie zahlen nichts dazu'
                   : aktiv.ersparnisGegenGehaltMonat < 0.5 ? 'kostet so viel wie eine Gehaltserhöhung'
                   : `je Mitarbeiter und Monat — ${euro(aktiv.ersparnisGegenGehaltMonat * 12 * n)} im Jahr bei ${n}`}
-                gross
+                akzent
               />
             </section>
 
@@ -394,9 +389,9 @@ export function Seite() {
                 </p>
                 <div className="mt-3 space-y-2 print:hidden">
                   <Balken text={`${aktiv.titel}, kostet Sie netto`} betrag={ag.nettoKostenMonat}
-                    max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-emerald-500" />
+                    max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-ui-tinte" />
                   <Balken text="Gehaltserhöhung, kostet Sie netto" betrag={g.nettoKostenMonat}
-                    max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-slate-400" />
+                    max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-ui-daten-3" />
                 </div>
               </section>
             ) : aktiv.id === 'arbeitnehmer' && (

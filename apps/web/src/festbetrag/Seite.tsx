@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, HandCoins, PiggyBank, Printer, Scale, ShieldCheck } from 'lucide-react';
+import { Printer, Scale, ShieldCheck } from 'lucide-react';
 import {
   festbetragModell, festbetragGehaltsStaffel, parameterFuer, BUNDESLAENDER, betriebUmstieg,
 } from '@renten/engine';
@@ -160,22 +160,19 @@ export function Seite() {
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
-                symbol={<HandCoins className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
                 titel="Mitarbeiter zahlt netto" betrag={ma.nettoAufwandMonat}
                 unten={`von ${euro(ma.umwandlungMonat)} Umwandlung`}
               />
               <Kachel
-                symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Arbeitgeber zahlt netto" betrag={ag.nettoKostenMonat}
                 unten={`für ${euro(ag.zuschussMonat)} Beitrag`}
               />
               <Kachel
-                symbol={<PiggyBank className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
                 titel="Fließt in die Direktversicherung" betrag={r.vertragMonat}
                 unten={r.hebelMitarbeiter > 0
                   ? `${r.hebelMitarbeiter.toLocaleString('de-DE', { maximumFractionDigits: 1 })}-fach der Nettokosten des Mitarbeiters`
                   : 'jeden Monat'}
-                gross
+                akzent
               />
             </section>
 

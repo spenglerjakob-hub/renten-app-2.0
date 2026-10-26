@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowRightLeft, Building2, HandCoins, Link2, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
+import { ArrowRightLeft, Link2, Printer, ShieldCheck, Wand2 } from 'lucide-react';
 import {
   matchingModell, optimaleUmwandlung, parameterFuer, BUNDESLAENDER, type UmwandlungsWeg, betriebUmstieg, type MatchingEingaben,
 } from '@renten/engine';
@@ -177,22 +177,19 @@ export function Seite() {
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
-                symbol={<HandCoins className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
                 titel="Mitarbeiter zahlt netto" betrag={ma.nettoAufwandMonat}
                 unten={`von ${euro(ma.umwandlungMonat)} Umwandlung`}
               />
               <Kachel
-                symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Arbeitgeber zahlt netto" betrag={ag.nettoKostenMonat}
                 unten="nach Steuern und gesparten Abgaben"
               />
               <Kachel
-                symbol={<PiggyBank className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
                 titel="Fließt in die Altersvorsorge" betrag={r.vertrag.gesamtMonat}
                 unten={r.hebelMitarbeiter > 0
                   ? `${r.hebelMitarbeiter.toLocaleString('de-DE', { maximumFractionDigits: 1 })}-fach der Nettokosten des Mitarbeiters`
                   : 'jeden Monat'}
-                gross
+                akzent
               />
             </section>
 
@@ -308,7 +305,7 @@ export function Seite() {
                 </>}
               >
                 <div className="mt-3 grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
-                  <WechselSpalte titel="Direktversicherung — nimmt er mit" farbe="border-sky-200 bg-sky-50">
+                  <WechselSpalte titel="Direktversicherung — nimmt er mit">
                     <li>Umwandlung und Pflichtzuschuss sind <strong>sofort unverfallbar</strong> (§ 1b Abs. 5 BetrAVG).</li>
                     <li>Mitnahme zum neuen Arbeitgeber: Anspruch <strong>innerhalb eines Jahres</strong> nach dem Ausscheiden
                       (§ 4 Abs. 3 BetrAVG), steuerfrei (§ 3 Nr. 55 EStG). Meist wird einfach der Versicherungsnehmer
@@ -316,7 +313,7 @@ export function Seite() {
                     <li>Alternativ beitragsfrei stellen oder privat weiterführen — dann ohne Steuer- und SV-Vorteil.</li>
                     <li>Kündigen und auszahlen lassen geht nicht (§ 2 Abs. 2 BetrAVG).</li>
                   </WechselSpalte>
-                  <WechselSpalte titel="Unterstützungskasse — bleibt hier" farbe="border-emerald-200 bg-emerald-50">
+                  <WechselSpalte titel="Unterstützungskasse — bleibt hier">
                     <li>Wer <strong>vor drei Jahren</strong> Zusagedauer geht, verliert den Arbeitgeberanteil. Der Wert der
                       Rückdeckung bleibt in der Unterstützungskasse (je nach Satzung).</li>
                     <li>Danach bleibt die Anwartschaft <strong>beitragsfrei stehen</strong>; die Rente zahlt später die
@@ -324,7 +321,7 @@ export function Seite() {
                     <li>Einen Anspruch auf Mitnahme gibt es nicht. Übertragen lässt sie sich nur, wenn alter und neuer
                       Arbeitgeber und der Mitarbeiter zustimmen (§ 4 Abs. 2 BetrAVG) — in der Praxis selten.</li>
                   </WechselSpalte>
-                  <WechselSpalte titel="Für den Arbeitgeber" farbe="border-amber-200 bg-amber-50">
+                  <WechselSpalte titel="Für den Arbeitgeber">
                     <li>Für unverfallbare Anwartschaften bleiben Verwaltung, Auskunft (§ 4a BetrAVG) und
                       <strong> PSV-Beiträge</strong> bis zum Rentenbeginn.</li>
                     <li><strong>Kongruent rückgedeckte</strong> Unterstützungskasse wählen — sonst haftet der Arbeitgeber

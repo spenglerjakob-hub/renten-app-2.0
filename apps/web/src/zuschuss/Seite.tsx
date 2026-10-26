@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, HandCoins, PiggyBank, Printer, ShieldCheck, Wand2 } from 'lucide-react';
+import { Printer, Wand2 } from 'lucide-react';
 import {
   zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER, betriebUmstieg,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
+import { EINLEITUNG, Hervor, KNOPF, KNOPF_KLEIN, Titel } from '../components/stil';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
-  BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
+  BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, Punkte,
+  KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_ZEILE, TABELLE_DRUCK, ZELLE, KOPFZELLE, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
 
@@ -71,21 +73,22 @@ export function Seite() {
   );
 
   return (
-    <div className="min-h-screen bg-ui-flaeche text-slate-800 print:min-h-0 print:bg-white">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       <Kopf />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
-          Betriebsrente mit Arbeitgeberzuschuss: {prozent(quote, 0)} obendrauf
-        </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
+        {/* Der Titel als Aussage wie in der Beratung; hervorgehoben, was der Arbeitgeber dazulegt. */}
+        <Titel gross klasse="print:text-xl">
+          Betriebsrente mit Arbeitgeberzuschuss: <Hervor>{prozent(quote, 0)} obendrauf</Hervor>
+        </Titel>
+        <p className={`mt-3 ${EINLEITUNG} print:mt-1 print:text-[10px] print:leading-snug`}>
           Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie legen {prozent(quote, 0)} davon dazu — höchstens
           {' '}{euro(deckel)} im Monat. Alles fließt in eine Direktversicherung. Weil Sie auf die Umwandlung
           Sozialabgaben sparen, kostet Sie der Zuschuss nur einen Bruchteil.
         </p>
         <AndereModelle aktuell="/zuschussmodell" />
 
-        <p className="mt-2 hidden text-xs print:text-[10px] leading-snug text-slate-600 print:block">
+        <p className="mt-2 hidden text-xs leading-snug text-ui-schiefer print:block print:text-[10px]">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
           {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)}, Zuschuss
           {' '}{prozent(quote, 0)} bis {euro(deckel)}. Unternehmenssteuer {prozent(steuersatz, 0)}
@@ -118,13 +121,11 @@ export function Seite() {
               <ZahlFeld label="Entgeltumwandlung im Monat" wert={umwandlung} onChange={setUmwandlung} einheit="€" schritt={10} />
               <div className="flex flex-wrap gap-1.5">
                 {[100, 200].map((b) => (
-                  <button key={b} type="button" onClick={() => setUmwandlung(b)}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] print:text-xs font-bold text-slate-700 hover:bg-slate-50">
+                  <button key={b} type="button" onClick={() => setUmwandlung(b)} className={KNOPF_KLEIN}>
                     {euro(b)}
                   </button>
                 ))}
-                <button type="button" onClick={voll}
-                  className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[13px] print:text-xs font-bold text-indigo-800 hover:bg-indigo-100">
+                <button type="button" onClick={voll} className={KNOPF_KLEIN}>
                   <Wand2 className="h-3.5 w-3.5" aria-hidden /> Rahmen voll ausschöpfen
                 </button>
               </div>
@@ -153,24 +154,22 @@ export function Seite() {
 
           {/* --- Ergebnis ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
+            {/* Wie „Ihre Rechnung“ in der Beratung: zwei Wertkarten, die dritte — was in den Vertrag fliesst — als Akzent. Kurze Etiketten, damit die Zahlen auf einer Hoehe stehen. */}
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
-                symbol={<HandCoins className="h-5 w-5" aria-hidden />} farbe="border-sky-200 bg-sky-50 text-sky-900"
                 titel="Mitarbeiter zahlt netto" betrag={ma.nettoAufwandMonat}
                 unten={`von ${euro(ma.umwandlungMonat)} Umwandlung`}
               />
               <Kachel
-                symbol={<Building2 className="h-5 w-5" aria-hidden />} farbe="border-amber-200 bg-amber-50 text-amber-900"
                 titel="Arbeitgeber zahlt netto" betrag={ag.nettoKostenMonat}
                 unten={`für ${euro(ag.zuschussMonat)} Zuschuss`}
               />
               <Kachel
-                symbol={<PiggyBank className="h-5 w-5" aria-hidden />} farbe="border-emerald-300 bg-emerald-50 text-emerald-900"
-                titel="Fließt in die Direktversicherung" betrag={r.vertragMonat}
+                titel="In die Direktversicherung" betrag={r.vertragMonat}
                 unten={r.hebelMitarbeiter > 0
                   ? `${r.hebelMitarbeiter.toLocaleString('de-DE', { maximumFractionDigits: 1 })}-fach der Nettokosten des Mitarbeiters`
                   : 'jeden Monat'}
-                gross
+                akzent
               />
             </section>
 
@@ -181,21 +180,21 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-xs print:text-[11px] text-rose-700">
+                  <p className="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
                   </p>
                 )}
               </Bon>
               <Bon titel="Arbeitgeber">
                 <Zeile text={`Zuschuss ${prozent(quote, 0)}${r.gedeckelt ? ' (gedeckelt)' : ''}`} betrag={ag.zuschussMonat} />
-                <p className="pl-3 text-xs print:text-[11px] text-slate-500">
+                <p className="pl-3 text-xs text-ui-schiefer print:text-[11px]">
                   davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
                 </p>
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="= Kosten vor Steuern" betrag={ag.kostenVorSteuerMonat} summe />
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pl-3 text-xs leading-snug text-slate-500 print:text-[9px]">
+                <p className="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
                   Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht aktiviert (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand — steuerlich zählt nur, was zusätzlich anfällt: Zuschuss minus gesparte Abgaben.
                 </p>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
@@ -208,44 +207,45 @@ export function Seite() {
               je nachdem, wie viel er umwandelt". Oberhalb des Deckels sinken
               die Kosten sogar — der Zuschuss steht, die Ersparnis waechst.
             */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="text-sm font-black text-slate-900">Was kostet mich jeder Mitarbeiter?</h2>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
+            <section className={`${KARTE} print:break-inside-avoid`}>
+              <h2 className={KARTE_TITEL}>Was kostet mich jeder Mitarbeiter?</h2>
+              <p className={ERKLAERUNG}>
                 Je nachdem, wie viel er umwandelt — im Monat, nach Steuern und gesparten Abgaben:
               </p>
-              <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
+              {/* Die gewaehlte Zeile liegt auf der Innenflaeche — wie die hervorgehobene Zeile der Vergleiche, ohne Gelb. */}
+              <table className={`mt-3 w-full text-sm print:mt-1 ${TABELLE_DRUCK}`}>
                 <thead>
-                  <tr className="text-xs print:text-[11px] text-slate-500">
-                    <th className="py-0.5 text-left font-medium">Umwandlung</th>
-                    <th className="py-0.5 text-right font-medium">Zuschuss</th>
-                    <th className="py-0.5 text-right font-bold text-amber-800">
+                  <tr className={TABELLE_KOPF}>
+                    <th className={`${KOPFZELLE} text-left font-normal`}>Umwandlung</th>
+                    <th className={`${KOPFZELLE} text-right font-normal`}>Zuschuss</th>
+                    <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>
                       <span className="sm:hidden">AG netto</span><span className="hidden sm:inline">Arbeitgeber netto</span>
                     </th>
-                    <th className="py-0.5 text-right font-bold text-emerald-700">
+                    <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>
                       <span className="sm:hidden">Vertrag</span><span className="hidden sm:inline">im Vertrag</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-700">
+                <tbody className="text-ui-tinte">
                   {staffel.map((st) => {
                     const aktiv = Math.abs(st.umwandlungMonat - ma.umwandlungMonat) < 0.5;
                     return (
                       <tr key={st.umwandlungMonat}
-                        className={`border-t border-slate-100 ${aktiv ? 'bg-amber-50 font-bold' : ''} cursor-pointer hover:bg-slate-50 print:cursor-auto`}
+                        className={`${TABELLE_ZEILE} ${aktiv ? 'bg-ui-innen font-medium' : ''} cursor-pointer hover:bg-ui-innen print:cursor-auto`}
                         onClick={() => setUmwandlung(st.umwandlungMonat)}>
-                        <td className="py-0.5">
+                        <td className={ZELLE}>
                           {euro(st.umwandlungMonat)}
-                          {st.voll && <span className="ml-1 text-xs print:text-[10px] font-normal text-indigo-700">Rahmen voll</span>}
+                          {st.voll && <span className="ml-1.5 text-xs font-normal text-ui-schiefer print:text-[10px]">Rahmen voll</span>}
                         </td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.zuschussMonat)}</td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.arbeitgeberNettoMonat)}</td>
-                        <td className="py-0.5 text-right tabular-nums">{euro(st.vertragMonat)}</td>
+                        <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.zuschussMonat)}</td>
+                        <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.arbeitgeberNettoMonat)}</td>
+                        <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.vertragMonat)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px]">
+              <p className={FUSSNOTE}>
                 Oberhalb des Deckels sinken Ihre Kosten sogar: Der Zuschuss bleibt bei {euro(deckel)}, die gesparten
                 Sozialabgaben wachsen mit jeder weiteren beitragsfreien Umwandlung.
                 <span className="print:hidden"> Zeile antippen übernimmt den Betrag.</span>
@@ -267,26 +267,17 @@ export function Seite() {
               <UmstiegVergleich betrieb={betrieb} vlVertrag={bisher.vlVertrag} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />
             )}
 
-            {r.hinweise.length > 0 && (
-              <section className="space-y-1.5">
-                {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
-                    {h}
-                  </p>
-                ))}
-              </section>
-            )}
+            <Hinweiszeilen hinweise={r.hinweise} />
 
             {/* Mit VL beginnt Seite 2 schon beim Vergleich mit heute (siehe UmstiegVergleich). */}
             <div className={`space-y-4 print:space-y-2 ${hatBisherige(bisher) ? '' : 'print:break-before-page'}`}>
-              <p className="hidden text-lg font-black text-slate-900 print:block">Umsetzung</p>
+              <p className="ui-titel hidden text-lg text-ui-tinte print:block">Umsetzung</p>
 
+              {/* „Einfach umzusetzen“ wie „Gut zu wissen“ in der Beratung: Punkte mit Gedankenstrich, ohne gruenen Kasten. */}
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 print:p-2">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> Einfach umzusetzen
-                  </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                <div className={KARTE}>
+                  <h2 className={KARTE_TITEL}>Einfach umzusetzen</h2>
+                  <Punkte klasse="mt-3 print:mt-1">
                     <li><strong>Ein Vertrag</strong> je Mitarbeiter, eine Direktversicherung — keine Unterstützungskasse,
                       kein Pensions-Sicherungs-Verein.</li>
                     <li>Der gesetzliche <strong>Pflichtzuschuss ist enthalten</strong> — nichts kommt obendrauf.</li>
@@ -294,46 +285,41 @@ export function Seite() {
                       Jahres, § 4 Abs. 3 BetrAVG); für Sie ist er danach erledigt.</li>
                     <li>Umwandlung und Pflichtzuschuss sind sofort unverfallbar. Der <strong>freiwillige Teil</strong> darüber
                       hinaus erst nach drei Jahren (§ 1b BetrAVG) — das Bezugsrecht dafür mit dem Versicherer gestalten.</li>
-                  </ul>
+                  </Punkte>
                 </div>
                 {hatBisherige(bisher) ? <BetriebJahr betrieb={betrieb} /> : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
-                    <h2 className="text-sm font-black text-slate-900">
+                  <div className={KARTE}>
+                    <h2 className={KARTE_TITEL}>
                       Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                     </h2>
-                    <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
-                      <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Zuschüsse in die Altersvorsorge</dt><dd className="tabular-nums">{euro(ag.zuschussMonat * 12 * n)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Altersvorsorge insgesamt</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertragMonat * 12 * n)}</dd></div>
+                    <dl className="mt-3 text-sm print:mt-1 print:text-xs">
+                      <Zeile text="Kosten Arbeitgeber, netto" betrag={ag.nettoKostenMonat * 12 * n} stark />
+                      <Zeile text="Zuschüsse in die Altersvorsorge" betrag={ag.zuschussMonat * 12 * n} />
+                      <Zeile text="Altersvorsorge insgesamt" betrag={r.vertragMonat * 12 * n} stark />
                     </dl>
                   </div>
                 )}
               </section>
 
-              <Nachschlagen
-                titel={<><ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung</>}
-              >
-                <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-[13px] leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
-                  <li>• Zuschuss {prozent(quote, 0)} der Umwandlung, höchstens {euro(deckel)} im Monat</li>
-                  <li>• Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
-                  <li>• Für alle Beschäftigten gleich (Gleichbehandlung)</li>
-                  <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
-                  <li>• Unverfallbarkeit des freiwilligen Teils: gesetzlich 3 Jahre, kürzer möglich</li>
-                  <li>• Ein Anbieter, ein Tarif — neue Mitarbeiter können mitgebrachte Verträge übertragen</li>
+              <Nachschlagen titel="In die Versorgungsordnung">
+                <ul className={`grid gap-x-6 gap-y-1 text-sm leading-relaxed text-ui-tinte sm:grid-cols-2 print:mt-1 print:grid-cols-2 print:gap-y-0.5 print:text-[10px] print:leading-snug ${STRICHE}`}>
+                  <li>Zuschuss {prozent(quote, 0)} der Umwandlung, höchstens {euro(deckel)} im Monat</li>
+                  <li>Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
+                  <li>Für alle Beschäftigten gleich (Gleichbehandlung)</li>
+                  <li>Tarifvorrang prüfen (§ 20 BetrAVG)</li>
+                  <li>Unverfallbarkeit des freiwilligen Teils: gesetzlich 3 Jahre, kürzer möglich</li>
+                  <li>Ein Anbieter, ein Tarif — neue Mitarbeiter können mitgebrachte Verträge übertragen</li>
                 </ul>
               </Nachschlagen>
 
-              <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
+              <p className="text-xs leading-relaxed text-ui-schiefer print:text-[8px]">
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Nicht enthalten: die
                 Besteuerung und Verbeitragung der späteren Leistungen. Die Ausgestaltung sollte ein bAV-Spezialist prüfen.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2 print:hidden">
-              <button
-                type="button" onClick={() => window.print()}
-                className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700"
-              >
+              <button type="button" onClick={() => window.print()} className={KNOPF}>
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
               <UebernehmenKnopf modell={{ art: 'zuschuss', quote, deckelMonat: deckel }} bundesland={bundesland} />
