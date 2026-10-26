@@ -48,7 +48,6 @@ import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { KaufkraftSchalter } from './components/KaufkraftSchalter';
-import { Reiterleiste } from './components/Reiterleiste';
 import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seitenleiste';
 import { Dialog } from './components/Dialog';
 import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
@@ -790,8 +789,18 @@ export default function App() {
   */
   const schichten = (
     <div id="vertraege" className="scroll-mt-28 space-y-5">
+      {/*
+        Am Telefon passen vier Pillen mit „Schicht …“ nicht in eine Reihe —
+        dort nur die Ziffer (die Ueberschrift darunter nennt die Schicht), der
+        Vorlesetext behaelt den ganzen Namen.
+      */}
       <Pillen
-        reiter={REITER.map((r) => ({ id: r.id, inhalt: r.text }))}
+        reiter={REITER.map((r) => ({
+          id: r.id,
+          inhalt: r.id === 'planer' ? r.text : (
+            <><span aria-hidden className="sm:hidden">{r.text.replace('Schicht ', '')}</span><span className="sr-only sm:not-sr-only">{r.text}</span></>
+          ),
+        }))}
         aktiv={reiter}
         onWechsel={setReiter}
         beschriftung="Versorgungsschichten"
@@ -1327,24 +1336,23 @@ export default function App() {
               (bestehende Vertraege)? Die erste ist die der Beratung, die
               zweite die Pruefung auf Wunsch.
             */}
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <Reiterleiste
-                reiter={[
-                  { id: 'loesungen' as const, text: 'Lösungen & Angebote' },
-                  { id: 'tuev' as const, text: 'Bestehende Verträge prüfen' },
-                ]}
-                aktiv={tuevReiter}
-                onWechsel={setTuevReiter}
-                beschriftung="Lösungen oder bestehende Verträge"
-              />
+            {/* Als Pillen wie die Reiter der Beratung; der Bereich darunter ohne eigene Breite. */}
+            <Pillen
+              // Am Telefon kurz — die langen Namen braechen die Pillen in zwei Reihen.
+              reiter={[
+                { id: 'loesungen' as const, inhalt: <><span className="sm:hidden">Lösungen</span><span className="hidden sm:inline">Lösungen & Angebote</span></> },
+                { id: 'tuev' as const, inhalt: <><span className="sm:hidden">Verträge prüfen</span><span className="hidden sm:inline">Bestehende Verträge prüfen</span></> },
+              ]}
+              aktiv={tuevReiter}
+              onWechsel={setTuevReiter}
+              beschriftung="Lösungen oder bestehende Verträge"
+              kennung={(id) => ({ reiter: `tuev-reiter-${id}`, bereich: 'tuev-bereich' })}
+            />
+            <div id="tuev-bereich" role="tabpanel" aria-labelledby={`tuev-reiter-${tuevReiter}`}>
+              {tuevReiter === 'loesungen'
+                ? <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
+                : <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />}
             </div>
-            {tuevReiter === 'loesungen' ? (
-              <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
-            ) : (
-              <div className="-mx-4 sm:-mx-6">
-                <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />
-              </div>
-            )}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
           </>
         )}

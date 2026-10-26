@@ -529,11 +529,11 @@ export function Schalter(props: { label: string; wert: boolean; onChange: (b: bo
 export type Ton = 'ergebnis' | 'eingabe';
 
 /**
- * Exportiert, weil zwei Flaechen den Eingabeton tragen, die keine Karte
- * sind: die Vertragskarte mit der Reiterleiste (`App.tsx`) und der Block
- * „1. Ihre Annahmen" im Vertrags-TUEV. Dieselbe Farbe an drei Stellen
- * abzuschreiben hiesse, dass sie beim naechsten Mal an zweien geaendert
- * wird.
+ * Exportiert, weil auch Flaechen, die keine Karte sind, einen Ton tragen —
+ * etwa das Band der Testphase (`ZugangsBand`). Dieselbe Flaeche an mehreren
+ * Stellen abzuschreiben hiesse, dass sie beim naechsten Mal an einer
+ * vergessen wird. Der Rechner traegt Eingaben inzwischen auf weissen
+ * Karten wie die Mitarbeiterberatung.
  */
 export const TON: Record<Ton, string> = {
   ergebnis: 'ui-karte',
@@ -879,7 +879,7 @@ export function InfoPunkt(props: {
           id={id}
           role="tooltip"
           style={{ top: lage?.top ?? 0, left: lage?.left ?? 0, visibility: lage ? 'visible' : 'hidden' }}
-          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-ui-linie bg-white p-3 text-left text-xs font-normal leading-relaxed text-ui-tinte/80 shadow-lg print:hidden sm:w-72"
+          className="pointer-events-none fixed z-50 w-60 rounded-lg border border-ui-linie bg-white p-3 text-left text-xs font-normal leading-relaxed text-ui-tinte/80 shadow-lg print:hidden sm:w-72 [&_strong]:font-medium [&_strong]:text-ui-tinte"
         >
           <span className="mb-1 block text-xs font-medium text-ui-tinte">
             {props.titel}

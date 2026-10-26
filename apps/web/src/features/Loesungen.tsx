@@ -5,8 +5,9 @@ import {
 } from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
-  ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt, TON,
+  ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt,
 } from '../components/Feld';
+import { AKZENT, EINLEITUNG, Hervor, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
 import {
   foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
 } from './tuev-berechnung';
@@ -27,12 +28,6 @@ import { anteilAmNetto, anteilAnLuecke } from './bezug';
  * meisten bringt — gerechnet wie ein Vertrag im Vertrags-TUEV, mit der
  * Steuer und Krankenversicherung im Alter.
  */
-
-const FARBE: Record<1 | 2 | 3, string> = {
-  1: 'bg-blue-100 text-blue-700',
-  2: 'bg-purple-100 text-purple-700',
-  3: 'bg-emerald-100 text-emerald-700',
-};
 
 const LOESUNG_TEXT: Record<LoesungId, string> = {
   avd: 'Altersvorsorgedepot',
@@ -95,12 +90,17 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
   return (
     <div className="space-y-8 sm:space-y-10">
       <section aria-labelledby="loesungen-titel">
-        <div className="mb-4 border-b-2 border-indigo-200 px-1 pb-3">
-          <h3 id="loesungen-titel" className="flex items-center gap-2 text-base font-bold text-indigo-900 sm:text-xl">
-            <Scale className="h-5 w-5 shrink-0 text-indigo-600 sm:h-6 sm:w-6" aria-hidden />
-            {brutto ? `Was kosten ${euro(betrag)} Beitrag im Monat netto?` : `Was wird aus ${euro(betrag)} netto im Monat?`}
-          </h3>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
+        {/* Die Frage des Abschnitts als Titel in Inter Tight, der Betrag darin hervorgehoben. */}
+        <div className="mb-6">
+          <Titel als="h2" id="loesungen-titel" klasse="flex items-center gap-3">
+            <Scale className="h-6 w-6 shrink-0 text-ui-schiefer" aria-hidden />
+            <span>
+              {brutto
+                ? <>Was kosten <Hervor>{euro(betrag)}</Hervor> Beitrag im Monat netto?</>
+                : <>Was wird aus <Hervor>{euro(betrag)}</Hervor> netto im Monat?</>}
+            </span>
+          </Titel>
+          <p className={`mt-2 ${EINLEITUNG}`}>
             {brutto
               ? 'Derselbe Beitrag in jeder Schicht — und was er Sie nach Steuer- und Abgabenersparnis wirklich '
                 + 'kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
@@ -116,9 +116,9 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
           beginnen alle Felder auf einer Hoehe. Hilfetexte stehen darunter und
           verschieben nichts.
         */}
-        <div className={`mb-4 rounded-xl border p-3 sm:p-4 ${TON.eingabe}`}>
+        <div className="ui-karte mb-6 p-5 sm:p-7">
           <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <ZahlFeld
                 label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
@@ -133,7 +133,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
                 <button
                   type="button"
                   onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
-                  className="mt-1 text-xs font-bold text-indigo-700 hover:underline"
+                  className={`mt-1.5 text-left ${LINK} text-xs`}
                 >
                   Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
                 </button>
@@ -167,7 +167,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
           {loesungen.map((x) => (
             <LoesungsKarte
               key={x.id}
@@ -180,7 +180,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
             />
           ))}
         </div>
-        <p className="mt-3 px-1 text-xs leading-relaxed text-slate-500">
+        <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
           Das ist die Einzahlseite. Was im Alter davon netto ankommt, hängt am Angebot — an der Rente,
           die der Anbieter nennt, und an Steuer und Krankenversicherung. Das rechnet der Vergleich darunter.
         </p>
@@ -199,7 +199,8 @@ const ZUSCHUSS_EINHEITEN = [
 /** Netto-Aufwand oder Beitrag vorgeben — die beiden Fragen aus dem Gespraech. */
 function VorgabeSchalter({ wert, onWechsel }: { wert: LoesungsVorgabe; onWechsel: (v: LoesungsVorgabe) => void }) {
   return (
-    <div role="radiogroup" aria-label="Vorgabe" className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 print:hidden">
+    /* Als Pillen wie die Zahlweise auf der Preisseite. */
+    <div role="radiogroup" aria-label="Vorgabe" className="inline-flex gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 print:hidden">
       {([['netto', 'Netto-Aufwand'], ['brutto', 'Brutto-Beitrag']] as const).map(([id, text]) => (
         <button
           key={id}
@@ -207,8 +208,8 @@ function VorgabeSchalter({ wert, onWechsel }: { wert: LoesungsVorgabe; onWechsel
           role="radio"
           aria-checked={wert === id}
           onClick={() => onWechsel(id)}
-          className={`rounded-md px-2.5 py-1 text-xs font-bold ${
-            wert === id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            wert === id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
           }`}
         >
           {text}
@@ -237,40 +238,45 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
     (Aufwand plus Ersparnis ist der Beitrag), Brutto-Vorgabe von oben nach
     unten (Beitrag minus Ersparnis ist der Aufwand).
   */
-  const zeilen: [string, number, string?][] = brutto
+  // Die erste Zeile der Brutto-Rechnung ist ihr Ausgangsbetrag — betont durch Gewicht, nicht durch Farbe.
+  const zeilen: [string, number, boolean?][] = brutto
     ? [
-        [`${beitragText} (brutto)`, x.eigenbeitragMonat, 'font-bold text-slate-900'],
-        ...ersparnis.map(([t, w]) => [`− ${t}`, w, 'text-emerald-700'] as [string, number, string]),
+        [`${beitragText} (brutto)`, x.eigenbeitragMonat, true],
+        ...ersparnis.map(([t, w]) => [`− ${t}`, w] as [string, number]),
       ]
     : [
         ['Ihr Netto-Aufwand', x.nettoMonat],
-        ...ersparnis.map(([t, w]) => [`+ ${t}`, w, 'text-emerald-700'] as [string, number, string]),
+        ...ersparnis.map(([t, w]) => [`+ ${t}`, w] as [string, number]),
       ];
   const summe: [string, number] = brutto
     ? ['= Kostet Sie netto', x.nettoMonat]
     : [x.id === 'bav' ? '= Bruttoumwandlung' : '= Ihr Beitrag', x.eigenbeitragMonat];
   const geld = (n: number) => euroGenau(Math.round(n * 100) / 100);
+  /*
+    Die ausgezeichnete Loesung („Meiste“, „Günstigste“) ist die Akzentkarte:
+    die Marke wie „Empfohlen“ auf der Preisseite, der Betrag hervorgehoben.
+    Gruen und ein Ring sagten dasselbe lauter.
+    Akzentkarte und Karte sehen gleich aus — der Akzent sitzt im Betrag.
+  */
+  const ausgezeichnet = guenstigste || bester;
   return (
     <article
-      className={`flex flex-col overflow-hidden rounded-xl border bg-white shadow-sm ${
-        guenstigste || bester ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'
-      } ${x.verfuegbar ? '' : 'opacity-70'}`}
+      className={`flex flex-col overflow-hidden ${ausgezeichnet ? AKZENT : 'ui-karte'} ${x.verfuegbar ? '' : 'opacity-70'}`}
     >
-      <header className="flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5">
+      <header className="flex items-start justify-between gap-2 px-5 pt-5">
         <div className="min-w-0">
-          <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${FARBE[x.schicht]}`}>
-            Schicht {x.schicht}
-          </span>
-          <h4 className="mt-1 text-sm font-bold leading-snug text-slate-800">{x.titel}</h4>
+          <span className="text-xs text-ui-schiefer">Schicht {x.schicht}</span>
+          {/* Mit Silbentrennung: „(Entgeltumwandlung)“ passt in vier Spalten sonst nicht in die Karte. */}
+          <h4 className="mt-0.5 break-words text-base font-medium leading-snug text-ui-tinte hyphens-auto">{x.titel}</h4>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {guenstigste && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
+            <span className="ui-marke flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
               <BadgeEuro className="h-3 w-3" aria-hidden /> Günstigste
             </span>
           )}
           {bester && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
+            <span className="ui-marke flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
               <Trophy className="h-3 w-3" aria-hidden /> Meiste
             </span>
           )}
@@ -278,38 +284,41 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
       </header>
 
       {x.verfuegbar ? (
-        <div className="flex flex-1 flex-col p-3">
+        <div className="flex flex-1 flex-col p-5 pt-4">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-xs text-ui-schiefer">
               {brutto ? 'Kostet Sie netto' : 'Im Vertrag'}
             </span>
-            <span className="text-2xl font-black tabular-nums text-indigo-800">
-              {geld(brutto ? x.nettoMonat : x.vertragMonat)}
+            <span className="ui-titel text-[28px] font-normal leading-none tabular-nums text-ui-tinte">
+              {ausgezeichnet
+                ? <Hervor>{geld(brutto ? x.nettoMonat : x.vertragMonat)}</Hervor>
+                : geld(brutto ? x.nettoMonat : x.vertragMonat)}
             </span>
           </div>
-          <p className="text-right text-xs font-bold text-emerald-700">
+          <p className="mt-1.5 text-right text-xs text-ui-schiefer">
             {brutto && <>Im Vertrag {geld(x.vertragMonat)} · </>}
-            {zahl(x.hebel)} × {brutto ? 'je Netto-Euro' : 'Ihr Netto-Aufwand'}
+            <span className="font-medium text-ui-tinte">{zahl(x.hebel)} ×</span> {brutto ? 'je Netto-Euro' : 'Ihr Netto-Aufwand'}
           </p>
 
-          <dl className="mt-3 space-y-1 text-xs">
-            {zeilen.map(([t, w, f]) => (
+          {/* Die Rechnung als Posten mit Summenlinie in Tinte — wie die Aufstellungen der Beratung. */}
+          <dl className="mt-4 space-y-1 text-xs">
+            {zeilen.map(([t, w, betont]) => (
               <div key={t} className="flex justify-between gap-2">
-                <dt className={f?.includes('font-bold') ? 'font-bold text-slate-700' : 'text-slate-600'}>{t}</dt>
-                <dd className={`tabular-nums ${f ?? 'text-slate-800'}`}>{geld(w)}</dd>
+                <dt className={betont ? 'font-medium text-ui-tinte' : 'text-ui-schiefer'}>{t}</dt>
+                <dd className={`tabular-nums text-ui-tinte ${betont ? 'font-medium' : ''}`}>{geld(w)}</dd>
               </div>
             ))}
-            <div className="flex justify-between gap-2 border-t border-slate-100 pt-1 font-bold">
-              <dt className="text-slate-700">{summe[0]}</dt>
-              <dd className="tabular-nums text-slate-900">{geld(summe[1])}</dd>
+            <div className="flex justify-between gap-2 border-t border-ui-tinte pt-1.5 font-medium">
+              <dt className="text-ui-tinte">{summe[0]}</dt>
+              <dd className="tabular-nums text-ui-tinte">{geld(summe[1])}</dd>
             </div>
             {zusatz.length > 0 && brutto && (
-              <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Zusätzlich im Vertrag</p>
+              <p className="pt-1.5 text-xs font-medium text-ui-schiefer">Zusätzlich im Vertrag</p>
             )}
             {zusatz.map(([t, w]) => (
               <div key={t} className="flex justify-between gap-2">
-                <dt className="text-slate-600">{t}</dt>
-                <dd className="tabular-nums text-emerald-700">{geld(w)}</dd>
+                <dt className="text-ui-schiefer">{t}</dt>
+                <dd className="tabular-nums text-ui-tinte">{geld(w)}</dd>
               </div>
             ))}
           </dl>
@@ -322,28 +331,25 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
             aus, deren Rente spaeter voll steuer- und beitragspflichtig ist.
           */}
           {anteil && (
-            <p className="mt-2 text-xs text-slate-600">
-              Netto-Aufwand {geld(x.nettoMonat)} = <strong>{anteil}</strong> Ihres heutigen Nettos
+            <p className="mt-3 text-xs text-ui-schiefer">
+              Netto-Aufwand {geld(x.nettoMonat)} = <strong className="font-medium text-ui-tinte">{anteil}</strong> Ihres heutigen Nettos
             </p>
           )}
-          <p className="mt-3 text-xs leading-relaxed text-slate-500">
-            <strong className="text-slate-600">Im Alter:</strong> {x.besteuerung}
+          <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+            <strong className="font-medium text-ui-tinte">Im Alter:</strong> {x.besteuerung}
           </p>
+          {/* Begrenzte Loesungen sagen es in Tinte statt in Bernstein — der Satz selbst traegt die Einschraenkung. */}
           {x.hinweise.map((h) => (
-            <p key={h} className={`mt-1.5 text-xs leading-relaxed ${x.begrenzt ? 'text-amber-800' : 'text-slate-500'}`}>{h}</p>
+            <p key={h} className={`mt-1.5 text-xs leading-relaxed ${x.begrenzt ? 'text-ui-tinte' : 'text-ui-schiefer'}`}>{h}</p>
           ))}
 
           <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onErfassen}
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100 print:hidden"
-          >
-            <FilePlus2 className="h-4 w-4" aria-hidden /> Angebot mit diesem Beitrag erfassen
+          <button type="button" onClick={onErfassen} className={`mt-4 w-full print:hidden ${KNOPF_ZWEIT}`}>
+            <FilePlus2 className="h-4 w-4 shrink-0" aria-hidden /> Angebot mit diesem Beitrag erfassen
           </button>
         </div>
       ) : (
-        <div className="p-3 text-xs leading-relaxed text-slate-600">
+        <div className="p-5 pt-3 text-xs leading-relaxed text-ui-schiefer">
           {x.hinweise.map((h) => <p key={h}>{h}</p>)}
         </div>
       )}
@@ -364,10 +370,10 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
 
   return (
     <section aria-labelledby="angebote-titel">
-      <div className="mb-4 flex flex-col items-start justify-between gap-3 border-b-2 border-indigo-200 px-1 pb-3 sm:flex-row sm:items-end">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h3 id="angebote-titel" className="text-base font-bold text-indigo-900 sm:text-xl">Angebote vergleichen</h3>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
+          <Titel als="h2" id="angebote-titel">Angebote vergleichen</Titel>
+          <p className={`mt-2 ${EINLEITUNG}`}>
             Holen Sie mit den Beiträgen oben Angebote ein und tragen Sie die Rente ein, die der Anbieter
             zum Rentenbeginn nennt — und, wo es sie gibt, die Kapitalabfindung. Gerechnet wird wie im
             Vertrags-TÜV: was das Angebot Sie netto kostet, gegen das, was im Alter nach Steuer und
@@ -381,7 +387,7 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
               loesung: 'privat', name: '', inhaber: 'A', beitragMonat: 100, agZuschussMonat: 0, dynamik: 0,
               renteMonat: 0, kapital: 0,
             })}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-50 print:hidden"
+            className={`shrink-0 print:hidden ${KNOPF_ZWEIT}`}
           >
             <FilePlus2 className="h-4 w-4" aria-hidden /> Leeres Angebot
           </button>
@@ -389,24 +395,24 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
       </div>
 
       {angebote.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 px-4 py-8 text-center text-sm text-indigo-900">
+        <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
           Noch kein Angebot erfasst. Über „Angebot mit diesem Beitrag erfassen“ oben übernehmen Sie den
           Beitrag einer Lösung als Ausgangspunkt.
         </p>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
             {positionen.map(({ angebot: a }, i) => {
               const kapitalMoeglich = angebotKenntKapital(a.loesung);
               return (
-                <article key={a.id} className={`rounded-xl border p-3 shadow-sm ${TON.eingabe}`}>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">Angebot {i + 1}</span>
+                <article key={a.id} className="ui-karte p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-base font-medium text-ui-tinte">Angebot {i + 1}</span>
                     <button
                       type="button"
                       onClick={() => angebotEntfernen(a.id)}
                       aria-label={`Angebot ${i + 1} entfernen`}
-                      className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
+                      className="rounded-full p-1.5 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
@@ -484,7 +490,7 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
                         hilfe="Statt der Rente — die Abfindung zum Rentenbeginn."
                       />
                     ) : (
-                      <p className="text-xs leading-relaxed text-slate-500">
+                      <p className="text-xs leading-relaxed text-ui-schiefer">
                         Eine volle Kapitalauszahlung ist {a.loesung === 'basis' ? 'bei der Basisrente' : 'beim Altersvorsorgedepot'} nicht
                         vorgesehen — gerechnet wird die Rente.
                       </p>
@@ -597,18 +603,18 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
   const spalten = positionen.length + 1;
 
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="ui-karte mt-6 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] text-xs sm:text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left">
-              <th className="sticky left-0 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Vergleich</th>
+            <tr className="border-b border-ui-linie bg-ui-innen text-left">
+              <th className="sticky left-0 bg-ui-innen px-4 py-2.5 text-xs font-medium text-ui-schiefer">Vergleich</th>
               {positionen.map((p, i) => (
-                <th key={p.angebot.id} className="px-3 py-2 text-right align-bottom">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">Angebot {i + 1}</span>
-                  <span className="block font-bold leading-tight text-slate-800">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
+                <th key={p.angebot.id} className="px-4 py-2.5 text-right align-bottom">
+                  <span className="block text-xs font-normal text-ui-schiefer">Angebot {i + 1}</span>
+                  <span className="block font-medium leading-tight text-ui-tinte">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
                   {gerechnet.length > 1 && (p.rente || p.kapital) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
+                    <span className="ui-marke mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
                   )}
@@ -618,21 +624,22 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
           </thead>
           <tbody>
             {zeilen.map((z) => ('gruppe' in z ? (
-              <tr key={z.gruppe} className="border-b border-slate-200 bg-slate-50">
-                <td colSpan={spalten} className="sticky left-0 px-3 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr key={z.gruppe} className="border-b border-ui-linie bg-ui-innen">
+                <td colSpan={spalten} className="sticky left-0 px-4 pb-1.5 pt-3 text-xs font-medium text-ui-schiefer">
                   {z.gruppe}
                 </td>
               </tr>
             ) : (
-              <tr key={z.text} className={`border-b border-slate-100 last:border-0 ${z.stark ? 'bg-indigo-50/40 font-bold' : ''}`}>
-                <td className={`sticky left-0 px-3 py-1.5 text-slate-600 ${z.stark ? 'bg-indigo-50' : 'bg-white'}`}>
+              /* Die entscheidenden Zeilen (Netto, Rendite) durch Gewicht betont, nicht durch Farbe. */
+              <tr key={z.text} className={`border-b border-ui-linie last:border-0 ${z.stark ? 'font-medium' : ''}`}>
+                <td className={`sticky left-0 bg-ui-karte px-4 py-2 ${z.stark ? 'text-ui-tinte' : 'text-ui-schiefer'}`}>
                   {z.text}{z.info && <InfoPunkt titel={z.text}>{z.info}</InfoPunkt>}
                 </td>
                 {positionen.map((p) => {
                   const w = z.wert(p);
                   return (
-                    <td key={p.angebot.id} className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-slate-900">
-                      {w ?? <span className="font-normal text-slate-400">—</span>}
+                    <td key={p.angebot.id} className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-ui-tinte">
+                      {w ?? <span className="font-normal text-ui-schiefer">—</span>}
                     </td>
                   );
                 })}
@@ -642,7 +649,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
         </table>
       </div>
       {positionen.some((p) => !p.rente && !p.kapital) && (
-        <p className="border-t border-slate-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs text-ui-tinte">
           Bei Angeboten ohne Beitrag oder ohne Rente bzw. Kapital fehlt die Rechnung — tragen Sie beides ein.
         </p>
       )}

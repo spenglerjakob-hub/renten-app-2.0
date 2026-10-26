@@ -4,6 +4,7 @@ import { foerdercheck, type Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { euro, euroGenau, InfoPunkt } from '../components/Feld';
 import { foerderBasis } from './tuev-berechnung';
+import { EINLEITUNG } from '../components/stil';
 
 /**
  * FÖRDERCHECK — was an Förderung liegen bleibt.
@@ -33,20 +34,19 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
   if (befunde.length === 0) return null;
 
   return (
-    <section aria-labelledby="foerdercheck-titel" className="mt-8 sm:mt-12 print:hidden">
+    <section aria-labelledby="foerdercheck-titel" className="pt-2 print:hidden">
       {/*
         Derselbe Kopf-Aufbau wie beim Vertrags-TÜV, eine Stufe kleiner: Der
-        Block ist ein Teil dieses Bereichs, nicht ein zweiter daneben. Grün
-        statt Bernstein, weil Bernstein hier für die Prüfung steht und Grün
-        für die Förderung.
+        Block ist ein Teil dieses Bereichs, nicht ein zweiter daneben — ohne
+        eigene Farbe, die Foerderung steht in den Zahlen.
       */}
-      <div className="mb-4 flex items-start gap-2 border-b-2 border-emerald-200 px-2 pb-3 sm:gap-3">
-        <Gift className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 sm:h-6 sm:w-6" aria-hidden />
+      <div className="mb-5 flex items-start gap-3">
+        <Gift className="mt-1 h-5 w-5 shrink-0 text-ui-schiefer" aria-hidden />
         <div>
-          <h3 id="foerdercheck-titel" className="text-base font-bold text-emerald-800 sm:text-xl">
+          <h3 id="foerdercheck-titel" className="ui-titel text-[22px] font-normal leading-snug text-ui-tinte sm:text-[26px]">
             Fördercheck
           </h3>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:text-sm">
+          <p className={`mt-1 ${EINLEITUNG}`}>
             Oben steht, was Ihre Verträge leisten. Hier steht, welche Förderung Sie heute nicht
             ausschöpfen — und was ein geförderter Beitrag Sie nach Steuern und Abgaben
             tatsächlich kostet.
@@ -58,11 +58,11 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
         Zwei Spalten erst ab `lg`. Bei 640 Punkten blieben je Karte rund 300
         uebrig, und darin bricht der erklaerende Satz in sieben Zeilen um.
       */}
-      <div className="grid gap-4 px-2 sm:gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
         {befunde.map((b) => (
           <article
             key={b.id}
-            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            className="ui-karte overflow-hidden"
           >
             {/*
               `min-w-0` am Titel und `shrink-0` am Betrag: sonst schiebt ein
@@ -79,25 +79,25 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
               sie wert ist, haengt an Einkommen und Familienstand und laesst
               sich nicht in eine Schlagzahl fassen.
             */}
-            <header className="flex items-baseline justify-between gap-3 border-b border-slate-100 bg-emerald-50/70 px-3 py-2.5 sm:px-4 sm:py-3">
-              <h4 className="min-w-0 text-xs font-bold text-slate-800 sm:text-sm">{b.titel}</h4>
+            <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-ui-linie px-5 py-4 sm:px-6">
+              <h4 className="min-w-0 break-words text-base font-medium text-ui-tinte hyphens-auto">{b.titel}</h4>
               {b.foerderArt === 'zulage' ? (
                 <span className="shrink-0 text-right">
-                  <span className="block text-lg font-black leading-none tabular-nums text-emerald-700 sm:text-2xl">
+                  <span className="block text-2xl font-medium leading-none tabular-nums text-ui-tinte">
                     {euro(b.ersparnisJahr)}
                   </span>
-                  <span className="mt-0.5 block text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
+                  <span className="mt-1 block text-xs text-ui-schiefer">
                     Zulage im Jahr
                   </span>
                 </span>
               ) : (
-                <span className="shrink-0 text-xs font-black tabular-nums text-emerald-700 sm:text-sm">
+                <span className="shrink-0 text-sm font-medium tabular-nums text-ui-tinte">
                   {euro(b.rahmenMonat)} / Monat frei
                 </span>
               )}
             </header>
 
-            <div className="p-3 sm:p-4">
+            <div className="p-5 sm:p-6">
               {/*
                 Bei der Zulage rueckt der Rahmen hierher — er ist die
                 Voraussetzung („so viel muessten Sie einzahlen"), nicht das
@@ -109,18 +109,18 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 ZUSAETZLICH in den Vertrag; der eigene Beitrag bleibt, was er ist.
               */}
               {b.foerderArt === 'zulage' && (
-                <p className="mb-2 text-xs font-semibold text-emerald-800">
+                <p className="mb-2 text-sm font-medium text-ui-tinte">
                   {euro(b.rahmenMonat)} im Monat einzahlen — der Staat legt{' '}
                   {euro(b.ersparnisJahr / 12)} obendrauf.
                 </p>
               )}
 
-              <p className="text-xs leading-relaxed text-slate-600">{b.text}</p>
+              <p className="text-xs leading-relaxed text-ui-tinte/80">{b.text}</p>
 
               {/* Die Einschraenkung steht kleiner darunter — im Ausdruck
                   entfaellt sie ganz, dort zaehlt der Befund. */}
               {b.hinweis && (
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                <p className="mt-1.5 text-xs leading-relaxed text-ui-schiefer">
                   {b.hinweis}
                 </p>
               )}
@@ -130,7 +130,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 erst der Netto-Aufwand sagt, was es kostet — und das ist die
                 Zahl, nach der jemand entscheidet.
               */}
-              <p className="mt-2.5 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs leading-relaxed text-emerald-900">
+              <p className="ui-innen mt-3 px-3 py-2.5 text-xs leading-relaxed text-ui-tinte/80 [&_strong]:font-medium [&_strong]:text-ui-tinte">
                 {b.foerderArt === 'zulage' ? (
                   /*
                     Die Zulage SENKT den Beitrag nicht, sie VERGROESSERT das Depot.
@@ -200,7 +200,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                 </InfoPunkt>
               </p>
 
-              <p className="mt-1.5 text-xs text-slate-400">{b.paragraf}</p>
+              <p className="mt-2 text-xs text-ui-schiefer">{b.paragraf}</p>
             </div>
           </article>
         ))}
@@ -212,7 +212,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
           verbraucht Foerderrahmen, den der Check nicht sehen kann. Ohne
           diesen Satz waere der ausgewiesene freie Rahmen zu gross.
         */
-        <p className="mx-2 mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+        <p className="ui-innen mt-5 px-4 py-3 text-xs leading-relaxed text-ui-schiefer">
           Zu {ohneBeitrag === 1 ? 'einem geförderten Vertrag' : `${ohneBeitrag} geförderten Verträgen`}{' '}
           ist kein laufender Beitrag erfasst. Tragen Sie ihn oben in der Prüfung ein — sonst
           erscheint hier mehr freier Rahmen, als Sie tatsächlich haben.
