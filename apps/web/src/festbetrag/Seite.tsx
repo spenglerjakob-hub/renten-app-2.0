@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Printer, Scale, ShieldCheck } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import {
   festbetragModell, festbetragGehaltsStaffel, parameterFuer, BUNDESLAENDER, betriebUmstieg,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
+import { EINLEITUNG, Hervor, KNOPF, KNOPF_KLEIN, Titel } from '../components/stil';
 import {
   Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
-  BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN,
+  BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, Punkte,
+  KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_ZEILE, TABELLE_DRUCK, ZELLE, KOPFZELLE, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
 
@@ -76,14 +78,15 @@ export function Seite() {
   );
 
   return (
-    <div className="min-h-screen bg-ui-flaeche text-slate-800 print:min-h-0 print:bg-white">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       <Kopf />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
-          Betriebsrente mit festem Arbeitgeberbeitrag: {euro(festbetrag)} für jeden
-        </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
+        {/* Der Titel als Aussage wie in der Beratung; hervorgehoben, was jeder bekommt. */}
+        <Titel gross klasse="print:text-xl">
+          Betriebsrente mit festem Arbeitgeberbeitrag: <Hervor>{euro(festbetrag)} für jeden</Hervor>
+        </Titel>
+        <p className={`mt-3 ${EINLEITUNG} print:mt-1 print:text-[10px] print:leading-snug`}>
           Jeder Mitarbeiter, der mindestens {euro(mindest)} im Monat für seine Betriebsrente umwandelt, bekommt
           {' '}{euro(festbetrag)} von Ihnen dazu — gleich viel für alle, unabhängig vom Gehalt und davon, wie viel
           sich jemand leisten kann. Weil Sie auf die Umwandlung Sozialabgaben sparen, kostet Sie das nur einen
@@ -91,7 +94,7 @@ export function Seite() {
         </p>
         <AndereModelle aktuell="/festbetrag" />
 
-        <p className="mt-2 hidden text-xs print:text-[10px] leading-snug text-slate-600 print:block">
+        <p className="mt-2 hidden text-xs leading-snug text-ui-schiefer print:block print:text-[10px]">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
           {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)}, Festbetrag
           {' '}{euro(festbetrag)} ab {euro(mindest)} Umwandlung. Unternehmenssteuer {prozent(steuersatz, 0)}
@@ -124,8 +127,7 @@ export function Seite() {
               <ZahlFeld label="Entgeltumwandlung im Monat" wert={umwandlung} onChange={setUmwandlung} einheit="€" schritt={10} />
               <div className="flex flex-wrap gap-1.5">
                 {[50, 100, 200].map((b) => (
-                  <button key={b} type="button" onClick={() => setUmwandlung(b)}
-                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[13px] print:text-xs font-bold text-slate-700 hover:bg-slate-50">
+                  <button key={b} type="button" onClick={() => setUmwandlung(b)} className={KNOPF_KLEIN}>
                     {euro(b)}
                   </button>
                 ))}
@@ -158,6 +160,7 @@ export function Seite() {
 
           {/* --- Ergebnis ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
+            {/* Wie „Ihre Rechnung“ in der Beratung: zwei Wertkarten, die dritte — was in den Vertrag fliesst — als Akzent. Kurze Etiketten, damit die Zahlen auf einer Hoehe stehen. */}
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
                 titel="Mitarbeiter zahlt netto" betrag={ma.nettoAufwandMonat}
@@ -168,7 +171,7 @@ export function Seite() {
                 unten={`für ${euro(ag.zuschussMonat)} Beitrag`}
               />
               <Kachel
-                titel="Fließt in die Direktversicherung" betrag={r.vertragMonat}
+                titel="In die Direktversicherung" betrag={r.vertragMonat}
                 unten={r.hebelMitarbeiter > 0
                   ? `${r.hebelMitarbeiter.toLocaleString('de-DE', { maximumFractionDigits: 1 })}-fach der Nettokosten des Mitarbeiters`
                   : 'jeden Monat'}
@@ -183,7 +186,7 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-xs print:text-[11px] text-rose-700">
+                  <p className="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
                   </p>
                 )}
@@ -191,7 +194,7 @@ export function Seite() {
               <Bon titel="Arbeitgeber">
                 <Zeile text={r.schwelleErreicht ? 'Festbetrag' : 'Pflichtzuschuss (Schwelle nicht erreicht)'} betrag={ag.zuschussMonat} />
                 {r.schwelleErreicht && (
-                  <p className="pl-3 text-xs print:text-[11px] text-slate-500">
+                  <p className="pl-3 text-xs text-ui-schiefer print:text-[11px]">
                     davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
                   </p>
                 )}
@@ -199,7 +202,7 @@ export function Seite() {
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="= Kosten vor Steuern" betrag={ag.kostenVorSteuerMonat} summe />
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pl-3 text-xs leading-snug text-slate-500 print:text-[9px]">
+                <p className="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
                   Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht
                   aktiviert (§ 4b EStG).
                 </p>
@@ -212,46 +215,45 @@ export function Seite() {
               jedem Gehalt; die Kosten unterscheiden sich nur dort, wo das Gehalt
               ueber einer Beitragsbemessungsgrenze liegt.
             */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                <Scale className="h-4 w-4 text-indigo-600" aria-hidden /> Gleich für alle — was es Sie je Mitarbeiter kostet
-              </h2>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
+            <section className={`${KARTE} print:break-inside-avoid`}>
+              <h2 className={KARTE_TITEL}>Gleich für alle — was es Sie je Mitarbeiter kostet</h2>
+              <p className={ERKLAERUNG}>
                 Bei {euro(mindest)} Umwandlung, im Monat, nach Steuern und gesparten Abgaben:
               </p>
-              <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
+              {/* Die Spalten, nach denen der Arbeitgeber fragt, in Tinte — statt je einer eigenen Farbe. */}
+              <table className={`mt-3 w-full text-sm print:mt-1 ${TABELLE_DRUCK}`}>
                 <thead>
-                  <tr className="text-xs print:text-[11px] text-slate-500">
-                    <th className="py-0.5 text-left font-medium">
+                  <tr className={TABELLE_KOPF}>
+                    <th className={`${KOPFZELLE} text-left font-normal`}>
                       <span className="sm:hidden">Brutto</span><span className="hidden sm:inline">Bruttogehalt im Jahr</span>
                     </th>
-                    <th className="py-0.5 text-right font-medium">
+                    <th className={`${KOPFZELLE} text-right font-normal`}>
                       <span className="sm:hidden">Beitrag</span><span className="hidden sm:inline">Ihr Beitrag</span>
                     </th>
-                    <th className="py-0.5 text-right font-bold text-amber-800">
+                    <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>
                       <span className="sm:hidden">AG netto</span><span className="hidden sm:inline">Sie netto</span>
                     </th>
-                    <th className="py-0.5 text-right font-medium text-sky-800">
+                    <th className={`${KOPFZELLE} text-right font-normal`}>
                       <span className="sm:hidden">MA netto</span><span className="hidden sm:inline">Mitarbeiter netto</span>
                     </th>
-                    <th className="py-0.5 text-right font-bold text-emerald-700">
+                    <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>
                       <span className="sm:hidden">Vertrag</span><span className="hidden sm:inline">im Vertrag</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-700">
+                <tbody className="text-ui-tinte">
                   {staffel.map((st) => (
-                    <tr key={st.jahresbrutto} className="border-t border-slate-100">
-                      <td className="py-0.5">{euro(st.jahresbrutto)}</td>
-                      <td className="py-0.5 text-right tabular-nums">{euro(st.zuschussMonat)}</td>
-                      <td className="py-0.5 text-right tabular-nums">{euro(st.arbeitgeberNettoMonat)}</td>
-                      <td className="py-0.5 text-right tabular-nums">{euro(st.mitarbeiterNettoMonat)}</td>
-                      <td className="py-0.5 text-right tabular-nums">{euro(st.vertragMonat)}</td>
+                    <tr key={st.jahresbrutto} className={TABELLE_ZEILE}>
+                      <td className={ZELLE}>{euro(st.jahresbrutto)}</td>
+                      <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.zuschussMonat)}</td>
+                      <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.arbeitgeberNettoMonat)}</td>
+                      <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.mitarbeiterNettoMonat)}</td>
+                      <td className={`${ZELLE} text-right tabular-nums`}>{euro(st.vertragMonat)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px]">
+              <p className={FUSSNOTE}>
                 Jeder bekommt denselben Beitrag. Im Verhältnis zum Gehalt ist er für Geringverdiener am größten — für
                 sie ist das Modell der stärkste Anreiz, überhaupt vorzusorgen. Über der Beitragsbemessungsgrenze der
                 Krankenversicherung sparen Sie auf die Umwandlung weniger Abgaben; deshalb kostet es dort etwas mehr.
@@ -273,26 +275,17 @@ export function Seite() {
               <UmstiegVergleich betrieb={betrieb} vlVertrag={bisher.vlVertrag} steuersatz={steuersatz} mitUmlagen={umlagen > 0} />
             )}
 
-            {r.hinweise.length > 0 && (
-              <section className="space-y-1.5">
-                {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
-                    {h}
-                  </p>
-                ))}
-              </section>
-            )}
+            <Hinweiszeilen hinweise={r.hinweise} />
 
             {/* Mit VL beginnt Seite 2 schon beim Vergleich mit heute (siehe UmstiegVergleich). */}
             <div className={`space-y-4 print:space-y-2 ${hatBisherige(bisher) ? '' : 'print:break-before-page'}`}>
-              <p className="hidden text-lg font-black text-slate-900 print:block">Umsetzung</p>
+              <p className="ui-titel hidden text-lg text-ui-tinte print:block">Umsetzung</p>
 
+              {/* „Einfach und fair“ wie „Gut zu wissen“ in der Beratung: Punkte mit Gedankenstrich, ohne gruenen Kasten. */}
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 print:p-2">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <Scale className="h-4 w-4 text-emerald-600" aria-hidden /> Einfach und fair
-                  </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                <div className={KARTE}>
+                  <h2 className={KARTE_TITEL}>Einfach und fair</h2>
+                  <Punkte klasse="mt-3 print:mt-1">
                     <li><strong>Ein fester Betrag für alle</strong> — leicht zu erklären, niemand fühlt sich benachteiligt.</li>
                     <li>Der gesetzliche <strong>Pflichtzuschuss ist enthalten</strong>; ab rund {euro(festbetrag / 0.15)} Umwandlung
                       wäre er höher als der Festbetrag, dann gilt er.</li>
@@ -302,46 +295,41 @@ export function Seite() {
                       drei Jahren (§ 1b BetrAVG) — das Bezugsrecht dafür mit dem Versicherer gestalten.</li>
                     <li>Für <strong>Geringverdiener</strong> kann zusätzlich der BAV-Förderbetrag nach § 100 EStG greifen —
                       die Voraussetzungen mit dem Steuerberater prüfen.</li>
-                  </ul>
+                  </Punkte>
                 </div>
                 {hatBisherige(bisher) ? <BetriebJahr betrieb={betrieb} /> : (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:p-2 print:shadow-none">
-                    <h2 className="text-sm font-black text-slate-900">
+                  <div className={KARTE}>
+                    <h2 className={KARTE_TITEL}>
                       Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                     </h2>
-                    <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
-                      <div className="flex justify-between gap-2"><dt>Kosten Arbeitgeber, netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Beiträge in die Altersvorsorge</dt><dd className="tabular-nums">{euro(ag.zuschussMonat * 12 * n)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt>Altersvorsorge insgesamt</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(r.vertragMonat * 12 * n)}</dd></div>
+                    <dl className="mt-3 text-sm print:mt-1 print:text-xs">
+                      <Zeile text="Kosten Arbeitgeber, netto" betrag={ag.nettoKostenMonat * 12 * n} stark />
+                      <Zeile text="Beiträge in die Altersvorsorge" betrag={ag.zuschussMonat * 12 * n} />
+                      <Zeile text="Altersvorsorge insgesamt" betrag={r.vertragMonat * 12 * n} stark />
                     </dl>
                   </div>
                 )}
               </section>
 
-              <Nachschlagen
-                titel={<><ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden /> In die Versorgungsordnung</>}
-              >
-                <ul className="mt-1 grid gap-x-4 gap-y-0.5 text-[13px] leading-relaxed text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:text-[10px] print:leading-snug">
-                  <li>• {euro(festbetrag)} im Monat für jeden, der mindestens {euro(mindest)} umwandelt</li>
-                  <li>• Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
-                  <li>• Für alle Beschäftigten gleich (Gleichbehandlung)</li>
-                  <li>• Tarifvorrang prüfen (§ 20 BetrAVG)</li>
-                  <li>• Unverfallbarkeit des freiwilligen Teils: gesetzlich 3 Jahre, kürzer möglich</li>
-                  <li>• Ein Anbieter, ein Tarif — neue Mitarbeiter können mitgebrachte Verträge übertragen</li>
+              <Nachschlagen titel="In die Versorgungsordnung">
+                <ul className={`grid gap-x-6 gap-y-1 text-sm leading-relaxed text-ui-tinte sm:grid-cols-2 print:mt-1 print:grid-cols-2 print:gap-y-0.5 print:text-[10px] print:leading-snug ${STRICHE}`}>
+                  <li>{euro(festbetrag)} im Monat für jeden, der mindestens {euro(mindest)} umwandelt</li>
+                  <li>Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
+                  <li>Für alle Beschäftigten gleich (Gleichbehandlung)</li>
+                  <li>Tarifvorrang prüfen (§ 20 BetrAVG)</li>
+                  <li>Unverfallbarkeit des freiwilligen Teils: gesetzlich 3 Jahre, kürzer möglich</li>
+                  <li>Ein Anbieter, ein Tarif — neue Mitarbeiter können mitgebrachte Verträge übertragen</li>
                 </ul>
               </Nachschlagen>
 
-              <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
+              <p className="text-xs leading-relaxed text-ui-schiefer print:text-[8px]">
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Nicht enthalten: die
                 Besteuerung und Verbeitragung der späteren Leistungen. Die Ausgestaltung sollte ein bAV-Spezialist prüfen.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2 print:hidden">
-              <button
-                type="button" onClick={() => window.print()}
-                className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700"
-              >
+              <button type="button" onClick={() => window.print()} className={KNOPF}>
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
               <UebernehmenKnopf modell={{ art: 'festbetrag', festbetragMonat: festbetrag, mindestUmwandlungMonat: mindest }} bundesland={bundesland} />

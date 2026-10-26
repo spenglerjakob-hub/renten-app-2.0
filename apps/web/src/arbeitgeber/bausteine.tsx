@@ -221,7 +221,7 @@ export function Zeile({ text, betrag, summe, stark }: { text: string; betrag: nu
         : stark ? 'font-medium text-ui-tinte' : 'text-ui-schiefer'
     }`}>
       <dt>{text}</dt>
-      <dd className="text-right tabular-nums text-ui-tinte">{euro(betrag)}</dd>
+      <dd className="whitespace-nowrap text-right tabular-nums text-ui-tinte">{euro(betrag)}</dd>
     </div>
   );
 }
@@ -700,7 +700,7 @@ export function BetriebJahr({ betrieb }: { betrieb: BetriebErgebnis }) {
   const anzahl = betrieb.zeilen.reduce((s, z) => s + z.anzahl, 0);
   /* Wie die Zeilen einer Aufstellung (Zeile): Text leise, Betrag in Tinte. */
   const zeile = (text: string, wert: string, klasse = 'text-ui-schiefer') => (
-    <div className={`flex justify-between gap-3 py-1 print:py-0 ${klasse}`}><dt>{text}</dt><dd className="text-right tabular-nums text-ui-tinte">{wert}</dd></div>
+    <div className={`flex justify-between gap-3 py-1 print:py-0 ${klasse}`}><dt>{text}</dt><dd className="whitespace-nowrap text-right tabular-nums text-ui-tinte">{wert}</dd></div>
   );
   const mehr = betrieb.mehrkostenNettoJahr;
   return (
