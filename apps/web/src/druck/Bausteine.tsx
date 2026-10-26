@@ -28,12 +28,16 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 
 /**
+ * DER STIL „SELINE“ wie am Bildschirm: Tinte und Schiefer auf weissem Papier,
+ * Haarlinien, keine Farbflaechen. Gewicht hoechstens 500, keine Versalien —
+ * betont wird durch Gewicht und Tinte, nicht durch Farbe.
+ *
  * DIE AKZENTFARBE aus „Ihr Auftritt im Gutachten“ wirkt an genau drei
  * Stellen: am Balken des Deckblatts (`DeckblattKopf.tsx`), an der Linie unter
  * dem Seitentitel und an den Untertiteln. Gesetzt wird sie als CSS-Variable am
- * Gutachten (`akzentVariablen`); die Vorgaben hier sind die Farben von
- * bisher. Alles, was etwas bedeutet — Ergebnis, markierte Spalten, Luecke —,
- * behaelt seine feste Farbe.
+ * Gutachten (`akzentVariablen`); ohne sie gilt Tinte. Was etwas bedeutet —
+ * das Ergebnis, die Luecke — traegt den Akzent des Stils: die Hervorhebung
+ * (`ui-hervor`, `ui-marke`), nie die Farbe des Beraters.
  */
 
 /**
@@ -55,9 +59,9 @@ export function Seite({
   return (
     <section className={erste ? '' : 'break-before-page'}>
       {titel && (
-        <header className="mb-4 flex items-baseline justify-between gap-4 border-b-2 border-[color:var(--akzent-linie,#1e293b)] pb-1">
-          <h2 className="text-base font-black tracking-tight text-slate-900">{titel}</h2>
-          {nummer && <span className="text-[11px] font-medium text-slate-500">{nummer}</span>}
+        <header className="mb-4 flex items-baseline justify-between gap-4 border-b-2 border-[color:var(--akzent-linie,rgb(var(--ui-tinte)))] pb-1">
+          <h2 className="text-base font-medium tracking-[-0.01em] text-ui-tinte">{titel}</h2>
+          {nummer && <span className="text-[11px] text-ui-schiefer">{nummer}</span>}
         </header>
       )}
       {children}
@@ -70,11 +74,12 @@ export function Seite({
  *
  * Der obere Abstand ist `mt-4` und nicht `mt-5`: Auf der Angabenseite stehen
  * sechs davon, das waren 24 Punkte allein an Luft zwischen den Bloecken. Die
- * Trennung traegt ohnehin die Versalschrift, nicht der Abstand.
+ * Trennung traegt die Schrift in Tinte ueber dem Schiefer des Texts, nicht
+ * der Abstand.
  */
 export function Untertitel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 mt-4 break-after-avoid text-[12px] font-bold uppercase tracking-wider text-[color:var(--akzent-titel,#64748b)] first:mt-0">
+    <h3 className="mb-2 mt-4 break-after-avoid text-[12px] font-medium text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))] first:mt-0">
       {children}
     </h3>
   );
@@ -86,9 +91,9 @@ export function Untertitel({ children }: { children: ReactNode }) {
  */
 export function Angabe({ feld, wert }: { feld: string; wert: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 break-inside-avoid border-b border-dotted border-slate-200 py-1">
-      <dt className="text-[12px] text-slate-600">{feld}</dt>
-      <dd className="text-right text-[12px] font-semibold tabular-nums text-slate-900">{wert}</dd>
+    <div className="flex items-baseline justify-between gap-3 break-inside-avoid border-b border-ui-linie py-1">
+      <dt className="text-[12px] text-ui-schiefer">{feld}</dt>
+      <dd className="text-right text-[12px] font-medium tabular-nums text-ui-tinte">{wert}</dd>
     </div>
   );
 }
@@ -99,27 +104,18 @@ export function Zweispaltig({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Die hervorgehobenen Spalten einer Tabelle — die Zeilen lesen sie von hier.
+ * Wie am Bildschirm ohne Toenung: Die Marke im Kopf („Meiste“) zeichnet die
+ * Spalte aus, ihre Werte stehen in Gewicht 500.
+ */
+const MarkierteSpalten = createContext<readonly number[]>([]);
+
+/**
  * Tabelle mit wiederholtem Kopf.
  *
  * `table-header-group` sorgt dafuer, dass die Kopfzeile auf jeder Folgeseite
  * erscheint. Ohne das steht auf Seite zwei eine Zahlenwand ohne Beschriftung.
  */
-/**
- * Die hervorgehobenen Spalten einer Tabelle — Zeilen und Gruppenzeilen
- * lesen sie von hier, damit die Toenung ohne Luecke durchlaeuft.
- */
-const MarkierteSpalten = createContext<readonly number[]>([]);
-
-/** Gruen wie die Auszeichnung am Bildschirm; gedruckt dank `print-color-adjust`. */
-const MARKIERT_KOPF = 'bg-emerald-100 text-emerald-900';
-const MARKIERT_ZELLE = 'bg-emerald-50';
-/**
- * Innenabstand der markierten Spalte — die Toenung klebt sonst an der Zahl.
- * Zusammen so breit wie das `pr-3` der anderen Spalten, sonst passt der Kopf
- * nicht mehr in die Spalte.
- */
-const MARKIERT_RAND = 'pl-1 pr-2';
-
 export function Tabelle({
   kopf, spalten, textSpalten, markiert = [], children,
 }: {
@@ -133,8 +129,8 @@ export function Tabelle({
    */
   textSpalten?: number[];
   /**
-   * Spalten, die das Ergebnis tragen (Index wie in `kopf`): gruen getoent von
-   * oben bis unten, wie die Auszeichnung „Meiste" am Bildschirm.
+   * Spalten, die das Ergebnis tragen (Index wie in `kopf`): ihre Werte in
+   * Gewicht 500, wie die Auszeichnung „Meiste" am Bildschirm.
    */
   markiert?: readonly number[];
   children: ReactNode;
@@ -149,13 +145,13 @@ export function Tabelle({
           </colgroup>
         )}
         <thead className="table-header-group">
-          <tr className="border-b border-slate-400">
+          <tr className="border-b border-ui-asche">
             {kopf.map((k, i) => (
               <th
                 key={i}
-                className={`py-1 font-bold ${
-                  markiert.includes(i) ? `${MARKIERT_KOPF} ${MARKIERT_RAND} align-bottom` : 'text-slate-700'
-                } ${i < kopf.length - 1 && !markiert.includes(i) ? 'pr-3' : ''} ${links(i) ? 'text-left' : 'text-right'}`}
+                className={`py-1 align-bottom font-medium ${i === 0 ? 'text-ui-schiefer' : 'text-ui-tinte'} ${
+                  i < kopf.length - 1 ? 'pr-3' : ''
+                } ${links(i) ? 'text-left' : 'text-right'}`}
               >
                 {k}
               </th>
@@ -177,46 +173,31 @@ export function Zeile({
 }) {
   const links = (i: number) => i === 0 || (textSpalten?.includes(i) ?? false);
   const markiert = useContext(MarkierteSpalten);
+  // Wie die Vergleichstabelle am Bildschirm: die Beschriftung in Schiefer, betonte Zeilen ganz in Tinte.
   return (
-    <tr className={`break-inside-avoid border-b border-slate-100 ${fett ? 'font-bold' : ''}`}>
-      {zellen.map((z, i) => {
-        const hervor = markiert.includes(i);
-        return (
-          <td
-            key={i}
-            // pr-3 ausser in der letzten Spalte: ohne Abstand stossen eine
-            // rechtsbuendige und die folgende linksbuendige Spalte aneinander,
-            // und "5 € Beitrag" und "—" lesen sich als ein Wert.
-            className={`py-1 align-top ${hervor ? `${MARKIERT_ZELLE} ${MARKIERT_RAND}` : i < zellen.length - 1 ? 'pr-3' : ''} ${
-              links(i) ? 'text-left' : 'text-right tabular-nums'
-            } ${hervor && fett ? 'text-emerald-800' : 'text-slate-800'}`}
-          >
-            {z}
-          </td>
-        );
-      })}
+    <tr className={`break-inside-avoid border-b border-ui-linie text-ui-tinte ${fett ? 'font-medium' : ''}`}>
+      {zellen.map((z, i) => (
+        <td
+          key={i}
+          // pr-3 ausser in der letzten Spalte: ohne Abstand stossen eine
+          // rechtsbuendige und die folgende linksbuendige Spalte aneinander,
+          // und "5 € Beitrag" und "—" lesen sich als ein Wert.
+          className={`py-1 align-top ${i < zellen.length - 1 ? 'pr-3' : ''} ${
+            links(i) ? 'text-left' : 'text-right tabular-nums'
+          } ${i === 0 && !fett ? 'text-ui-schiefer' : ''} ${markiert.includes(i) ? 'font-medium' : ''}`}
+        >
+          {z}
+        </td>
+      ))}
     </tr>
   );
 }
 
 /** Zwischenueberschrift innerhalb einer Tabelle — haelt die Spalten in einer Flucht. */
 export function Gruppenzeile({ text, spalten }: { text: string; spalten: number }) {
-  const markiert = useContext(MarkierteSpalten);
-  const klasse = 'pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate-500';
-  // Mit markierter Spalte einzeln statt ueber alle Spalten — sonst risse die Toenung ab.
-  if (markiert.length > 0) {
-    return (
-      <tr className="break-inside-avoid break-after-avoid">
-        <td className={klasse}>{text}</td>
-        {Array.from({ length: spalten - 1 }, (_, j) => (
-          <td key={j} className={markiert.includes(j + 1) ? MARKIERT_ZELLE : ''} />
-        ))}
-      </tr>
-    );
-  }
   return (
     <tr className="break-inside-avoid break-after-avoid">
-      <td colSpan={spalten} className={klasse}>
+      <td colSpan={spalten} className="pb-1 pt-3 text-[11px] font-medium text-ui-schiefer">
         {text}
       </td>
     </tr>
@@ -234,7 +215,7 @@ export function Hinweiszeile({ text, spalten }: { text: string; spalten: number 
   return (
     <tr className="break-inside-avoid">
       <td colSpan={spalten} className="pb-1">
-        <span className="block rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-relaxed text-amber-900">
+        <span className="block rounded-[6px] border border-ui-linie bg-ui-innen px-2 py-1 text-[10px] leading-relaxed text-ui-tinte">
           {text}
         </span>
       </td>
@@ -242,11 +223,11 @@ export function Hinweiszeile({ text, spalten }: { text: string; spalten: number 
   );
 }
 
-/** Kleines Abzeichen im Spaltenkopf — „★ Meiste", „Günstigste". */
+/** Kleine Marke im Spaltenkopf — „★ Meiste", „Günstigste" — wie „Empfohlen" am Bildschirm. */
 export function Abzeichen({ children }: { children: ReactNode }) {
   return (
     <span className="mt-0.5 block">
-      <span className="inline-block whitespace-nowrap rounded-full bg-emerald-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">
+      <span className="ui-marke inline-block whitespace-nowrap px-1.5 py-px text-[9px] font-medium">
         {children}
       </span>
     </span>
@@ -254,22 +235,24 @@ export function Abzeichen({ children }: { children: ReactNode }) {
 }
 
 /**
- * Das Ergebnis einer Seite auf einen Blick: gruen umrandet, in derselben
- * Farbe wie die markierte Spalte darunter. Sachlich formuliert — es fasst die
- * Rechnung zusammen, es empfiehlt kein Produkt.
+ * Das Ergebnis einer Seite auf einen Blick: ein ruhiger Kasten mit der Marke
+ * „Ergebnis", wie die ausgezeichnete Loesung am Bildschirm. Sachlich
+ * formuliert — es fasst die Rechnung zusammen, es empfiehlt kein Produkt.
  */
 export function Ergebnis({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 flex break-inside-avoid items-start gap-2.5 rounded-lg border-2 border-emerald-500 bg-emerald-50 px-3 py-2">
-      <span className="mt-px shrink-0 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
-        Ergebnis
-      </span>
-      <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-emerald-950">{children}</p>
+    <div className="mt-3 flex break-inside-avoid items-start gap-2.5 rounded-[10px] border border-ui-linie px-3 py-2">
+      <span className="ui-marke mt-px shrink-0 px-1.5 py-0.5 text-[9px] font-medium">Ergebnis</span>
+      <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-ui-tinte">{children}</p>
     </div>
   );
 }
 
-/** Hervorgehobene Kennzahl fuer das Deckblatt und die Ergebnisseite. */
+/**
+ * Hervorgehobene Kennzahl fuer das Deckblatt und die Ergebnisseite. Ob gut
+ * oder schlecht, sagen Zahl und Beschriftung; `ton` zeichnet nur die Zahl
+ * aus, um die es geht — mit der Hervorhebung, ohne Ampel.
+ */
 export function GrosseZahl({
   titel, wert, hinweis, ton = 'neutral',
 }: {
@@ -278,19 +261,18 @@ export function GrosseZahl({
   hinweis?: string;
   ton?: 'neutral' | 'gut' | 'schlecht';
 }) {
-  const farbe = ton === 'gut' ? 'text-emerald-700 border-emerald-300'
-    : ton === 'schlecht' ? 'text-rose-700 border-rose-300'
-    : 'text-slate-900 border-slate-300';
   return (
-    <div className={`break-inside-avoid rounded-lg border bg-white p-3 ${farbe}`}>
-      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
-      <div className="mt-0.5 text-2xl font-black tabular-nums">{wert}</div>
-      {hinweis && <div className="mt-0.5 text-[10px] leading-tight text-slate-500">{hinweis}</div>}
+    <div className="break-inside-avoid rounded-[10px] border border-ui-linie bg-white p-3">
+      <div className="text-[11px] text-ui-schiefer">{titel}</div>
+      <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">
+        {ton === 'neutral' ? wert : <span className="ui-hervor">{wert}</span>}
+      </div>
+      {hinweis && <div className="mt-0.5 text-[10px] leading-tight text-ui-schiefer">{hinweis}</div>}
     </div>
   );
 }
 
-/** Erklaerender Fliesstext. Keine Restzeilen auf der Folgeseite. */
+/** Erklaerender Fliesstext in Schiefer; was er hervorhebt, steht in Tinte. Keine Restzeilen auf der Folgeseite. */
 export function Text({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-[11px] leading-relaxed text-slate-600">{children}</p>;
+  return <p className="mt-2 text-[11px] leading-relaxed text-ui-schiefer [&_strong]:text-ui-tinte">{children}</p>;
 }
