@@ -12,11 +12,12 @@ import {
   CHECK_CODE, codePruefen, einreichen, type CodeStatus, type DokumentArt, type DokumentEintrag,
 } from '../lib/check';
 import { supabaseKonfiguriert } from '../lib/supabase';
+import { mitName, namensTeile } from '../lib/namen';
 import { DokumentHochladen } from './Dokumente';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  ZahlFeld, ProzentFeld, DatumFeld, TextFeld, AuswahlFeld, Schalter, euro,
+  ZahlFeld, ProzentFeld, DatumFeld, NamenFelder, AuswahlFeld, Schalter, euro,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
@@ -459,7 +460,8 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
 
       <Block>
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextFeld label="Ihr Vor- und Nachname" wert={x.a.name} onChange={(s) => setzePerson('a', { name: s })} />
+          <NamenFelder {...namensTeile(x.a.name, x.a.vorname, x.a.nachname)} beschriftung={['Ihr Vorname', 'Ihr Nachname']}
+            onChange={(teile) => setzePerson('a', mitName(teile))} eigener />
           <DatumFeld label="Ihr Geburtsdatum" wert={x.a.geburtsdatum}
             onChange={(s) => setzePerson('a', { geburtsdatum: s })} />
         </div>
@@ -469,7 +471,8 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
         </div>
         {x.verheiratet && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <TextFeld label="Vor- und Nachname Partner/in" wert={x.b.name} onChange={(s) => setzePerson('b', { name: s })} />
+            <NamenFelder {...namensTeile(x.b.name, x.b.vorname, x.b.nachname)}
+              beschriftung={['Vorname Partner/in', 'Nachname Partner/in']} onChange={(teile) => setzePerson('b', mitName(teile))} />
             <DatumFeld label="Geburtsdatum Partner/in" wert={x.b.geburtsdatum}
               onChange={(s) => setzePerson('b', { geburtsdatum: s })} />
           </div>

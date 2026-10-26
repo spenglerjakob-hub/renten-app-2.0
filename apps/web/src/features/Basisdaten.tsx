@@ -10,10 +10,11 @@ import { PkvFelder } from './PkvFelder';
 import { KvdrHinweis } from './KvdrHinweis';
 import { EinkommenFelder } from './EinkommenFelder';
 import {
-  ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
+  ZahlFeld, ProzentFeld, NamenFelder, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
+import { mitName, namensTeile } from '../lib/namen';
 import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
 import { useVorbelegt } from './useVorbelegt';
 import { nettoHeuteMonat as nettoHeute } from './bezug';
@@ -438,8 +439,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
       {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
         <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
-              platzhalter={`Person ${p.id}`} />
+            <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
+              onChange={(teile) => setzePerson(p.id, mitName(teile))} />
             <AuswahlFeld label="Versorgungsart" wert={p.art}
               onChange={(v) => setzePerson(p.id, { art: v })}
               optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
