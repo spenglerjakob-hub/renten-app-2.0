@@ -48,7 +48,7 @@ function Abschnitt({ titel, children, umbruch = false, teilbar = false }: {
 }) {
   return (
     <section className={`mt-5 ${teilbar ? '' : 'break-inside-avoid'} ${umbruch ? 'break-before-page' : ''}`}>
-      <h2 className="border-b border-[color:var(--akzent-linie,#1e293b)] pb-0.5 text-[12pt] font-black text-[color:var(--akzent-titel,#0f172a)]">{titel}</h2>
+      <h2 className="border-b border-[color:var(--akzent-linie,rgb(var(--ui-tinte)))] pb-0.5 text-[12pt] font-medium text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))]">{titel}</h2>
       <div className="mt-2 text-[10pt] leading-snug">{children}</div>
     </section>
   );
@@ -59,7 +59,7 @@ function Paare({ zeilen }: { zeilen: [string, ReactNode][] }) {
     <dl className="grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] gap-x-4 gap-y-0.5">
       {zeilen.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="text-slate-600">{k}</dt>
+          <dt className="text-ui-schiefer">{k}</dt>
           <dd>{v}</dd>
         </div>
       ))}
@@ -69,7 +69,7 @@ function Paare({ zeilen }: { zeilen: [string, ReactNode][] }) {
 
 function Betrag({ text, wert, summe = false }: { text: string; wert: number; summe?: boolean }) {
   return (
-    <div className={`flex justify-between gap-4 ${summe ? 'border-t border-slate-400 pt-0.5 font-bold' : ''}`}>
+    <div className={`flex justify-between gap-4 ${summe ? 'border-t border-ui-tinte pt-0.5 font-medium' : ''}`}>
       <span>{text}</span><span className="tabular-nums">{euroGenau(wert)}</span>
     </div>
   );
@@ -85,15 +85,15 @@ interface UnterschriftsZeile { wer: string; feld?: UnterschriftPerson }
 
 function Unterschriften({ links, rechts, ort }: { links: UnterschriftsZeile; rechts: UnterschriftsZeile; ort: string }) {
   return (
-    <div className="mt-6 grid grid-cols-2 gap-10 text-[9pt] text-slate-700 break-inside-avoid">
+    <div className="mt-6 grid grid-cols-2 gap-10 text-[9pt] text-ui-tinte break-inside-avoid">
       {[links, rechts].map((z) => (
         <div key={z.wer}>
           <div className="flex h-[16mm] items-end justify-between gap-3">
             <p className="shrink-0">{ort}</p>
             {z.feld && <div data-unterschrift={z.feld} className="flex h-full min-w-0 flex-1 items-end justify-end" />}
           </div>
-          <p className="border-t border-slate-500 pt-1">Ort, Datum, Unterschrift {z.wer}</p>
-          {z.feld && <p data-vermerk={z.feld} className="text-[7.5pt] leading-snug text-slate-500" />}
+          <p className="border-t border-ui-schiefer pt-1">Ort, Datum, Unterschrift {z.wer}</p>
+          {z.feld && <p data-vermerk={z.feld} className="text-[7.5pt] leading-snug text-ui-schiefer" />}
         </div>
       ))}
     </div>
@@ -105,10 +105,10 @@ const ortDatum = (d: BeratungDaten) => [d.entscheidung.ort.trim(), d.entscheidun
 /** Was jede Unterlage als Kopf traegt, wenn sie nicht vom Berater kommt: die Firma. */
 export function FirmenKopf({ firma, logo }: { firma: Firma; logo: string | null }) {
   return (
-    <div className="flex items-start justify-between gap-6 border-b-2 border-slate-800 pb-3">
+    <div className="flex items-start justify-between gap-6 border-b-2 border-ui-tinte pb-3">
       <div>
-        <p className="text-[14pt] font-black">{firma.name}</p>
-        {firma.angebot.anschrift && <p className="whitespace-pre-line text-[9pt] text-slate-600">{firma.angebot.anschrift}</p>}
+        <p className="ui-titel text-[14pt] font-medium">{firma.name}</p>
+        {firma.angebot.anschrift && <p className="whitespace-pre-line text-[9pt] text-ui-schiefer">{firma.angebot.anschrift}</p>}
       </div>
       {logo && <img src={logo} alt="" className="h-14 max-w-[12rem] object-contain" />}
     </div>
@@ -117,7 +117,7 @@ export function FirmenKopf({ firma, logo }: { firma: Firma; logo: string | null 
 
 function Muster() {
   return (
-    <p className="mt-6 border-t border-slate-300 pt-1 text-[8pt] text-slate-500">
+    <p className="mt-6 border-t border-ui-linie pt-1 text-[8pt] text-ui-schiefer">
       Muster, erstellt mit dem JS-Rentenplaner. Vor der Verwendung rechtlich prüfen lassen und mit der Versorgungsordnung abgleichen.
     </p>
   );
@@ -166,7 +166,7 @@ function LeistungsZeile({ titel, w }: { titel: string; w: AuszahlungsWerte | nul
   if (!w) return null;
   return (
     <div className="mt-1">
-      <p className="font-bold">{titel}</p>
+      <p className="font-medium">{titel}</p>
       <Betrag text="Rente brutto" wert={w.bruttoMonat} />
       <Betrag text="− Kranken- und Pflegeversicherung" wert={w.kvPvMonat} />
       <Betrag text="− Steuer" wert={w.steuerMonat} />
@@ -186,15 +186,15 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
   const prozent = prozentZahl;
 
   return (
-    <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
+    <article className="text-ui-tinte [&_strong]:font-medium" style={akzentVariablen(auftritt) as CSSProperties}>
       {fussCss && <style>{fussCss}</style>}
       <DeckblattKopf auftritt={auftritt} />
       {/* Oben der Berater, neben dem Titel die Firma, um deren Angebot es geht */}
       <div className="mt-5 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Beratungsprotokoll betriebliche Altersversorgung</h1>
+          <h1 className="ui-titel text-[18pt] font-normal text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))]">Beratungsprotokoll betriebliche Altersversorgung</h1>
           <p className="mt-1 text-[11pt]">für {a.name || 'den Mitarbeiter'}, {firma.name}</p>
-          {ortDatum(daten) && <p className="text-[9pt] text-slate-600">Beratung: {ortDatum(daten)}</p>}
+          {ortDatum(daten) && <p className="text-[9pt] text-ui-schiefer">Beratung: {ortDatum(daten)}</p>}
         </div>
         {logo && <img src={logo} alt="" className="h-12 max-w-[10rem] shrink-0 object-contain" />}
       </div>
@@ -222,7 +222,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
             [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat (heutige Kaufkraft)`],
             ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} % des Nettolohns`],
           ]} />
-          <p className="mt-1 text-[9pt] text-slate-700">
+          <p className="mt-1 text-[9pt] text-ui-schiefer">
             Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
             {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Steuer als Monatsanteil
             der Jahressteuer.
@@ -248,13 +248,13 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         {r.hebel > 0 && (
           <p className="mt-1">Je 1 € netto fließen {r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} € in die Vorsorge.</p>
         )}
-        {r.hinweise.map((h) => <p key={h} className="mt-1 text-[9pt] text-slate-700">{h}</p>)}
+        {r.hinweise.map((h) => <p key={h} className="mt-1 text-[9pt] text-ui-schiefer">{h}</p>)}
         <p className="mt-1">
           Netto im Monat: {euroGenau(abrechnung.netto.ohne)} ohne, {euroGenau(abrechnung.netto.mit)} mit Betriebsrente — Eigenbeteiligung{' '}
           {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)} Gesamtbeitrag.
         </p>
         {h.monate > 0 && (
-          <p className="mt-1 text-[9pt] text-slate-700">
+          <p className="mt-1 text-[9pt] text-ui-schiefer">
             Beispielhafte, geschätzte Hochrechnung mit {prozent(h.annahmen.renditeAnsparphase)} Rendite im Jahr (keine Zusage): bis zum
             Rentenbeginn {euroGenau(Math.round(h.beitraegeSumme))} Beiträge, davon netto aus eigener Tasche{' '}
             {euroGenau(Math.round(h.nettoSumme))}; Kapital bei Rentenbeginn rund {euroGenau(Math.round(h.kapital))}, geschätzte Rente
@@ -269,8 +269,8 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
             const w = daten.versicherer[l.weg];
             return (
               <div key={l.weg} className="mt-2 break-inside-avoid">
-                <p className="font-bold">{vertragName(l.weg, firma.angebot)}{traegerText(l.weg, firma.angebot) ? ` — ${traegerText(l.weg, firma.angebot)}` : ''}</p>
-                <p className="text-[9pt] text-slate-600">
+                <p className="font-medium">{vertragName(l.weg, firma.angebot)}{traegerText(l.weg, firma.angebot) ? ` — ${traegerText(l.weg, firma.angebot)}` : ''}</p>
+                <p className="text-[9pt] text-ui-schiefer">
                   Beitrag {euroGenau(w.beitragMonat > 0 ? w.beitragMonat : r.vertraege.find((v) => v.weg === l.weg)?.beitragMonat ?? 0)} im Monat
                   {w.dynamik > 0 ? `, Dynamik ${(w.dynamik * 100).toLocaleString('de-DE')} %` : ''}
                 </p>
@@ -291,7 +291,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           })}
           {kennzahlen && kz && (
             <div className="mt-2 break-inside-avoid">
-              <p className="font-bold">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
+              <p className="font-medium">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
               <p>
                 Netto-Hebel {zahl(kz.nettoHebel)} × · Nettorendite {zahl(kz.rendite * 100)} % p. a. · Netto-Gewinn{' '}
                 {euroGenau(Math.round(kz.echterGewinn))}
@@ -312,7 +312,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
 
       <Abschnitt titel="Empfehlung und Entscheidung">
         {e.empfehlung.trim() && <p className="whitespace-pre-line">{e.empfehlung}</p>}
-        <p className="mt-1 font-bold">
+        <p className="mt-1 font-medium">
           {e.status === 'teilnahme'
             ? `Entscheidung: Teilnahme mit ${euroGenau(r.umwandlungMonat)} Umwandlung im Monat ab ${beginnDatum(daten, firma.angebot)}.`
             : e.status === 'verzicht'
@@ -322,7 +322,7 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
       </Abschnitt>
 
       <Unterschriften links={{ wer: 'Mitarbeiter', feld: 'mitarbeiter' }} rechts={{ wer: 'Berater', feld: 'berater' }} ort={ortDatum(daten)} />
-      <p className="mt-6 text-[8pt] text-slate-500">
+      <p className="mt-6 text-[8pt] text-ui-schiefer">
         Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
         mit den Regeln von heute fortgeschrieben.
       </p>
@@ -336,7 +336,7 @@ const heuteText = () => new Date().toLocaleDateString('de-DE', { day: '2-digit',
 
 function AbrechnungsZeileDruck({ text, ohne, mit, summe = false }: { text: string; ohne: number | null; mit: number; summe?: boolean }) {
   return (
-    <tr className={summe ? 'border-t border-slate-400 font-bold' : ''}>
+    <tr className={summe ? 'border-t border-ui-tinte font-medium' : ''}>
       <td className="py-0.5 pr-2">{text}</td>
       <td className="py-0.5 pl-2 text-right">{ohne === null ? '—' : euroGenau(ohne)}</td>
       <td className="py-0.5 pl-2 text-right">{euroGenau(mit)}</td>
@@ -386,12 +386,12 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
   const nr = () => `${(n += 1)}. `;
 
   return (
-    <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
+    <article className="text-ui-tinte [&_strong]:font-medium" style={akzentVariablen(auftritt) as CSSProperties}>
       {fussCss && <style>{fussCss}</style>}
       <DeckblattKopf auftritt={auftritt} />
       <div className="mt-5 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Ihre betriebliche Altersversorgung</h1>
+          <h1 className="ui-titel text-[18pt] font-normal text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))]">Ihre betriebliche Altersversorgung</h1>
           <p className="mt-1 text-[11pt]">Unterlagen zu unserem Gespräch am {datum}</p>
           <p className="text-[11pt]">für {a.name || 'Sie'}, {firma.name}</p>
         </div>
@@ -406,7 +406,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
 
       <Abschnitt titel={`${nr()}Das Angebot Ihres Arbeitgebers`}>
         {angebot.begruessung.trim() && <p className="whitespace-pre-line">{angebot.begruessung.trim()}</p>}
-        <p className="mt-1 font-bold">{regelText(angebot.modell)}</p>
+        <p className="mt-1 font-medium">{regelText(angebot.modell)}</p>
         <ul className="mt-1 list-disc pl-5">
           {r.vertraege.map((v) => (
             <li key={v.weg}>{vertragName(v.weg, angebot)}{traegerText(v.weg, angebot) ? `: ${traegerText(v.weg, angebot)}` : ''}</li>
@@ -414,7 +414,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
         </ul>
         {firmenHinweise(angebot).length > 0 && (
           <>
-            <p className="mt-2 font-bold">Was {firma.name} dazu festgelegt hat</p>
+            <p className="mt-2 font-medium">Was {firma.name} dazu festgelegt hat</p>
             <ul className="list-disc pl-5">{firmenHinweise(angebot).map((x) => <li key={x}>{x}</li>)}</ul>
           </>
         )}
@@ -436,9 +436,11 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
                 ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} %`],
               ]} />
               {luecke.lueckeProzent > 0 && (
-                <p className="mt-2 font-bold">Im Alter fehlen Ihnen {luecke.lueckeProzent} % Ihres heutigen Nettolohns.</p>
+                <p className="mt-2 font-medium">
+                  Im Alter fehlen Ihnen <span className="ui-hervor whitespace-nowrap">{luecke.lueckeProzent} %</span> Ihres heutigen Nettolohns.
+                </p>
               )}
-              <p className="mt-1 text-[9pt] text-slate-700">
+              <p className="mt-1 text-[9pt] text-ui-schiefer">
                 In heutiger Kaufkraft. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung{' '}
                 {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr.
               </p>
@@ -454,13 +456,13 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           Sie das <strong>{euroGenau(r.nettoAufwandMonat)}</strong> im Monat.
         </p>
         <div className="mt-3 break-inside-avoid">
-          <p className="font-bold">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</p>
+          <p className="font-medium">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</p>
           <table className="mt-1 w-full max-w-[34rem] tabular-nums">
             <thead>
-              <tr className="text-[9pt] text-slate-600">
-                <th className="text-left font-semibold" />
-                <th className="pl-2 text-right font-semibold">ohne bAV</th>
-                <th className="pl-2 text-right font-semibold">mit bAV</th>
+              <tr className="text-[9pt] text-ui-schiefer">
+                <th className="text-left font-medium" />
+                <th className="pl-2 text-right font-medium">ohne bAV</th>
+                <th className="pl-2 text-right font-medium">mit bAV</th>
               </tr>
             </thead>
             <tbody>
@@ -474,7 +476,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
               <AbrechnungsZeileDruck text="= Netto" ohne={abrechnung.netto.ohne} mit={abrechnung.netto.mit} summe />
             </tbody>
           </table>
-          <p className="mt-1 text-[9pt] text-slate-700">
+          <p className="mt-1 text-[9pt] text-ui-schiefer">
             Eigenbeteiligung aus dem Nettolohn {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)}{' '}
             Gesamtbeitrag. Steuern als Monatsanteil der Jahressteuer — auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je
             nach Steuerklasse anders.
@@ -482,13 +484,13 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
         </div>
         {belastungen.map(({ v, t }) => (
           <div key={v.weg} className="mt-3 break-inside-avoid">
-            <p className="font-bold">Ihre Belastung im Monat{belastungen.length > 1 ? ` — ${vertragName(v.weg, angebot)}` : ''}</p>
+            <p className="font-medium">Ihre Belastung im Monat{belastungen.length > 1 ? ` — ${vertragName(v.weg, angebot)}` : ''}</p>
             <BelastungDruck t={t} />
           </div>
         ))}
         {h.monate > 0 && (
           <div className="mt-3 break-inside-avoid">
-            <p className="font-bold">Beispielhafte und geschätzte Hochrechnung</p>
+            <p className="font-medium">Beispielhafte und geschätzte Hochrechnung</p>
             <Paare zeilen={[
               ['Angenommene Rendite', `${prozentZahl(h.annahmen.renditeAnsparphase)} im Jahr`],
               ['Bis zum Rentenbeginn', `${laufzeitText(h.monate)}${rentenbeginnVon(a) ? `, am ${rentenbeginnVon(a)}` : ''}`],
@@ -500,7 +502,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
               {euroGenau(Math.round(h.ersparnisSumme))}, Arbeitgeber {euroGenau(Math.round(h.arbeitgeberSumme))}, Erträge{' '}
               {euroGenau(Math.round(h.ertrag))}.
             </p>
-            <p className="mt-1 text-[9pt] text-slate-700">
+            <p className="mt-1 text-[9pt] text-ui-schiefer">
               Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine Zusage.
               Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab; die Rente ist brutto, vor Kranken- und
               Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers.
@@ -511,14 +513,14 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
 
       {leistung && leistung.vertraege.length > 0 && (
         <Abschnitt titel={`${nr()}Ihre Leistung im Alter ${quelleDerLeistung(leistung.vertraege.map((l) => daten.versicherer[l.weg].ausHochrechnung))}`} teilbar>
-          <p className="text-[9pt] text-slate-700">
+          <p className="text-[9pt] text-ui-schiefer">
             Im ersten Rentenjahr {leistung.rentenbeginnJahr}, nach Kranken- und Pflegeversicherung und Steuer.
           </p>
           {leistung.vertraege.map((l) => {
             const w = daten.versicherer[l.weg];
             return (
               <div key={l.weg} className="mt-2 break-inside-avoid">
-                <p className="font-bold">{vertragName(l.weg, angebot)}{traegerText(l.weg, angebot) ? ` — ${traegerText(l.weg, angebot)}` : ''}</p>
+                <p className="font-medium">{vertragName(l.weg, angebot)}{traegerText(l.weg, angebot) ? ` — ${traegerText(l.weg, angebot)}` : ''}</p>
                 <div className="max-w-[22rem]">
                   <LeistungsZeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} />
                 </div>
@@ -533,7 +535,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           })}
           {kennzahlen && haupt && (
             <div className="mt-3 break-inside-avoid">
-              <p className="font-bold">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
+              <p className="font-medium">Kennzahlen (Vertrag allein, Rente bis {kennzahlen.lebenserwartung})</p>
               <p>
                 Netto-Hebel {zahl(haupt.nettoHebel)} × · Nettorendite {zahl(haupt.rendite * 100)} % p. a. · Netto-Gewinn{' '}
                 {euroGenau(Math.round(haupt.echterGewinn))}
@@ -542,9 +544,9 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
               {wege.length > 1 && (
                 <table className="mt-1 w-full max-w-[34rem] tabular-nums">
                   <thead>
-                    <tr className="text-[9pt] text-slate-600">
-                      <th className="text-left font-semibold" />
-                      {wege.map((x) => <th key={x.art} className="pl-2 text-right font-semibold">{WEG_SPALTE[x.art]}</th>)}
+                    <tr className="text-[9pt] text-ui-schiefer">
+                      <th className="text-left font-medium" />
+                      {wege.map((x) => <th key={x.art} className="pl-2 text-right font-medium">{WEG_SPALTE[x.art]}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -555,7 +557,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
                       ['Netto-Gewinn', (x: KennzahlenWeg) => euroGenau(Math.round(x.echterGewinn))],
                       ['Amortisation', (x: KennzahlenWeg) => (x.art === 'kapital' ? '—' : `${zahl(x.amortisationsJahre, 1)} J.`)],
                     ] as const).map(([text, wert]) => (
-                      <tr key={text} className="border-t border-slate-200">
+                      <tr key={text} className="border-t border-ui-linie">
                         <td className="py-0.5">{text}</td>
                         {wege.map((x) => <td key={x.art} className="py-0.5 pl-2 text-right">{wert(x)}</td>)}
                       </tr>
@@ -582,7 +584,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           : <p>Sprechen Sie mich jederzeit an.</p>}
       </Abschnitt>
 
-      <p className="mt-6 text-[8pt] text-slate-500">
+      <p className="mt-6 text-[8pt] text-ui-schiefer">
         Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
         mit den Regeln von heute fortgeschrieben.
       </p>
@@ -601,9 +603,9 @@ export function Vereinbarung({ firma, logo, daten, r }: DokumentProps) {
   const umwandlungIn = m.art === 'matching' && m.weg === 'ukasse' ? 'ukasse' : 'direkt';
 
   return (
-    <article className="text-[10.5pt] leading-relaxed text-slate-900">
+    <article className="text-[10.5pt] leading-relaxed text-ui-tinte [&_strong]:font-medium">
       <FirmenKopf firma={firma} logo={logo} />
-      <h1 className="mt-6 text-[16pt] font-black">Vereinbarung über Entgeltumwandlung</h1>
+      <h1 className="ui-titel mt-6 text-[16pt] font-normal">Vereinbarung über Entgeltumwandlung</h1>
       <p className="mt-3">
         zwischen <strong>{firma.name}</strong>{firma.angebot.anschrift ? `, ${firma.angebot.anschrift.replace(/\n+/g, ', ')}` : ''} — Arbeitgeber —
       </p>
@@ -611,20 +613,20 @@ export function Vereinbarung({ firma, logo, daten, r }: DokumentProps) {
         und <strong>{a.name || LINIE}</strong>, geboren am {a.geburtsdatum || LINIE} — Arbeitnehmer —
       </p>
 
-      <h2 className="mt-5 font-black">1. Entgeltumwandlung</h2>
+      <h2 className="mt-5 font-medium">1. Entgeltumwandlung</h2>
       <p>
         Der Arbeitnehmer wandelt ab dem {beginnDatum(daten, firma.angebot)} monatlich <strong>{euroGenau(r.umwandlungMonat)}</strong> seines
         Bruttoentgelts in einen Beitrag zur betrieblichen Altersversorgung um (§ 1a BetrAVG). Bei Teilzahlungsmonaten gilt
         der Betrag anteilig.
       </p>
 
-      <h2 className="mt-4 font-black">2. Durchführung</h2>
+      <h2 className="mt-4 font-medium">2. Durchführung</h2>
       <p>
         Der umgewandelte Betrag fließt in {WEG_IM_SATZ(umwandlungIn, firma)}. Der Arbeitgeber schließt den Vertrag ab und zahlt
         die Beiträge; versorgungsberechtigt ist der Arbeitnehmer.
       </p>
 
-      <h2 className="mt-4 font-black">3. Beitrag des Arbeitgebers</h2>
+      <h2 className="mt-4 font-medium">3. Beitrag des Arbeitgebers</h2>
       <p>{regelFuerVereinbarung(m)}</p>
       <p className="mt-1">
         Bei der vereinbarten Umwandlung sind das {euroGenau(r.arbeitgeberMonat)} im Monat
@@ -633,13 +635,13 @@ export function Vereinbarung({ firma, logo, daten, r }: DokumentProps) {
         {r.pflichtzuschussMonat > 0.005 ? ` Darin enthalten ist der Zuschuss nach § 1a Abs. 1a BetrAVG von ${euroGenau(r.pflichtzuschussMonat)}.` : ''}
       </p>
 
-      <h2 className="mt-4 font-black">4. Änderung und Ende</h2>
+      <h2 className="mt-4 font-medium">4. Änderung und Ende</h2>
       <p>
         Höhe und Ende der Umwandlung kann der Arbeitnehmer für die Zukunft ändern; Einzelheiten und Fristen regelt die
         Versorgungsordnung. Änderungen bedürfen der Textform.
       </p>
 
-      <h2 className="mt-4 font-black">5. Hinweise</h2>
+      <h2 className="mt-4 font-medium">5. Hinweise</h2>
       <p>
         Die Anwartschaft aus der Entgeltumwandlung ist sofort unverfallbar (§ 1b Abs. 5 BetrAVG). Die Umwandlung mindert das
         beitragspflichtige Entgelt; daraus können sich geringere Leistungen der gesetzlichen Sozialversicherung ergeben.
@@ -657,14 +659,14 @@ export function Verzicht({ firma, logo, daten, r }: DokumentProps) {
   const a = daten.angaben;
   const e = daten.entscheidung;
   return (
-    <article className="text-[10.5pt] leading-relaxed text-slate-900">
+    <article className="text-[10.5pt] leading-relaxed text-ui-tinte [&_strong]:font-medium">
       <FirmenKopf firma={firma} logo={logo} />
-      <h1 className="mt-6 text-[16pt] font-black">Erklärung zum Verzicht auf die Entgeltumwandlung</h1>
+      <h1 className="ui-titel mt-6 text-[16pt] font-normal">Erklärung zum Verzicht auf die Entgeltumwandlung</h1>
       <p className="mt-4">
         Ich, <strong>{a.name || LINIE}</strong>, geboren am {a.geburtsdatum || LINIE}, wurde{e.datum ? ` am ${e.datum}` : ''} über mein
         Recht auf Entgeltumwandlung nach § 1a BetrAVG und über das Angebot von {firma.name} informiert:
       </p>
-      <p className="mt-2 rounded border border-slate-300 px-3 py-2">{regelText(firma.angebot.modell)}</p>
+      <p className="mt-2 rounded-[8px] border border-ui-linie px-3 py-2">{regelText(firma.angebot.modell)}</p>
       {r.umwandlungMonat > 0 && (
         <p className="mt-2">
           In der Beratung wurde mir gezeigt: Bei einer Umwandlung von {euroGenau(r.umwandlungMonat)} im Monat gibt der
@@ -675,7 +677,7 @@ export function Verzicht({ firma, logo, daten, r }: DokumentProps) {
         Ich nehme das Angebot derzeit nicht in Anspruch. Mir ist bekannt, dass ich mich jederzeit später für eine
         Entgeltumwandlung entscheiden kann; einen Zuschuss für die Zeit bis dahin gibt es nicht.
       </p>
-      {e.grund.trim() && <p className="mt-3"><span className="text-slate-600">Grund (freiwillig):</span> {e.grund.trim()}</p>}
+      {e.grund.trim() && <p className="mt-3"><span className="text-ui-schiefer">Grund (freiwillig):</span> {e.grund.trim()}</p>}
 
       <Unterschriften links={{ wer: 'Arbeitnehmer', feld: 'mitarbeiter' }} rechts={{ wer: 'Arbeitgeber (Kenntnisnahme)' }} ort={ortDatum(daten)} />
       <Muster />
@@ -693,17 +695,17 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
   firma: Firma; logo: string | null; zeilen: readonly UebersichtZeile[]; summen: UebersichtSummen; auftritt: Auftritt | null;
 }) {
   const fussCss = fusszeileCss(auftritt);
-  const zelle = 'border-b border-slate-200 px-1.5 py-1 align-top';
+  const zelle = 'border-b border-ui-linie px-1.5 py-1 align-top';
   const zahl = `${zelle} text-right tabular-nums`;
   return (
-    <article className="text-slate-900" style={akzentVariablen(auftritt) as CSSProperties}>
+    <article className="text-ui-tinte [&_strong]:font-medium" style={akzentVariablen(auftritt) as CSSProperties}>
       {fussCss && <style>{fussCss}</style>}
       <DeckblattKopf auftritt={auftritt} />
       <div className="mt-5 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[18pt] font-black text-[color:var(--akzent-titel,#0f172a)]">Betriebliche Altersversorgung: Stand der Beratungen</h1>
+          <h1 className="ui-titel text-[18pt] font-normal text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))]">Betriebliche Altersversorgung: Stand der Beratungen</h1>
           <p className="mt-1 text-[11pt]">{firma.name}</p>
-          <p className="text-[9pt] text-slate-600">
+          <p className="text-[9pt] text-ui-schiefer">
             {MODELL_NAME[firma.angebot.modell.art]}: {regelText(firma.angebot.modell)} Stand {new Date().toLocaleDateString('de-DE')}.
           </p>
         </div>
@@ -716,7 +718,7 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
 
       <table className="mt-2 w-full border-collapse text-[9.5pt]">
         <thead>
-          <tr className="text-left text-[8.5pt] text-slate-600">
+          <tr className="text-left text-[8.5pt] text-ui-schiefer [&_th]:font-medium">
             <th className={zelle}>Name</th>
             <th className={zelle}>Entscheidung</th>
             <th className={`${zelle} text-right`}>Umwandlung</th>
@@ -737,7 +739,7 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
             </tr>
           ))}
         </tbody>
-        <tfoot className="font-bold">
+        <tfoot className="font-medium">
           <tr>
             <td className={zelle} colSpan={2}>Summe im Monat</td>
             <td className={zahl}>{euroGenau(summen.umwandlungMonat)}</td>
@@ -745,7 +747,7 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
             <td className={zahl}>{euroGenau(summen.gesamtMonat)}</td>
             <td className={zelle} />
           </tr>
-          <tr className="text-slate-700">
+          <tr className="text-ui-schiefer">
             <td className={zelle} colSpan={2}>Im Jahr</td>
             <td className={zahl}>{euroGenau(summen.umwandlungMonat * 12)}</td>
             <td className={zahl}>{euroGenau(summen.arbeitgeberMonat * 12)}</td>
@@ -755,7 +757,7 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
         </tfoot>
       </table>
 
-      <p className="mt-4 text-[8.5pt] leading-snug text-slate-600">
+      <p className="mt-4 text-[8.5pt] leading-snug text-ui-schiefer">
         Beträge im Monat laut Beratung. Maßgeblich sind die unterschriebenen Vereinbarungen. Der Arbeitgeberbeitrag enthält
         den Zuschuss nach § 1a Abs. 1a BetrAVG, soweit er anfällt. Gehälter und weitere persönliche Angaben enthält diese
         Übersicht bewusst nicht.

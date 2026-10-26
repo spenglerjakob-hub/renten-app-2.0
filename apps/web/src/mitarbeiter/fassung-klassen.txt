@@ -9,6 +9,9 @@
 # LueckenRing.tsx (bis 0858796 aus mitarbeiter/bausteine.tsx) seit Einfuehrung der
 # Unterschrift (0a3d07c). Nur ergaenzen, nie kuerzen.
 
+[&_strong]:font-medium
+[&_strong]:text-ui-tinte
+[&_th]:font-medium
 align-bottom
 align-top
 bg-amber-50
@@ -18,6 +21,7 @@ bg-emerald-600
 bg-slate-50
 bg-transparent
 bg-ui-asche
+bg-ui-innen
 bg-ui-karte
 bg-ui-tinte
 bg-white
@@ -27,6 +31,7 @@ border-2
 border-[color:var(--akzent-linie,#0c0a09)]
 border-[color:var(--akzent-linie,#10b981)]
 border-[color:var(--akzent-linie,#1e293b)]
+border-[color:var(--akzent-linie,rgb(var(--ui-tinte)))]
 border-amber-200
 border-b
 border-b-2
@@ -45,6 +50,9 @@ border-slate-500
 border-slate-800
 border-t
 border-ui-asche
+border-ui-linie
+border-ui-schiefer
+border-ui-tinte
 break-after-avoid
 break-before-page
 break-inside-avoid
@@ -160,6 +168,9 @@ py-3
 py-px
 rounded
 rounded-2xl
+rounded-[10px]
+rounded-[6px]
+rounded-[8px]
 rounded-full
 rounded-lg
 shrink-0
@@ -184,6 +195,7 @@ text-[11px]
 text-[12pt]
 text-[12px]
 text-[14pt]
+text-[14px]
 text-[16pt]
 text-[18pt]
 text-[26px]
@@ -196,6 +208,7 @@ text-[9pt]
 text-[9px]
 text-[color:var(--akzent-titel,#0f172a)]
 text-[color:var(--akzent-titel,#64748b)]
+text-[color:var(--akzent-titel,rgb(var(--ui-tinte)))]
 text-amber-900
 text-balance
 text-base
@@ -223,6 +236,8 @@ tracking-wide
 tracking-wider
 transform
 tsx
+ui-hervor
+ui-marke
 ui-titel
 underline-offset-4
 uppercase

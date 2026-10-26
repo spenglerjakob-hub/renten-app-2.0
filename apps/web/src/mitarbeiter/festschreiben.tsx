@@ -20,8 +20,9 @@ import { pruefsummeKurz, vermerkText, zeitpunktText, zugGueltig, zugRahmen } fro
  * eingebettete Daten. Geschrieben hat das HTML die App selbst; das ist die
  * zweite Sicherung.
  *
- * Die Klassen im HTML sind die von druck.tsx. Solange die Unterlagen dort
- * stehen, liefert das Stylesheet sie mit.
+ * Die Klassen im HTML sind die von druck.tsx beim Festschreiben. Aendert sich
+ * der Druck, haelt fassung-klassen.txt sie im Stylesheet — alte Fassungen
+ * sehen so weiter aus wie beim Unterschreiben.
  */
 
 /** So gross kommt ein Logo hoechstens in die Fassung — der Druck zeigt es kleiner. */
@@ -173,7 +174,7 @@ export function UnterschriebeneUnterlage({ html, erstelltAm, pruefsumme, stimmt 
   return (
     <div>
       <div dangerouslySetInnerHTML={{ __html: html }} />
-      <p className={`mt-4 border-t border-slate-300 pt-1 text-[7.5pt] ${stimmt ? 'text-slate-500' : 'font-bold text-rose-700'}`}>
+      <p className={`mt-4 border-t border-ui-linie pt-1 text-[7.5pt] ${stimmt ? 'text-ui-schiefer' : 'font-medium text-rose-700'}`}>
         {stimmt
           ? `Elektronisch unterschriebene Fassung, festgeschrieben am ${zeitpunktText(erstelltAm)} · Prüfsumme ${pruefsummeKurz(pruefsumme)}`
           : 'Achtung: Der Inhalt passt nicht zur Prüfsumme der festgeschriebenen Fassung.'}
