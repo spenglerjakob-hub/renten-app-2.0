@@ -1,11 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Building2, CircleCheck, ListChecks, Printer, Stethoscope, TriangleAlert } from 'lucide-react';
+import { ArrowRight, CircleCheck, Printer, TriangleAlert } from 'lucide-react';
 import {
   bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, type BkvWeg, type BkvWegId,
 } from '@renten/engine';
 import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
-import { Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung } from '../arbeitgeber/bausteine';
+import {
+  Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung, Hinweiszeilen, Punkte, Zeile,
+  KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_DRUCK, KOPFZELLE,
+} from '../arbeitgeber/bausteine';
+import { EINLEITUNG, Hervor, KNOPF, LINK, Titel } from '../components/stil';
 
 /**
  * Arbeitgeber-Seite „Betriebliche Krankenversicherung".
@@ -96,20 +100,20 @@ export function Seite() {
   const zuKlein = BEISPIELE.find((b) => b.abMitarbeitern && b.beitrag === beitrag && n < b.abMitarbeitern);
 
   return (
-    <div className="min-h-screen bg-ui-flaeche text-slate-800 print:min-h-0 print:bg-white">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       <Kopf />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl print:text-xl">
-          Betriebliche Krankenversicherung: Gesundheit als Benefit
-        </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-relaxed text-slate-600 print:mt-1 print:text-[10px] print:leading-snug">
+        <Titel gross klasse="print:text-xl">
+          Betriebliche Krankenversicherung: <Hervor>Gesundheit als Benefit</Hervor>
+        </Titel>
+        <p className={`mt-3 ${EINLEITUNG} print:mt-1 print:text-[10px] print:leading-snug`}>
           Sie zahlen für Ihre Mitarbeiter eine private Zusatzversicherung — für Zahnersatz, Brille, Vorsorge oder
           Facharzttermine. Bis {euro(SACHBEZUG_FREIGRENZE_MONAT)} im Monat ist das ein steuer- und abgabenfreier
           Sachbezug: Beim Mitarbeiter kommt jeder Euro an, und Sie zahlen keine Lohnnebenkosten darauf.
         </p>
 
-        <p className="mt-2 hidden text-xs print:text-[10px] leading-snug text-slate-600 print:block">
+        <p className="mt-2 hidden text-xs leading-snug text-ui-schiefer print:block print:text-[10px]">
           Annahmen: Beitrag {euroGenau(beitrag)} je Mitarbeiter und Monat{weitere > 0 ? `, weitere Sachbezüge ${euroGenau(weitere)}` : ''},
           {' '}{n} Mitarbeiter, Weg: {aktiv.titel}. Unternehmenssteuer {prozent(steuersatz, 0)}{umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}.
           Beispiel-Mitarbeiter für den Gehaltsvergleich: {euro(brutto)} brutto im Jahr,
@@ -127,33 +131,36 @@ export function Seite() {
                 hilfe="Laut Angebot des Versicherers. Monatlich zahlen — eine Jahreszahlung sprengt die Freigrenze."
               />
               <div>
-                <p className="text-xs print:text-[11px] text-slate-500">
+                <p className="text-xs text-ui-schiefer print:text-[11px]">
                   Beispiel: AXA-Budgettarif, Jahresbudget je Mitarbeiter (Beiträge Stand 10/2026, kein Angebot):
                 </p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                {/* Gewaehlt wie ein Reiter: gefuellt in Soot; nicht abschliessbare Budgets leise auf der Innenflaeche. */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {BEISPIELE.map((b) => {
                     const gesperrt = b.abMitarbeitern !== undefined && n < b.abMitarbeitern;
+                    const gewaehlt = beitrag === b.beitrag;
                     return (
                       <button key={b.budget} type="button" onClick={() => setBeitrag(b.beitrag)} disabled={gesperrt}
+                        aria-pressed={gewaehlt}
                         title={gesperrt ? `Erst ab ${b.abMitarbeitern} Mitarbeitern abschließbar` : undefined}
-                        className={`rounded-md border px-2 py-1.5 text-left text-xs print:text-[11px] leading-tight ${
-                          gesperrt ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-                          : beitrag === b.beitrag ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
-                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                        className={`rounded-[8px] border px-2.5 py-1.5 text-left text-xs leading-tight transition-colors print:text-[11px] ${
+                          gesperrt ? 'cursor-not-allowed border-ui-linie bg-ui-innen text-ui-schiefer'
+                          : gewaehlt ? 'border-ui-dunkel bg-ui-dunkel text-white'
+                          : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
                         }`}>
-                        <span className="block font-bold">Budget {euro(b.budget)}</span>
-                        <span className={`block ${gesperrt ? '' : 'text-slate-500'}`}>{euroGenau(b.beitrag)} / Monat</span>
+                        <span className="block font-medium">Budget {euro(b.budget)}</span>
+                        <span className={`block ${gesperrt ? '' : gewaehlt ? 'text-white/80' : 'text-ui-schiefer'}`}>{euroGenau(b.beitrag)} / Monat</span>
                       </button>
                     );
                   })}
                 </div>
                 {zuKlein ? (
-                  <p className="mt-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs print:text-[11px] leading-snug text-amber-900">
+                  <p className="mt-2 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs leading-snug text-rose-900 print:text-[11px]">
                     Das Budget {euro(zuKlein.budget)} gibt es erst ab {zuKlein.abMitarbeitern} Mitarbeitern — bei {n} bitte
                     ein größeres Budget wählen.
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs print:text-[11px] text-slate-500">Budget 300 € erst ab 10 Mitarbeitern abschließbar.</p>
+                  <p className="mt-1.5 text-xs text-ui-schiefer print:text-[11px]">Budget 300 € erst ab 10 Mitarbeitern abschließbar.</p>
                 )}
               </div>
               <ZahlFeld
@@ -175,14 +182,14 @@ export function Seite() {
                     hilfe="Den Satz ermittelt das Finanzamt bzw. der Steuerberater aus den Durchschnittswerten aller einbezogenen Mitarbeiter (R 40.1 Abs. 3 LStR). Ohne Soli und Kirchensteuer eintragen."
                   />
                 ) : (
-                  <p className="text-xs leading-snug text-slate-600">
-                    Geschätzt aus dem Beispiel-Mitarbeiter: <strong>{prozent(r.pauschsatz40.satz, 1)}</strong>
+                  <p className="text-xs leading-snug text-ui-schiefer">
+                    Geschätzt aus dem Beispiel-Mitarbeiter: <span className="font-medium text-ui-tinte">{prozent(r.pauschsatz40.satz, 1)}</span>
                     {traegtMa40 ? ' (Bruttosteuersatz)' : ' (Nettosteuersatz, weil Sie die Steuer übernehmen)'}, dazu Soli
                     {kirchensteuer ? ' und Kirchensteuer' : ''}. Den verbindlichen Satz setzt das Finanzamt fest.
                   </p>
                 )}
                 <Schalter label="Pauschsteuer trägt der Mitarbeiter" wert={traegtMa40} onChange={setTraegtMa40} />
-                <p className="-mt-1 text-xs leading-snug text-slate-500">
+                <p className="-mt-2 text-xs leading-snug text-ui-schiefer">
                   Abwälzung nach § 40 Abs. 3 S. 2 EStG: Der Mitarbeiter zahlt die Steuer aus dem Netto, die
                   Bemessungsgrundlage sinkt dadurch nicht.
                 </p>
@@ -202,7 +209,7 @@ export function Seite() {
             </Kasten>
 
             <Kasten titel="Beispiel-Mitarbeiter">
-              <p className="-mt-1 text-xs print:text-[11px] leading-snug text-slate-500">
+              <p className="-mt-2 text-xs leading-snug text-ui-schiefer print:text-[11px]">
                 Nur für den Vergleich mit einer Gehaltserhöhung — die bKV selbst kostet bei jedem Gehalt gleich viel.
               </p>
               <ZahlFeld label="Bruttogehalt im Jahr" wert={brutto} onChange={setBrutto} einheit="€" schritt={1000} />
@@ -225,8 +232,8 @@ export function Seite() {
 
           {/* --- Ergebnis ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-8 print:space-y-2">
-            <p className="-mb-2 text-xs print:text-[11px] font-bold uppercase tracking-wide text-slate-500 print:mb-0">
-              Gewählter Weg: <span className="text-indigo-700">{aktiv.titel}</span>
+            <p className="-mb-1 text-sm text-ui-schiefer print:mb-0 print:text-[11px]">
+              Gewählter Weg: <span className="font-medium text-ui-tinte">{aktiv.titel}</span>
             </p>
             <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
               <Kachel
@@ -249,34 +256,40 @@ export function Seite() {
             </section>
 
             {/* --- Sachbezug-Check: die eine Grenze, an der alles haengt ------- */}
-            <section className={`rounded-2xl border-2 p-4 print:break-inside-avoid print:p-2 ${
-              r.inFreigrenze ? 'border-emerald-200 bg-white' : 'border-rose-300 bg-rose-50'
+            {/*
+              DER SACHBEZUG-CHECK: in der Freigrenze ruhig wie jede Karte — der
+              Balken in Tinte, die Grenze als Strich in Cyan, dem einen Akzent.
+              Darueber wird es ein Fehler: Dann steht die Karte in Rot, denn
+              dann waere der ganze Betrag steuer- und beitragspflichtig.
+            */}
+            <section className={`print:break-inside-avoid ${
+              r.inFreigrenze ? KARTE : 'rounded-[10px] border border-rose-300 bg-rose-50 p-5 sm:p-6 print:p-2'
             }`}>
-              <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
+              <h2 className={`flex items-center gap-2 ${KARTE_TITEL}`}>
                 {r.inFreigrenze
-                  ? <CircleCheck className="h-4 w-4 text-emerald-600" aria-hidden />
-                  : <TriangleAlert className="h-4 w-4 text-rose-600" aria-hidden />}
+                  ? <CircleCheck className="h-5 w-5 shrink-0 text-ui-tinte print:h-4 print:w-4" aria-hidden />
+                  : <TriangleAlert className="h-5 w-5 shrink-0 text-rose-700 print:h-4 print:w-4" aria-hidden />}
                 Sachbezug-Check: {euroGenau(summe)} von {euro(SACHBEZUG_FREIGRENZE_MONAT)}
               </h2>
-              <div className="relative mt-2 h-4 overflow-hidden rounded-full bg-slate-100 print:[print-color-adjust:exact]">
+              <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-ui-linie print:mt-2 print:[print-color-adjust:exact]">
                 <div
-                  className={`absolute inset-y-0 left-0 ${r.inFreigrenze ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                  className={`absolute inset-y-0 left-0 ${r.inFreigrenze ? 'bg-ui-tinte' : 'bg-rose-600'}`}
                   style={{ width: `${(Math.max(0, beitrag) / skala) * 100}%` }}
                 />
                 <div
-                  className={`absolute inset-y-0 ${r.inFreigrenze ? 'bg-emerald-300' : 'bg-rose-300'}`}
+                  className={`absolute inset-y-0 ${r.inFreigrenze ? 'bg-ui-daten-3' : 'bg-rose-300'}`}
                   style={{ left: `${(Math.max(0, beitrag) / skala) * 100}%`, width: `${(Math.max(0, weitere) / skala) * 100}%` }}
                 />
                 <div
-                  aria-hidden className="absolute inset-y-0 w-0.5 bg-slate-900"
+                  aria-hidden className="absolute inset-y-0 w-1 bg-ui-knopf"
                   style={{ left: `${(SACHBEZUG_FREIGRENZE_MONAT / skala) * 100}%` }}
                 />
               </div>
-              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-xs print:text-[11px] text-slate-500">
+              <div className={`mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs print:text-[11px] ${r.inFreigrenze ? 'text-ui-schiefer' : 'text-rose-900'}`}>
                 <span>bKV {euroGenau(beitrag)}{weitere > 0 ? ` + weitere Sachbezüge ${euroGenau(weitere)}` : ''}</span>
                 <span>Freigrenze {euro(SACHBEZUG_FREIGRENZE_MONAT)} (§ 8 Abs. 2 S. 11 EStG)</span>
               </div>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+              <p className={`mt-2 text-sm leading-relaxed print:mt-1.5 print:text-[10px] print:leading-snug [&_strong]:font-medium ${r.inFreigrenze ? 'text-ui-tinte' : 'text-rose-900'}`}>
                 {r.inFreigrenze
                   ? <>In der Freigrenze: keine Lohnsteuer, keine Sozialabgaben — weder für Sie noch für den Mitarbeiter.
                     {r.freigrenzeRestMonat > 0.005 && <> Noch {euroGenau(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
@@ -286,17 +299,17 @@ export function Seite() {
             </section>
 
             {/* --- Die Wege im Vergleich — anklickbar --------------------------- */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-inside-avoid print:p-2 print:shadow-none">
-              <h2 className="text-sm font-black text-slate-900">Welcher Weg passt?</h2>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
+            <section className={`${KARTE} print:break-inside-avoid`}>
+              <h2 className={KARTE_TITEL}>Welcher Weg passt?</h2>
+              <p className={ERKLAERUNG}>
                 Je Mitarbeiter und Monat, für einen Tarif von {euroGenau(beitrag)}.<span className="print:hidden"> Antippen, um einen Weg zu wählen:</span>
               </p>
-              <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-2 space-y-1.5 print:space-y-1">
+              <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-3 space-y-2 print:mt-2 print:space-y-1">
                 {r.wege.map((w) => (
                   <WegZeile key={w.id} weg={w} aktiv={w.id === aktiv.id} onWaehlen={() => setWahl(w.id)} />
                 ))}
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+              <p className={FUSSNOTE}>
                 „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
                 {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt'
                   : r.vorauswahl === 'aufteilen' ? 'die Freigrenze am besten nutzt'
@@ -304,35 +317,27 @@ export function Seite() {
               </p>
             </section>
 
-            {r.hinweise.length > 0 && (
-              <section className="space-y-1.5">
-                {r.hinweise.map((h, i) => (
-                  <p key={i} className="rounded-lg bg-slate-200/60 px-3 py-2 text-xs leading-relaxed text-slate-700 print:px-2 print:py-1 print:text-[9px]">
-                    {h}
-                  </p>
-                ))}
-              </section>
-            )}
+            <Hinweiszeilen hinweise={r.hinweise} />
 
             {/* --- Vergleich mit einer Gehaltserhoehung ------------------------ */}
             {/* Im Druck beginnt hier Seite 2: Seite 1 traegt Kacheln, Check und Wege. */}
             {g ? (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 print:break-before-page print:break-inside-avoid print:p-2 print:shadow-none">
-                <h2 className="text-sm font-black text-slate-900">{aktiv.titel} — und als Gehaltserhöhung?</h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-slate-600 print:text-[10px]">
+              <section className={`${KARTE} print:break-before-page print:break-inside-avoid`}>
+                <h2 className={KARTE_TITEL}>{aktiv.titel} — und als Gehaltserhöhung?</h2>
+                <p className={ERKLAERUNG}>
                   Damit beim Mitarbeiter netto derselbe Vorteil ankommt, im Monat:
                 </p>
-                <table className="mt-2 w-full text-[13px] print:mt-1 print:text-[10px]">
+                <table className={`mt-3 w-full text-sm print:mt-1 ${TABELLE_DRUCK}`}>
                   <thead>
-                    <tr className="text-left text-xs print:text-[11px] text-slate-500">
-                      <th className="py-0.5 font-medium" />
-                      <th className="py-0.5 text-right font-bold text-emerald-700">{SPALTE[aktiv.id]}</th>
-                      <th className="py-0.5 pl-3 text-right font-bold text-slate-600">
+                    <tr className={`text-left ${TABELLE_KOPF}`}>
+                      <th className={`${KOPFZELLE} font-normal`} />
+                      <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>{SPALTE[aktiv.id]}</th>
+                      <th className={`${KOPFZELLE} pl-3 text-right font-normal`}>
                         <span className="sm:hidden">Gehalt</span><span className="hidden sm:inline">Gehaltserhöhung</span>
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="text-slate-700">
+                  <tbody className="text-ui-tinte">
                     <VergleichZeile
                       text={aktiv.id === 'aufteilen' ? 'Zahlung des Arbeitgebers (Ihr Anteil)' : 'Zahlung des Arbeitgebers'}
                       links={<>{euroGenau(ag.beitragMonat)}<Zusatz> Beitrag</Zusatz></>}
@@ -384,10 +389,10 @@ export function Seite() {
                     />
                   </tbody>
                 </table>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500 print:text-[9px] print:leading-snug">
+                <p className={FUSSNOTE}>
                   {herleitung(aktiv, g, n)}
                 </p>
-                <div className="mt-3 space-y-2 print:hidden">
+                <div className="mt-4 space-y-3 print:hidden">
                   <Balken text={`${aktiv.titel}, kostet Sie netto`} betrag={ag.nettoKostenMonat}
                     max={Math.max(g.nettoKostenMonat, ag.nettoKostenMonat, 1)} farbe="bg-ui-tinte" />
                   <Balken text="Gehaltserhöhung, kostet Sie netto" betrag={g.nettoKostenMonat}
@@ -395,9 +400,9 @@ export function Seite() {
                 </div>
               </section>
             ) : aktiv.id === 'arbeitnehmer' && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 text-[13px] leading-relaxed text-slate-700 shadow-sm print:break-before-page print:p-2 print:text-[10px] print:shadow-none">
-                <h2 className="text-sm font-black text-slate-900">Mitarbeiter zahlt selbst</h2>
-                <p className="mt-1">
+              <section className={`${KARTE} text-sm leading-relaxed text-ui-tinte print:break-before-page print:text-[10px] print:leading-snug`}>
+                <h2 className={KARTE_TITEL}>Mitarbeiter zahlt selbst</h2>
+                <p className="mt-3 print:mt-1">
                   Sie schließen den Gruppenvertrag ab, der Mitarbeiter zahlt {euroGenau(beitrag)} im Monat aus dem
                   Netto. Für Sie entstehen keine Beiträge, nur etwas Aufwand in der Abrechnung. Sein Vorteil sind die
                   Gruppenkonditionen — je nach Tarif ohne Gesundheitsprüfung und Wartezeiten. Als Benefit wirkt das
@@ -408,14 +413,13 @@ export function Seite() {
 
 
             <div className="space-y-4 print:space-y-2">
-              <p className="hidden text-lg font-black text-slate-900 print:block">Vorteile und Umsetzung</p>
+              <p className="ui-titel hidden text-lg text-ui-tinte print:block">Vorteile und Umsetzung</p>
 
+              {/* Wie „Gut zu wissen“ in der Beratung: Punkte mit Gedankenstrich, ohne gruene und blaue Kaesten. */}
               <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 print:p-2">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <Building2 className="h-4 w-4 text-emerald-600" aria-hidden /> Was Sie davon haben
-                  </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                <div className={KARTE}>
+                  <h2 className={KARTE_TITEL}>Was Sie davon haben</h2>
+                  <Punkte klasse="mt-3 print:mt-1">
                     <li><strong>Bindung:</strong> ein Benefit, den Mitarbeiter im Alltag spüren — beim Zahnarzt, beim
                       Optiker, beim Facharzt. Wer kündigt, verliert ihn.</li>
                     <li><strong>Arbeitgebermarke:</strong> in Stellenanzeigen sichtbar und ein Argument gegenüber
@@ -426,13 +430,11 @@ export function Seite() {
                       Betriebsausgabe.</li>
                     <li><strong>Planbar:</strong> ein fester Beitrag je Mitarbeiter, die Leistungen wickelt der
                       Versicherer direkt mit dem Mitarbeiter ab.</li>
-                  </ul>
+                  </Punkte>
                 </div>
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 print:p-2">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <Stethoscope className="h-4 w-4 text-sky-600" aria-hidden /> Was Ihre Mitarbeiter davon haben
-                  </h2>
-                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[13px] leading-relaxed text-slate-700 print:text-[10px] print:leading-snug">
+                <div className={KARTE}>
+                  <h2 className={KARTE_TITEL}>Was Ihre Mitarbeiter davon haben</h2>
+                  <Punkte klasse="mt-3 print:mt-1">
                     <li><strong>Ohne Gesundheitsprüfung</strong> und meist ohne Wartezeiten — oft sind auch laufende
                       Behandlungen und bestehende Erkrankungen mitversichert.</li>
                     <li><strong>Budgettarif:</strong> ein Jahresbudget für Zahnreinigung, Brille, Vorsorge oder
@@ -442,40 +444,34 @@ export function Seite() {
                     <li><strong>Angehörige</strong> können oft zu Sonderkonditionen mitversichert werden, auf eigene
                       Kosten.</li>
                     <li>Beim Ausscheiden meist <strong>privat weiterführbar</strong>, ohne neue Gesundheitsprüfung.</li>
-                  </ul>
-                  <p className="mt-1 text-xs text-slate-500 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
+                  </Punkte>
+                  <p className="mt-2 text-xs text-ui-schiefer print:mt-1 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
                 </div>
               </section>
 
               <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:col-span-2 print:col-span-2 print:break-inside-avoid print:p-2 print:shadow-none">
-                  <h2 className="flex items-center gap-1.5 text-sm font-black text-slate-900">
-                    <ListChecks className="h-4 w-4 text-indigo-600" aria-hidden /> Umsetzung: {aktiv.titel}
-                  </h2>
-                  <ul className="mt-1 space-y-0.5 text-[13px] leading-relaxed text-slate-600 print:text-[10px] print:leading-snug">
-                    {UMSETZUNG[aktiv.id].map((punkt, i) => <li key={i}>• {punkt}</li>)}
-                    <li>• Gruppenvertrag: <strong>Mindestteilnehmerzahl</strong> und Annahmeregeln im Angebot prüfen</li>
-                    <li>• Allen Mitarbeitern oder klar abgegrenzten Gruppen anbieten (<strong>Gleichbehandlung</strong>)</li>
-                  </ul>
+                <div className={`${KARTE} sm:col-span-2 print:col-span-2 print:break-inside-avoid`}>
+                  <h2 className={KARTE_TITEL}>Umsetzung: {aktiv.titel}</h2>
+                  <Punkte klasse="mt-3 print:mt-1">
+                    {UMSETZUNG[aktiv.id].map((punkt, i) => <li key={i}>{punkt}</li>)}
+                    <li>Gruppenvertrag: <strong>Mindestteilnehmerzahl</strong> und Annahmeregeln im Angebot prüfen</li>
+                    <li>Allen Mitarbeitern oder klar abgegrenzten Gruppen anbieten (<strong>Gleichbehandlung</strong>)</li>
+                  </Punkte>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm print:break-inside-avoid print:p-2 print:shadow-none">
-                  <h2 className="text-sm font-black text-slate-900">
+                <div className={`${KARTE} print:break-inside-avoid`}>
+                  <h2 className={KARTE_TITEL}>
                     Bei {n} Mitarbeiter{n === 1 ? '' : 'n'} im Jahr
                   </h2>
-                  <dl className="mt-1 space-y-0.5 text-[13px] print:text-xs text-slate-700">
-                    <div className="flex justify-between gap-2"><dt>Beiträge{aktiv.id === 'aufteilen' ? ' (Ihr Anteil)' : ''}</dt><dd className="tabular-nums">{euro(ag.beitragMonat * 12 * n)}</dd></div>
-                    <div className="flex justify-between gap-2"><dt>Kosten netto</dt><dd className="font-bold tabular-nums">{euro(ag.nettoKostenMonat * 12 * n)}</dd></div>
-                    {g && (
-                      <div className="flex justify-between gap-2"><dt>als Gehalt netto</dt><dd className="tabular-nums">{euro(g.nettoKostenMonat * 12 * n)}</dd></div>
-                    )}
-                    <div className="flex justify-between gap-2 border-t border-slate-200 pt-0.5">
-                      <dt>gespart</dt><dd className="font-bold tabular-nums text-emerald-700">{euro(aktiv.ersparnisGegenGehaltMonat * 12 * n)}</dd>
-                    </div>
+                  <dl className="mt-3 text-sm print:mt-1 print:text-xs">
+                    <Zeile text={`Beiträge${aktiv.id === 'aufteilen' ? ' (Ihr Anteil)' : ''}`} betrag={ag.beitragMonat * 12 * n} />
+                    <Zeile text="Kosten netto" betrag={ag.nettoKostenMonat * 12 * n} stark />
+                    {g && <Zeile text="als Gehalt netto" betrag={g.nettoKostenMonat * 12 * n} />}
+                    <Zeile text="gespart" betrag={aktiv.ersparnisGegenGehaltMonat * 12 * n} summe />
                   </dl>
                 </div>
               </section>
 
-              <p className="text-xs leading-relaxed text-slate-500 print:text-[8px]">
+              <p className="text-xs leading-relaxed text-ui-schiefer print:text-[8px]">
                 Modellrechnung zum Rechtsstand {p.jahr}, keine Steuer- oder Rechtsberatung. Beiträge und Leistungen
                 hängen vom Tarif ab; die Beispielbeiträge sind Richtwerte, kein Angebot. Annahme- und
                 Gesundheitsregeln legt der Versicherer fest. Der Gehaltsvergleich gilt für den eingetragenen
@@ -484,19 +480,15 @@ export function Seite() {
               </p>
             </div>
 
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] print:text-xs print:hidden">
-              <span className="text-slate-500">Betriebsrente für Ihre Mitarbeiter:</span>
-              <a href="/zuschussmodell" className="font-bold text-indigo-700 hover:underline">Zuschussmodell →</a>
-              <span aria-hidden className="text-slate-300">·</span>
-              <a href="/festbetrag" className="font-bold text-indigo-700 hover:underline">Festbetrag →</a>
-              <span aria-hidden className="text-slate-300">·</span>
-              <a href="/arbeitgeber" className="font-bold text-indigo-700 hover:underline">Matching-Modell →</a>
+            {/* Die Betriebsrente als Textlinks, wie „Andere Modelle“ auf ihren Seiten. */}
+            <p className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm print:hidden">
+              <span className="text-ui-schiefer">Betriebsrente für Ihre Mitarbeiter:</span>
+              <a href="/zuschussmodell" className={LINK}>Zuschussmodell <ArrowRight className="h-3.5 w-3.5" aria-hidden /></a>
+              <a href="/festbetrag" className={LINK}>Festbetrag <ArrowRight className="h-3.5 w-3.5" aria-hidden /></a>
+              <a href="/arbeitgeber" className={LINK}>Matching-Modell <ArrowRight className="h-3.5 w-3.5" aria-hidden /></a>
             </p>
 
-            <button
-              type="button" onClick={() => window.print()}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-700 print:hidden"
-            >
+            <button type="button" onClick={() => window.print()} className={`${KNOPF} print:hidden`}>
               <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
             </button>
             <RechtsLinks />
@@ -514,22 +506,23 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
       type="button" role="radio" aria-checked={aktiv} disabled={!w.moeglich} onClick={onWaehlen}
       // druck-kopf: Knoepfe verschwinden sonst im Druck — hier traegt der
       // Knopf den Vergleich selbst.
-      className={`druck-kopf flex w-full flex-col gap-1.5 rounded-xl border px-3 py-2 text-left sm:flex-row sm:items-center sm:gap-3 print:flex-row print:items-center print:gap-2 print:px-2 print:py-1 ${
-        !w.moeglich ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-        : aktiv ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
-        : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'
+      // Gewaehlt wie die Wahl in der Beratung: Rand und Punkt in Tinte, auf der Innenflaeche — ohne Blau.
+      className={`druck-kopf flex w-full flex-col gap-1.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors sm:flex-row sm:items-center sm:gap-3 print:flex-row print:items-center print:gap-2 print:px-2 print:py-1 ${
+        !w.moeglich ? 'cursor-not-allowed border-ui-linie bg-ui-innen text-ui-schiefer'
+        : aktiv ? 'border-ui-tinte bg-ui-innen ring-1 ring-ui-tinte'
+        : 'border-ui-linie bg-ui-karte hover:border-ui-feld-rand hover:bg-ui-hover'
       }`}
     >
       <span className="flex min-w-0 flex-1 items-start gap-2">
         <span aria-hidden className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 ${
-          aktiv ? 'border-indigo-600 bg-indigo-600 shadow-[inset_0_0_0_2px_white]' : 'border-slate-300 bg-white'
+          aktiv ? 'border-ui-tinte bg-ui-tinte shadow-[inset_0_0_0_2px_white]' : 'border-ui-feld-rand bg-white'
         }`} />
         <span className="min-w-0">
-          <span className={`block text-[13px] print:text-xs font-bold ${w.moeglich ? 'text-slate-900' : ''}`}>{w.titel}</span>
-          <span className="block text-xs leading-snug text-slate-500 print:text-[9px]">{w.kurz}</span>
+          <span className={`block text-sm font-medium print:text-xs ${w.moeglich ? 'text-ui-tinte' : ''}`}>{w.titel}</span>
+          <span className="block text-xs leading-snug text-ui-schiefer print:text-[9px]">{w.kurz}</span>
           {w.grund && (
             <span className={`block text-xs leading-snug print:text-[9px] ${
-              w.moeglich ? 'text-amber-700' : w.id === 'sachbezug' ? 'text-rose-600' : 'text-slate-500'
+              w.moeglich ? 'text-ui-tinte' : w.id === 'sachbezug' ? 'text-rose-700' : 'text-ui-schiefer'
             }`}>
               {w.grund}
             </span>
@@ -550,8 +543,8 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
 function Zahl({ titel, wert, hervor }: { titel: string; wert: string; hervor?: boolean }) {
   return (
     <span className="block">
-      <span className="block text-xs print:text-[10px] leading-tight text-slate-500">{titel}</span>
-      <span className={`block text-[13px] print:text-xs tabular-nums ${hervor ? 'font-black text-emerald-700' : 'font-bold text-slate-800'}`}>{wert}</span>
+      <span className="block text-xs leading-tight text-ui-schiefer print:text-[10px]">{titel}</span>
+      <span className={`block text-sm tabular-nums text-ui-tinte print:text-xs ${hervor ? 'font-medium' : ''}`}>{wert}</span>
     </span>
   );
 }
