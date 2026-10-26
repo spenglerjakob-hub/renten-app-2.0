@@ -171,12 +171,12 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
           </label>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-          Für Linien und Überschriften im Gutachten. Die Farben der Ergebnisse — Grün und Rot — bleiben.
+          Für Linien und Überschriften im Gutachten. Die Ergebnisse behalten ihre hellblaue Hervorhebung.
         </p>
         {wert.farbe && !titelTauglich(wert.farbe) && (
           <p role="status" className="mt-1 flex items-start gap-1.5 text-xs text-ui-tinte">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-ui-schiefer" aria-hidden />
-            Diese Farbe ist für Überschriften zu hell. Im Gutachten färbt sie nur die Linien; Überschriften bleiben grau.
+            Diese Farbe ist für Überschriften zu hell. Im Gutachten färbt sie nur die Linien; Überschriften bleiben schwarz.
           </p>
         )}
         {linieKaumSichtbar(wert.farbe) && (

@@ -144,8 +144,9 @@ export function cssZeichenkette(text: string): string {
 export function fusszeileCss(a: Auftritt | null | undefined): string {
   if (!a || !auftrittSichtbar(a)) return '';
   const links = fusszeileText(a);
-  const stil = 'font-family: ui-sans-serif, system-ui, sans-serif; font-size: 8pt; line-height: 1.3; '
-    + 'color: #64748b; vertical-align: top; padding-top: 3mm;';
+  // Schrift und Schiefer des Stils als Werte: die Randfelder der Seite lesen keine CSS-Variablen der Wurzel.
+  const stil = 'font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif; font-size: 8pt; line-height: 1.3; '
+    + 'color: #78716c; vertical-align: top; padding-top: 3mm;';
   return [
     '@media print { @page {',
     links ? `  @bottom-left { content: ${cssZeichenkette(links)}; ${stil} text-align: left; }` : '',

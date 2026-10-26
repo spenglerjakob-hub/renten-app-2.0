@@ -5,7 +5,9 @@ import { euro, euroGenau, prozent } from '../components/Feld';
 import { typText, vertragsBezeichnung } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
-import { Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text } from './Bausteine';
+import {
+  Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text, KASTEN, KASTEN_TITEL, Summe,
+} from './Bausteine';
 
 /**
  * Der Vertrags-TUEV als Gutachtenbogen — eine Seite je geprueftem Vertrag.
@@ -80,28 +82,23 @@ export function TuevBogen({
       </Zweispaltig>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
-        <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div className={KASTEN}>
+          <div className={KASTEN_TITEL}>
             Was Sie einzahlen (laufender Beitrag, monatlich)
           </div>
           {/* Dieselbe Treppe wie am Bildschirm, aus derselben Funktion: oben
               was der Vertrag bekommt, unten was es kostet. */}
           <Angabe feld="Gesamtbeitrag" wert={euro(treppe.zufluss)} />
           {treppe.zeilen.map((z) => (
-            <div key={z.text} className={z.art === 'summe' ? 'border-t border-slate-300' : ''}>
+            <div key={z.text} className={z.art === 'summe' ? 'border-t border-ui-asche' : ''}>
               <Angabe feld={z.text} wert={euro(z.betrag)} />
             </div>
           ))}
-          <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
-            <span className="text-[12px] font-bold text-slate-800">Kostet Sie wirklich</span>
-            <span className="text-[14px] font-black tabular-nums text-slate-900">
-              {euro(treppe.aufwand)}
-            </span>
-          </div>
+          <Summe text="Kostet Sie wirklich" wert={euro(treppe.aufwand)} />
         </div>
 
-        <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div className={KASTEN}>
+          <div className={KASTEN_TITEL}>
             Was ankommt {istKapital ? '(einmalig)' : '(monatlich)'}
           </div>
           <Angabe
@@ -121,12 +118,7 @@ export function TuevBogen({
           {istKapital && r.kvPvKapital > 0 && (
             <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(r.kvPvKapital)} />
           )}
-          <div className="mt-1 flex items-baseline justify-between border-t border-slate-400 pt-1">
-            <span className="text-[12px] font-bold text-slate-800">Bleibt Ihnen</span>
-            <span className="text-[14px] font-black tabular-nums text-slate-900">
-              {euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)}
-            </span>
-          </div>
+          <Summe text="Bleibt Ihnen" wert={euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)} />
         </div>
       </div>
 
@@ -136,8 +128,8 @@ export function TuevBogen({
         gehen davon wieder ab; unten steht derselbe Betrag wie zuvor.
       */}
       {r.zulageMonat > 0 && (
-        <div className="mt-4 break-inside-avoid rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+        <div className={`mt-4 ${KASTEN}`}>
+          <div className={KASTEN_TITEL}>
             Was der Staat dazugibt (1. Jahr, monatlich)
           </div>
           {r.zulageDetail ? (
@@ -154,12 +146,12 @@ export function TuevBogen({
             <Angabe feld="Zulage" wert={euro(r.zulageMonat)} />
           )}
           {r.zulageDetail && r.zulageDetail.bonusEinmalig > 0 && (
-            <p className="mt-1 text-[11px] text-emerald-800">
+            <p className="mt-1 text-[11px] text-ui-tinte">
               Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
               {euro(r.zulageDetail.bonusEinmalig)}.
             </p>
           )}
-          <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
+          <p className="mt-1 text-[11px] leading-relaxed text-ui-tinte">
             Die Zulagen sind der Anteil des Staates am Gesamtbeitrag — sie fließen zusätzlich in
             den Vertrag und senken Ihren eigenen Beitrag nicht. Über das Jahr sind das{' '}
             <strong>{euro(laufendeZulageJahr(r))}</strong>.
@@ -263,11 +255,11 @@ export function TuevBogen({
       )}
 
       {r.hinweise.length > 0 && (
-        <div className="mt-3 break-inside-avoid rounded-lg border border-amber-300 bg-amber-50 p-2">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+        <div className="mt-3 break-inside-avoid rounded-[10px] border border-ui-linie bg-ui-innen p-2">
+          <div className="mb-1 text-[11px] font-medium text-ui-schiefer">
             Zu beachten
           </div>
-          <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-relaxed text-amber-900">
+          <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-relaxed text-ui-tinte">
             {r.hinweise.map((h) => <li key={h}>{h}</li>)}
           </ul>
         </div>

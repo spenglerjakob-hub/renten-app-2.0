@@ -4,7 +4,7 @@ import { SCHICHT_TITEL } from '../features/vertragsarten';
 import { geteilterFreibetrag, freibetragText } from '../features/bav-freibetrag';
 import {
   Seite, Untertitel, Angabe, Zweispaltig, Tabelle, Zeile, Gruppenzeile,
-  GrosseZahl, Text,
+  GrosseZahl, Text, KASTEN,
 } from './Bausteine';
 
 /**
@@ -91,8 +91,8 @@ export function Renteneinkuenfte({
         und der wirkt ohne den Bezugspunkt willkuerlich hoch.
       */}
       <Untertitel>Ihr Versorgungsziel — monatlich, in zwei Maßstäben</Untertitel>
-      <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
-        <div className="mb-1 grid grid-cols-2 gap-x-8 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <div className={KASTEN}>
+        <div className="mb-1 grid grid-cols-2 gap-x-8 text-[11px] font-medium text-ui-schiefer">
           <span>In heutiger Kaufkraft</span>
           <span>Beträge des Jahres {zeile.jahr}</span>
         </div>
@@ -111,19 +111,19 @@ export function Renteneinkuenfte({
           />
         </Zweispaltig>
         <div className="mt-3 flex items-center gap-2">
-          {/* Blau wie auf dem Deckblatt — zwei Farben fuer dieselbe Zahl
-              waeren zwei Aussagen ueber denselben Sachverhalt. */}
-          <div className="h-2.5 flex-1 overflow-hidden rounded-full border border-slate-300 bg-white">
+          {/* Tinte auf Stein wie auf dem Deckblatt — zwei Farben fuer dieselbe
+              Zahl waeren zwei Aussagen ueber denselben Sachverhalt. */}
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-ui-luecke">
             <div
-              className="h-full bg-blue-500"
+              className="h-full bg-ui-tinte"
               style={{ width: `${Math.min(100, Math.max(0, gedeckt))}%` }}
             />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="text-[11px] text-ui-schiefer">
             {gedeckt.toFixed(0)} % erreicht
           </span>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-2 text-[11px] leading-relaxed text-ui-schiefer [&_strong]:text-ui-tinte">
           Bei <strong>{prozent(inflation)}</strong> Inflation im Jahr kostet das, was heute{' '}
           {euro(zielNettoHeute)} kostet, im Jahr {zeile.jahr} rund{' '}
           <strong>{euro(zeile.zielNettoMonat)}</strong>. Beide Spalten sagen dasselbe — die linke
@@ -203,11 +203,11 @@ export function Renteneinkuenfte({
       {ergebnis.kapitalauszahlungen.length > 0 && (
         <>
           <Untertitel>Einmalige Kapitalauszahlungen</Untertitel>
-          <div className="break-inside-avoid rounded-lg border border-slate-300 bg-slate-50 p-3">
+          <div className={KASTEN}>
             {ergebnis.kapitalauszahlungen.map((a) => (
               <div key={a.vertragId} className="mb-2 last:mb-0">
-                <div className="mb-1 text-[12px] font-bold text-slate-800">
-                  {a.bezeichnung} <span className="font-normal text-slate-500">· Zufluss {a.jahr}</span>
+                <div className="mb-1 text-[12px] font-medium text-ui-tinte">
+                  {a.bezeichnung} <span className="font-normal text-ui-schiefer">· Zufluss {a.jahr}</span>
                 </div>
                 <Zweispaltig>
                   <Angabe feld="Kapital brutto" wert={euro(a.bruttoKapital)} />
@@ -226,7 +226,7 @@ export function Renteneinkuenfte({
                 </Zweispaltig>
               </div>
             ))}
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
+            <p className="mt-2 text-[11px] leading-relaxed text-ui-schiefer [&_strong]:text-ui-tinte">
               Einmalbeträge. Im monatlichen Netto oben sind sie <strong>nicht</strong> enthalten.
               Steuer und Beiträge gehen beim Zufluss ab; dass § 229 SGB V die Beiträge über
               120 Monate bemisst, ist eine Rechengröße und kein Zahlungsweg.

@@ -108,8 +108,8 @@ export function Vertragsliste({
                 key={v.id}
                 zellen={[
                   <>
-                    <span className="font-semibold">{v.name || 'ohne Bezeichnung'}</span>
-                    <span className="block text-slate-500">{typText(v.typ)}</span>
+                    <span className="font-medium text-ui-tinte">{v.name || 'ohne Bezeichnung'}</span>
+                    <span className="block text-ui-schiefer">{typText(v.typ)}</span>
                   </>,
                   ...(verheiratet ? [personNameAus(szenario.personen, v.inhaber)] : []),
                   betragText(v),

@@ -98,6 +98,21 @@ export function Angabe({ feld, wert }: { feld: string; wert: ReactNode }) {
   );
 }
 
+/** Ein Kasten auf der Innenflaeche: Aufstellung, Aufschluesselung, Hinweise. */
+export const KASTEN = 'break-inside-avoid rounded-[10px] border border-ui-linie bg-ui-innen p-3';
+/** Seine Beschriftung — klein, in Schiefer, ohne Versalien. */
+export const KASTEN_TITEL = 'mb-2 text-[11px] font-medium text-ui-schiefer';
+
+/** Die Summe einer Aufstellung: Linie und Betrag in Tinte, wie die Posten der Beratung. */
+export function Summe({ text, wert }: { text: ReactNode; wert: ReactNode }) {
+  return (
+    <div className="mt-1 flex items-baseline justify-between border-t border-ui-tinte pt-1">
+      <span className="text-[12px] font-medium text-ui-tinte">{text}</span>
+      <span className="text-[14px] font-medium tabular-nums text-ui-tinte">{wert}</span>
+    </div>
+  );
+}
+
 /** Zwei Spalten nebeneinander — auf A4 hochkant die brauchbare Aufteilung. */
 export function Zweispaltig({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-2 gap-x-8 gap-y-1">{children}</div>;

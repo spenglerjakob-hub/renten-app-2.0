@@ -151,24 +151,24 @@ function Befund({
   }
 
   return (
-    <div className="mt-3 break-inside-avoid rounded-lg border border-emerald-300 px-3 py-2">
-      <div className="flex items-baseline justify-between gap-4 border-b border-emerald-100 pb-1.5">
-        <h4 className="text-[13px] font-bold text-slate-900">{b.titel}</h4>
+    <div className="mt-3 break-inside-avoid rounded-[10px] border border-ui-linie px-3 py-2">
+      <div className="flex items-baseline justify-between gap-4 border-b border-ui-linie pb-1.5">
+        <h4 className="text-[13px] font-medium text-ui-tinte">{b.titel}</h4>
         <span className="shrink-0 text-right">
-          <span className="block text-base font-black tabular-nums text-emerald-700">
+          <span className="block text-base font-medium tabular-nums text-ui-tinte">
             {b.foerderArt === 'zulage' ? euro(b.ersparnisJahr) : euro(b.rahmenMonat)}
           </span>
-          <span className="block text-[9px] font-bold uppercase tracking-wider text-emerald-600">
+          <span className="block text-[10px] leading-[1.35] text-ui-schiefer">
             {b.foerderArt === 'zulage' ? 'Zulage im Jahr' : 'im Monat frei'}
           </span>
         </span>
       </div>
 
-      <p className="mt-1.5 text-[11px] leading-snug text-slate-700">{b.text}</p>
+      <p className="mt-1.5 text-[11px] leading-snug text-ui-tinte">{b.text}</p>
 
       <div className="mt-1.5 grid grid-cols-2 gap-x-6">
         <dl>
-          <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="mb-0.5 text-[10px] font-medium leading-[1.35] text-ui-schiefer">
             Beispiel für einen Monat
           </div>
           {monat.map(([feld, wert, fett]) => (
@@ -176,7 +176,7 @@ function Befund({
           ))}
         </dl>
         <dl>
-          <div className="mb-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="mb-0.5 text-[10px] font-medium leading-[1.35] text-ui-schiefer">
             Bis zum Rentenbeginn — {jahre} Jahre
           </div>
           {rente.map(([feld, wert, fett]) => (
@@ -186,7 +186,7 @@ function Befund({
       </div>
 
       {(b.hinweis || b.id === 'bav') && (
-        <p className="mt-1.5 text-[10px] leading-snug text-slate-500">
+        <p className="mt-1.5 text-[10px] leading-snug text-ui-schiefer">
           {/* Bei der bAV ersetzt der eigene Satz den Hinweis auf die zweite
               Stufe — der passt auf dem Bildschirm, hier kostet er Platz, den
               die Hochrechnung braucht. */}
@@ -197,11 +197,11 @@ function Befund({
                 fällt dadurch etwas niedriger aus.
               </>
             : b.hinweis}
-          <span className="text-slate-400"> · {b.paragraf}</span>
+          <span> · {b.paragraf}</span>
         </p>
       )}
       {!(b.hinweis || b.id === 'bav') && (
-        <p className="mt-1 text-[9px] text-slate-400">{b.paragraf}</p>
+        <p className="mt-1 text-[9px] text-ui-schiefer">{b.paragraf}</p>
       )}
     </div>
   );
@@ -210,9 +210,9 @@ function Befund({
 /** Eine Zeile der Beispielrechnung — enger als `Angabe`, damit drei Wege auf eine Seite passen. */
 function Posten({ feld, wert, fett }: { feld: string; wert: ReactNode; fett?: boolean }) {
   return (
-    <div className={`flex items-baseline justify-between gap-3 border-b border-dotted border-slate-200 py-0.5 text-[11px] ${fett ? 'font-bold text-slate-900' : 'text-slate-600'}`}>
+    <div className={`flex items-baseline justify-between gap-3 border-b border-ui-linie py-0.5 text-[11px] ${fett ? 'font-medium text-ui-tinte' : 'text-ui-schiefer'}`}>
       <dt>{feld}</dt>
-      <dd className="text-right tabular-nums text-slate-900">{wert}</dd>
+      <dd className="text-right tabular-nums text-ui-tinte">{wert}</dd>
     </div>
   );
 }
