@@ -12,6 +12,14 @@ export const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-fu
 export const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-ui-zweit-rand bg-transparent px-5 py-2.5 text-sm font-medium text-ui-tinte hover:bg-ui-hover disabled:border-ui-linie disabled:opacity-40';
 /* Loeschen bleibt rot: Wer etwas unwiderruflich entfernt, soll es nicht mit einem gewoehnlichen Knopf verwechseln. */
 export const KNOPF_GEFAHR = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40';
+/*
+ * Die kleinen Knoepfe fuer Zeilen und Listen (Kopieren, Ansehen,
+ * Zurueckziehen) — dieselben drei Arten, eine Stufe kleiner, damit eine
+ * Liste mit vielen Aktionen ruhig bleibt.
+ */
+export const KNOPF_KLEIN = 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover disabled:opacity-40';
+export const KNOPF_KLEIN_HAUPT = 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-ui-knopf-rand bg-ui-knopf px-3 py-1.5 text-xs font-medium text-ui-knopf-schrift transition-colors hover:bg-ui-knopf-hover disabled:opacity-40';
+export const KNOPF_KLEIN_GEFAHR = 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:opacity-40';
 /** Textlink mit Pfeil — die leiseste Aktion; unterstrichen erst beim Darueberfahren. */
 export const LINK = 'inline-flex items-center gap-1 text-sm font-medium text-ui-tinte underline-offset-4 hover:underline';
 /** Die eine Akzentkarte je Ansicht. */
@@ -81,6 +89,27 @@ export function Hinweis({ children, symbol: Zeichen = Info, klasse = '' }: {
 export function Vermerk({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center whitespace-nowrap rounded-full border border-ui-linie bg-ui-karte px-2.5 py-0.5 text-xs text-ui-schiefer">
+      {children}
+    </span>
+  );
+}
+
+/** Eine Marke, die etwas verlangt („Feedback überfällig“) — Sky Wash wie das hervorgehobene Wort, sparsam. */
+export function Marke({ children }: { children: ReactNode }) {
+  return <span className="ui-marke inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 text-xs font-medium">{children}</span>;
+}
+
+/**
+ * Ein Stand als Punkt und Wort, wie der Status der Beratungen: erledigt in
+ * Tinte mit vollem Punkt, offen leise, vorbei mit leerem Ring — lesbar auch
+ * ohne Farbe, ohne Ampel.
+ */
+export function Stand({ art, children }: { art: 'erledigt' | 'offen' | 'vorbei'; children: ReactNode }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm ${art === 'erledigt' ? 'text-ui-tinte' : 'text-ui-schiefer'}`}>
+      <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${
+        art === 'erledigt' ? 'bg-ui-tinte' : art === 'offen' ? 'bg-ui-asche' : 'border border-ui-asche bg-ui-karte'
+      }`} />
       {children}
     </span>
   );

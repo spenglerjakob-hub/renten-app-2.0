@@ -4,6 +4,7 @@ import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT, paketVon } from '@renten/
 import { LinkFeld } from '../components/LinkFeld';
 import { PaketBuchung } from '../components/PaketWahl';
 import { Sicher } from '../components/Sicher';
+import { FEHLER, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, Marke, Vermerk } from '../components/stil';
 import { preiseAbgleichen, zumPortal, zurKasse, useWeiterleitung, type Abgleich } from '../lib/abo';
 import { einladungsLink } from '../lib/einladung';
 import {
@@ -36,10 +37,9 @@ export function AboTeam() {
 
   if (!z) {
     return (
-      <div className="space-y-3 text-sm text-slate-600">
+      <div className="space-y-3 text-sm text-ui-schiefer">
         <p>Ihr Zugang konnte gerade nicht abgefragt werden.</p>
-        <button type="button" onClick={() => { if (fuer !== null) void laden(fuer, true); }}
-          className="rounded-lg border border-slate-300 px-3 py-2 font-bold text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={() => { if (fuer !== null) void laden(fuer, true); }} className={KNOPF_ZWEIT}>
           Erneut versuchen
         </button>
       </div>
@@ -48,7 +48,7 @@ export function AboTeam() {
 
   const aboLaeuft = z.abo !== null && aboAktiv(z.abo.status);
   return (
-    <div className="space-y-6">
+    <div className="divide-y divide-ui-linie">
       <Status z={z} />
       {z.fruehstart && <IhreRueckmeldungen z={z} />}
       {z.buero !== null && <Buero z={z} vorschau={vorschau} />}
@@ -59,10 +59,11 @@ export function AboTeam() {
   );
 }
 
+/** Ein Abschnitt des Fensters — getrennt durch Haarlinien, die Ueberschrift ruhig statt in Versalien. */
 function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
   return (
-    <section>
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{titel}</h3>
+    <section className="py-5 first:pt-0 last:pb-0">
+      <h3 className="mb-2 text-base font-medium text-ui-tinte">{titel}</h3>
       {children}
     </section>
   );
@@ -111,8 +112,9 @@ function Status({ z }: { z: Zugang }) {
   }
   return (
     <Abschnitt titel="Ihr Zugang">
-      <p className="text-base font-black text-slate-900">{titel}</p>
-      <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{text}</p>
+      {/* Der Stand als Aussage in der Schrift der Titel — wie die Saetze der Beratung, nicht fett. */}
+      <p className="ui-titel text-[22px] leading-snug text-ui-tinte">{titel}</p>
+      <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">{text}</p>
     </Abschnitt>
   );
 }
@@ -122,24 +124,23 @@ function IhreRueckmeldungen({ z }: { z: Zugang }) {
   const oeffneRueckmeldung = useZugang((s) => s.oeffneRueckmeldung);
   return (
     <Abschnitt titel="Ihre Rückmeldungen">
-      <p className="text-sm leading-relaxed text-slate-600">
+      <p className="text-sm leading-relaxed text-ui-schiefer">
         Als Early Adopter helfen Sie mit Ihren Rückmeldungen, den JS-Rentenplaner besser zu machen — wir bitten
         etwa alle vier Wochen darum.{' '}
         {z.letzteRueckmeldung
-          ? <>Ihre letzte kam am <strong className="text-slate-800">{datum(z.letzteRueckmeldung)}</strong>.</>
+          ? <>Ihre letzte kam am <span className="font-medium text-ui-tinte">{datum(z.letzteRueckmeldung)}</span>.</>
           : 'Wir freuen uns auf Ihre erste.'}
       </p>
-      <button type="button" onClick={oeffneRueckmeldung}
-        className="mt-2 flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+      <button type="button" onClick={oeffneRueckmeldung} className={`mt-3 ${KNOPF_ZWEIT}`}>
         <MessageSquare className="h-4 w-4" aria-hidden /> Feedback geben
       </button>
     </Abschnitt>
   );
 }
 
-function Hinweis({ fehler }: { fehler: string | null }) {
+function Fehler({ fehler }: { fehler: string | null }) {
   if (!fehler) return null;
-  return <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>;
+  return <p role="alert" className={`mt-3 ${FEHLER}`}>{fehler}</p>;
 }
 
 const fehlgeschlagen = 'Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.';
@@ -184,27 +185,25 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   return (
     <Abschnitt titel={z.bueroName ? `Büro „${z.bueroName}“` : 'Ihr Büro'}>
       {z.abo && (
-        <p className="mb-2 text-sm text-slate-600">
+        <p className="text-sm text-ui-schiefer">
           {z.abo.belegt} von {z.abo.plaetze} {z.abo.plaetze === 1 ? 'Platz' : 'Plätzen'} belegt
         </p>
       )}
       {vorschau ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">In der Vorschau ohne echte Mitglieder.</p>
+        <p className="ui-innen mt-2 px-3 py-2 text-sm text-ui-schiefer">In der Vorschau ohne echte Mitglieder.</p>
       ) : mitglieder === null ? (
-        <p className="text-sm text-slate-500">Wird geladen …</p>
+        <p className="mt-2 text-sm text-ui-schiefer">Wird geladen …</p>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        /* Zeilen mit Haarlinien wie die Liste der Beratungen. „ohne Platz“ verlangt etwas und traegt die
+           Marke; wer das Abo verwaltet, ist nur ein Vermerk. */
+        <ul className="mt-2 divide-y divide-ui-linie border-y border-ui-linie">
           {mitglieder.map((m) => (
-            <li key={m.nutzer} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-              <span className="min-w-0 flex-1 truncate text-slate-800">
-                {m.email}{m.email === ich && <span className="text-slate-500"> (Sie)</span>}
+            <li key={m.nutzer} className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
+              <span className="min-w-0 flex-1 truncate text-ui-tinte">
+                {m.email}{m.email === ich && <span className="text-ui-schiefer"> (Sie)</span>}
               </span>
-              {m.rolle === 'inhaber' && (
-                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-bold text-indigo-800">verwaltet das Abo</span>
-              )}
-              {!m.hatPlatz && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-900">ohne Platz</span>
-              )}
+              {m.rolle === 'inhaber' && <Vermerk>verwaltet das Abo</Vermerk>}
+              {!m.hatPlatz && <Marke>ohne Platz</Marke>}
               {inhaber && m.rolle === 'mitglied' && (
                 <Sicher text="Entfernen" frage="Entfernen?" ja="Ja"
                   onJa={() => tun(() => mitgliedEntfernen(m.nutzer), () => Promise.all([neuLaden(), zugangNeuLaden()]))} />
@@ -215,27 +214,27 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
       )}
 
       {inhaber ? (
-        <div className="mt-4 rounded-xl bg-slate-50 p-3">
-          <p className="text-sm font-bold text-slate-800">Kollegen einladen</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+        <div className="ui-innen mt-4 p-4">
+          <p className="text-sm font-medium text-ui-tinte">Kollegen einladen</p>
+          <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
             Jeder Link gilt 7 Tage und für eine Person. Wer ihn öffnet, legt ein Konto an oder meldet sich an —
             und gehört danach zu Ihrem Büro.
           </p>
           <button type="button" onClick={() => void einladen()} disabled={vorschau || !aboLaeuft || voll}
-            className="mt-2 flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+            className={`mt-3 ${KNOPF_ZWEIT} disabled:cursor-not-allowed`}>
             <Link2 className="h-4 w-4" aria-hidden /> Einladungslink erstellen
           </button>
           {aboLaeuft && voll && (
-            <p className="mt-2 text-xs text-slate-600">Alle Plätze sind belegt. Weitere buchen Sie unter „Abo verwalten“ dazu.</p>
+            <p className="mt-2 text-xs text-ui-schiefer">Alle Plätze sind belegt. Weitere buchen Sie unter „Abo verwalten“ dazu.</p>
           )}
-          {!aboLaeuft && <p className="mt-2 text-xs text-slate-600">Einladen geht, solange das Abo läuft.</p>}
+          {!aboLaeuft && <p className="mt-2 text-xs text-ui-schiefer">Einladen geht, solange das Abo läuft.</p>}
           {einladungen.length > 0 && (
             <ul className="mt-3 space-y-2">
               {einladungen.map((e) => (
-                <li key={e.token} className="rounded-lg border border-slate-200 bg-white p-2">
+                <li key={e.token} className="rounded-[8px] border border-ui-linie bg-ui-karte p-3">
                   <LinkFeld link={einladungsLink(e.token)} neu={e.token === neu} />
-                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs text-slate-500">Offen, gültig bis {datum(e.gueltigBis)}</span>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs text-ui-schiefer">Offen, gültig bis {datum(e.gueltigBis)}</span>
                     <Sicher text="Zurückziehen" frage="Zurückziehen?" ja="Ja"
                       onJa={() => tun(() => einladungZurueckziehen(e.token), neuLaden)} />
                   </div>
@@ -245,13 +244,13 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
           )}
         </div>
       ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ui-schiefer">
           <span className="flex-1">Sie sind Mitglied. Das Abo verwaltet die Person mit dem Vermerk oben.</span>
           <Sicher text="Büro verlassen" frage="Wirklich austreten?" ja="Ja, austreten" deaktiviert={vorschau}
             onJa={() => tun(bueroVerlassen, zugangNeuLaden)} />
         </div>
       )}
-      <Hinweis fehler={fehler} />
+      <Fehler fehler={fehler} />
     </Abschnitt>
   );
 }
@@ -270,24 +269,25 @@ function AboVerwalten({ abo, bereit, vorschau }: { abo: AboAngaben; bereit: bool
   if (abo.laeuftBis && !abo.kuendigungZum) zeilen.push(['Nächste Abrechnung', datum(abo.laeuftBis)]);
   return (
     <Abschnitt titel="Abo">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+      {/* Rot nur, wenn die Zahlung offen ist — das ist ein Fehler, kein Stand. */}
+      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
         {zeilen.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-slate-500">{k}</dt>
-            <dd className={`font-semibold ${k === 'Stand' && abo.status === 'past_due' ? 'text-rose-700' : 'text-slate-800'}`}>{v}</dd>
+            <dt className="text-ui-schiefer">{k}</dt>
+            <dd className={`font-medium ${k === 'Stand' && abo.status === 'past_due' ? 'text-rose-700' : 'text-ui-tinte'}`}>{v}</dd>
           </div>
         ))}
       </dl>
       <button type="button" onClick={() => void los(zumPortal)} disabled={!bereit || vorschau || laedt}
-        className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+        className={`mt-4 ${KNOPF} disabled:cursor-not-allowed`}>
         {laedt ? 'Einen Moment …' : 'Abo verwalten'}
       </button>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
         Plätze ändern, Paket wechseln, Zahlungsdaten, Rechnungen und Kündigung — im Kundenportal unseres
         Zahlungsdienstleisters Stripe.
         {!bereit && !vorschau && ' Das Kundenportal wird gerade eingerichtet.'}
       </p>
-      <Hinweis fehler={fehler} />
+      <Fehler fehler={fehler} />
     </Abschnitt>
   );
 }
@@ -306,7 +306,7 @@ function Buchen({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
     : null;
   return (
     <Abschnitt titel={z.abo ? 'Abo erneuern' : 'Paket buchen'}>
-      {hinweis && <p className="mb-3 text-sm leading-relaxed text-slate-600">{hinweis}</p>}
+      {hinweis && <p className="mb-4 text-sm leading-relaxed text-ui-schiefer">{hinweis}</p>}
       <PaketBuchung
         bereit={z.zahlungBereit && !vorschau}
         gesperrtText={vorschau ? 'In der Vorschau wird nichts gebucht.' : undefined}
@@ -378,43 +378,52 @@ function Betreiber({ echt }: { echt: Zugang }) {
   const aktiv = useZugang((s) => s.vorschau?.titel ?? null);
   const setzeVorschau = useZugang((s) => s.setzeVorschau);
   return (
-    <section className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-4">
-      <h3 className="text-xs font-bold uppercase tracking-wide text-fuchsia-800">Betreiber</h3>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-fuchsia-900/70">Abo-Pflicht</dt>
-        <dd className="font-semibold text-fuchsia-950">
-          {echt.aboPflichtAb ? `ab ${datum(echt.aboPflichtAb)}` : 'noch nicht festgelegt — alle Konten wie bisher'}
-        </dd>
-        <dt className="text-fuchsia-900/70">Buchung</dt>
-        <dd className="font-semibold text-fuchsia-950">
-          {echt.zahlungBereit ? 'freigeschaltet' : 'gesperrt, bis die Zahlung eingerichtet ist'}
-        </dd>
-      </dl>
-      <p className="mt-3 text-sm text-fuchsia-950">
-        <strong>Vorschau:</strong> So sehen es Kunden — nur in diesem Tab, mit erfundenen Angaben.
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {vorschauen(echt).map((v) => (
-          <button key={v.titel} type="button" aria-pressed={aktiv === v.titel} onClick={() => setzeVorschau(v)}
-            className={`rounded-md border px-2.5 py-1 text-xs font-bold ${
-              aktiv === v.titel
-                ? 'border-fuchsia-700 bg-fuchsia-700 text-white'
-                : 'border-fuchsia-300 bg-white text-fuchsia-900 hover:bg-fuchsia-100'
-            }`}>
-            {v.titel}
-          </button>
-        ))}
-        {aktiv && (
-          <button type="button" onClick={() => setzeVorschau(null)}
-            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50">
-            Vorschau beenden
-          </button>
-        )}
+    /*
+      Der Bereich des Betreibers hebt sich durch den gestrichelten Rand ab,
+      nicht durch eine eigene Farbe — wie der Hinweis auf Beispielwerte im
+      Rechner: Er gehoert nicht zu dem, was Kunden sehen.
+    */
+    <section className="py-5 last:pb-0">
+      <div className="rounded-[10px] border border-dashed border-ui-schiefer/60 p-4 sm:p-5">
+        <h3 className="flex flex-wrap items-center gap-2 text-base font-medium text-ui-tinte">
+          Betreiber <Vermerk>nur für Sie sichtbar</Vermerk>
+        </h3>
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
+          <dt className="text-ui-schiefer">Abo-Pflicht</dt>
+          <dd className="font-medium text-ui-tinte">
+            {echt.aboPflichtAb ? `ab ${datum(echt.aboPflichtAb)}` : 'noch nicht festgelegt — alle Konten wie bisher'}
+          </dd>
+          <dt className="text-ui-schiefer">Buchung</dt>
+          <dd className="font-medium text-ui-tinte">
+            {echt.zahlungBereit ? 'freigeschaltet' : 'gesperrt, bis die Zahlung eingerichtet ist'}
+          </dd>
+        </dl>
+        <p className="mt-4 text-sm text-ui-tinte">
+          <span className="font-medium">Vorschau:</span> So sehen es Kunden — nur in diesem Tab, mit erfundenen Angaben.
+        </p>
+        {/* Gewaehlt wie ein Reiter: gefuellt in Soot, die anderen mit Kontur. */}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {vorschauen(echt).map((v) => (
+            <button key={v.titel} type="button" aria-pressed={aktiv === v.titel} onClick={() => setzeVorschau(v)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                aktiv === v.titel
+                  ? 'border-ui-dunkel bg-ui-dunkel text-white'
+                  : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
+              }`}>
+              {v.titel}
+            </button>
+          ))}
+          {aktiv && (
+            <button type="button" onClick={() => setzeVorschau(null)} className={KNOPF_KLEIN}>
+              Vorschau beenden
+            </button>
+          )}
+        </div>
+        <PreiseAbgleichen />
+        <Suspense fallback={<p className="mt-4 text-xs text-ui-schiefer">Einen Moment …</p>}>
+          <BetreiberFruehstart />
+        </Suspense>
       </div>
-      <PreiseAbgleichen />
-      <Suspense fallback={<p className="mt-4 text-xs text-fuchsia-900/70">Einen Moment …</p>}>
-        <BetreiberFruehstart />
-      </Suspense>
     </section>
   );
 }
@@ -437,24 +446,23 @@ function PreiseAbgleichen() {
     setLaedt(false);
   };
   return (
-    <div className="mt-4 border-t border-fuchsia-200 pt-3">
-      <p className="text-sm text-fuchsia-950">
-        <strong>Stripe:</strong> Produkte, Staffelpreise, Early-Adopter-Gutschein, Steuersatz und Kundenportal
+    <div className="mt-5 border-t border-ui-linie pt-4">
+      <p className="text-sm text-ui-tinte">
+        <span className="font-medium">Stripe:</span> Produkte, Staffelpreise, Early-Adopter-Gutschein, Steuersatz und Kundenportal
         aus der Preisliste anlegen bzw. nachziehen.
       </p>
-      <button type="button" onClick={() => void los()} disabled={laedt}
-        className="mt-2 rounded-md border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-bold text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50">
+      <button type="button" onClick={() => void los()} disabled={laedt} className={`mt-2 ${KNOPF_KLEIN}`}>
         {laedt ? 'Gleiche ab …' : 'Preise in Stripe abgleichen'}
       </button>
-      {ergebnis && 'fehler' in ergebnis && <Hinweis fehler={ergebnis.fehler} />}
+      {ergebnis && 'fehler' in ergebnis && <Fehler fehler={ergebnis.fehler} />}
       {ergebnis && 'bericht' in ergebnis && (
-        <div className="mt-2 rounded-lg bg-white p-2 text-xs text-slate-700">
-          <p className="font-bold">
+        <div className="ui-innen mt-3 p-3 text-xs text-ui-tinte">
+          <p className="font-medium">
             Abgeglichen im {ergebnis.modus === 'live' ? 'Live-Modus (echte Zahlungen)' : 'Testmodus'}:
           </p>
-          <ul className="mt-1 grid grid-cols-[auto_1fr] gap-x-3">
+          <ul className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
             {Object.entries(ergebnis.bericht).map(([k, v]) => (
-              <li key={k} className="contents"><span>{k}</span><span>{ABGLEICH_STAND[v] ?? v}</span></li>
+              <li key={k} className="contents"><span className="text-ui-schiefer">{k}</span><span>{ABGLEICH_STAND[v] ?? v}</span></li>
             ))}
           </ul>
         </div>

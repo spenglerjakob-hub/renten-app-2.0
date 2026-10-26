@@ -3,6 +3,8 @@ import {
   Copy, Check, Mail, Download, Trash2, RefreshCw, Link2, Paperclip, ChevronDown, Eye, FileText,
   Image as BildSymbol,
 } from 'lucide-react';
+import { LinkFeld } from '../components/LinkFeld';
+import { FEHLER, FELD, KNOPF, KNOPF_KLEIN, KNOPF_KLEIN_HAUPT, Stand } from '../components/stil';
 import { useCheckAnfragen } from '../store/check-anfragen';
 import { useSzenario } from '../store/szenario';
 import { useAuth } from '../store/auth';
@@ -17,6 +19,10 @@ const groesse = (bytes: number | null) => (bytes === null ? ''
     : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
 const ARTEN = Object.keys(DOKUMENT_ART_TEXT) as DokumentArt[];
+
+/** Knoepfe nur mit Symbol, wie das Loeschen in der Liste der Beratungen. */
+const SYMBOL_KNOPF = 'shrink-0 rounded-full p-2 text-ui-schiefer transition-colors hover:bg-ui-innen hover:text-ui-tinte';
+const SYMBOL_LOESCHEN = 'shrink-0 rounded-full p-2 text-ui-schiefer transition-colors hover:bg-rose-50 hover:text-rose-700';
 
 /**
  * „Vorsorge-Check anfordern" — die Seite des Beraters.
@@ -59,24 +65,23 @@ function Unterlagen({ dokumente }: { dokumente: BeraterDokument[] }) {
   };
 
   return (
-    <div className="mt-2 space-y-2 rounded-md border border-slate-200 bg-white p-2">
+    <div className="ui-innen mt-2 space-y-3 p-3">
       {ARTEN.filter((art) => dokumente.some((d) => d.art === art)).map((art) => (
         <div key={art}>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{DOKUMENT_ART_TEXT[art]}</p>
-          <ul className="mt-1 space-y-1">
+          <p className="text-xs font-medium text-ui-schiefer">{DOKUMENT_ART_TEXT[art]}</p>
+          <ul className="mt-1 space-y-1.5">
             {dokumente.filter((d) => d.art === art).map((d) => (
               <li key={d.pfad} className="flex items-center gap-2 text-sm">
+                {/* Die Art der Datei zeigt das Symbol, nicht eine Farbe. */}
                 {d.typ === 'application/pdf'
-                  ? <FileText className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
-                  : <BildSymbol className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />}
-                <span className="min-w-0 flex-1 truncate text-slate-800">{d.name}</span>
-                <span className="hidden shrink-0 text-xs tabular-nums text-slate-500 sm:inline">{groesse(d.groesse)}</span>
-                <button type="button" onClick={() => void ansehen(d)} aria-label={`${d.name} ansehen`}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100">
+                  ? <FileText className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+                  : <BildSymbol className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />}
+                <span className="min-w-0 flex-1 truncate text-ui-tinte">{d.name}</span>
+                <span className="hidden shrink-0 text-xs tabular-nums text-ui-schiefer sm:inline">{groesse(d.groesse)}</span>
+                <button type="button" onClick={() => void ansehen(d)} aria-label={`${d.name} ansehen`} className={KNOPF_KLEIN}>
                   <Eye className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Ansehen</span>
                 </button>
-                <button type="button" onClick={() => void herunterladen(d)} aria-label={`${d.name} herunterladen`}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100">
+                <button type="button" onClick={() => void herunterladen(d)} aria-label={`${d.name} herunterladen`} className={KNOPF_KLEIN}>
                   <Download className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Laden</span>
                 </button>
               </li>
@@ -127,15 +132,16 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
     return `mailto:?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;
   };
 
+  /* Der Stand als Punkt und Wort wie bei den Beratungen: eingegangen voll, offen leise, abgelaufen als Ring. */
   const status = (a: CheckAnfrage) => {
-    if (a.eingang) return { text: `Eingegangen am ${datum(a.eingang.eingegangenAm)}`, farbe: 'bg-emerald-100 text-emerald-800' };
-    if (new Date(a.gueltigBis).getTime() < Date.now()) return { text: 'Abgelaufen', farbe: 'bg-slate-100 text-slate-500' };
-    return { text: `Offen bis ${datum(a.gueltigBis)}`, farbe: 'bg-amber-100 text-amber-800' };
+    if (a.eingang) return { text: `Eingegangen am ${datum(a.eingang.eingegangenAm)}`, art: 'erledigt' as const };
+    if (new Date(a.gueltigBis).getTime() < Date.now()) return { text: 'Abgelaufen', art: 'vorbei' as const };
+    return { text: `Offen bis ${datum(a.gueltigBis)}`, art: 'offen' as const };
   };
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs leading-relaxed text-slate-600">
+    <div className="space-y-5">
+      <p className="text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
         Schicken Sie Ihrem Kunden einen persönlichen Link. Er erfasst seine Angaben zu Hause,
         Schritt für Schritt und ohne Konto, und kann Unterlagen als Foto oder Scan hochladen statt
         abzutippen — alles landet nur bei Ihnen.
@@ -146,11 +152,11 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
       </p>
 
       {meldung && (
-        <div role="status" className={`flex items-start justify-between gap-3 rounded-md px-3 py-2 text-sm ${
-          meldung.art === 'ok' ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'
+        <div role="status" className={`flex items-start justify-between gap-3 ${
+          meldung.art === 'ok' ? 'ui-innen px-3 py-2 text-sm text-ui-tinte' : FEHLER
         }`}>
           <span>{meldung.text}</span>
-          <button type="button" onClick={meldungLoeschen} className="text-xs underline">OK</button>
+          <button type="button" onClick={meldungLoeschen} className="text-xs font-medium underline underline-offset-2">OK</button>
         </div>
       )}
 
@@ -169,69 +175,57 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
           onChange={(e) => setKunde(e.target.value)}
           maxLength={120}
           placeholder="Name des Kunden (nur für Sie sichtbar)"
-          className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white p-2 text-sm"
+          className={`${FELD} min-w-0 flex-1`}
         />
-        <button type="submit"
-          className="flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500">
+        <button type="submit" className={KNOPF}>
           <Link2 className="h-4 w-4" aria-hidden /> Link erstellen
         </button>
       </form>
 
       {neu && (
-        <div className="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-xs font-semibold text-emerald-900">
+        /* Der neue Link mit dem Rand in Cyan — der eine Akzent statt eines gruenen Kastens. */
+        <div className="ui-innen p-4">
+          <p className="text-sm font-medium text-ui-tinte">
             Link{neu.kunde ? ` für ${neu.kunde}` : ''} — gültig bis {datum(neu.gueltigBis)}, einmal nutzbar:
           </p>
-          <input
-            readOnly
-            value={checkLink(neu.code)}
-            onFocus={(e) => e.target.select()}
-            aria-label="Link für den Kunden"
-            className="mt-1.5 w-full rounded-md border border-emerald-300 bg-white p-2 font-mono text-xs"
-          />
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" onClick={() => void kopieren(neu.code)}
-              className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
-              {kopiert === neu.code ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-              {kopiert === neu.code ? 'Kopiert' : 'Link kopieren'}
-            </button>
-            <a href={mail(neu)}
-              className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
-              <Mail className="h-3.5 w-3.5" aria-hidden /> Per E-Mail senden
-            </a>
+          <div className="mt-2">
+            <LinkFeld link={checkLink(neu.code)} neu beschriftung="Link für den Kunden" />
           </div>
+          <a href={mail(neu)} className={`mt-2 ${KNOPF_KLEIN}`}>
+            <Mail className="h-3.5 w-3.5" aria-hidden /> Per E-Mail senden
+          </a>
         </div>
       )}
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Angefordert ({liste.length})
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-medium text-ui-tinte">
+            Angefordert <span className="font-normal text-ui-schiefer">({liste.length})</span>
           </h3>
-          <button type="button" onClick={() => void laden()} aria-label="Liste aktualisieren"
-            className="rounded p-1 text-slate-400 hover:text-slate-700">
-            <RefreshCw className={`h-3.5 w-3.5 ${laedt ? 'animate-spin' : ''}`} aria-hidden />
+          <button type="button" onClick={() => void laden()} aria-label="Liste aktualisieren" className={SYMBOL_KNOPF}>
+            <RefreshCw className={`h-4 w-4 ${laedt ? 'animate-spin' : ''}`} aria-hidden />
           </button>
         </div>
 
         {liste.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-center text-sm text-slate-500">
+          <p className="mt-2 rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-4 text-center text-sm text-ui-schiefer">
             Noch keine Anfragen.
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          /* Zeilen mit Haarlinien wie die Liste der Beratungen. */
+          <ul className="mt-1 divide-y divide-ui-linie border-b border-ui-linie">
             {liste.map((a) => {
               const s = status(a);
               const offen = !a.eingang && new Date(a.gueltigBis).getTime() >= Date.now();
               const unterlagen = dokumente[a.code] ?? [];
               const zeigeUnterlagen = offeneUnterlagen === a.code;
               return (
-                <li key={a.code} className="rounded-md bg-slate-50 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm">{a.kunde || 'ohne Namen'}</span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${s.farbe}`}>{s.text}</span>
+                <li key={a.code} className="py-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-ui-tinte">{a.kunde || 'ohne Namen'}</span>
+                    <Stand art={s.art}>{s.text}</Stand>
                   </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {a.eingang && (
                       <button
                         type="button"
@@ -240,20 +234,18 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                           const sz = await uebernehmen(a.code);
                           if (sz) { setze(() => sz); setUebernommen(a.code); onUebernommen?.(); }
                         }}
-                        className="flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-500"
+                        className={KNOPF_KLEIN_HAUPT}
                       >
                         <Download className="h-3.5 w-3.5" aria-hidden /> In den Rechner übernehmen
                       </button>
                     )}
                     {offen && (
                       <>
-                        <button type="button" onClick={() => void kopieren(a.code)}
-                          className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                        <button type="button" onClick={() => void kopieren(a.code)} className={KNOPF_KLEIN}>
                           {kopiert === a.code ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
                           {kopiert === a.code ? 'Kopiert' : 'Link kopieren'}
                         </button>
-                        <a href={mail(a)}
-                          className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100">
+                        <a href={mail(a)} className={KNOPF_KLEIN}>
                           <Mail className="h-3.5 w-3.5" aria-hidden /> E-Mail
                         </a>
                       </>
@@ -263,7 +255,7 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                         type="button"
                         onClick={() => setOffeneUnterlagen(zeigeUnterlagen ? null : a.code)}
                         aria-expanded={zeigeUnterlagen}
-                        className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-800 hover:bg-indigo-100"
+                        className={KNOPF_KLEIN}
                       >
                         <Paperclip className="h-3.5 w-3.5" aria-hidden />
                         {unterlagen.length} Unterlage{unterlagen.length > 1 ? 'n' : ''}
@@ -279,7 +271,7 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                         void loeschen(a.code);
                       }}
                       aria-label={`Anfrage ${a.kunde || 'ohne Namen'} löschen`}
-                      className="rounded p-1 text-slate-400 hover:bg-white hover:text-rose-600">
+                      className={SYMBOL_LOESCHEN}>
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
                   </div>
@@ -289,14 +281,14 @@ export function CheckAnfragen({ onUebernommen, onKonto }: {
                   */}
                   {zeigeUnterlagen && unterlagen.length > 0 && <Unterlagen dokumente={unterlagen} />}
                   {uebernommen === a.code && (
-                    <p className="mt-1.5 text-xs leading-relaxed text-emerald-800">
+                    <p role="status" className="ui-innen mt-2 px-3 py-2 text-xs leading-relaxed text-ui-tinte">
                       Übernommen. Sichern Sie die Angaben im Konto unter „Als neues speichern“ und
                       löschen Sie danach diesen Eingang — er wird nicht mehr gebraucht.
                       {unterlagen.length > 0 && ' Unterlagen, die Sie behalten möchten, laden Sie vorher herunter — sie gehen mit dem Eingang.'}
                       {onKonto && (
                         <>
                           {' '}
-                          <button type="button" onClick={onKonto} className="font-bold underline underline-offset-2 hover:text-emerald-950">
+                          <button type="button" onClick={onKonto} className="font-medium underline underline-offset-2">
                             Konto öffnen
                           </button>
                         </>

@@ -15,7 +15,7 @@ import { personNameAus } from '../features/personen';
 import { kaufkraft } from '../features/kaufkraft';
 import { nettoHeuteMonat } from '../features/bezug';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
-import { DeckblattHeute, DeckblattKopf, DeckblattTitel } from './DeckblattKopf';
+import { DeckblattHeute, DeckblattKopf, DeckblattTitel, PAPIER } from './DeckblattKopf';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
@@ -351,7 +351,7 @@ export function Gutachten({
   return (
     <div
       id="gutachten"
-      className="hidden bg-white text-slate-800 print:block"
+      className={`hidden ${PAPIER} print:block`}
       style={akzentVariablen(auftritt) as CSSProperties}
     >
       {fussCss && <style>{fussCss}</style>}

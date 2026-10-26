@@ -10,6 +10,9 @@ import { Untertitel } from './Bausteine';
  * Komponenten, damit die Vorschau genau dem Druck entspricht.
  */
 
+/** Grund und Schrift des Papiers — das Gutachten und die Vorschau des Deckblatts teilen sie. */
+export const PAPIER = 'bg-white text-slate-800';
+
 /**
  * Der Kopf. Ohne Auftritt wie bisher: Logo, Name und Leitsatz des
  * Rentenplaners. Mit Auftritt steht der Berater vorn; „erstellt mit dem

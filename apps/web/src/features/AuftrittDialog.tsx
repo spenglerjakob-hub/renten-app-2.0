@@ -4,6 +4,7 @@ import { useAuftritt, type SpeichernErgebnis } from '../store/auftritt';
 import { AUFTRITT_LEER, type Auftritt } from './auftritt';
 import { AuftrittFormular } from './AuftrittFormular';
 import { DeckblattVorschau } from './DeckblattVorschau';
+import { FEHLER, Hinweis, KNOPF, KNOPF_KLEIN, KNOPF_KLEIN_GEFAHR } from '../components/stil';
 
 const MELDUNG: Record<SpeichernErgebnis, string> = {
   ok: 'Gespeichert. Ihr nächstes Gutachten trägt Ihren Auftritt.',
@@ -72,13 +73,13 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
   };
 
   if (status === 'laedt' && !gespeichert && !geaendert) {
-    return <p className="text-sm text-slate-500">Wird geladen …</p>;
+    return <p className="text-sm text-ui-schiefer">Wird geladen …</p>;
   }
 
   return (
     <div className="space-y-5">
       {status === 'fehler' && (
-        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p role="alert" className={FEHLER}>
           Ihr gespeicherter Auftritt ließ sich gerade nicht laden. Was Sie jetzt speichern, ersetzt ihn.
         </p>
       )}
@@ -93,49 +94,36 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
 
       <DeckblattVorschau auftritt={entwurf} />
 
-      <p className="rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-        <strong>Tipp:</strong> Schalten Sie im Druckdialog unter „Weitere Einstellungen“ die „Kopf- und
+      <Hinweis>
+        <span className="font-medium">Tipp:</span> Schalten Sie im Druckdialog unter „Weitere Einstellungen“ die „Kopf- und
         Fußzeilen“ aus. Die Fußzeile mit Ihrem Namen und der Seitenzahl setzt das Gutachten selbst (Chrome
         und Edge).
-      </p>
+      </Hinweis>
 
       {meldung && (
-        <p role="status" className={`rounded-md px-3 py-2 text-sm ${meldung.ok ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'}`}>
+        <p role="status" className={meldung.ok ? 'ui-innen px-3 py-2 text-sm text-ui-tinte' : FEHLER}>
           {meldung.text}
         </p>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => void sichern()}
-          disabled={laeuft || !geaendert}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
-        >
+      {/* Speichern ist die Hauptaktion; Entfernen bleibt klein und fragt nach, das Ja in Rot wie jedes Loeschen. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ui-linie pt-4">
+        <button type="button" onClick={() => void sichern()} disabled={laeuft || !geaendert} className={KNOPF}>
           <Save className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird gespeichert …' : 'Speichern'}
         </button>
         {gespeichert && (
           entfernenFrage ? (
-            <span className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
+            <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-ui-tinte">
               Logo und Angaben löschen?
-              <button
-                type="button" onClick={() => void wegnehmen()} disabled={laeuft}
-                className="rounded-md border border-rose-300 bg-white px-2.5 py-1.5 font-bold text-rose-700 hover:bg-rose-50"
-              >
+              <button type="button" onClick={() => void wegnehmen()} disabled={laeuft} className={KNOPF_KLEIN_GEFAHR}>
                 Wirklich entfernen
               </button>
-              <button
-                type="button" onClick={() => setEntfernenFrage(false)}
-                className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 font-bold text-slate-700 hover:bg-slate-50"
-              >
+              <button type="button" onClick={() => setEntfernenFrage(false)} className={KNOPF_KLEIN}>
                 Behalten
               </button>
             </span>
           ) : (
-            <button
-              type="button" onClick={() => setEntfernenFrage(true)} disabled={laeuft}
-              className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
+            <button type="button" onClick={() => setEntfernenFrage(true)} disabled={laeuft} className={KNOPF_KLEIN}>
               <Trash2 className="h-3.5 w-3.5" aria-hidden /> Auftritt entfernen
             </button>
           )

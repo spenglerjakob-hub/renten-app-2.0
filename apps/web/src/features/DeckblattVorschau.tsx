@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { DeckblattHeute, DeckblattKopf, DeckblattTitel } from '../druck/DeckblattKopf';
+import { DeckblattHeute, DeckblattKopf, DeckblattTitel, PAPIER } from '../druck/DeckblattKopf';
 import { akzentVariablen, type Auftritt } from './auftritt';
 
 /** Satzspiegel des Gutachtens: A4 (210 mm) minus 2 × 16 mm Rand = 178 mm, in CSS-Pixeln. */
@@ -36,11 +36,11 @@ export function DeckblattVorschau({ auftritt, fuer = 'Ihren Mandanten', zahlen =
 
   return (
     <figure className="m-0 min-w-0">
-      <div ref={rahmen} className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <div ref={rahmen} className="ui-karte overflow-hidden">
         <div
           aria-hidden="true"
           data-vorschau="deckblatt"
-          className="bg-white text-slate-800"
+          className={PAPIER}
           style={{
             ...(akzentVariablen(auftritt) as CSSProperties),
             width: SATZ_BREITE + 2 * RAND,
@@ -53,7 +53,7 @@ export function DeckblattVorschau({ auftritt, fuer = 'Ihren Mandanten', zahlen =
           {zahlen && <DeckblattHeute bedarf={zahlen.bedarf} netto={zahlen.netto} />}
         </div>
       </div>
-      <figcaption className="mt-1 text-xs text-slate-500">
+      <figcaption className="mt-1.5 text-xs text-ui-schiefer">
         Vorschau des Deckblatts — so steht es im Gutachten.
       </figcaption>
     </figure>

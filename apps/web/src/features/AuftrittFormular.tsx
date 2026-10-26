@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImagePlus, Trash2 } from 'lucide-react';
 import { TextFeld } from '../components/Feld';
-import { FELD_LABEL } from '../components/stil';
+import { FELD_LABEL, KNOPF_KLEIN } from '../components/stil';
 import { logoVorbereiten, type LogoFehler, type VorbereitetesLogo } from '../lib/bild';
 import {
   FARBVORSCHLAEGE, GRENZEN, farbeNormal, linieKaumSichtbar, titelTauglich, type Auftritt,
@@ -47,8 +47,6 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
     onLogo(r);
   };
 
-  const knopf = 'flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-white px-3 py-1.5 text-xs font-medium text-ui-tinte hover:bg-ui-innen disabled:opacity-50';
-
   return (
     <div className="space-y-4">
       {/* ---------- Logo ---------- */}
@@ -61,11 +59,11 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
               : <span className="text-xs text-ui-schiefer">Noch kein Logo</span>}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => dateiRef.current?.click()} disabled={liest} className={knopf}>
+            <button type="button" onClick={() => dateiRef.current?.click()} disabled={liest} className={KNOPF_KLEIN}>
               <ImagePlus className="h-3.5 w-3.5" aria-hidden /> {liest ? 'Wird gelesen …' : wert.logo ? 'Anderes Logo' : 'Logo wählen'}
             </button>
             {wert.logo && (
-              <button type="button" onClick={() => { setFehler(null); onLogo(null); }} className={knopf}>
+              <button type="button" onClick={() => { setFehler(null); onLogo(null); }} className={KNOPF_KLEIN}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden /> Logo entfernen
               </button>
             )}
