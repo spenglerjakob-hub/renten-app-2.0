@@ -236,7 +236,7 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
       {/* Die eine Akzentkarte: was „All inklusive“ kostet, der Preis hervorgehoben. */}
       <div className={`${AKZENT} p-6 sm:p-8`}>
         <p className="text-sm">Beides nutzen?</p>
-        <p className="ui-titel mt-2 text-balance text-[22px] font-normal leading-snug sm:text-[26px]">
+        <p className="ui-titel mt-2 text-balance text-[24px] font-normal leading-snug sm:text-[26px]">
           Mit „All inklusive“ für <Hervor>{preisText(preisJeNutzer('alles', intervall, plaetze))}</Hervor> statt{' '}
           {preisText(preisJeNutzer(paket.id, intervall, plaetze))} je Nutzer und {zeitraum}, {' '}
           {plaetze === 1 ? 'bei einem Nutzer' : `bei ${plaetze} Nutzern`}.

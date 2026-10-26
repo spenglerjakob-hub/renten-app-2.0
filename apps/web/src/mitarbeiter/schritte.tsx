@@ -271,7 +271,7 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
               </div>
               {luecke.lueckeProzent > 0 && (
                 <div className={`${AKZENT} mt-6 px-5 py-4`}>
-                  <p className="ui-titel text-[22px] leading-snug sm:text-[26px]">
+                  <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
                     Im Alter fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
                   </p>
                 </div>

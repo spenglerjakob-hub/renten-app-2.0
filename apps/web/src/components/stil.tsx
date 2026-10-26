@@ -214,6 +214,9 @@ export function Zahl({ etikett, wert, zusatz, punkt }: {
  * geht, in Inter Tight, die Zahl darin hervorgehoben. Hoechstens einer je
  * Ansicht — wie in der Mitarbeiterberatung die Regel der Firma, die Luecke
  * und das Fazit.
+ *
+ * Am Telefon mindestens 24 px: erst ab da gilt der Satz als grosse Schrift,
+ * und das hervorgehobene Wort (4,18:1) erfuellt die 3:1. Bei 22 px galten 4,5:1.
  */
 export function Kernsatz({ etikett, children, gross = false, klasse = '' }: {
   etikett?: ReactNode; children: ReactNode; gross?: boolean; klasse?: string;
@@ -222,7 +225,7 @@ export function Kernsatz({ etikett, children, gross = false, klasse = '' }: {
     <div className={`${AKZENT} ${gross ? 'p-6 sm:p-10' : 'px-5 py-4 sm:px-6 sm:py-5'} ${klasse}`}>
       {etikett && <p className="text-sm">{etikett}</p>}
       <p className={`ui-titel text-balance font-normal ${etikett ? 'mt-2 ' : ''}${
-        gross ? 'text-[26px] leading-[1.25] sm:text-[34px]' : 'text-[22px] leading-snug sm:text-[26px]'
+        gross ? 'text-[26px] leading-[1.25] sm:text-[34px]' : 'text-[24px] leading-snug sm:text-[26px]'
       }`}>
         {children}
       </p>
