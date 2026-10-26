@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // fassung-klassen.txt haelt die Klassen unterschriebener Unterlagen im Stylesheet (siehe dort).
+  content: ['./index.html', './src/**/*.{ts,tsx}', './src/mitarbeiter/fassung-klassen.txt'],
   theme: {
     extend: {
       /*
