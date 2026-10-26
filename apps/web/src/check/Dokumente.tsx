@@ -5,6 +5,7 @@ import {
   type DokumentArt, type DokumentEintrag, type HochladenFehler,
 } from '../lib/check';
 import { bildVorbereiten } from '../lib/bild';
+import { KNOPF, KNOPF_ZWEIT } from '../components/stil';
 
 /**
  * „Statt abtippen: hochladen" — im Vorsorge-Check unter der Unterlage des
@@ -112,16 +113,16 @@ export function DokumentHochladen({
     haken.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
   const gesperrt = frei === 0 || laeuft.length > 0;
-  const knopf = 'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40';
-  const haupt = `${knopf} bg-indigo-600 text-white hover:bg-indigo-500`;
-  const neben = `${knopf} border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50`;
+  const haupt = `${KNOPF} disabled:cursor-not-allowed`;
+  const neben = `${KNOPF_ZWEIT} disabled:cursor-not-allowed`;
 
+  /* Die Ablage gestrichelt wie jede Stelle, an der noch etwas hinein soll — ohne Farbe. */
   return (
-    <div className="mt-3 rounded-lg border-2 border-dashed border-indigo-200 bg-white p-3">
-      <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-        <Camera className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden /> {titel}
+    <div className="mt-4 rounded-[10px] border border-dashed border-ui-feld-rand p-4">
+      <p className="flex items-center gap-2 text-sm font-medium text-ui-tinte">
+        <Camera className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> {titel}
       </p>
-      <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+      <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
         {text ?? 'Foto oder PDF, bis 10 MB je Datei.'} Ihr Berater liest die Zahlen ab — die Felder
         können Sie dann leer lassen.
       </p>
@@ -135,14 +136,14 @@ export function DokumentHochladen({
       */}
       {!einwilligung && (
         <>
-          <label className={`mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-md bg-indigo-50 p-2.5 text-xs leading-relaxed text-slate-700 ${
-            erinnern ? 'ring-2 ring-amber-400' : ''}`}>
+          <label className={`ui-innen mt-3 flex cursor-pointer items-start gap-2.5 p-3 text-xs leading-relaxed text-ui-tinte [&_strong]:font-medium ${
+            erinnern ? 'ring-2 ring-ui-knopf' : ''}`}>
             <input
               ref={haken}
               type="checkbox"
               checked={einwilligung}
               onChange={(e) => onEinwilligung(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
+              className="mt-0.5 h-4 w-4 shrink-0"
             />
             <span>
               Ich willige ein, dass meine Unterlagen beim Hochladen geschützt gespeichert und mit dem Absenden
@@ -151,20 +152,20 @@ export function DokumentHochladen({
               Links. Das schließt Angaben zu Religionszugehörigkeit (Kirchensteuer) und Gesundheit ein, die auf
               Unterlagen stehen können (Art. 9 Abs. 2 lit. a DSGVO). Widerruf jederzeit bei meinem Berater.
               Mehr in der{' '}
-              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-indigo-700 underline">
+              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-ui-tinte underline underline-offset-2">
                 Datenschutzerklärung
               </a>.
             </span>
           </label>
           {erinnern && (
-            <p role="alert" className="mt-1.5 text-xs font-semibold text-amber-800">
+            <p role="alert" className="mt-1.5 text-xs font-medium text-rose-700">
               Bitte setzen Sie zuerst den Haken — dann können Sie Dateien wählen.
             </p>
           )}
         </>
       )}
 
-      <div className="mt-2.5 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {touch && (
           <button type="button" onClick={() => waehlen(kamera.current)} disabled={gesperrt} className={haupt}>
             <Camera className="h-4 w-4" aria-hidden /> Foto aufnehmen
@@ -196,20 +197,21 @@ export function DokumentHochladen({
       )}
 
       {(eigene.length > 0 || laeuft.length > 0) && (
-        <ul className="mt-2.5 space-y-1.5">
+        <ul className="mt-3 space-y-1.5">
           {eigene.map((d) => (
-            <li key={d.pfad} className="flex items-center gap-2 rounded-md bg-slate-50 px-2.5 py-1.5">
+            <li key={d.pfad} className="ui-innen flex items-center gap-2 px-3 py-1.5">
+              {/* Die Art der Datei zeigt das Symbol, nicht eine Farbe. */}
               {d.typ === 'application/pdf'
-                ? <FileText className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
-                : <BildSymbol className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />}
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-800">{d.name}</span>
-              <span className="shrink-0 text-xs tabular-nums text-slate-500">{groesse(d.groesse)}</span>
+                ? <FileText className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+                : <BildSymbol className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />}
+              <span className="min-w-0 flex-1 truncate text-sm text-ui-tinte">{d.name}</span>
+              <span className="shrink-0 text-xs tabular-nums text-ui-schiefer">{groesse(d.groesse)}</span>
               <button
                 type="button"
                 onClick={() => void entfernen(d)}
                 disabled={entfernt === d.pfad}
                 aria-label={`${d.name} entfernen`}
-                className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                className="shrink-0 rounded-full p-1.5 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
               >
                 {entfernt === d.pfad
                   ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -218,10 +220,10 @@ export function DokumentHochladen({
             </li>
           ))}
           {laeuft.map((x) => (
-            <li key={x.id} className="flex items-center gap-2 rounded-md bg-indigo-50 px-2.5 py-1.5 text-sm text-indigo-900">
+            <li key={x.id} className="ui-innen flex items-center gap-2 px-3 py-1.5 text-sm text-ui-tinte">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{x.name}</span>
-              <span className="shrink-0 text-xs">wird hochgeladen …</span>
+              <span className="shrink-0 text-xs text-ui-schiefer">wird hochgeladen …</span>
             </li>
           ))}
         </ul>
@@ -234,7 +236,7 @@ export function DokumentHochladen({
       )}
 
       {einwilligung && frei === 0 && (
-        <p className="mt-2 text-xs text-amber-800">
+        <p className="mt-2 text-xs font-medium text-ui-tinte">
           Es sind {DOKUMENTE_HOECHSTENS} Unterlagen hochgeladen — mehr nimmt ein Check nicht auf.
         </p>
       )}

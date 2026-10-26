@@ -19,6 +19,9 @@ import {
   ZahlFeld, ProzentFeld, DatumFeld, TextFeld, AuswahlFeld, Schalter, euro,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import {
+  EINLEITUNG, Etappen, FEHLER, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, LINK, Titel,
+} from '../components/stil';
 import { Dialog } from '../components/Dialog';
 import { EinkommenFelder } from '../features/EinkommenFelder';
 import { PkvFelder } from '../features/PkvFelder';
@@ -230,14 +233,14 @@ export function Seite() {
     : [['a', 'Sie']];
 
   return (
-    <div className="min-h-screen bg-ui-flaeche text-slate-800 print:min-h-0 print:bg-white">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       <SeitenKopf breite="max-w-4xl" />
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-          Ihre Vorsorge in 7 Schritten
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+        <Titel gross>
+          Ihre Vorsorge in <Hervor>7 Schritten</Hervor>
+        </Titel>
+        <p className={`mt-3 ${EINLEITUNG}`}>
           Wir fragen nur, was für die Berechnung wirklich zählt — und sagen bei jedem Schritt,
           welche Unterlage Sie dafür brauchen. Was Sie gerade nicht zur Hand haben, überspringen
           Sie einfach; es lässt sich später ergänzen.
@@ -250,10 +253,9 @@ export function Seite() {
           Link kam — und genau das steht da.
         */}
         {ANFRAGE && senden !== 'fertig' && (
-          <div role="status" className={`mt-4 rounded-lg border px-3 py-2.5 text-sm leading-relaxed ${
-            codeStatus === 'ungueltig' ? 'border-rose-200 bg-rose-50 text-rose-900'
-              : codeStatus === 'fehler' ? 'border-amber-200 bg-amber-50 text-amber-900'
-                : 'border-indigo-200 bg-indigo-50 text-indigo-900'
+          /* Ein abgelaufener Link ist ein Fehler und steht in Rot; alles andere ruhig auf der Innenflaeche. */
+          <div role="status" className={`mt-6 rounded-[10px] px-4 py-3 text-sm leading-relaxed [&_strong]:font-medium ${
+            codeStatus === 'ungueltig' ? 'border border-rose-200 bg-rose-50 text-rose-900' : 'ui-innen text-ui-tinte'
           }`}>
             {codeStatus === 'ungueltig'
               ? <><strong>Dieser Link ist abgelaufen oder wurde schon genutzt.</strong> Bitte fragen Sie
@@ -274,54 +276,36 @@ export function Seite() {
         )}
 
         {senden === 'fertig' ? (
-          <section className="mt-6 rounded-2xl border-2 border-emerald-300 bg-white p-6 text-center shadow-sm">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" aria-hidden />
-            <h2 className="mt-3 text-xl font-black text-slate-900">Vielen Dank!</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+          <section className="ui-karte mt-8 p-6 text-center sm:p-10">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-ui-tinte" aria-hidden />
+            <h2 className="ui-titel mt-4 text-[26px] font-normal text-ui-tinte">Vielen Dank!</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ui-schiefer">
               Ihre Angaben sind bei Ihrem Berater angekommen. Er rechnet Ihre Vorsorge damit durch
               und bespricht das Ergebnis mit Ihnen. Auf diesem Gerät ist nichts mehr gespeichert.
             </p>
           </section>
         ) : (<>
 
-        {/* --- Fortschritt --- */}
-        <nav aria-label="Schritte" className="mt-6 print:hidden">
-          <ol className="grid grid-cols-7 gap-1">
-            {SCHRITTE.map((t, i) => {
-              const aktiv = i === schritt;
-              const fertig = i < SCHRITTE.length - 1 && vollstaendig(i, x);
-              return (
-                <li key={t}>
-                  <button
-                    type="button"
-                    onClick={() => geheZu(i)}
-                    aria-current={aktiv ? 'step' : undefined}
-                    aria-label={`Schritt ${i + 1}: ${t}`}
-                    className="group flex w-full flex-col items-center gap-1"
-                  >
-                    <span className={`h-1.5 w-full rounded-full ${
-                      aktiv ? 'bg-indigo-600' : fertig ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`} />
-                    <span className={`hidden text-xs font-semibold leading-tight sm:block ${
-                      aktiv ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-700'
-                    }`}>
-                      {t}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-          <p className="mt-2 text-xs font-semibold text-slate-500 sm:hidden">
-            Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}
-          </p>
-        </nav>
+        {/*
+          FORTSCHRITT als duenne Linien wie die Schrittleiste der Beratung:
+          aktuell volle Tinte, erledigt halbe, offen Haarlinie — statt Blau
+          und Gruen. Erledigt heisst vollstaendig, nicht nur besucht.
+        */}
+        <div className="mt-8 print:hidden">
+          <Etappen
+            schritte={SCHRITTE}
+            aktiv={schritt}
+            onWechsel={geheZu}
+            beschriftung="Schritte"
+            erledigt={(i) => i < SCHRITTE.length - 1 && vollstaendig(i, x)}
+          />
+        </div>
 
-        {/* --- Der aktuelle Schritt --- */}
-        <section className="mt-4 rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-4 shadow-sm sm:p-6 print:hidden">
-          <h2 className="text-lg font-black text-slate-900">
-            <span className="text-indigo-600">{schritt + 1}.</span> {SCHRITTE[schritt]}
-          </h2>
+        {/* --- Der aktuelle Schritt: eine weisse Karte wie ein Schritt der Beratung --- */}
+        <section className="ui-karte mt-4 p-5 sm:p-7 print:hidden">
+          <Titel als="h2">
+            <span className="text-ui-schiefer">{schritt + 1}.</span> {SCHRITTE[schritt]}
+          </Titel>
 
           {schritt === 0 && <SchrittHaushalt x={x} setze={setze} setzePerson={setzePerson} />}
           {schritt === 1 && (
@@ -357,20 +341,17 @@ export function Seite() {
             />
           )}
           {schritt === 6 && senden === 'fehler' && (
-            <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            <p role="alert" className={`mt-4 ${FEHLER}`}>
               Das Senden hat nicht geklappt — bitte prüfen Sie Ihre Internetverbindung und versuchen
               Sie es noch einmal. Ihre Angaben sind nicht verloren.
             </p>
           )}
 
           {/* Navigation */}
-          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-indigo-100 pt-4">
+          {/* Wie die Navigation der Beratung: Zurueck mit Kontur, Weiter gefuellt — rechts. */}
+          <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-ui-linie pt-6">
             {schritt > 0 && (
-              <button
-                type="button"
-                onClick={() => geheZu(schritt - 1)}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
+              <button type="button" onClick={() => geheZu(schritt - 1)} className={KNOPF_ZWEIT}>
                 <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
               </button>
             )}
@@ -381,16 +362,12 @@ export function Seite() {
                   <button
                     type="button"
                     onClick={() => geheZu(schritt + 1)}
-                    className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-white"
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
                   >
                     <SkipForward className="h-3.5 w-3.5" aria-hidden /> Habe ich gerade nicht zur Hand
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => geheZu(schritt + 1)}
-                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"
-                >
+                <button type="button" onClick={() => geheZu(schritt + 1)} className={KNOPF}>
                   Weiter <ArrowRight className="h-4 w-4" aria-hidden />
                 </button>
               </>
@@ -399,17 +376,13 @@ export function Seite() {
                 type="button"
                 onClick={() => void absenden()}
                 disabled={!einwilligung || codeStatus === 'ungueltig' || senden === 'laeuft'}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`${KNOPF} disabled:cursor-not-allowed`}
               >
                 <Send className="h-4 w-4" aria-hidden />
                 {senden === 'laeuft' ? 'Wird gesendet …' : 'An meinen Berater senden'}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={berechnen}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500"
-              >
+              <button type="button" onClick={berechnen} className={KNOPF}>
                 <Calculator className="h-4 w-4" aria-hidden /> Ergebnis berechnen
               </button>
             )}
@@ -418,7 +391,7 @@ export function Seite() {
 
         </>)}
 
-        <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
+        <p className="mt-8 text-center text-xs leading-relaxed text-ui-schiefer">
           {ANFRAGE
             ? `Ihre Angaben bleiben in Ihrem Browser, bis Sie sie absenden. Übermittelt werden sie verschlüsselt und nur an Ihren Berater.${
               x.dokumente.length > 0 ? ' Hochgeladene Unterlagen liegen bis dahin geschützt auf dem Server; Ihr Berater sieht sie erst nach dem Absenden.' : ''}`
@@ -435,18 +408,10 @@ export function Seite() {
         onSchliessen={() => setErsetzenOffen(false)}
       >
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setErsetzenOffen(false)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
+          <button type="button" onClick={() => setErsetzenOffen(false)} className={KNOPF_ZWEIT}>
             Abbrechen
           </button>
-          <button
-            type="button"
-            onClick={uebernehmen}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-500"
-          >
+          <button type="button" onClick={uebernehmen} className={KNOPF}>
             Ersetzen und berechnen
           </button>
         </div>
@@ -459,24 +424,20 @@ export function Seite() {
    Bausteine
    -------------------------------------------------------------------------- */
 
-/** „Das brauchen Sie" — die Unterlage zu diesem Schritt und wo die Zahl steht. */
+/** „Das brauchen Sie" — die Unterlage zu diesem Schritt und wo die Zahl steht: ein ruhiger Hinweis statt eines gelben Kastens. */
 function Unterlage({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-      <div className="text-xs leading-relaxed text-amber-900">
-        <span className="font-bold">Das brauchen Sie: </span>{children}
-      </div>
-    </div>
+    <Hinweis symbol={FileText} klasse="mt-5 [&_strong]:font-medium">
+      <span className="font-medium">Das brauchen Sie: </span>{children}
+    </Hinweis>
   );
 }
 
+/** Ein Abschnitt der Karte, durch eine Haarlinie getrennt; die Ueberschrift nennt die Person, wenn es zwei gibt. */
 function Block({ titel, children }: { titel?: string; children: ReactNode }) {
   return (
-    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
-      {titel && (
-        <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</h3>
-      )}
+    <div className="mt-6 border-t border-ui-linie pt-6">
+      {titel && <h3 className="mb-4 text-base font-medium text-ui-tinte">{titel}</h3>}
       {children}
     </div>
   );
@@ -497,7 +458,7 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
       </Unterlage>
 
       <Block>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <TextFeld label="Ihr Vor- und Nachname" wert={x.a.name} onChange={(s) => setzePerson('a', { name: s })} />
           <DatumFeld label="Ihr Geburtsdatum" wert={x.a.geburtsdatum}
             onChange={(s) => setzePerson('a', { geburtsdatum: s })} />
@@ -507,7 +468,7 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
             onChange={(b) => setze({ verheiratet: b })} />
         </div>
         {x.verheiratet && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <TextFeld label="Vor- und Nachname Partner/in" wert={x.b.name} onChange={(s) => setzePerson('b', { name: s })} />
             <DatumFeld label="Geburtsdatum Partner/in" wert={x.b.geburtsdatum}
               onChange={(s) => setzePerson('b', { geburtsdatum: s })} />
@@ -536,7 +497,7 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
             stufen
           />
           {x.kinder.length > 0 && (
-            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+            <div className="ui-innen mt-2 p-3">
               <KinderZeilen
                 kinder={x.kinder}
                 onKind={(index, p) => setze({
@@ -640,10 +601,11 @@ function SchrittKv({ x, setze, personen, upload }: {
               type="button"
               onClick={() => setze({ kv: art })}
               aria-pressed={x.kv === art}
-              className={`rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold ${
+              // Gewaehlt wie ein Reiter: gefuellt in Soot.
+              className={`rounded-[8px] border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                 x.kv === art
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-900'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'border-ui-dunkel bg-ui-dunkel text-white'
+                  : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
               }`}
             >
               {art === 'gesetzlich' ? 'Gesetzlich versichert' : 'Privat versichert'}
@@ -704,7 +666,7 @@ function SchrittRente({ x, personen, setzePerson, upload }: {
           href={DRV_ESERVICE}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-2 flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+          className={`${LINK} mt-2 underline`}
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden />
           Renteninformation / Rentenauskunft online anfordern (Deutsche Rentenversicherung)
@@ -762,7 +724,7 @@ function RenteJePerson({ p, name, setze }: {
       ) : (
         <>
           {selbstOhneGrv && (
-            <p className="mb-2 text-xs leading-relaxed text-slate-500">
+            <p className="mb-3 text-xs leading-relaxed text-ui-schiefer">
               Sie zahlen nach Ihren Angaben nicht in die gesetzliche Rentenversicherung ein. Einen
               Anspruch aus früheren Jahren als Angestellte/r tragen Sie trotzdem hier ein — oder
               lassen das Feld leer.
@@ -783,7 +745,7 @@ function RenteJePerson({ p, name, setze }: {
                 type="button"
                 onClick={schaetzen}
                 disabled={!parseDatum(p.geburtsdatum) || (e.modus !== 'selbststaendig' && e.betrag <= 0)}
-                className="mb-5 flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`mb-6 ${KNOPF_KLEIN} disabled:cursor-not-allowed`}
               >
                 <Calculator className="h-3.5 w-3.5" aria-hidden /> Keine Renteninformation? Schätzen
               </button>
@@ -827,7 +789,7 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
       {upload}
 
       {x.vertraege.length === 0 && (
-        <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm text-slate-500">
+        <p className="mt-6 rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-5 text-center text-sm text-ui-schiefer">
           {x.dokumente.some((d) => d.art === 'vertraege')
             ? 'Ihre Standmitteilungen sind hochgeladen — Ihr Berater übernimmt die Verträge daraus.'
             : 'Noch keine Verträge. Keine zu haben ist auch eine Angabe — dann einfach weiter.'}
@@ -840,18 +802,18 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
         const immobilie = v.typ === 'immobilie';
         return (
           <Block key={v.id}>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Vertrag {i + 1}</span>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-base font-medium text-ui-tinte">Vertrag {i + 1}</span>
               <button
                 type="button"
                 onClick={() => setze({ vertraege: x.vertraege.filter((w) => w.id !== v.id) })}
                 aria-label={`Vertrag ${i + 1} entfernen`}
-                className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                className="rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700"
               >
                 <Trash2 className="h-4 w-4" aria-hidden />
               </button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <AuswahlFeld label="Art" wert={v.typ} onChange={(t) => aendern(v.id, { typ: t })}
                 optionen={VERTRAGSARTEN} />
               {x.verheiratet && (
@@ -890,11 +852,7 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
         );
       })}
 
-      <button
-        type="button"
-        onClick={neu}
-        className="mt-4 flex items-center gap-1.5 rounded-lg border-2 border-dashed border-indigo-300 bg-white px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50"
-      >
+      <button type="button" onClick={neu} className={`mt-6 ${KNOPF_ZWEIT}`}>
         <Plus className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
       </button>
     </>
@@ -926,17 +884,17 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
         gerechnet in <strong>heutigem Geld</strong>? Die Preissteigerung bis dahin rechnen wir selbst hinzu.
       </Unterlage>
       <Block>
-        <div className="grid items-end gap-3 sm:grid-cols-2">
+        <div className="grid items-end gap-4 sm:grid-cols-2">
           <ZahlFeld label="Gewünschtes Netto im Monat (heutiges Geld)" wert={x.zielNettoHeute}
             onChange={(n) => setze({ zielNettoHeute: n })} einheit="€" />
           {vorschlag > 0 && (
             <button
               type="button"
               onClick={() => setze({ zielNettoHeute: vorschlag })}
-              className="mb-0.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
+              className="mb-0.5 rounded-[8px] border border-ui-zweit-rand bg-ui-karte px-3 py-2 text-left text-xs text-ui-tinte transition-colors hover:bg-ui-hover"
             >
-              Vorschlag übernehmen: <strong>{euro(vorschlag)}</strong>
-              <span className="block text-xs text-slate-500">
+              Vorschlag übernehmen: <span className="font-medium">{euro(vorschlag)}</span>
+              <span className="block text-xs text-ui-schiefer">
                 drei Viertel Ihres heutigen Nettos von rund {euro(nettoHeute)}
               </span>
             </button>
@@ -979,19 +937,20 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
 
   return (
     <>
-      <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+      {/* Zeilen mit Haarlinien wie die Liste der Beratungen; offen ein leerer Kreis, erledigt ein Haken — in Tinte. */}
+      <ul className="mt-5 divide-y divide-ui-linie border-y border-ui-linie">
         {SCHRITTE.slice(0, 6).map((t, i) => {
           const ok = vollstaendig(i, x);
           const unterlagen = unterlagenZu(i, x);
           const nurUnterlagen = unterlagen > 0 && !felderVollstaendig(i, x);
           return (
-            <li key={t} className="flex items-center gap-3 px-3 py-2.5">
+            <li key={t} className="flex items-center gap-3 py-3">
               {ok
-                ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-label="vollständig" />
-                : <CircleDashed className="h-5 w-5 shrink-0 text-amber-500" aria-label="offen" />}
+                ? <CheckCircle2 className="h-5 w-5 shrink-0 text-ui-tinte" aria-label="vollständig" />
+                : <CircleDashed className="h-5 w-5 shrink-0 text-ui-schiefer" aria-label="offen" />}
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-slate-800">{t}</div>
-                <div className="truncate text-xs text-slate-500">
+                <div className="text-sm font-medium text-ui-tinte">{t}</div>
+                <div className="truncate text-xs text-ui-schiefer">
                   {nurUnterlagen
                     ? `${unterlagen} Unterlage${unterlagen > 1 ? 'n' : ''} hochgeladen — Ihr Berater liest die Zahlen ab`
                     : ok
@@ -999,8 +958,7 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
                       : 'Noch offen — der Rechner nimmt dafür einen Standardwert.'}
                 </div>
               </div>
-              <button type="button" onClick={() => geheZu(i)}
-                className="shrink-0 rounded px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-50">
+              <button type="button" onClick={() => geheZu(i)} className={KNOPF_KLEIN}>
                 {ok ? 'Ändern' : 'Ergänzen'}
               </button>
             </li>
@@ -1011,7 +969,7 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
       {upload}
 
       {anfrage ? (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
+        <div className="ui-innen mt-5 p-4 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
           <strong>So geht es weiter:</strong> Mit „An meinen Berater senden“ gehen Ihre Angaben an
           den Berater, der Ihnen den Link geschickt hat. Er rechnet damit Ihre Versorgung im
           Ruhestand durch und bespricht das Ergebnis mit Ihnen.
@@ -1029,12 +987,12 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
             muessen beim Namen genannt sein. Die Loeschfrist steht hier, weil
             der Kunde sonst nicht weiss, wie lange er einwilligt.
           */}
-          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md bg-white p-2.5 text-xs leading-relaxed text-slate-700">
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-[8px] border border-ui-linie bg-ui-karte p-3 text-xs leading-relaxed text-ui-tinte">
             <input
               type="checkbox"
               checked={einwilligung}
               onChange={(e) => setEinwilligung(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600"
+              className="mt-0.5 h-4 w-4 shrink-0"
             />
             <span>
               Ich willige ein, dass meine Angaben{x.dokumente.length > 0 && ' und die hochgeladenen Unterlagen'} an
@@ -1044,14 +1002,14 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
               (Kirchensteuer) oder meine Gesundheit (Zuschlag der privaten Krankenversicherung) zulassen
               (Art. 9 Abs. 2 lit. a DSGVO). Die Einwilligung ist freiwillig und kann jederzeit mit Wirkung
               für die Zukunft bei meinem Berater widerrufen werden. Mehr in der{' '}
-              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-emerald-800 underline">
+              <a href="/datenschutz" target="_blank" rel="noopener" className="font-medium text-ui-tinte underline underline-offset-2">
                 Datenschutzerklärung
               </a>.
             </span>
           </label>
         </div>
       ) : (
-      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
+      <div className="ui-innen mt-5 p-4 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
         <strong>So geht es weiter:</strong> Mit „Ergebnis berechnen“ übernimmt der Rentenplaner Ihre
         Angaben und rechnet Ihre Versorgung im Ruhestand durch — Einkünfte, Versorgungslücke,
         Prüfung Ihrer Verträge und ungenutzte Förderung. Beim ersten Mal legen Sie dort ein
