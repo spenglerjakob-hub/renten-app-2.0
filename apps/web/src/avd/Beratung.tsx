@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Mail, Copy, Check } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
 import type { AvdKind } from '@renten/engine';
-import { TextFeld, euro } from '../components/Feld';
+import { NamenFelder, TextFeld, euro } from '../components/Feld';
 import { Hinweis, KNOPF, KNOPF_ZWEIT } from '../components/stil';
+import { vollerName, type NamensTeile } from '../lib/namen';
 
 /** Die Eckdaten der Rechnung, die mit in die Anfrage gehen. */
 export interface Eckdaten {
@@ -72,21 +73,22 @@ function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): 
  * glaubt, die Seite verschicke etwas, waere sonst zu Recht veraergert.
  */
 export function BeratungDialog({
-  offen, onSchliessen, empfaenger, eckdaten,
+  offen, onSchliessen, empfaenger, eckdaten, name: teile, onName,
 }: {
   offen: boolean;
   onSchliessen: () => void;
   empfaenger: string;
   eckdaten: Eckdaten;
+  /** Derselbe Name wie auf der Seite — wer ihn dort schon eingetragen hat, tippt ihn hier nicht noch einmal. */
+  name: NamensTeile;
+  onName: (n: NamensTeile) => void;
 }) {
-  const [vorname, setVorname] = useState('');
-  const [nachname, setNachname] = useState('');
   const [telefon, setTelefon] = useState('');
   const [zeit, setZeit] = useState('');
   const [kopiert, setKopiert] = useState(false);
 
-  const name = `${vorname} ${nachname}`.trim();
-  const bereit = vorname.trim().length > 0 && nachname.trim().length > 0;
+  const name = vollerName(teile);
+  const bereit = teile.vorname.trim().length > 0 && teile.nachname.trim().length > 0;
 
   const betreff = `Beratung zum Altersvorsorgedepot${name ? ` — ${name}` : ''}`;
   const text = anfrageText(name, telefon.trim(), zeit.trim(), eckdaten);
@@ -112,8 +114,8 @@ export function BeratungDialog({
     >
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextFeld label="Vorname" wert={vorname} onChange={setVorname} platzhalter="Max" />
-          <TextFeld label="Nachname" wert={nachname} onChange={setNachname} platzhalter="Mustermann" />
+          <NamenFelder vorname={teile.vorname} nachname={teile.nachname} onChange={onName}
+            platzhalter={['Max', 'Mustermann']} eigener />
           <TextFeld label="Telefon (freiwillig)" wert={telefon} onChange={setTelefon}
             platzhalter="0170 1234567" />
           <TextFeld label="Wann erreichbar? (freiwillig)" wert={zeit} onChange={setZeit}

@@ -10,13 +10,14 @@ import {
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile,
+  ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile, NamenFelder,
   euro, prozent,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
-  EINLEITUNG, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Karte, Kernsatz, Titel, Vermerk, Zahl,
+  EINLEITUNG, FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Karte, Kernsatz, LINK, Regler, Titel, Vermerk, Zahl,
 } from '../components/stil';
+import { vollerName, type NamensTeile } from '../lib/namen';
 import { KapitalaufbauDiagramm } from './Diagramme';
 import { BeratungDialog, type Eckdaten } from './Beratung';
 import { GeburtsdatumDialog } from './Geburtsdatum';
@@ -62,6 +63,15 @@ export function Seite() {
   const [bruttoJahr, setBruttoJahr] = useState<number>(BEISPIEL.bruttoJahr);
   const [rendite, setRendite] = useState(0.04);
   const [verheiratet, setVerheiratet] = useState(false);
+  /**
+   * Der Name — freiwillig, fuer den Ausdruck und die Beratungsanfrage. Er
+   * bleibt wie alles hier nur im Speicher der Seite und hebt das Beispiel
+   * nicht auf: Es geht um die Zahlen.
+   */
+  const [name, setName] = useState<NamensTeile>({ vorname: '', nachname: '' });
+  const ganzerName = vollerName(name);
+  /** Den Beitrag genau eintippen — fuer Betraege zwischen den Stufen des Reglers oder darueber. */
+  const [genau, setGenau] = useState(false);
   /** Solange nichts angefasst wurde, sind die Zahlen als Beispiel markiert. */
   const [istBeispiel, setIstBeispiel] = useState(true);
   const [wissenOffen, setWissenOffen] = useState(false);
@@ -80,6 +90,7 @@ export function Seite() {
 
   const leeren = () => {
     setIstBeispiel(false);
+    setName({ vorname: '', nachname: '' });
     setBeitragMonat(0);
     setKinderListe([]);
     setGeburtsdatum('');
@@ -201,6 +212,8 @@ export function Seite() {
         <Titel gross klasse="print:text-3xl">
           Altersvorsorgedepot: Was Ihnen der Staat ab 2027 <Hervor>dazugibt</Hervor>
         </Titel>
+        {/* Im Druck steht, fuer wen gerechnet wurde — wie „für …“ auf dem Deckblatt des Gutachtens. */}
+        {ganzerName && <p className="mt-2 hidden text-lg text-ui-tinte print:block">für {ganzerName}</p>}
         {/* Drei kurze Punkte statt eines Absatzes: Wer die Seite ueber einen
             QR-Code auf dem Telefon oeffnet, ueberspringt einen Textblock — drei
             Zeilen mit Symbol liest er. */}
@@ -284,41 +297,44 @@ export function Seite() {
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <div>
-              <ZahlFeld label="Beitrag monatlich" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€"
-                hilfe="Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage." />
-              {/* Schnellwahl: die Betraege, an denen sich die Foerderung
-                  entscheidet, dazu 100 EUR als runder Mittelweg. Einen Knopf
-                  "Maximum" gibt es bewusst nicht — oberhalb der Foerdergrenze
-                  kommt keine Zulage mehr dazu, er verspraeche also mehr, als
-                  es gibt. Zwei Spalten auf dem Telefon: vier Knoepfe
-                  nebeneinander waeren dort zu schmal zum Treffen. */}
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <SchnellWahl
-                  betragJahr={a.mindesteigenbeitragJahr}
-                  text="Mindestbeitrag"
-                  aktiv={beitragMonat * 12 === a.mindesteigenbeitragJahr}
-                  onWaehlen={() => eigen(setBeitragMonat)(a.mindesteigenbeitragJahr / 12)}
-                />
-                <SchnellWahl
-                  betragJahr={a.kinderzulage}
-                  text="Volle Kinderzulage"
-                  aktiv={beitragMonat * 12 === a.kinderzulage}
-                  onWaehlen={() => eigen(setBeitragMonat)(a.kinderzulage / 12)}
-                />
-                <SchnellWahl
-                  betragJahr={1200}
-                  text="Mittelweg"
-                  aktiv={beitragMonat * 12 === 1200}
-                  onWaehlen={() => eigen(setBeitragMonat)(100)}
-                />
-                <SchnellWahl
-                  betragJahr={a.stufe2Grenze}
-                  text="Volle Förderung"
-                  aktiv={beitragMonat * 12 === a.stufe2Grenze}
-                  onWaehlen={() => eigen(setBeitragMonat)(a.stufe2Grenze / 12)}
-                />
+            <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1">
+              <NamenFelder vorname={name.vorname} nachname={name.nachname} onChange={setName}
+                platzhalter={['Max', 'Mustermann']} eigener />
+              <p className="col-span-2 -mt-1 text-xs leading-relaxed text-ui-schiefer">
+                Freiwillig — für den Ausdruck. Die Seite speichert nichts.
+              </p>
+            </div>
+
+            {/*
+              Der Beitrag am Regler in 10-€-Schritten wie der Regler der
+              Beratung — bis zur vollen Foerderung; darueber kommt keine Zulage
+              mehr dazu. Was dazwischen oder darueber liegt (25 € fuer die volle
+              Kinderzulage, 200 €), laesst sich genau eintippen.
+            */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <p className={FELD_LABEL}>Beitrag monatlich</p>
+              <p className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
+                <span className="ui-titel text-[40px] font-normal leading-none text-ui-tinte">{euro(beitragMonat)}</span>
+                <span className="text-sm text-ui-schiefer">im Monat · {euro(beitragMonat * 12)} im Jahr</span>
+              </p>
+              <Regler
+                wert={beitragMonat} max={a.stufe2Grenze / 12} schritt={10} onChange={eigen(setBeitragMonat)}
+                beschriftung="Beitrag im Monat" wertText={`${beitragMonat} Euro im Monat`} klasse="mt-4"
+              />
+              <div className="mt-1 flex justify-between text-xs tabular-nums text-ui-schiefer">
+                <span>{euro(0)}</span><span>{euro(a.stufe2Grenze / 12)} · volle Förderung</span>
               </div>
+              <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+                Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage.
+              </p>
+              <button type="button" onClick={() => setGenau((x) => !x)} aria-expanded={genau} className={`${LINK} mt-2`}>
+                {genau ? 'Genaue Eingabe ausblenden' : 'Betrag genau eingeben'}
+              </button>
+              {genau && (
+                <div className="mt-2">
+                  <ZahlFeld label="Beitrag monatlich, genau" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€" />
+                </div>
+              )}
             </div>
 
             <DatumFeld label="Geburtsdatum" wert={geburtsdatum} onChange={eigen(setGeburtsdatum)}
@@ -718,6 +734,8 @@ export function Seite() {
         onSchliessen={() => setBeratungOffen(false)}
         empfaenger={BERATER_MAIL}
         eckdaten={eckdaten}
+        name={name}
+        onName={setName}
       />
     </div>
   );
@@ -757,29 +775,6 @@ function Summe({ text, wert }: { text: string; wert: string }) {
       <dt className="text-sm font-medium text-ui-tinte">{text}</dt>
       <dd className="text-xl font-medium tabular-nums text-ui-tinte">{wert}</dd>
     </div>
-  );
-}
-
-function SchnellWahl({ betragJahr, text, aktiv, onWaehlen }: {
-  betragJahr: number; text: string; aktiv: boolean; onWaehlen: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onWaehlen}
-      aria-pressed={aktiv}
-      // Gewaehlt wie ein Reiter: gefuellt in Soot.
-      className={`rounded-[8px] border px-2 py-1.5 text-center transition-colors ${
-        aktiv ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
-      }`}
-    >
-      <span className="block text-sm font-medium tabular-nums">
-        {euro(betragJahr / 12)}
-      </span>
-      <span className={`block text-xs leading-tight ${aktiv ? 'text-white/80' : 'text-ui-schiefer'}`}>
-        {text} · {euro(betragJahr)} im Jahr
-      </span>
-    </button>
   );
 }
 

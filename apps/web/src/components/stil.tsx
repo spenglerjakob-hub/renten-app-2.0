@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { Info, type LucideIcon } from 'lucide-react';
 
 /*
@@ -255,6 +255,32 @@ export function Anteile({ teile, format }: {
         ))}
       </dl>
     </>
+  );
+}
+
+/**
+ * Der Regler des Stils (index.css: .ui-regler), gefuellt bis zum Wert — fuer
+ * Betraege in festen Schritten. Die Pfeiltasten gehen je einen Schritt. Liegt
+ * der Wert ausserhalb der Spanne, steht der Regler am Rand; die Zahl daneben
+ * nennt den echten Wert.
+ */
+export function Regler({ wert, min = 0, max, schritt, onChange, beschriftung, wertText, klasse = '' }: {
+  wert: number; min?: number; max: number; schritt: number; onChange: (n: number) => void;
+  /** Wofuer der Regler steht — fuer Screenreader, die Beschriftung steht sichtbar daneben */
+  beschriftung: string;
+  /** Der Wert in Worten, etwa „100 Euro im Monat“ */
+  wertText: string;
+  klasse?: string;
+}) {
+  const w = Math.min(max, Math.max(min, wert));
+  return (
+    <input
+      type="range" min={min} max={max} step={schritt} value={w}
+      onChange={(e) => onChange(Number(e.target.value))}
+      aria-label={beschriftung} aria-valuetext={wertText}
+      style={{ '--anteil': `${((w - min) / Math.max(1, max - min)) * 100}%` } as CSSProperties}
+      className={`ui-regler block w-full ${klasse}`}
+    />
   );
 }
 

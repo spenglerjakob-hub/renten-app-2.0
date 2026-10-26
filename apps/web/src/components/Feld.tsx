@@ -289,6 +289,35 @@ export function ProzentFeld(props: {
   );
 }
 
+/** Hoechstlaenge je Namensteil — beide zusammen passen in die 120 Zeichen des ganzen Namens. */
+export const NAMENSTEIL_MAX = 59;
+
+/**
+ * Vor- und Nachname in zwei Feldern — als Paar nebeneinander im Raster der
+ * Umgebung. Gespeichert wird beides getrennt und dazu der ganze Name
+ * (lib/namen.ts), den Druck, Listen und die Live-Seite lesen.
+ *
+ * `eigener`: der Name der Person am Geraet (Depot-Seite, Auftritt) — dann
+ * darf der Browser ihn vorschlagen. Fuer Kunden und Mitarbeiter nicht: Er
+ * truege sonst den Namen des Beraters ein.
+ */
+export function NamenFelder({ vorname, nachname, onChange, beschriftung = ['Vorname', 'Nachname'], platzhalter, eigener = false }: {
+  vorname: string; nachname: string;
+  onChange: (teile: { vorname: string; nachname: string }) => void;
+  beschriftung?: readonly [string, string];
+  platzhalter?: readonly [string, string];
+  eigener?: boolean;
+}) {
+  return (
+    <>
+      <TextFeld label={beschriftung[0]} wert={vorname} onChange={(v) => onChange({ vorname: v, nachname })}
+        platzhalter={platzhalter?.[0]} maxLaenge={NAMENSTEIL_MAX} autoComplete={eigener ? 'given-name' : 'off'} />
+      <TextFeld label={beschriftung[1]} wert={nachname} onChange={(n) => onChange({ vorname, nachname: n })}
+        platzhalter={platzhalter?.[1]} maxLaenge={NAMENSTEIL_MAX} autoComplete={eigener ? 'family-name' : 'off'} />
+    </>
+  );
+}
+
 export function TextFeld(props: {
   label: string; wert: string; onChange: (s: string) => void;
   platzhalter?: string; fehler?: string | null;
