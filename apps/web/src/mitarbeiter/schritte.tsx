@@ -8,8 +8,9 @@ import {
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
-  AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
+  AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, NamenFelder, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
+import { mitName, namensTeile } from '../lib/namen';
 import { laufzeitText } from '../features/tuev-berechnung';
 import {
   AKZENT, Anteile, ETIKETT, FELD_LABEL, Hervor, Hinweise, KNOPF, KNOPF_ZWEIT, Karte, LINK, Posten, SCHWEBEND, TextBereich, Titel,
@@ -136,7 +137,9 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Karte titel="Zur Person">
         <div className="space-y-3">
-          <TextFeld label="Name" wert={a.name} onChange={(name) => setzeA({ name })} maxLaenge={120} autoComplete="off" />
+          <div className="grid grid-cols-2 gap-3">
+            <NamenFelder {...namensTeile(a.name, a.vorname, a.nachname)} onChange={(teile) => setzeA(mitName(teile))} />
+          </div>
           <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
           <div>
             <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}

@@ -62,7 +62,15 @@ export const firmenAngebotSchema = z.object({
 });
 
 export const beratungAngabenSchema = z.object({
+  /** Der ganze Name — ihn lesen Liste, Unterlagen, Unterschrift und die Live-Seite. */
   name: z.string().max(120).default(''),
+  /**
+   * Vor- und Nachname, getrennt erfasst. `name` wird bei jeder Eingabe
+   * mitgeschrieben; passen beide nicht mehr zu ihm, gilt `name`
+   * (apps/web lib/namen.ts). Leer in Beratungen von vor der Trennung.
+   */
+  vorname: z.string().max(60).default(''),
+  nachname: z.string().max(60).default(''),
   geburtsdatum: datum(),
   jahresbrutto: betrag(2_000_000).default(0),
   /** Leer: das Bundesland der Firma */
