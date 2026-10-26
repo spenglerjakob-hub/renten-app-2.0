@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { zufallsname } from './check';
 import { GRENZEN, farbeNormal, type Auftritt, type AuftrittText } from '../features/auftritt';
+import { namensTeile } from './namen';
 
 /**
  * „Ihr Auftritt im Gutachten“ im Konto: die Zeile in `berater_profil` und das
@@ -21,8 +22,9 @@ export interface Profil {
   logoPfad: string | null;
 }
 
-const SPALTEN = 'firma, berater, telefon, email, web, zusatz, farbe, logo';
-const TEXTE: AuftrittText[] = ['firma', 'berater', 'telefon', 'email', 'web', 'zusatz'];
+// vorname/nachname seit Migration 20261026120000; `berater` bleibt der ganze Name.
+const SPALTEN = 'firma, berater, vorname, nachname, telefon, email, web, zusatz, farbe, logo';
+const TEXTE: AuftrittText[] = ['firma', 'berater', 'vorname', 'nachname', 'telefon', 'email', 'web', 'zusatz'];
 
 type Zeile = Record<AuftrittText, string> & { farbe: string | null; logo: string | null };
 
@@ -53,7 +55,8 @@ export async function profilLaden(): Promise<Profil | null | 'fehler'> {
     const z = data as unknown as Zeile;
     const angaben = Object.fromEntries(TEXTE.map((k) => [k, typeof z[k] === 'string' ? z[k] : ''])) as Record<AuftrittText, string>;
     return {
-      angaben: { ...angaben, farbe: farbeNormal(z.farbe) },
+      // Hat die Live-Seite den Namen geaendert, passen die Teile nicht mehr — dann gilt `berater`.
+      angaben: { ...angaben, ...namensTeile(angaben.berater, angaben.vorname, angaben.nachname), farbe: farbeNormal(z.farbe) },
       logoPfad: typeof z.logo === 'string' && z.logo !== '' ? z.logo : null,
     };
   } catch {

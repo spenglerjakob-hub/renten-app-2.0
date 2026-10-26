@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImagePlus, Trash2 } from 'lucide-react';
-import { TextFeld } from '../components/Feld';
+import { NamenFelder, TextFeld } from '../components/Feld';
+import { namensTeile, vollerName } from '../lib/namen';
 import { FELD_LABEL, KNOPF_KLEIN } from '../components/stil';
 import { logoVorbereiten, type LogoFehler, type VorbereitetesLogo } from '../lib/bild';
 import {
@@ -91,16 +92,13 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
       {voll && (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld
-              label="Ihr Name" wert={wert.berater} onChange={(s) => onAendern({ berater: s })}
-              maxLaenge={GRENZEN.berater} autoComplete="name"
-            />
+            {/* Vor- und Nachname getrennt; der ganze Name (`berater`) steht im Briefkopf und wird mitgeschrieben. */}
+            <NamenFelder {...namensTeile(wert.berater, wert.vorname, wert.nachname)} beschriftung={['Ihr Vorname', 'Ihr Nachname']}
+              onChange={(teile) => onAendern({ ...teile, berater: vollerName(teile) })} eigener />
             <TextFeld
               label="Telefon" typ="tel" wert={wert.telefon} onChange={(s) => onAendern({ telefon: s })}
               maxLaenge={GRENZEN.telefon} autoComplete="tel"
             />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <TextFeld
                 label="E-Mail" typ="email" wert={wert.email} onChange={(s) => onAendern({ email: s })}

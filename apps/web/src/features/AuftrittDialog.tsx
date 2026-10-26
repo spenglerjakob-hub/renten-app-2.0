@@ -50,8 +50,8 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
   const sichern = async () => {
     setLaeuft(true);
     // Das Logo geht als Datei (neuesLogo), nicht als Anzeige-URL.
-    const { firma, berater, telefon, email, web, zusatz, farbe } = entwurf;
-    const r = await speichern({ firma, berater, telefon, email, web, zusatz, farbe }, neuesLogo);
+    const { firma, berater, vorname, nachname, telefon, email, web, zusatz, farbe } = entwurf;
+    const r = await speichern({ firma, berater, vorname, nachname, telefon, email, web, zusatz, farbe }, neuesLogo);
     setLaeuft(false);
     setMeldung({ ok: r === 'ok', text: MELDUNG[r] });
     if (r === 'ok') { setGeaendert(false); setNeuesLogo(undefined); }

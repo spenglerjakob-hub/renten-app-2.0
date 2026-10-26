@@ -427,7 +427,8 @@ export default function App() {
     const logo = e.logo ? dataUrlZuBlob(e.logo) : null;
     const r = await useAuftritt.getState().speichern({
       firma: e.firma.trim() || basis.firma,
-      berater: basis.berater, telefon: basis.telefon, email: basis.email, web: basis.web, zusatz: basis.zusatz,
+      berater: basis.berater, vorname: basis.vorname, nachname: basis.nachname,
+      telefon: basis.telefon, email: basis.email, web: basis.web, zusatz: basis.zusatz,
       farbe: e.farbe ?? basis.farbe,
     }, logo ?? undefined);
     if (r !== 'ok') return false;
