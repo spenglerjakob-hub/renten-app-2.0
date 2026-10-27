@@ -4,12 +4,12 @@ import type { Beratung, Firma } from '../lib/bav-beratung';
 import { csvDateiname, csvZelle, uebersichtCsv, uebersichtSummen, uebersichtZeilen } from './uebersicht-daten';
 
 const firma: Firma = {
-  id: 'f', name: 'Muster GmbH', logoPfad: null, geaendertAm: '',
+  id: 'f', name: 'Muster GmbH', logoPfad: null, geaendertAm: '', besitzer: 'a', eigene: true, buero: null,
   angebot: firmenAngebotSchema.parse({ modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } }),
 };
 
 const beratung = (id: string, name: string, status: Beratung['status'], umwandlungMonat: number, beginn = ''): Beratung => ({
-  id, firma: 'f', mitarbeiter: name, status, beratenAm: null, geaendertAm: '',
+  id, firma: 'f', mitarbeiter: name, status, beratenAm: null, geaendertAm: '', besitzer: 'a', eigene: true,
   daten: beratungDatenSchema.parse({
     angaben: { name, geburtsdatum: '01.01.1990', jahresbrutto: 48_000 },
     umwandlungMonat,

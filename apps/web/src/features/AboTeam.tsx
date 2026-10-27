@@ -13,7 +13,7 @@ import {
 } from '../lib/team';
 import { useAuth } from '../store/auth';
 import {
-  aboAktiv, datum, fruehstartVorbei, tage, tageBis, useZugang, wirksam, type AboAngaben, type Vorschau, type Zugang,
+  aboAktiv, datum, deckt, fruehstartVorbei, tage, tageBis, useZugang, wirksam, type AboAngaben, type Vorschau, type Zugang,
 } from '../store/zugang';
 
 // Nur der Betreiber braucht es — Kunden laden es nicht mit.
@@ -155,6 +155,8 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
   const inhaber = z.rolle === 'inhaber';
   const aboLaeuft = z.abo !== null && aboAktiv(z.abo.status);
   const voll = z.abo !== null && z.abo.belegt >= z.abo.plaetze;
+  // Nur wer die Mitarbeiterberatung nutzen kann, braucht den Hinweis auf freigegebene Firmen.
+  const mitarbeiterberatung = deckt(z, 'ag');
   const [mitglieder, setMitglieder] = useState<Mitglied[] | null>(null);
   const [einladungen, setEinladungen] = useState<OffeneEinladung[]>([]);
   const [neu, setNeu] = useState<string | null>(null);
@@ -212,6 +214,13 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
           ))}
         </ul>
       )}
+      {/* Was beim Ausscheiden mit den Firmen der Mitarbeiterberatung geschieht (Migration …_bav_gemeinsam) */}
+      {inhaber && mitarbeiterberatung && mitglieder?.some((m) => m.rolle === 'mitglied') && (
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+          Entfernen Sie einen Kollegen, übernehmen Sie in der Mitarbeiterberatung die Firmen, die er fürs Büro freigegeben
+          hat, mit allen Beratungen. Seine Beratungen in Firmen anderer Kollegen bleiben dort.
+        </p>
+      )}
 
       {inhaber ? (
         <div className="ui-innen mt-4 p-4">
@@ -245,7 +254,10 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ui-schiefer">
-          <span className="flex-1">Sie sind Mitglied. Das Abo verwaltet die Person mit dem Vermerk oben.</span>
+          <span className="flex-1">
+            Sie sind Mitglied. Das Abo verwaltet die Person mit dem Vermerk oben.
+            {mitarbeiterberatung && ' Treten Sie aus, gehen die Firmen, die Sie in der Mitarbeiterberatung fürs Büro freigegeben haben, mit allen Beratungen an diese Person.'}
+          </span>
           <Sicher text="Büro verlassen" frage="Wirklich austreten?" ja="Ja, austreten" deaktiviert={vorschau}
             onJa={() => tun(bueroVerlassen, zugangNeuLaden)} />
         </div>

@@ -1,28 +1,33 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus, Users } from 'lucide-react';
 import { firmenAngebotSchema } from '@renten/schema';
 import { firmaAnlegen, firmenLaden, staendeLaden, type Firma, type Stand } from '../lib/bav-beratung';
+import { kollegenLaden, kollegenName, type Kollege } from '../lib/bav-gemeinsam';
 import { TextFeld } from '../components/Feld';
 import { ETIKETT, KNOPF, Karte, Titel } from '../components/stil';
 import { STATUS_PUNKT } from './bausteine';
 import { MODELL_NAME, regelText } from './texte';
 import { anzahlText } from './uebersicht-daten';
+import { freigabeText } from './gemeinsam-texte';
 import type { Ort } from './ort';
 
-/** Die Firmen des Beraters — Einstieg der Seite. */
+/** Die Firmen des Beraters und die, die Kollegen fuer sein Buero freigegeben haben — Einstieg der Seite. */
 export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
   const [firmen, setFirmen] = useState<Firma[] | 'laedt' | 'fehler'>('laedt');
   const [staende, setStaende] = useState<Record<string, Stand>>({});
+  // Die Kollegen im Buero — fehlt der Stand, entfallen nur die Namen.
+  const [kollegen, setKollegen] = useState<Kollege[]>([]);
   const [name, setName] = useState('');
   const [laeuft, setLaeuft] = useState(false);
   const [meldung, setMeldung] = useState<string | null>(null);
 
   useEffect(() => {
     let aktiv = true;
-    void Promise.all([firmenLaden(), staendeLaden()]).then(([f, s]) => {
+    void Promise.all([firmenLaden(), staendeLaden(), kollegenLaden()]).then(([f, s, k]) => {
       if (!aktiv) return;
       setFirmen(f);
       if (s !== 'fehler') setStaende(s);
+      if (k !== 'fehler') setKollegen(k);
     });
     return () => { aktiv = false; };
   }, []);
@@ -81,6 +86,7 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-label="Firmen">
           {firmen.map((f) => {
             const s = staende[f.id] ?? { offen: 0, teilnahme: 0, verzicht: 0 };
+            const zeile = freigabeText(f.eigene, f.buero !== null, f.eigene ? null : kollegenName(kollegen, f.besitzer));
             return (
               <li key={f.id}>
                 <button
@@ -92,6 +98,11 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
                     <span className={`block ${ETIKETT}`}>{MODELL_NAME[f.angebot.modell.art]}</span>
                     <span className="mt-1 block break-words text-xl font-medium text-ui-tinte">{f.name}</span>
                     <span className="mt-2 block text-sm leading-relaxed text-ui-schiefer">{regelText(f.angebot.modell)}</span>
+                    {zeile && (
+                      <span className="mt-2 flex items-center gap-1.5 text-sm text-ui-schiefer">
+                        <Users className="h-3.5 w-3.5 shrink-0" aria-hidden /> {zeile}
+                      </span>
+                    )}
                     <span className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                       {(['teilnahme', 'verzicht', 'offen'] as const).filter((k) => s[k] > 0).map((k) => (
                         <span key={k} className="inline-flex items-center gap-1.5 text-ui-tinte">

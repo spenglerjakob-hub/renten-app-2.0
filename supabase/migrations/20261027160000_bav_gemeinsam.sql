@@ -1,92 +1,127 @@
--- bAV-Mitarbeiterberatung: Firmen gemeinsam beraten — auch agenturuebergreifend.
+-- bAV-Mitarbeiterberatung: Firmen im Buero gemeinsam beraten.
 --
--- WOZU. Bei manchen Arbeitgebern beraten mehrere Berater die Mitarbeiter,
--- auch aus verschiedenen Agenturen. Der Inhaber einer Firma laedt Kollegen
--- per Link ein (sieben Tage gueltig, einmal einloesbar). Alle Beteiligten
--- sehen und bearbeiten alle Beratungen der Firma; das Angebot aendert nur
--- der Inhaber.
+-- WOZU. In einer Agentur fuehren bei manchen Arbeitgebern mehrere Kollegen
+-- die Gespraeche. Die Agentur ist in der App das Buero („Abo & Team“:
+-- Inhaber, Mitglieder, Plaetze). Wer eine Firma angelegt hat, kann sie fuer
+-- sein Buero freigeben (bav_firma_freigeben). Dann sehen und bearbeiten alle
+-- Mitglieder des Bueros alle Beratungen der Firma; das Angebot aendert weiter
+-- nur, wer die Firma angelegt hat.
 --
--- WER SIEHT WAS. Eine Beratung sieht, wer ihre Firma sieht: der Inhaber und
--- die Beteiligten (bav_firma_teilnehmer). Loeschen duerfen sie, wer sie
--- angelegt hat, und der Inhaber. Unterlagen und Unterschriften folgen der
--- Beratung — damit greift die Sperre unterschriebener Beratungen auch fuer
--- Kollegen (bav_beratung_sperre_pruefen liest die Unterlagen mit den Rechten
--- des Aufrufers).
+-- WER SIEHT WAS. Eine Firma sieht ihr Besitzer und — ist sie freigegeben —
+-- jedes Mitglied ihres Bueros. Eine Beratung sieht, wer ihre Firma sieht.
+-- Loeschen duerfen sie, wer sie angelegt hat, und der Besitzer der Firma.
+-- Unterlagen und Unterschriften folgen der Beratung — damit greift die
+-- Sperre unterschriebener Beratungen auch fuer Kollegen
+-- (bav_beratung_sperre_pruefen liest die Unterlagen mit den Rechten des
+-- Aufrufers).
 --
--- AUSSCHEIDEN. Verlaesst ein Kollege die Firma, wird er entfernt oder
--- loescht er sein Konto, bleiben seine Beratungen bei der Firma: Beratungen,
--- Unterlagen und Unterschriften gehen an den Inhaber ueber. Loescht der
--- Inhaber die Firma oder sein Konto, gehen alle Beratungen mit (Kaskade).
+-- AUSSCHEIDEN. Tritt ein Mitglied aus, wird es entfernt oder loescht es sein
+-- Konto: Firmen, die es fuers Buero freigegeben hat, gehen samt aller
+-- Beratungen an den Inhaber des Bueros und bleiben freigegeben; seine
+-- Beratungen in Firmen der Kollegen gehen an deren Besitzer. Endet eine
+-- Freigabe, gehen die Beratungen der Kollegen an den Besitzer der Firma.
+-- Loescht der Inhaber sein Konto, endet das Buero und mit ihm alle
+-- Freigaben; seine eigenen Firmen gehen mit allen Beratungen (Kaskade).
 --
 -- ABWAERTSKOMPATIBEL: Test- und Live-Seite teilen diese Datenbank. Ohne
--- Beteiligte sieht und darf jeder genau, was er bisher sah und durfte.
+-- Freigabe sieht und darf jeder genau, was er bisher sah und durfte.
 
 -- ---------------------------------------------------------------------------
--- Beteiligte einer Firma — der Inhaber steht nicht darin, er ist `besitzer`
+-- Freigabe: das Buero, fuer das eine Firma freigegeben ist — oder null
 -- ---------------------------------------------------------------------------
-create table if not exists public.bav_firma_teilnehmer (
-  firma  uuid not null references public.bav_firmen (id) on delete cascade,
-  nutzer uuid not null references auth.users (id) on delete cascade,
-  seit   timestamptz not null default now(),
-  primary key (firma, nutzer)
+alter table public.bav_firmen
+  add column if not exists buero uuid references privat.bueros (id) on delete set null;
+
+comment on column public.bav_firmen.buero is
+  'Das Buero, fuer das die Firma freigegeben ist (alle Mitglieder beraten mit), oder null. Gesetzt nur ueber bav_firma_freigeben.';
+
+create index if not exists bav_firmen_buero_idx on public.bav_firmen (buero) where buero is not null;
+
+-- Das Logo gehoert zu genau dieser Firma; der Ordner ist der dessen, der es
+-- hochgeladen hat. Uebernimmt der Inhaber des Bueros eine Firma, bleibt es
+-- dort liegen — die alte Regel (Ordner = Besitzer) liesse die Uebernahme
+-- scheitern. Hochladen geht weiter nur in den eigenen Ordner
+-- (bav_logo_pfad_erlaubt).
+alter table public.bav_firmen drop constraint if exists logo_eigene_firma;
+alter table public.bav_firmen drop constraint if exists logo_dieser_firma;
+alter table public.bav_firmen add constraint logo_dieser_firma check (
+  logo is null
+  or logo ~ ('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/' || id::text || '-[0-9a-f]{24}\.(png|webp)$')
 );
 
-comment on table public.bav_firma_teilnehmer is
-  'bAV-Mitarbeiterberatung: Kollegen, mit denen der Inhaber eine Firma gemeinsam beraet. Geschrieben nur ueber die Funktionen bav_firma_*.';
+-- ---------------------------------------------------------------------------
+-- Das eigene Buero — fuer die Policies. `privat` ist fuer authenticated nicht
+-- lesbar; die Funktion liefert nur die eigene Mitgliedschaft (wie hat_paket).
+-- ---------------------------------------------------------------------------
+create or replace function public.bav_mein_buero()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.buero from privat.buero_mitglieder m where m.nutzer = auth.uid();
+$$;
 
-create index if not exists bav_firma_teilnehmer_nutzer_idx on public.bav_firma_teilnehmer (nutzer);
-
--- Lesen nur die eigenen Zeilen. Ein Verweis auf bav_firmen fehlt mit Absicht:
--- Deren Policy fragt diese Tabelle — andersherum liefe es im Kreis.
-alter table public.bav_firma_teilnehmer enable row level security;
-alter table public.bav_firma_teilnehmer force row level security;
-
-create policy "eigene teilnahmen lesen" on public.bav_firma_teilnehmer
-  for select to authenticated
-  using ((select auth.uid()) = nutzer);
-
-revoke all on public.bav_firma_teilnehmer from anon, authenticated;
-grant select on public.bav_firma_teilnehmer to authenticated;
+revoke all on function public.bav_mein_buero() from public, anon;
+grant execute on function public.bav_mein_buero() to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Einladungen: ein Link je Einladung, einmal einloesbar, sieben Tage gueltig
--- ---------------------------------------------------------------------------
-create table if not exists privat.bav_firma_einladungen (
-  token          uuid primary key default gen_random_uuid(),
-  firma          uuid not null references public.bav_firmen (id) on delete cascade,
-  erstellt_von   uuid references auth.users (id) on delete set null,
-  erstellt_am    timestamptz not null default now(),
-  gueltig_bis    timestamptz not null default now() + interval '7 days',
-  angenommen_von uuid references auth.users (id) on delete set null,
-  angenommen_am  timestamptz
-);
-create index if not exists bav_firma_einladungen_firma_idx on privat.bav_firma_einladungen (firma);
-
-alter table privat.bav_firma_einladungen enable row level security;
-revoke all on privat.bav_firma_einladungen from public, anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- Firmen: lesen duerfen Inhaber und Beteiligte. Anlegen, Aendern (das
--- Angebot) und Loeschen bleiben beim Inhaber — diese Policies bleiben.
+-- Firmen: lesen duerfen der Besitzer und, ist sie freigegeben, das Buero.
+-- Aendern und Loeschen bleiben beim Besitzer — diese Policies bleiben. Neu
+-- angelegt wird nie freigegeben.
 -- ---------------------------------------------------------------------------
 drop policy if exists "eigene firmen lesen" on public.bav_firmen;
+drop policy if exists "firmen lesen" on public.bav_firmen;
 create policy "firmen lesen" on public.bav_firmen
   for select to authenticated
   using (
     (select auth.uid()) = besitzer
-    or exists (select 1 from public.bav_firma_teilnehmer t
-                where t.firma = bav_firmen.id and t.nutzer = (select auth.uid()))
+    or (buero is not null and buero = (select public.bav_mein_buero()))
   );
+
+drop policy if exists "eigene firmen anlegen" on public.bav_firmen;
+create policy "eigene firmen anlegen" on public.bav_firmen
+  for insert to authenticated
+  with check ((select auth.uid()) = besitzer and buero is null);
+
+-- Besitzer und Freigabe bleiben, wie sie sind — ausser ueber die Funktionen
+-- unten (als Eigentuemer der Datenbank). Bisher hielt szenarien_geaendert_am
+-- den Besitzer; die Uebernahme durch den Inhaber des Bueros braucht eine
+-- eigene Funktion.
+create or replace function public.bav_firma_geaendert_am()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.geaendert_am := now();
+  if current_user in ('authenticated', 'anon') then
+    new.besitzer := old.besitzer;
+    new.buero := old.buero;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists bav_firmen_geaendert_am on public.bav_firmen;
+create trigger bav_firmen_geaendert_am
+  before update on public.bav_firmen
+  for each row execute function public.bav_firma_geaendert_am();
 
 -- ---------------------------------------------------------------------------
 -- Beratungen: alles ueber die sichtbare Firma — die Unterabfrage auf
 -- bav_firmen unterliegt deren Policy. Loeschen: wer sie angelegt hat, und der
--- Inhaber.
+-- Besitzer der Firma.
 -- ---------------------------------------------------------------------------
 drop policy if exists "eigene beratungen lesen"   on public.bav_beratungen;
 drop policy if exists "eigene beratungen anlegen" on public.bav_beratungen;
 drop policy if exists "eigene beratungen aendern" on public.bav_beratungen;
 drop policy if exists "eigene beratungen loeschen" on public.bav_beratungen;
+drop policy if exists "beratungen lesen"   on public.bav_beratungen;
+drop policy if exists "beratungen anlegen" on public.bav_beratungen;
+drop policy if exists "beratungen aendern" on public.bav_beratungen;
+drop policy if exists "beratungen loeschen" on public.bav_beratungen;
 
 create policy "beratungen lesen" on public.bav_beratungen
   for select to authenticated
@@ -112,10 +147,10 @@ create policy "beratungen loeschen" on public.bav_beratungen
                 where f.id = bav_beratungen.firma and f.besitzer = (select auth.uid()))
   );
 
--- Besitzer und Firma einer Beratung bleiben, wie sie sind — ausser bei der
--- Uebergabe an den Inhaber (privat.bav_uebergeben, als Eigentuemer der
--- Datenbank). Bisher hielt szenarien_geaendert_am den Besitzer; die
--- Uebergabe braucht eine eigene Funktion.
+-- Eine Beratung bleibt bei ihrer Firma: Der Versuch, sie zu verschieben, wird
+-- abgewiesen (wie bisher ueber die Policy). Der Besitzer bleibt stillschweigend,
+-- wie bisher bei szenarien_geaendert_am — ausser bei der Uebergabe
+-- (privat.bav_uebergeben, als Eigentuemer der Datenbank).
 create or replace function public.bav_beratung_geaendert_am()
 returns trigger
 language plpgsql
@@ -124,8 +159,11 @@ as $$
 begin
   new.geaendert_am := now();
   if current_user in ('authenticated', 'anon') then
+    if new.firma is distinct from old.firma then
+      raise exception 'Eine Beratung bleibt bei ihrer Firma.'
+        using errcode = 'check_violation';
+    end if;
     new.besitzer := old.besitzer;
-    new.firma := old.firma;
   end if;
   return new;
 end;
@@ -143,6 +181,9 @@ create trigger bav_beratungen_geaendert_am
 drop policy if exists "eigene unterlagen lesen"   on public.bav_unterlagen;
 drop policy if exists "eigene unterlagen anlegen" on public.bav_unterlagen;
 drop policy if exists "eigene unterlagen loeschen" on public.bav_unterlagen;
+drop policy if exists "unterlagen lesen"   on public.bav_unterlagen;
+drop policy if exists "unterlagen anlegen" on public.bav_unterlagen;
+drop policy if exists "unterlagen loeschen" on public.bav_unterlagen;
 
 create policy "unterlagen lesen" on public.bav_unterlagen
   for select to authenticated
@@ -161,6 +202,8 @@ create policy "unterlagen loeschen" on public.bav_unterlagen
 
 drop policy if exists "eigene unterschriften lesen"   on public.bav_unterschriften;
 drop policy if exists "eigene unterschriften anlegen" on public.bav_unterschriften;
+drop policy if exists "unterschriften lesen"   on public.bav_unterschriften;
+drop policy if exists "unterschriften anlegen" on public.bav_unterschriften;
 
 create policy "unterschriften lesen" on public.bav_unterschriften
   for select to authenticated
@@ -174,22 +217,23 @@ create policy "unterschriften anlegen" on public.bav_unterschriften
   );
 
 -- ---------------------------------------------------------------------------
--- Firmenlogos: Beteiligte lesen das aktuelle Logo der Firma. Hochladen und
--- Loeschen bleiben beim Inhaber (eigener Ordner).
+-- Firmenlogos: lesen darf, wer die Firma sieht — Kollegen im Buero und nach
+-- einer Uebernahme der neue Besitzer. Hochladen und Loeschen bleiben im
+-- eigenen Ordner.
 -- ---------------------------------------------------------------------------
-create policy "firmenlogo beteiligte lesen" on storage.objects
+drop policy if exists "firmenlogo der firma lesen" on storage.objects;
+create policy "firmenlogo der firma lesen" on storage.objects
   for select to authenticated
   using (
     bucket_id = 'bav-firmenlogos'
-    and exists (select 1 from public.bav_firma_teilnehmer t
-                  join public.bav_firmen f on f.id = t.firma
-                 where t.nutzer = (select auth.uid()) and f.logo = objects.name)
+    and exists (select 1 from public.bav_firmen f where f.logo = objects.name)
   );
 
 -- ---------------------------------------------------------------------------
--- Uebergabe an den Inhaber: Beratungen, Unterlagen und Unterschriften eines
--- Kollegen in einer Firma. Nur fuer die Funktionen unten.
+-- Uebergeben — nur fuer die Funktionen und Trigger unten.
 -- ---------------------------------------------------------------------------
+-- Was ein Nutzer in einer Firma angelegt oder unterschrieben hat, geht an den
+-- Besitzer der Firma. Die Beratungen bleiben so bei der Firma.
 create or replace function privat.bav_uebergeben(p_firma uuid, p_nutzer uuid)
 returns void
 language plpgsql
@@ -197,18 +241,18 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_inhaber uuid;
+  v_besitzer uuid;
 begin
-  select f.besitzer into v_inhaber from public.bav_firmen f where f.id = p_firma;
-  if v_inhaber is null or v_inhaber = p_nutzer then
+  select f.besitzer into v_besitzer from public.bav_firmen f where f.id = p_firma;
+  if v_besitzer is null or v_besitzer = p_nutzer then
     return;
   end if;
-  update public.bav_beratungen b set besitzer = v_inhaber
+  update public.bav_beratungen b set besitzer = v_besitzer
    where b.firma = p_firma and b.besitzer = p_nutzer;
-  update public.bav_unterlagen u set besitzer = v_inhaber
+  update public.bav_unterlagen u set besitzer = v_besitzer
    where u.besitzer = p_nutzer
      and exists (select 1 from public.bav_beratungen b where b.id = u.beratung and b.firma = p_firma);
-  update public.bav_unterschriften s set besitzer = v_inhaber
+  update public.bav_unterschriften s set besitzer = v_besitzer
    where s.besitzer = p_nutzer
      and exists (select 1 from public.bav_beratungen b where b.id = s.beratung and b.firma = p_firma);
 end;
@@ -216,8 +260,108 @@ $$;
 
 revoke all on function privat.bav_uebergeben(uuid, uuid) from public;
 
--- Wer sein Konto loescht, verlaesst damit alle fremden Firmen — seine
--- Beratungen bleiben dort. Sonst loeschte die Kaskade sie mit dem Konto.
+-- Eine Freigabe endet: Was Kollegen in der Firma angelegt oder unterschrieben
+-- haben, geht an ihren Besitzer — sie sehen die Firma danach nicht mehr.
+create or replace function privat.bav_freigabe_beenden(p_firma uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_besitzer uuid;
+begin
+  update public.bav_firmen f set buero = null where f.id = p_firma returning f.besitzer into v_besitzer;
+  if v_besitzer is null then
+    return;
+  end if;
+  update public.bav_beratungen b set besitzer = v_besitzer
+   where b.firma = p_firma and b.besitzer <> v_besitzer;
+  update public.bav_unterlagen u set besitzer = v_besitzer
+   where u.besitzer <> v_besitzer
+     and exists (select 1 from public.bav_beratungen b where b.id = u.beratung and b.firma = p_firma);
+  update public.bav_unterschriften s set besitzer = v_besitzer
+   where s.besitzer <> v_besitzer
+     and exists (select 1 from public.bav_beratungen b where b.id = s.beratung and b.firma = p_firma);
+end;
+$$;
+
+revoke all on function privat.bav_freigabe_beenden(uuid) from public;
+
+-- Ein Mitglied verlaesst das Buero (austreten, entfernt, Konto geloescht):
+-- Firmen, die es fuers Buero freigegeben hat, gehen samt aller Beratungen an
+-- den Inhaber und bleiben freigegeben; seine Beratungen in Firmen der
+-- Kollegen gehen an deren Besitzer. Gibt es das Buero nicht mehr oder ist es
+-- der Inhaber selbst, bleibt alles, wie es ist.
+create or replace function privat.bav_buero_austritt(p_buero uuid, p_nutzer uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_inhaber uuid;
+  v_firma   uuid;
+begin
+  select b.inhaber into v_inhaber from privat.bueros b where b.id = p_buero;
+  if v_inhaber is null or v_inhaber = p_nutzer then
+    return;
+  end if;
+  for v_firma in
+    select f.id from public.bav_firmen f where f.buero = p_buero and f.besitzer = p_nutzer
+  loop
+    update public.bav_firmen f set besitzer = v_inhaber where f.id = v_firma;
+    perform privat.bav_uebergeben(v_firma, p_nutzer);
+  end loop;
+  for v_firma in
+    select b.firma from public.bav_beratungen b
+      join public.bav_firmen f on f.id = b.firma
+     where b.besitzer = p_nutzer and f.buero = p_buero
+    union
+    select b.firma from public.bav_unterlagen u
+      join public.bav_beratungen b on b.id = u.beratung
+      join public.bav_firmen f on f.id = b.firma
+     where u.besitzer = p_nutzer and f.buero = p_buero
+    union
+    select b.firma from public.bav_unterschriften s
+      join public.bav_beratungen b on b.id = s.beratung
+      join public.bav_firmen f on f.id = b.firma
+     where s.besitzer = p_nutzer and f.buero = p_buero
+  loop
+    perform privat.bav_uebergeben(v_firma, p_nutzer);
+  end loop;
+end;
+$$;
+
+revoke all on function privat.bav_buero_austritt(uuid, uuid) from public;
+
+-- Austreten und Entfernen (buero_verlassen, mitglied_entfernen) — und die
+-- Kaskade, wenn ein Konto geht. Endet das Buero selbst, gibt es seinen
+-- Inhaber nicht mehr: bav_buero_austritt tut dann nichts.
+create or replace function privat.bav_mitglied_ausgetreten()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.rolle = 'mitglied' then
+    perform privat.bav_buero_austritt(old.buero, old.nutzer);
+  end if;
+  return old;
+end;
+$$;
+
+revoke all on function privat.bav_mitglied_ausgetreten() from public;
+
+drop trigger if exists bav_mitglied_ausgetreten on privat.buero_mitglieder;
+create trigger bav_mitglied_ausgetreten
+  after delete on privat.buero_mitglieder
+  for each row execute function privat.bav_mitglied_ausgetreten();
+
+-- Wer sein Konto loescht: als Mitglied wie Austreten; als Inhaber enden die
+-- Freigaben seines Bueros. Was ihm danach noch in Firmen anderer gehoert,
+-- bleibt dort. Sonst loeschte die Kaskade es mit dem Konto.
 create or replace function privat.bav_beim_kontoloeschen_uebergeben()
 returns trigger
 language plpgsql
@@ -225,8 +369,19 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_m     privat.buero_mitglieder%rowtype;
   v_firma uuid;
 begin
+  select * into v_m from privat.buero_mitglieder m where m.nutzer = old.id;
+  if found and v_m.rolle = 'mitglied' then
+    perform privat.bav_buero_austritt(v_m.buero, old.id);
+  elsif found then
+    for v_firma in
+      select f.id from public.bav_firmen f where f.buero = v_m.buero and f.besitzer <> old.id
+    loop
+      perform privat.bav_freigabe_beenden(v_firma);
+    end loop;
+  end if;
   for v_firma in
     select b.firma from public.bav_beratungen b where b.besitzer = old.id
     union
@@ -248,191 +403,59 @@ create trigger bav_beteiligungen_uebergeben
   for each row execute function privat.bav_beim_kontoloeschen_uebergeben();
 
 -- ---------------------------------------------------------------------------
--- Einladen, annehmen, zurueckziehen, auflisten, entfernen, verlassen.
--- SECURITY DEFINER wie beim Buero: Einladungen liegen in `privat`, und die
--- Beteiligten schreibt nur der Server. Jede Funktion prueft auth.uid().
+-- Freigeben und die Kollegen — SECURITY DEFINER wie beim Buero: Mitglieder
+-- stehen in `privat`. Jede Funktion prueft auth.uid().
 -- ---------------------------------------------------------------------------
-create or replace function public.bav_firma_einladung_erstellen(p_firma uuid)
-returns uuid
+-- Antwort statt Ausnahme, wo es die Oberflaeche erklaert: ok | kein_buero.
+create or replace function public.bav_firma_freigeben(p_firma uuid, p_freigeben boolean)
+returns text
 language plpgsql
 volatile
 security definer
 set search_path = ''
 as $$
 declare
-  v_offen integer;
-  v_token uuid;
+  v_buero uuid;
 begin
   if not exists (select 1 from public.bav_firmen f where f.id = p_firma and f.besitzer = auth.uid()) then
-    raise exception 'Nur der Inhaber der Firma kann einladen' using errcode = '42501';
+    raise exception 'Freigeben kann nur, wer die Firma angelegt hat' using errcode = '42501';
   end if;
-  select count(*) into v_offen
-    from privat.bav_firma_einladungen e
-   where e.firma = p_firma and e.angenommen_von is null and e.gueltig_bis > now();
-  if v_offen >= 10 then
-    raise exception 'Zu viele offene Einladungen' using errcode = 'P0001';
+  if p_freigeben is not true then
+    perform privat.bav_freigabe_beenden(p_firma);
+    return 'ok';
   end if;
-  insert into privat.bav_firma_einladungen (firma, erstellt_von)
-  values (p_firma, auth.uid())
-  returning token into v_token;
-  return v_token;
+  select m.buero into v_buero from privat.buero_mitglieder m where m.nutzer = auth.uid();
+  if v_buero is null then
+    return 'kein_buero';
+  end if;
+  update public.bav_firmen f set buero = v_buero where f.id = p_firma;
+  return 'ok';
 end;
 $$;
 
--- Offene Einladungen einer Firma — nur fuer den Inhaber.
-create or replace function public.bav_firma_einladungen(p_firma uuid)
-returns table (token uuid, erstellt_am timestamptz, gueltig_bis timestamptz)
+-- Die Mitglieder des eigenen Bueros: der Name aus „Ihr Auftritt“, sonst die
+-- E-Mail (wie buero_mitglieder), dazu die Agentur — fuer „Freigegeben von …“
+-- und „betreut von …“.
+create or replace function public.bav_kollegen()
+returns table (nutzer uuid, name text, agentur text, rolle text, ich boolean)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select e.token, e.erstellt_am, e.gueltig_bis
-    from privat.bav_firma_einladungen e
-    join public.bav_firmen f on f.id = e.firma and f.besitzer = auth.uid()
-   where e.firma = p_firma and e.angenommen_von is null and e.gueltig_bis > now()
-   order by e.erstellt_am;
-$$;
-
--- Macht eine offene Einladung ungueltig. Sie bleibt als Spur stehen.
-create or replace function public.bav_firma_einladung_zurueckziehen(p_token uuid)
-returns void
-language sql
-volatile
-security definer
-set search_path = ''
-as $$
-  update privat.bav_firma_einladungen e
-     set gueltig_bis = least(e.gueltig_bis, now())
-   where e.token = p_token
-     and e.angenommen_von is null
-     and exists (select 1 from public.bav_firmen f where f.id = e.firma and f.besitzer = auth.uid());
-$$;
-
--- Antwort statt Ausnahme: {"antwort": ok | ungueltig | abgelaufen | eigene |
--- schon | voll, "firma", "name"} — die Oberflaeche erklaert jeden Fall.
--- Hoechstens 20 Kollegen je Firma.
-create or replace function public.bav_firma_einladung_annehmen(p_token uuid)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-declare
-  v_e       privat.bav_firma_einladungen%rowtype;
-  v_inhaber uuid;
-  v_name    text;
-  v_anzahl  integer;
-begin
-  if auth.uid() is null then
-    return jsonb_build_object('antwort', 'ungueltig');
-  end if;
-  select * into v_e from privat.bav_firma_einladungen e where e.token = p_token for update;
-  if not found or v_e.angenommen_von is not null then
-    return jsonb_build_object('antwort', 'ungueltig');
-  end if;
-  if v_e.gueltig_bis <= now() then
-    return jsonb_build_object('antwort', 'abgelaufen');
-  end if;
-  select f.besitzer, f.name into v_inhaber, v_name from public.bav_firmen f where f.id = v_e.firma for update;
-  if v_inhaber is null then
-    return jsonb_build_object('antwort', 'ungueltig');
-  end if;
-  if v_inhaber = auth.uid() then
-    return jsonb_build_object('antwort', 'eigene', 'firma', v_e.firma, 'name', v_name);
-  end if;
-  if exists (select 1 from public.bav_firma_teilnehmer t where t.firma = v_e.firma and t.nutzer = auth.uid()) then
-    return jsonb_build_object('antwort', 'schon', 'firma', v_e.firma, 'name', v_name);
-  end if;
-  select count(*) into v_anzahl from public.bav_firma_teilnehmer t where t.firma = v_e.firma;
-  if v_anzahl >= 20 then
-    return jsonb_build_object('antwort', 'voll');
-  end if;
-  insert into public.bav_firma_teilnehmer (firma, nutzer) values (v_e.firma, auth.uid());
-  update privat.bav_firma_einladungen set angenommen_von = auth.uid(), angenommen_am = now() where token = p_token;
-  return jsonb_build_object('antwort', 'ok', 'firma', v_e.firma, 'name', v_name);
-end;
-$$;
-
--- Inhaber und Beteiligte einer Firma — fuer alle, die sie sehen. Der Name aus
--- „Ihr Auftritt“, sonst die E-Mail (wie buero_mitglieder); dazu die Agentur.
-create or replace function public.bav_firma_beteiligte(p_firma uuid)
-returns table (nutzer uuid, name text, agentur text, rolle text, seit timestamptz, ich boolean)
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  with firma as (
-    select f.id, f.besitzer, f.erstellt_am
-      from public.bav_firmen f
-     where f.id = p_firma
-       and (f.besitzer = auth.uid()
-            or exists (select 1 from public.bav_firma_teilnehmer t where t.firma = f.id and t.nutzer = auth.uid()))
-  ),
-  alle as (
-    select firma.besitzer as nutzer, 'inhaber'::text as rolle, firma.erstellt_am as seit from firma
-    union all
-    select t.nutzer, 'beteiligt'::text, t.seit from public.bav_firma_teilnehmer t join firma on firma.id = t.firma
-  )
-  select a.nutzer,
+  select m.nutzer,
          coalesce(nullif(btrim(p.berater), ''), u.email::text, '') as name,
          coalesce(btrim(p.firma), '') as agentur,
-         a.rolle, a.seit, a.nutzer = auth.uid() as ich
-    from alle a
-    left join public.berater_profil p on p.besitzer = a.nutzer
-    left join auth.users u on u.id = a.nutzer
-   order by (a.rolle = 'inhaber') desc, a.seit, a.nutzer;
+         m.rolle,
+         m.nutzer = auth.uid() as ich
+    from privat.buero_mitglieder m
+    join privat.buero_mitglieder selbst on selbst.buero = m.buero and selbst.nutzer = auth.uid()
+    left join public.berater_profil p on p.besitzer = m.nutzer
+    left join auth.users u on u.id = m.nutzer
+   order by (m.rolle = 'inhaber') desc, m.seit, m.nutzer;
 $$;
 
-create or replace function public.bav_firma_teilnehmer_entfernen(p_firma uuid, p_nutzer uuid)
-returns void
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-begin
-  if not exists (select 1 from public.bav_firmen f where f.id = p_firma and f.besitzer = auth.uid()) then
-    raise exception 'Nur der Inhaber der Firma kann Kollegen entfernen' using errcode = '42501';
-  end if;
-  delete from public.bav_firma_teilnehmer t where t.firma = p_firma and t.nutzer = p_nutzer;
-  if not found then
-    raise exception 'Kein Beteiligter dieser Firma' using errcode = 'P0002';
-  end if;
-  perform privat.bav_uebergeben(p_firma, p_nutzer);
-end;
-$$;
-
--- Ein Kollege geht. Der Inhaber kann das nicht — er loescht die Firma.
-create or replace function public.bav_firma_verlassen(p_firma uuid)
-returns void
-language plpgsql
-volatile
-security definer
-set search_path = ''
-as $$
-begin
-  delete from public.bav_firma_teilnehmer t where t.firma = p_firma and t.nutzer = auth.uid();
-  if not found then
-    raise exception 'Sie sind an dieser Firma nicht beteiligt' using errcode = 'P0002';
-  end if;
-  perform privat.bav_uebergeben(p_firma, auth.uid());
-end;
-$$;
-
-revoke all on function public.bav_firma_einladung_erstellen(uuid)          from public, anon;
-revoke all on function public.bav_firma_einladungen(uuid)                  from public, anon;
-revoke all on function public.bav_firma_einladung_zurueckziehen(uuid)      from public, anon;
-revoke all on function public.bav_firma_einladung_annehmen(uuid)           from public, anon;
-revoke all on function public.bav_firma_beteiligte(uuid)                   from public, anon;
-revoke all on function public.bav_firma_teilnehmer_entfernen(uuid, uuid)   from public, anon;
-revoke all on function public.bav_firma_verlassen(uuid)                    from public, anon;
-grant execute on function public.bav_firma_einladung_erstellen(uuid)        to authenticated;
-grant execute on function public.bav_firma_einladungen(uuid)                to authenticated;
-grant execute on function public.bav_firma_einladung_zurueckziehen(uuid)    to authenticated;
-grant execute on function public.bav_firma_einladung_annehmen(uuid)         to authenticated;
-grant execute on function public.bav_firma_beteiligte(uuid)                 to authenticated;
-grant execute on function public.bav_firma_teilnehmer_entfernen(uuid, uuid) to authenticated;
-grant execute on function public.bav_firma_verlassen(uuid)                  to authenticated;
+revoke all on function public.bav_firma_freigeben(uuid, boolean) from public, anon;
+revoke all on function public.bav_kollegen()                     from public, anon;
+grant execute on function public.bav_firma_freigeben(uuid, boolean) to authenticated;
+grant execute on function public.bav_kollegen()                     to authenticated;

@@ -231,9 +231,10 @@ function Datenschutz() {
         sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
         Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
         betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
-        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
-        sichtbar, das sie angelegt hat; das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen
-        Speicher bei Supabase in der EU.
+        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind nur für das Konto sichtbar, das sie
+        angelegt hat, und — gibt der Berater eine Firma für sein Büro frei — für die Mitglieder dieses Büros (siehe
+        unten); das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen Speicher bei Supabase in
+        der EU.
       </P>
       <P>
         Unterschreiben Mitarbeiter und Berater am Bildschirm, speichern wir die Unterlagen so, wie sie unterschrieben
@@ -254,6 +255,16 @@ function Datenschutz() {
         auch im unterschriebenen Antrag; wird der Zusatz abgewählt, löschen wir sie, sonst mit der Beratung.
       </P>
       <P>
+        <strong>Gemeinsam im Büro.</strong> Gehört ein Berater zu einem Büro (Abschnitt 11), kann er eine Firma für
+        sein Büro freigeben. Dann sehen alle Mitglieder des Büros das Angebot der Firma (ändern kann es nur, wer die
+        Firma angelegt hat) und sehen und bearbeiten alle ihre Beratungen, einschließlich Gehalt, Steuer- und
+        Gesundheitsangaben und der unterschriebenen Unterlagen. Voneinander sehen sie Namen und Agentur aus „Ihr
+        Auftritt“, ist dort nichts eingetragen, die E-Mail-Adresse. Endet die Freigabe, gehen die Beratungen der
+        Kollegen an den Berater, der die Firma angelegt hat. Verlässt ein Mitglied das Büro, wird es entfernt oder
+        löscht es sein Konto, bleiben seine Beratungen samt unterschriebener Unterlagen bei den Firmen; Firmen, die es
+        für das Büro freigegeben hat, übernimmt mit allen Beratungen, wer das Büro verwaltet.
+      </P>
+      <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
         Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht und die
         Antworten zur Gesundheit im AXA-Antrag als Angaben besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
@@ -262,8 +273,10 @@ function Datenschutz() {
       </P>
       <P>
         Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen und
-        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Mit einer Firma werden ihre Beratungen
-        und ihr Logo gelöscht, mit dem Konto alles.
+        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Löschen kann eine Beratung, wer sie
+        angelegt hat, und der Berater, der die Firma angelegt hat. Mit einer Firma werden ihre Beratungen, auch die
+        der Kollegen, und ihr Logo gelöscht, mit dem Konto alles, was ihm gehört — Beratungen in Firmen von Kollegen
+        bleiben dort, freigegebene Firmen eines Büro-Mitglieds übernimmt, wer das Büro verwaltet.
       </P>
 
       <H2>8. Vorsorge-Check</H2>
@@ -323,7 +336,8 @@ function Datenschutz() {
         den Namen des Büros, wer ihm angehört und seit wann, wer es verwaltet, die Einladungslinks (wer sie wann
         erstellt und wer sie wann eingelöst hat) sowie den Stand des Abos: Paket, Zahlweise, Zahl der Plätze,
         Status, Laufzeit und gegebenenfalls das Kündigungsdatum. Die Mitglieder eines Büros sehen die
-        E-Mail-Adressen der anderen Mitglieder; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
+        E-Mail-Adressen der anderen Mitglieder, in der Mitarbeiterberatung auch Name und Agentur aus „Ihr
+        Auftritt“; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
         Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Angaben werden mit dem Konto der Person gelöscht, die das
         Büro verwaltet.
       </P>
@@ -385,6 +399,10 @@ function Datenschutz() {
           Unterlagen, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht
           vorher löschen.
         </li>
+        <li>
+          Beratungen in einer Firma, die ein Kollege für Ihr Büro freigegeben hat: bis er sie oder die Firma löscht,
+          auch über Ihr Ausscheiden aus dem Büro hinaus.
+        </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
         <li>Anfragen als Early Adopter: 180 Tage nach Eingang.</li>
@@ -415,7 +433,8 @@ function Datenschutz() {
         Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
-        Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann. Zahlungsdaten gibt
+        Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann — ein Firmenlogo auch die
+        Kollegen, für deren Büro die Firma freigegeben ist. Zahlungsdaten gibt
         es bei uns nicht; Meldungen von Stripe über Ihr Abo nehmen wir nur mit gültiger Signatur an.
       </P>
     </>

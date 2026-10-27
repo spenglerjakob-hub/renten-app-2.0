@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Lock, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Lock, Plus, Trash2, Users } from 'lucide-react';
 import { beratungDatenSchema } from '@renten/schema';
 import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
 } from '../lib/bav-beratung';
+import { kollegenLaden, kollegenName, type Kollege } from '../lib/bav-gemeinsam';
 import { Dialog } from '../components/Dialog';
 import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, Pillen } from '../components/stil';
 import { FirmenZeichen, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
+import { GemeinsamKarte } from './Gemeinsam';
+import { betreutText, freigabeText } from './gemeinsam-texte';
 import { Uebersicht } from './Uebersicht';
 import { MODELL_NAME, regelText } from './texte';
 import { FIRMEN, type Ort, type Reiter } from './ort';
@@ -21,7 +24,12 @@ const REITER: { id: Reiter; text: string; kurz: string }[] = [
 
 const datumText = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE') : '');
 
-/** Eine Firma: ihre Mitarbeiter, ihr Angebot und die Uebersicht fuer den Arbeitgeber. */
+/**
+ * Eine Firma: ihre Mitarbeiter, ihr Angebot und die Uebersicht fuer den
+ * Arbeitgeber. Ist sie fuers Buero freigegeben, steht an jeder Beratung, wer
+ * sie betreut; loeschen kann sie, wer sie angelegt hat, und wer die Firma
+ * angelegt hat.
+ */
 export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reiter: Reiter; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
   const [beratungen, setBeratungen] = useState<Beratung[] | 'laedt' | 'fehler'>('laedt');
@@ -30,15 +38,20 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   const [loeschen, setLoeschen] = useState<Beratung | null>(null);
   // Welche Beratungen am Bildschirm unterschrieben sind — fehlt der Stand, entfaellt nur der Hinweis.
   const [unterschrieben, setUnterschrieben] = useState<Record<string, UnterschriftPerson[]>>({});
+  // Die Kollegen im Buero — fehlt der Stand, entfallen nur die Namen.
+  const [kollegen, setKollegen] = useState<Kollege[] | 'laedt' | 'fehler'>('laedt');
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
 
   useEffect(() => {
     let aktiv = true;
-    void Promise.all([firmaLaden(firmaId), beratungenLaden(firmaId), unterschriebeneLaden(firmaId)]).then(([f, b, u]) => {
+    void Promise.all([
+      firmaLaden(firmaId), beratungenLaden(firmaId), unterschriebeneLaden(firmaId), kollegenLaden(),
+    ]).then(([f, b, u, k]) => {
       if (!aktiv) return;
       setFirma(f);
       setBeratungen(b);
       setUnterschrieben(u === 'fehler' ? {} : u);
+      setKollegen(k);
     });
     return () => { aktiv = false; };
   }, [firmaId]);
@@ -61,6 +74,19 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   }
 
   const liste = Array.isArray(beratungen) ? beratungen : [];
+  const imBuero = Array.isArray(kollegen) ? kollegen : [];
+  const freigegeben = firma.buero !== null;
+  const pflegt = firma.eigene ? null : kollegenName(imBuero, firma.besitzer);
+  const freigabeZeile = freigabeText(firma.eigene, freigegeben, pflegt);
+  const angelegtVon = (b: Beratung) => kollegenName(imBuero, b.besitzer);
+  /** „betreut von …“ — nur bei freigegebenen Firmen */
+  const betreut = (b: Beratung) => (freigegeben ? betreutText(b.eigene, angelegtVon(b)) : null);
+  const darfLoeschen = (b: Beratung) => firma.eigene || b.eigene;
+  /** Nach dem Freigeben oder Beenden: Beim Beenden gehen die Beratungen der Kollegen an den, der die Firma angelegt hat. */
+  const freigabeGeaendert = (f: Firma) => {
+    setFirma(f);
+    void beratungenLaden(f.id).then(setBeratungen);
+  };
 
   const neueBeratung = async () => {
     if (laeuft) return;
@@ -81,6 +107,11 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
         <p className="max-w-md text-sm leading-relaxed text-ui-schiefer">
           <span className={`block ${ETIKETT}`}>{MODELL_NAME[firma.angebot.modell.art]}</span>
           <span className="text-ui-tinte">{regelText(firma.angebot.modell)}</span>
+          {freigabeZeile && (
+            <span className="mt-1.5 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden /> {freigabeZeile}
+            </span>
+          )}
         </p>
       </div>
 
@@ -129,12 +160,18 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
                         </span>
                       )}
                       {b.beratenAm && <span className="text-sm text-ui-schiefer">{datumText(b.beratenAm)}</span>}
+                      {betreut(b) && <span className="text-sm text-ui-schiefer">{betreut(b)}</span>}
                       <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-ui-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </button>
-                    <button type="button" onClick={() => setLoeschen(b)} aria-label={`Beratung ${b.mitarbeiter || 'ohne Namen'} löschen`}
-                      className="rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </button>
+                    {darfLoeschen(b) ? (
+                      <button type="button" onClick={() => setLoeschen(b)} aria-label={`Beratung ${b.mitarbeiter || 'ohne Namen'} löschen`}
+                        className="rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    ) : (
+                      // Platz des Papierkorbs halten, damit die Pfeile untereinander stehen
+                      <span aria-hidden className="w-8" />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -144,13 +181,17 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
         )}
 
         {reiter === 'angebot' && (
-          <AngebotFormular
-            firma={firma}
-            logo={logo}
-            beratungen={liste.length}
-            onGespeichert={setFirma}
-            onGeloescht={() => gehe(FIRMEN)}
-          />
+          <div className="space-y-8">
+            <AngebotFormular
+              firma={firma}
+              logo={logo}
+              beratungen={liste.length}
+              pflegt={pflegt}
+              onGespeichert={setFirma}
+              onGeloescht={() => gehe(FIRMEN)}
+            />
+            <GemeinsamKarte firma={firma} kollegen={kollegen} onGeaendert={freigabeGeaendert} />
+          </div>
         )}
 
         {reiter === 'uebersicht' && <Uebersicht firma={firma} logo={logo} beratungen={liste} />}
@@ -161,6 +202,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
           Die Beratung von „{loeschen?.mitarbeiter || 'ohne Namen'}“ wird gelöscht
           {loeschen && unterschrieben[loeschen.id] ? ', mit den unterschriebenen Unterlagen' : ''}. Ausgedruckte Unterlagen bleiben
           davon unberührt.
+          {loeschen && !loeschen.eigene && angelegtVon(loeschen) ? ` Angelegt hat sie ${angelegtVon(loeschen)}; dort verschwindet sie ebenso.` : ''}
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setLoeschen(null)} className={KNOPF_ZWEIT}>Abbrechen</button>

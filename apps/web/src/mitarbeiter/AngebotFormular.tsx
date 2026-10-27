@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ImagePlus, Save, Trash2 } from 'lucide-react';
+import { ImagePlus, Lock, Save, Trash2 } from 'lucide-react';
 import { BUNDESLAENDER } from '@renten/engine';
 import {
   DURCHFUEHRUNGSWEGE, firmenAngebotSchema, firmenModellSchema, type FirmenAngebot, type FirmenModellDaten,
@@ -11,7 +11,7 @@ import { logoVorbereiten } from '../lib/bild';
 import { DRUCKFARBEN_HINWEIS } from '../lib/druckfarben';
 import { AuswahlFeld, DatumFeld, ProzentFeld, Schalter, TextFeld, ZahlFeld } from '../components/Feld';
 import { Dialog } from '../components/Dialog';
-import { FELD_LABEL, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from '../components/stil';
+import { FELD_LABEL, Hinweis, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from '../components/stil';
 import { MODELL_NAME, WEG_NAME, regelText } from './texte';
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
@@ -28,13 +28,18 @@ const LOGO_MELDUNG = {
  * Das Angebot einer Firma: wer sie ist (Name, Anschrift, Logo, Texte) und
  * was sie bietet (Modell, Durchfuehrungsweg, Versicherer). Gespeichert wird
  * erst mit „Speichern“ — geprueft mit demselben Schema, mit dem gelesen wird.
+ *
+ * Aendern und loeschen kann es nur, wer die Firma angelegt hat. Kollegen im
+ * Buero, fuer das sie freigegeben ist, sehen es schreibgeschuetzt.
  */
-export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGeloescht }: {
+export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGespeichert, onGeloescht }: {
   firma: Firma;
   /** Das gespeicherte Logo als Object-URL */
   logo: string | null;
   /** Fuer die Rueckfrage beim Loeschen */
   beratungen: number;
+  /** Wer das Angebot pflegt — fuer Kollegen */
+  pflegt?: string | null;
   onGespeichert: (f: Firma) => void;
   onGeloescht: () => void;
 }) {
@@ -46,6 +51,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
   const [status, setStatus] = useState<'bereit' | 'speichert' | 'gespeichert' | 'fehler'>('bereit');
   const [meldung, setMeldung] = useState<string | null>(null);
   const [loeschen, setLoeschen] = useState(false);
+  const nurLesen = !firma.eigene;
 
   const geaendert = name.trim() !== firma.name || JSON.stringify(a) !== JSON.stringify(firma.angebot) || neuesLogo !== null;
   const setze = <K extends keyof FirmenAngebot>(k: K, v: FirmenAngebot[K]) => {
@@ -100,7 +106,8 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {/* Fuer Kollegen schreibgeschuetzt: Ein gesperrtes fieldset sperrt alle Felder darin. */}
+      <fieldset disabled={nurLesen} className="m-0 grid min-w-0 grid-cols-1 gap-5 border-0 p-0 lg:grid-cols-2">
         <Karte titel="Die Firma">
           <div className="space-y-3">
             <TextFeld label="Name der Firma" wert={name} onChange={(v) => { setName(v); setStatus('bereit'); }} maxLaenge={120} autoComplete="organization" />
@@ -187,21 +194,28 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
               hilfe="Leer: jeweils der nächste Monatserste." />
           </div>
         </Karte>
-      </div>
+      </fieldset>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void speichern()} disabled={status === 'speichert' || !geaendert} className={KNOPF}>
-          <Save className="h-4 w-4" aria-hidden /> {status === 'speichert' ? 'Wird gespeichert …' : 'Speichern'}
-        </button>
-        <span role="status" className="text-sm text-ui-schiefer">
-          {status === 'gespeichert' && !geaendert ? 'Gespeichert.' : geaendert ? 'Nicht gespeichert.' : ''}
-        </span>
-        <span className="flex-1" />
-        <button type="button" onClick={() => setLoeschen(true)} className={KNOPF_GEFAHR}>
-          <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
-        </button>
-      </div>
-      {beratungen > 0 && (
+      {nurLesen && (
+        <Hinweis symbol={Lock}>
+          Das Angebot pflegt {pflegt ?? 'der Kollege, der die Firma angelegt hat'}. Hier steht es so, wie es in den Beratungen gilt.
+        </Hinweis>
+      )}
+      {!nurLesen && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => void speichern()} disabled={status === 'speichert' || !geaendert} className={KNOPF}>
+            <Save className="h-4 w-4" aria-hidden /> {status === 'speichert' ? 'Wird gespeichert …' : 'Speichern'}
+          </button>
+          <span role="status" className="text-sm text-ui-schiefer">
+            {status === 'gespeichert' && !geaendert ? 'Gespeichert.' : geaendert ? 'Nicht gespeichert.' : ''}
+          </span>
+          <span className="flex-1" />
+          <button type="button" onClick={() => setLoeschen(true)} className={KNOPF_GEFAHR}>
+            <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
+          </button>
+        </div>
+      )}
+      {!nurLesen && beratungen > 0 && (
         <p className="text-xs leading-relaxed text-ui-schiefer">
           Änderungen am Angebot gelten für alle Beratungen, die noch nicht unterschrieben sind. Unterschriebene Unterlagen
           bleiben, wie sie unterschrieben wurden.
@@ -212,6 +226,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
       <Dialog offen={loeschen} titel="Firma löschen?" onSchliessen={() => setLoeschen(false)}>
         <p className="text-sm leading-relaxed text-ui-tinte">
           „{firma.name}“ wird {mitGeloescht ? `mit ${mitGeloescht} ` : ''}gelöscht. Ausgedruckte Unterlagen bleiben davon unberührt.
+          {firma.buero !== null && ' Sie ist für Ihr Büro freigegeben: Auch Ihre Kollegen sehen sie danach nicht mehr, und ihre Beratungen darin gehen mit.'}
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setLoeschen(false)} className={KNOPF_ZWEIT}>Abbrechen</button>

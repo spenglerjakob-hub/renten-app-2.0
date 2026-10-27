@@ -14,7 +14,9 @@ const NEU = 'neu';
  * „Für die Mitarbeiter-Beratung übernehmen“ — das Fenster dazu, auf den drei
  * Arbeitgeber-Seiten. Was dort eingestellt ist (Modell und Bundesland), wird
  * das Angebot einer Firma: einer neuen oder einer bestehenden. Bei einer
- * bestehenden bleibt alles andere (Logo, Texte, Versicherer) stehen.
+ * bestehenden bleibt alles andere (Logo, Texte, Versicherer) stehen. Zur Wahl
+ * stehen nur eigene Firmen — das Angebot einer geteilten pflegt, wer sie
+ * angelegt hat.
  *
  * Wird erst beim ersten Klick geladen (`UebernehmenKnopf`).
  */
@@ -34,7 +36,7 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
     setFertig(null);
     setMeldung(null);
     setFirmen('laedt');
-    void firmenLaden().then((f) => { if (aktiv) setFirmen(f); });
+    void firmenLaden().then((f) => { if (aktiv) setFirmen(Array.isArray(f) ? f.filter((x) => x.eigene) : f); });
     return () => { aktiv = false; };
   }, [offen]);
 
