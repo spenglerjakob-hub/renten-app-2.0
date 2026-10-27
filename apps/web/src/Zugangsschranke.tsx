@@ -4,7 +4,7 @@ import type { Bereich } from '@renten/schema/preise';
 import { useAuth } from './store/auth';
 import { aboAktiv, deckt, useZugang, wirksam } from './store/zugang';
 import { supabase, supabaseKonfiguriert } from './lib/supabase';
-import { NUTZUNGSBEDINGUNGEN_FASSUNG } from './lib/nutzungsbedingungen';
+import { hatZugestimmt } from './lib/nutzungsbedingungen';
 import { einladungAusAdresse, fruehstartAusAdresse, offeneEinladung, offenerFruehstart } from './lib/einladung';
 import { Anmeldung } from './features/Anmeldung';
 import { Zustimmung } from './features/Zustimmung';
@@ -61,7 +61,7 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
   // Abgemeldet: Der Zugang des vorigen Kontos gilt nicht mehr.
   useEffect(() => { if (status === 'abgemeldet') zuruecksetzen(); }, [status, zuruecksetzen]);
 
-  // Hat das Konto der aktuellen Fassung der Nutzungsbedingungen zugestimmt?
+  // Hat das Konto der aktuellen (oder einer neueren) Fassung der Nutzungsbedingungen zugestimmt?
   // null: noch nicht geprueft. Die Sitzung liegt lokal vor, das kostet keine
   // Anfrage an den Server.
   const [zugestimmt, setZugestimmt] = useState<boolean | null>(null);
@@ -69,7 +69,7 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
     if (status !== 'angemeldet' || !supabase) { setZugestimmt(null); return; }
     let aktiv = true;
     void supabase.auth.getSession().then(({ data }) => {
-      if (aktiv) setZugestimmt(data.session?.user.user_metadata?.nutzungsbedingungen === NUTZUNGSBEDINGUNGEN_FASSUNG);
+      if (aktiv) setZugestimmt(hatZugestimmt(data.session?.user.user_metadata));
     });
     return () => { aktiv = false; };
   }, [status]);

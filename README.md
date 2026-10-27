@@ -233,8 +233,10 @@ In dieser Reihenfolge — jeder Schritt laesst sich einzeln pruefen:
 6. **Probekauf** mit dem Betreiberkonto (1 Platz, monatlich), danach im
    Kundenportal kuendigen und die Zahlung in Stripe erstatten.
 7. **Freigeben:** Branch `live` auf den geprueften Stand vorziehen. Die neue
-   Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt.
-   Bis dahin traegt `live` einen eigenen Commit (`8b7e9b8`, "Live:
+   Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt,
+   das ihr nicht schon auf der Testseite zugestimmt hat (die Zugangsschranke
+   laesst durch, wer der Fassung der Seite oder einer neueren zugestimmt hat
+   — Test und Live teilen die Konten). Bis dahin traegt `live` einen eigenen Commit (`8b7e9b8`, "Live:
    Nutzungsbedingungen bis zur Prüfung in der Fassung vom 1. Oktober 2026"),
    der die alte Fassung haelt. Ihn auf `live` mit `git revert` zuruecknehmen,
    dann den Arbeitszweig in `live` mergen — ein reiner Fast-Forward geht nicht.
