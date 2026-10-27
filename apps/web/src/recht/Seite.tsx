@@ -243,9 +243,17 @@ function Datenschutz() {
         Unterschriften aufhebt.
       </P>
       <P>
+        Ist die Firma bei der AXA versichert, tritt der AXA-Antrag auf Entgeltumwandlung an die Stelle der
+        Vereinbarung. Dafür speichern wir zur Firma die Kollektiv- und die Organisationsnummer, zur Beratung die
+        bAV-ID, wie die Beratung erfolgte und welche Besonderheiten erläutert wurden — und die Antworten des
+        Mitarbeiters auf die drei Fragen der AXA zu seiner Gesundheit (Arbeitsunfähigkeit, Einschränkung der
+        Erwerbs- oder Berufsfähigkeit, Höhe der versicherten BU-/EU-Rente). Das sind Gesundheitsdaten nach Art. 9
+        DSGVO. Sie stehen auch im unterschriebenen Antrag, und sie werden mit der Beratung gelöscht.
+      </P>
+      <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
-        Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht als Angabe
-        besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
+        Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht und die
+        Antworten zur Gesundheit im AXA-Antrag als Angaben besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
         was der Berater ihnen zeigt, druckt oder als Datei gibt. Die Übersicht für den Arbeitgeber enthält Namen,
         Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
       </P>

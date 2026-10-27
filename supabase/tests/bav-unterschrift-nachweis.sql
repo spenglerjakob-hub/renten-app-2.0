@@ -356,6 +356,33 @@ select 31, 'Funktionen ohne security definer, mit festem search_path', 'ja',
  where pronamespace = 'public'::regnamespace
    and proname in ('bav_unterschreiben', 'bav_unterlagen_festschreiben', 'bav_unterschrift_eintragen', 'bav_beratung_sperre_pruefen');
 
+-- ---------- AXA-Antrag: der Berater unterschreibt in der Vereinbarung mit ----------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-0000000000e1"}';
+insert into ids values ('axa_a', 'a7a7a7a7-0000-4000-8000-0000000000af');
+insert into public.bav_beratungen (id, firma, mitarbeiter, status, daten) values
+  ((select id from ids where name = 'axa_a'), (select id from ids where name = 'firma_a'), 'Alex Axa', 'teilnahme',
+   '{"schritt":6,"angaben":{"name":"Alex Axa"}}');
+
+do $$
+declare v jsonb;
+begin
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_a'), 'mitarbeiter', 'Alex Axa', 'M10 20L80 60',
+         (select inhalt from html where name = 'protokoll'),
+         repeat('<p>AXA-Antrag</p>', 20) || '<div data-unterschrift="mitarbeiter"></div><div data-unterschrift="berater"></div>',
+         null);
+  insert into ergebnis values (32, 'AXA-Antrag: Mitarbeiter wie bisher', 'protokoll+vereinbarung', v->>'dokumente',
+    v->'dokumente' = '["protokoll", "vereinbarung"]'::jsonb);
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_a'), 'berater', 'Max Berater', 'M5 5L100 50');
+  insert into ergebnis values (33, 'AXA-Antrag mit Berater-Feld: Berater deckt die Vereinbarung mit ab', 'protokoll+vereinbarung',
+    v->>'dokumente', v->'dokumente' = '["protokoll", "vereinbarung"]'::jsonb);
+exception when others then
+  insert into ergebnis values (33, 'AXA-Antrag mit Berater-Feld: Berater deckt die Vereinbarung mit ab', 'angenommen', sqlerrm, false);
+end $$;
+-- Ohne Berater-Feld (Mustervereinbarung) bleibt es beim Protokoll: Pruefung 3.
+
+reset role;
+
 select * from ergebnis order by nr;
 
 rollback;

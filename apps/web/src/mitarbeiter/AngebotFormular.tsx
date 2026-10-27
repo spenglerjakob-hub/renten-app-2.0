@@ -168,6 +168,13 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
             )}
             <TextFeld label="Versicherer" wert={a.versicherer} onChange={(v) => setze('versicherer', v)} maxLaenge={120} />
             <TextFeld label="Tarif" wert={a.tarif} onChange={(v) => setze('tarif', v)} maxLaenge={120} />
+            {/* Fuer den AXA-Antrag, der bei AXA an die Stelle der Mustervereinbarung tritt (axa-antrag.tsx). Leer: die Linie bleibt zum Ausfuellen. */}
+            {/\baxa\b/i.test(a.versicherer) && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextFeld label="Kollektivnummer (AXA)" wert={a.kollektivnummer} onChange={(v) => setze('kollektivnummer', v)} maxLaenge={40} />
+                <TextFeld label="Organisationsnummer (AXA)" wert={a.organisationsnummer} onChange={(v) => setze('organisationsnummer', v)} maxLaenge={40} />
+              </div>
+            )}
             {m.art === 'matching' && (
               <TextFeld label="Unterstützungskasse (Träger)" wert={a.ukasse} onChange={(v) => setze('ukasse', v)} maxLaenge={120} />
             )}

@@ -126,8 +126,9 @@ export function mitUnterschriften(html: string, unterschriften: readonly Untersc
   for (const u of unterschriften) {
     if (!u.dokumente.includes(art)) continue;
     const rahmen = zugGueltig(u.zug) ? zugRahmen(u.zug) : null;
-    const feld = doc.body.querySelector(`[data-unterschrift="${u.person}"]`);
-    if (feld && rahmen) {
+    // Jedes Feld der Person — der AXA-Antrag hat mehrere (Antrag, Einwilligung, Gespraechsprotokoll).
+    const felder = rahmen ? Array.from(doc.body.querySelectorAll(`[data-unterschrift="${u.person}"]`)) : [];
+    if (rahmen) for (const feld of felder) {
       const bild = doc.createElementNS(SVG, 'svg');
       bild.setAttribute('viewBox', `${rahmen.x} ${rahmen.y} ${rahmen.breite} ${rahmen.hoehe}`);
       bild.setAttribute('preserveAspectRatio', 'xMaxYMax meet');
@@ -146,8 +147,9 @@ export function mitUnterschriften(html: string, unterschriften: readonly Untersc
       bild.append(linie);
       feld.replaceChildren(bild);
     }
-    const vermerk = doc.body.querySelector(`[data-vermerk="${u.person}"]`);
-    if (vermerk) vermerk.textContent = vermerkText(u.name, u.unterschriebenAm);
+    for (const vermerk of Array.from(doc.body.querySelectorAll(`[data-vermerk="${u.person}"]`))) {
+      vermerk.textContent = vermerkText(u.name, u.unterschriebenAm);
+    }
   }
   return doc.body.innerHTML;
 }
@@ -171,10 +173,13 @@ export async function pruefsummeVon(text: string): Promise<string | null> {
 export function UnterschriebeneUnterlage({ html, erstelltAm, pruefsumme, stimmt }: {
   html: string; erstelltAm: string; pruefsumme: string; stimmt: boolean;
 }) {
+  // Endet die Fassung auf einer eigenen Druckseite (AXA-Gespraechsprotokoll), steht die Zeile darunter auf derselben —
+  // sonst bricht Chrome beim Wechsel der Seite um, und sie stuende allein auf einem Blatt.
+  const seite = html.includes('[page:axa-formular]') ? '[page:axa-formular]' : '';
   return (
     <div>
       <div dangerouslySetInnerHTML={{ __html: html }} />
-      <p className={`mt-4 border-t border-ui-linie pt-1 text-[7.5pt] ${stimmt ? 'text-ui-schiefer' : 'font-medium text-rose-700'}`}>
+      <p className={`mt-4 border-t border-ui-linie pt-1 text-[7.5pt] ${seite} ${stimmt ? 'text-ui-schiefer' : 'font-medium text-rose-700'}`}>
         {stimmt
           ? `Elektronisch unterschriebene Fassung, festgeschrieben am ${zeitpunktText(erstelltAm)} · Prüfsumme ${pruefsummeKurz(pruefsumme)}`
           : 'Achtung: Der Inhalt passt nicht zur Prüfsumme der festgeschriebenen Fassung.'}

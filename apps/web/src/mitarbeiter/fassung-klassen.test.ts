@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 const DRUCK = [
   'mitarbeiter/druck.tsx', 'mitarbeiter/festschreiben.tsx', 'druck/DeckblattKopf.tsx',
   'druck/Bausteine.tsx', 'components/Logo.tsx', 'components/LueckenRing.tsx',
+  'mitarbeiter/axa-antrag.tsx',
 ];
 
 const lies = (pfad: string) => readFileSync(new URL(`../${pfad}`, import.meta.url), 'utf8');

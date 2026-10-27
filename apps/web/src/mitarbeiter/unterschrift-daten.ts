@@ -114,9 +114,10 @@ export function zugRahmen(zug: string): { x: number; y: number; breite: number; 
 }
 
 /** Welche Unterlagen eine Unterschrift abdeckt — wie der Trigger in der Datenbank. */
-export function dokumenteFuer(status: BeratungStatus, person: UnterschriftPerson): UnterlagenArt[] {
+export function dokumenteFuer(status: BeratungStatus, person: UnterschriftPerson, axa = false): UnterlagenArt[] {
   if (status === 'offen') return [];
-  if (person === 'berater') return ['protokoll'];
+  // Im AXA-Antrag unterschreibt der Berater mit: Einwilligung und AXA-Gespraechsprotokoll (wie die Datenbank es zaehlt).
+  if (person === 'berater') return axa && status === 'teilnahme' ? ['protokoll', 'vereinbarung'] : ['protokoll'];
   return ['protokoll', status === 'teilnahme' ? 'vereinbarung' : 'verzicht'];
 }
 
@@ -125,10 +126,12 @@ export const DOKUMENT_NAME: Record<UnterlagenArt, string> = {
   vereinbarung: 'Vereinbarung über Entgeltumwandlung',
   verzicht: 'Erklärung zum Verzicht auf die Entgeltumwandlung',
 };
+/** Bei AXA steht an Stelle der Vereinbarung der AXA-Antrag (axa-antrag.tsx). */
+export const AXA_ANTRAG_NAME = 'AXA-Antrag auf Entgeltumwandlung';
 
 /** „Beratungsprotokoll und Vereinbarung über Entgeltumwandlung“ */
-export function dokumenteText(arten: readonly UnterlagenArt[]): string {
-  const namen = arten.map((a) => DOKUMENT_NAME[a]);
+export function dokumenteText(arten: readonly UnterlagenArt[], axa = false): string {
+  const namen = arten.map((a) => (axa && a === 'vereinbarung' ? AXA_ANTRAG_NAME : DOKUMENT_NAME[a]));
   return namen.length <= 1 ? (namen[0] ?? '') : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`;
 }
 
