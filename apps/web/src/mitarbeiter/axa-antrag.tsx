@@ -3,8 +3,11 @@ import type { AxaAngaben } from '@renten/schema';
 import type { UnterschriftPerson } from '../lib/bav-beratung';
 import { namensTeile } from '../lib/namen';
 import { beginnDatum } from './rechnung';
-import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBetraege } from './axa';
-import type { DokumentProps } from './druck';
+import {
+  AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBausteine, axaBerater, axaBetraege, axaOrganr,
+  axaVerzichtZuschuss, mitGesundheitsfragen,
+} from './axa';
+import { Verzicht, type DokumentProps } from './druck';
 import { FORMULARCODE } from './axa/formularcode';
 import axaLogo from './axa/axa-logo.png';
 import axaLogoProtokoll from './axa/axa-logo-protokoll.png';
@@ -12,7 +15,9 @@ import axaLogoProtokoll from './axa/axa-logo-protokoll.png';
 /*
  * DER AXA-ANTRAG fuer die Mitarbeiterberatung — nachgebaut nach der Vorlage
  * einer AXA-Agentur (Antrag auf Entgeltumwandlung, Einwilligung,
- * Datenschutzhinweise der AXA, AXA-Gespraechsprotokoll 21012882 07.20).
+ * Datenschutzhinweise der AXA) und dem AXA-Gespraechsprotokoll 21012882
+ * (11.20). Bei Verzicht kommt das Protokoll mit „Nein“ hinter die
+ * Verzichtserklaerung (`AxaVerzicht`).
  *
  * Der Wortlaut ist der des Originals, auch wo es sich vertippt hat. Ersetzt
  * sind nur die Angaben, die dort fest fuer eine Firma standen: Arbeitgeber,
@@ -86,13 +91,13 @@ function ortDerFirma(anschrift: string): string {
   return (zeilen[zeilen.length - 1] ?? '').replace(/^\d{4,5}\s+/, '');
 }
 
-export function AxaAntrag({ firma, logo, daten, r, auftritt }: DokumentProps) {
+export function AxaAntrag(props: DokumentProps) {
+  const { firma, logo, daten, r, auftritt } = props;
   const a = daten.angaben;
   const e = daten.entscheidung;
   const x = e.axa;
   const f = firma.angebot;
   const mitarbeiter = namensTeile(a.name, a.vorname, a.nachname);
-  const berater = auftritt ? namensTeile(auftritt.berater, auftritt.vorname, auftritt.nachname) : { vorname: '', nachname: '' };
   const agentur = auftritt?.firma.trim() ?? '';
   const tarif = f.tarif.trim() || 'Relax Rente';
   const b = axaBetraege(r);
@@ -115,7 +120,7 @@ export function AxaAntrag({ firma, logo, daten, r, auftritt }: DokumentProps) {
           Direktversicherung bei der {AXA}
         </p>
         <p className="mt-3 font-semibold">
-          Kollektivnummer: <Linie wert={f.kollektivnummer} klasse="min-w-[30mm]" /> Organr.: <Linie wert={f.organisationsnummer} klasse="min-w-[30mm]" />
+          Kollektivnummer: <Linie wert={f.kollektivnummer} klasse="min-w-[30mm]" /> Organr.: <Linie wert={axaOrganr(x, f)} klasse="min-w-[30mm]" />
         </p>
         <p className="mt-4 font-semibold">
           Diese Vereinbarung zwischen Arbeitgeber und Arbeitnehmer gilt gleichzeitig als Antrag zum Abschluss einer
@@ -227,21 +232,26 @@ export function AxaAntrag({ firma, logo, daten, r, auftritt }: DokumentProps) {
         </div>
       </Ziffer>
 
-      <Ziffer rand={<>Mitarbeiter&shy;erklärung der zu versichernden Person</>} klasse="mt-6" teilbar>
-        <p className="font-semibold">Belehrung</p>
-        {AXA_BELEHRUNG.map(({ titel, text }, i) => (
-          <div key={i} className={i > 0 ? 'mt-2' : ''}>
-            {titel && <p>{titel}</p>}
-            <p>{text}</p>
-          </div>
-        ))}
-        <p className="mt-2">Erklärung des Arbeitnehmers:</p>
-        {AXA_FRAGEN.map(({ feld, text, sterne }) => <Frage key={feld} wert={x[feld]} sterne={sterne}>{text}</Frage>)}
-      </Ziffer>
+      {/* Die Fragen zur Gesundheit gibt es nur mit der Beitragsbefreiung bei Berufsunfaehigkeit. */}
+      {mitGesundheitsfragen(x) && (
+        <>
+          <Ziffer rand={<>Mitarbeiter&shy;erklärung der zu versichernden Person</>} klasse="mt-6" teilbar>
+            <p className="font-semibold">Belehrung</p>
+            {AXA_BELEHRUNG.map(({ titel, text }, i) => (
+              <div key={i} className={i > 0 ? 'mt-2' : ''}>
+                {titel && <p>{titel}</p>}
+                <p>{text}</p>
+              </div>
+            ))}
+            <p className="mt-2">Erklärung des Arbeitnehmers:</p>
+            {AXA_FRAGEN.map(({ feld, text, sterne }) => <Frage key={feld} wert={x[feld]} sterne={sterne}>{text}</Frage>)}
+          </Ziffer>
 
-      <div className="mt-6 space-y-0.5 text-[6.5pt] break-inside-avoid">
-        {AXA_FUSSNOTEN.map((f) => <p key={f}>{f}</p>)}
-      </div>
+          <div className="mt-6 space-y-0.5 text-[6.5pt] break-inside-avoid">
+            {AXA_FUSSNOTEN.map((f) => <p key={f}>{f}</p>)}
+          </div>
+        </>
+      )}
 
       {/* --- Einwilligung und Schweigepflichtentbindung ---------------------------- */}
       <div className="break-before-page pt-2 text-[6.8pt] leading-[1.3]">
@@ -268,16 +278,18 @@ export function AxaAntrag({ firma, logo, daten, r, auftritt }: DokumentProps) {
         </Ziffer>
       </div>
 
-      {/* --- AXA-Gespraechsprotokoll ------------------------------------------------ */}
-      <Gespraechsprotokoll
-        unternehmen={[firma.name, ortDerFirma(f.anschrift) || e.ort.trim()].filter(Boolean).join(', ')}
-        mitarbeiter={[mitarbeiter.nachname, mitarbeiter.vorname, a.geburtsdatum].filter(Boolean).join(', ')}
-        berater={[berater.nachname, berater.vorname].filter(Boolean).join(', ')}
-        datum={e.datum}
-        x={x}
-        tarif={f.tarif.trim()}
-      />
+      <AxaProtokoll {...props} />
     </article>
+  );
+}
+
+/** Bei Verzicht: die Verzichtserklaerung und dahinter, auf eigener Seite, das AXA-Gespraechsprotokoll mit „Nein“. */
+export function AxaVerzicht(props: DokumentProps) {
+  return (
+    <div>
+      <Verzicht {...props} />
+      <AxaProtokoll {...props} />
+    </div>
   );
 }
 
@@ -832,7 +844,7 @@ function Datenschutz() {
   );
 }
 
-/* --- AXA-Gespraechsprotokoll (Formular 21012882, 07.20) ------------------------------ */
+/* --- AXA-Gespraechsprotokoll (Formular 21012882, 11.20) ------------------------------ */
 
 const BLAU = 'text-[#00008f]';
 
@@ -853,33 +865,71 @@ function Punkt({ children }: { children: ReactNode }) {
   return <li className="flex gap-2"><span className="mt-[1.2mm] h-[1.6mm] w-[1.6mm] shrink-0 bg-[#00008f]" /><span className="min-w-0 flex-1">{children}</span></li>;
 }
 
-function Wahl({ an, text }: { an: boolean; text: string }) {
+function Wahl({ an, text }: { an: boolean; text: ReactNode }) {
   return <span className="inline-flex items-center gap-1"><Kaestchen an={an} /> {text}</span>;
 }
 
-function Gespraechsprotokoll({ unternehmen, mitarbeiter, berater, datum, x, tarif }: {
-  unternehmen: string; mitarbeiter: string; berater: string; datum: string; x: AxaAngaben; tarif: string;
-}) {
+/** Datum und die Unterschriften von Vermittler/in und versicherter Person — zweimal im Protokoll. */
+function ProtokollUnterschriften({ titel, datum }: { titel: ReactNode; datum: string }) {
   return (
-    <section className="break-before-page text-[6.4pt] leading-[1.18] [page:axa-formular]">
+    <div className="mt-1.5 grid grid-cols-[23mm_1fr] gap-3 border-t border-ui-tinte pt-1.5 break-inside-avoid">
+      <p className={`text-right font-semibold ${BLAU}`}>{titel}</p>
+      <div className="grid grid-cols-[30mm_1fr_1fr] gap-4">
+        <div>
+          <p className="text-[6.5pt] text-ui-schiefer">Datum</p>
+          <p className="mt-[5mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{datum || leer}</p>
+        </div>
+        <div>
+          <p className="text-[6.5pt] text-ui-schiefer">Vermittler/in</p>
+          <Unterschrift feld="berater" hoehe="h-[9mm]" />
+        </div>
+        <div>
+          <p className="text-[6.5pt] text-ui-schiefer">Versicherte Person</p>
+          <Unterschrift feld="mitarbeiter" hoehe="h-[9mm]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Das AXA-Gespraechsprotokoll, ausgefuellt aus der Beratung: beim AXA-Antrag
+ * mit „Ja“ und den gewaehlten Bausteinen, bei Verzicht mit „Nein“ und dem
+ * Zuschuss, auf den der Mitarbeiter verzichtet. Eine eigene Druckseite mit
+ * schmalem Rand (`@page axa-formular`, index.css), wie das Formular.
+ */
+function AxaProtokoll({ firma, daten, r, auftritt }: DokumentProps) {
+  const a = daten.angaben;
+  const e = daten.entscheidung;
+  const x = e.axa;
+  const f = firma.angebot;
+  const ja = e.status === 'teilnahme';
+  const mitarbeiter = namensTeile(a.name, a.vorname, a.nachname);
+  const berater = axaBerater(x, auftritt);
+  const zuschuss = ja ? { prozent: null, euro: null } : axaVerzichtZuschuss(f, r);
+
+  return (
+    <section className="break-before-page text-[6.4pt] leading-[1.18] text-ui-tinte [page:axa-formular]">
       <div className="flex items-start justify-between gap-6">
         <img src={axaLogoProtokoll} alt="AXA" className="h-[14mm] w-[14mm]" />
-        <p className={`mt-[6mm] w-[118mm] text-[10pt] font-semibold leading-tight ${BLAU}`}>
-          Gesprächsprotokoll betriebliche Altersversorgung (bAV)<br />im Wege einer Entgeltumwandlung
+        <p className={`mt-[6mm] w-[124mm] text-[10pt] font-semibold leading-tight ${BLAU}`}>
+          Gesprächsprotokoll betriebliche Altersversorgung (bAV)<br />im Wege einer Entgeltumwandlung (Direktversicherung)
         </p>
       </div>
       <p className="mt-1 border-b border-ui-tinte pb-0.5 font-semibold">Bitte in Druckbuchstaben ausfüllen</p>
 
-      <ProtokollZeile titel="Unternehmen" feld="Firma, Ort" wert={unternehmen} />
-      <ProtokollZeile titel="Mitarbeiter/in" feld="Name, Vorname, Geburtsdatum" wert={mitarbeiter} />
-      <ProtokollZeile titel="Berater/in" feld="Name, Vorname" wert={berater} />
+      <ProtokollZeile titel="Unternehmen" feld="Firma (mit Rechtsform), Ort"
+        wert={[firma.name, ortDerFirma(f.anschrift) || e.ort.trim()].filter(Boolean).join(', ')} />
+      <ProtokollZeile titel="Mitarbeiter/in" feld="Name, Vorname, Geburtsdatum"
+        wert={[mitarbeiter.nachname, mitarbeiter.vorname, a.geburtsdatum].filter(Boolean).join(', ')} />
+      <ProtokollZeile titel="Berater/in" feld="Name, Vorname" wert={[berater.nachname, berater.vorname].filter(Boolean).join(', ')} />
       <ProtokollZeile titel="Weitere Teilnehmer/in" feld="Name, Vorname" wert="" />
       <div className="mt-1 grid grid-cols-[23mm_1fr] gap-3">
         <p className={`text-right font-semibold ${BLAU}`}>Tag der Beratung</p>
         <div className="flex items-start justify-between gap-6">
           <div className="w-[45mm]">
             <p className="text-[6.5pt] text-ui-schiefer">Datum</p>
-            <p className="min-h-[4mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{datum || leer}</p>
+            <p className="min-h-[4mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{e.datum || leer}</p>
           </div>
           <div className="flex gap-6">
             <p>Die Beratung erfolgte</p>
@@ -926,50 +976,13 @@ function Gespraechsprotokoll({ unternehmen, mitarbeiter, berater, datum, x, tari
           </ul>
           <p className="mt-1 flex justify-between gap-4 font-semibold">
             <span>Wünschen Sie eine Versorgung über den Durchführungsweg Direktversicherung?</span>
-            <span className="flex gap-3"><Wahl an text="ja" /><Wahl an={false} text="nein" /></span>
+            <span className="flex gap-3"><Wahl an={ja} text="ja" /><Wahl an={!ja} text="nein" /></span>
           </p>
           <p className="mt-1">
             Sofern die Versorgungsordnung eine Wahlmöglichkeit des Arbeitnehmers zwischen verschiedenen
             Bausteinen/Leistungsarten vorsieht, entscheiden Sie sich für den/die folgenden Baustein(e)/Leistungsart (en):
           </p>
-          <p className="min-h-[4mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{tarif || leer}</p>
-
-          <p className="mt-2 border-t border-ui-linie pt-1 font-semibold">Unterstützungskasse über Entgeltumwandlung</p>
-          <p className="mt-1">Eigenschaften des Durchführungswegs Unterstützungskasse:</p>
-          <ul className="mt-0.5">
-            <Punkt>
-              Die Unterstützungskasse ermöglicht Dotierungen über den Rahmen der Direktversicherung (Steuerfreiheit der
-              Versicherungsbeiträge in Höhe von 8 % der jeweiligen Beitragsbemessungsgrenze in der gRV) hinaus.
-            </Punkt>
-            <Punkt>
-              Die Unterstützungskasse ermöglicht eine Sozialversicherungsersparnis bei Entgeltumwandlung in Höhe von max. 4 %
-              der Beitragsbemessungsgrenze in der gRV zusätzlich zur Direktversicherung.
-            </Punkt>
-            <Punkt>
-              Eine Unterstützungskassen-Versorgung kann nur mit gleichbleibenden oder steigenden Beiträgen abgeschlossen
-              werden (Ausnahme: im Rentenalter ist die Zahlung eines Einmalbeitrags möglich).
-            </Punkt>
-            <Punkt>
-              Eine Unterstützungskassen-Versorgung kann bei Ausscheiden aus dem Unternehmen nur mit Zustimmung des bisherigen
-              Arbeitgebers, des neuen Arbeitgebers und von Ihnen auf einen neuen Arbeitgeber übertragen werden. Eine
-              Übertragung auf Sie (privat) ist ausgeschlossen.
-            </Punkt>
-            <Punkt>
-              Eine Unterstützungskasse kann Auszahlungen nur in den in der Rückdeckungsversicherung vorgesehenen
-              Leistungsfällen vornehmen. Es ist also nicht möglich, außerhalb dieser Leistungsfälle auf das Vermögen der
-              Unterstützungskasse zuzugreifen; insbesondere ist die Auszahlung des Rückkaufswerts der
-              Rückdeckungsversicherung ausgeschlossen.
-            </Punkt>
-          </ul>
-          <p className="mt-1 flex justify-between gap-4 font-semibold">
-            <span>Wünschen Sie eine Versorgung über den Durchführungsweg Unterstützungskasse?</span>
-            <span className="flex gap-3"><Wahl an={false} text="ja" /><Wahl an text="nein" /></span>
-          </p>
-          <p className="mt-1">
-            Sofern die Versorgungsordnung eine Wahlmöglichkeit des Arbeitnehmers zwischen verschiedenen
-            Bausteinen/Leistungsarten vorsieht, entscheiden Sie sich für den/die folgenden Baustein(e)/Leistungsart (en):
-          </p>
-          <p className="min-h-[4mm] border-b border-l border-ui-tinte px-1">{leer}</p>
+          <p className="min-h-[4mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{(ja && axaBausteine(f, x)) || leer}</p>
 
           <p className="mt-2 border-t border-ui-linie pt-1 font-semibold">Folgende Besonderheiten in der betrieblichen Altersversorgung wurden erläutert:</p>
           <ul className="mt-0.5">
@@ -984,13 +997,50 @@ function Gespraechsprotokoll({ unternehmen, mitarbeiter, berater, datum, x, tari
                     Derzeit unterliegen die Leistungen aus einer betrieblichen Altersversorgung der Einkommensteuer und sind
                     beitragspflichtig in der gesetzlichen Kranken- und Pflegeversicherung, sofern dort eine
                     Versicherung/Mitgliedschaft besteht (Ausnahme: Die Direktversicherung mit Zulagen/Riesterförderung
-                    unterliegt zwar der Besteuerung, aber ist nicht beitragspflichtig zur gesetzlichen Kranken- und
+                    unterliegt zwar der Besteuerung, ist aber nicht beitragspflichtig in der gesetzlichen Kranken- und
                     Pflegeversicherung.).
                   </span>
                 )}
               </Punkt>
             ))}
           </ul>
+        </div>
+      </div>
+
+      <ProtokollUnterschriften titel={<>Unterschriften zum Gesprächsinhalt</>} datum={e.datum} />
+
+      <div className="mt-1.5 grid grid-cols-[23mm_1fr] gap-3 border-t border-ui-tinte pt-1.5 break-inside-avoid">
+        <p className={`text-right font-semibold ${BLAU}`}>Entscheidung</p>
+        <div>
+          <p className="font-semibold">Entscheidung des Mitarbeiters/der Mitarbeiterin zur Entgeltumwandlung:</p>
+          <div className="mt-1 flex gap-1.5">
+            <Kaestchen an={ja} />
+            <p>
+              Ja, ich möchte Entgeltumwandlung zugunsten einer betrieblichen Altersversorgung betreiben.<br />
+              Das Weitere wird gesondert vereinbart (vgl. Versorgungszusage des Arbeitgebers und Entgeltumwandlungsvereinbarung).
+            </p>
+          </div>
+          <div className="mt-1 flex gap-1.5">
+            <Kaestchen an={!ja} />
+            <div className="min-w-0 flex-1">
+              <p>Nein, eine betriebliche Altersversorgung interessiert mich momentan nicht. Das bedeutet:</p>
+              <ul className="mt-0.5 pl-2">
+                <Punkt>Ich habe jederzeit die Möglichkeit, dieses Angebot auch zu einem späteren Zeitpunkt in Anspruch zu nehmen.</Punkt>
+                <Punkt>Ich bin mir bewusst, dass ich auf mögliche staatliche und betriebliche Förderungen verzichte.</Punkt>
+                <Punkt>
+                  {/* Feld und Einheit bleiben beisammen, wenn die Zeile umbricht. */}
+                  Ich bin mir bewusst, dass ich auf den Arbeitgeberzuschuss in Höhe von{' '}
+                  <span className="whitespace-nowrap">
+                    <Linie wert={zuschuss.prozent === null ? '' : zuschuss.prozent.toLocaleString('de-DE')} klasse="min-w-[12mm]" />% des
+                  </span>{' '}
+                  Entgeltumwandlungsbetrages bzw.{' '}
+                  <span className="whitespace-nowrap">
+                    <Linie wert={zuschuss.euro === null ? '' : zahl2(zuschuss.euro)} klasse="min-w-[14mm]" />EUR verzichte.
+                  </span>
+                </Punkt>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1002,28 +1052,12 @@ function Gespraechsprotokoll({ unternehmen, mitarbeiter, berater, datum, x, tari
         Dieses Gesprächsprotokoll wird zusammen mit dem Versicherungsantrag/der Anmeldung zur Versicherung zum Zweck der
         Archivierung und Bearbeitung von Beanstandungen übermittelt.
       </p>
-      <div className="mt-1.5 grid grid-cols-[23mm_1fr] gap-3 break-inside-avoid">
-        <p className={`text-right font-semibold ${BLAU}`}>Unterschriften zu Entscheidung</p>
-        <div className="grid grid-cols-[30mm_1fr_1fr] gap-4">
-          <div>
-            <p className="text-[6.5pt] text-ui-schiefer">Datum</p>
-            <p className="mt-[5mm] border-b border-l border-ui-tinte px-1 text-[8pt]">{datum || leer}</p>
-          </div>
-          <div>
-            <p className="text-[6.5pt] text-ui-schiefer">Vermittler/in</p>
-            <Unterschrift feld="berater" hoehe="h-[9mm]" />
-          </div>
-          <div>
-            <p className="text-[6.5pt] text-ui-schiefer">Versicherte Person</p>
-            <Unterschrift feld="mitarbeiter" hoehe="h-[9mm]" />
-          </div>
-        </div>
-      </div>
+      <ProtokollUnterschriften titel={<>Unterschriften zu Entscheidung</>} datum={e.datum} />
       <div className="mt-1 flex items-end justify-between">
         <svg viewBox={`0 0 ${FORMULARCODE.module} ${FORMULARCODE.module}`} className="h-[10mm] w-[10mm]" role="img" aria-label="Formularcode">
           <path d={FORMULARCODE.pfad} fill="#000" />
         </svg>
-        <p className="text-[6.5pt]">21012882 (07.20)</p>
+        <p className="text-[6.5pt]">21012882 (11.20)</p>
       </div>
     </section>
   );

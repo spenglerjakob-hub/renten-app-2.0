@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { beratungDatenSchema, firmenAngebotSchema } from '@renten/schema';
 import { beitragsRechnung } from './rechnung';
-import { axaBetraege, axaFehlt, istAxaAntrag } from './axa';
+import { AUFTRITT_LEER } from '../features/auftritt';
+import {
+  axaBausteine, axaBerater, axaBetraege, axaFehlt, axaOrganr, axaVerzichtZuschuss, istAxaAntrag, mitGesundheitsfragen,
+} from './axa';
 
 const angebot = (x: object) => firmenAngebotSchema.parse({ versicherer: 'AXA Lebensversicherung AG', ...x });
-const beratung = (umwandlungMonat = 150, axa: object = {}) => beratungDatenSchema.parse({
+const beratung = (umwandlungMonat = 150, axa: object = {}, status = 'teilnahme') => beratungDatenSchema.parse({
   angaben: { name: 'Anna Beispiel', geburtsdatum: '15.04.1990', jahresbrutto: 48_000 },
   umwandlungMonat,
-  entscheidung: { status: 'teilnahme', axa },
+  entscheidung: { status, axa },
 });
+const auftritt = { ...AUFTRITT_LEER, berater: 'Max Berater', vorname: 'Max', nachname: 'Berater' };
 
 describe('istAxaAntrag', () => {
   it('gilt bei AXA und Direktversicherung — gleich wie der Versicherer geschrieben ist', () => {
@@ -58,18 +62,86 @@ describe('axaBetraege', () => {
 
 describe('axaFehlt', () => {
   const alles = {
-    arbeitsunfaehig: 'nein', einschraenkung: 'nein', buRente: 'nein', kanal: 'persoenlich',
+    buBefreiung: 'nein', kanal: 'persoenlich',
     erlaeutert: { versteuerung: 'ja', funktionsweise: 'ja', ausscheiden: 'ja', insolvenz: 'ja' },
   };
+  const fragen = { arbeitsunfaehig: 'nein', einschraenkung: 'nein', buRente: 'nein' };
 
   it('nichts, wenn alles beantwortet ist — auch mit Ja oder Nein', () => {
-    expect(axaFehlt(beratung(150, alles))).toEqual([]);
-    expect(axaFehlt(beratung(150, { ...alles, buRente: 'ja', erlaeutert: { ...alles.erlaeutert, insolvenz: 'nein' } }))).toEqual([]);
+    expect(axaFehlt(beratung(150, alles), 'Max Berater')).toEqual([]);
+    expect(axaFehlt(beratung(150, { ...alles, erlaeutert: { ...alles.erlaeutert, insolvenz: 'nein' } }), 'Max Berater')).toEqual([]);
+    expect(axaFehlt(beratung(150, { ...alles, ...fragen, buBefreiung: 'ja', buRente: 'ja' }), 'Max Berater')).toEqual([]);
+  });
+
+  it('die Fragen zur Gesundheit nur mit dem BU-Zusatz', () => {
+    expect(axaFehlt(beratung(150, { ...alles, buBefreiung: 'ja' }), 'Max Berater')).toEqual(['die drei Fragen zur Gesundheit']);
+    expect(axaFehlt(beratung(150, { ...alles, ...fragen, buBefreiung: 'ja', einschraenkung: '' }), 'Max Berater'))
+      .toEqual(['die drei Fragen zur Gesundheit']);
   });
 
   it('nennt, was fehlt', () => {
-    expect(axaFehlt(beratung())).toEqual(['die drei Fragen zur Gesundheit', 'wie die Beratung erfolgte', 'die erläuterten Besonderheiten']);
-    expect(axaFehlt(beratung(150, { ...alles, einschraenkung: '' }))).toEqual(['die drei Fragen zur Gesundheit']);
-    expect(axaFehlt(beratung(150, { ...alles, erlaeutert: { ...alles.erlaeutert, ausscheiden: '' } }))).toEqual(['die erläuterten Besonderheiten']);
+    expect(axaFehlt(beratung(), '')).toEqual([
+      'der Name des Beraters', 'ob die Beitragsbefreiung bei Berufsunfähigkeit eingeschlossen ist',
+      'wie die Beratung erfolgte', 'die erläuterten Besonderheiten',
+    ]);
+    expect(axaFehlt(beratung(150, { ...alles, erlaeutert: { ...alles.erlaeutert, ausscheiden: '' } }), 'Max Berater'))
+      .toEqual(['die erläuterten Besonderheiten']);
+  });
+
+  it('bei Verzicht nur, was ins Protokoll gehoert — ohne BU-Zusatz und Gesundheit', () => {
+    expect(axaFehlt(beratung(150, {}, 'verzicht'), '')).toEqual(['der Name des Beraters', 'wie die Beratung erfolgte', 'die erläuterten Besonderheiten']);
+    expect(axaFehlt(beratung(150, { ...alles, buBefreiung: '' }, 'verzicht'), 'Max Berater')).toEqual([]);
+  });
+});
+
+describe('axaBerater und axaOrganr', () => {
+  it('der Name aus der Beratung, sonst aus „Ihr Auftritt“', () => {
+    expect(axaBerater(beratung().entscheidung.axa, auftritt)).toEqual({ vorname: 'Max', nachname: 'Berater' });
+    expect(axaBerater(beratung(150, { beraterVorname: ' Erika ', beraterNachname: 'Kollegin' }).entscheidung.axa, auftritt))
+      .toEqual({ vorname: 'Erika', nachname: 'Kollegin' });
+    expect(axaBerater(beratung(150, { beraterNachname: 'Kollegin' }).entscheidung.axa, auftritt)).toEqual({ vorname: '', nachname: 'Kollegin' });
+    expect(axaBerater(beratung().entscheidung.axa, null)).toEqual({ vorname: '', nachname: '' });
+    // Ein Auftritt nur mit dem ganzen Namen (Live-Seite) wird geteilt.
+    expect(axaBerater(beratung().entscheidung.axa, { ...AUFTRITT_LEER, berater: 'Anna Maria Muster' }))
+      .toEqual({ vorname: 'Anna Maria', nachname: 'Muster' });
+  });
+
+  it('die Organr. der Beratung, sonst die der Firma', () => {
+    expect(axaOrganr(beratung().entscheidung.axa, angebot({ organisationsnummer: '1234' }))).toBe('1234');
+    expect(axaOrganr(beratung(150, { organisationsnummer: ' 9876 ' }).entscheidung.axa, angebot({ organisationsnummer: '1234' }))).toBe('9876');
+    expect(axaOrganr(beratung().entscheidung.axa, angebot({}))).toBe('');
+  });
+});
+
+describe('BU-Zusatz in Antrag und Protokoll', () => {
+  it('Fragen zur Gesundheit mit dem Zusatz und unbeantwortet, nicht ohne ihn', () => {
+    expect(mitGesundheitsfragen(beratung(150, { buBefreiung: 'ja' }).entscheidung.axa)).toBe(true);
+    expect(mitGesundheitsfragen(beratung(150, { buBefreiung: '' }).entscheidung.axa)).toBe(true);
+    expect(mitGesundheitsfragen(beratung(150, { buBefreiung: 'nein' }).entscheidung.axa)).toBe(false);
+  });
+
+  it('die Baustein-Zeile nennt den Zusatz nur, wenn er gewaehlt ist', () => {
+    const f = angebot({ tarif: 'Relax Rente' });
+    expect(axaBausteine(f, beratung(150, { buBefreiung: 'ja' }).entscheidung.axa)).toBe('Relax Rente, Beitragsbefreiung bei Berufsunfähigkeit');
+    expect(axaBausteine(f, beratung(150, { buBefreiung: 'nein' }).entscheidung.axa)).toBe('Relax Rente');
+    expect(axaBausteine(angebot({}), beratung(150, { buBefreiung: 'ja' }).entscheidung.axa)).toBe('Beitragsbefreiung bei Berufsunfähigkeit');
+  });
+});
+
+describe('axaVerzichtZuschuss', () => {
+  it('Zuschussmodell: die Quote und was der Arbeitgeber laut Beratung dazugaebe', () => {
+    const f = angebot({});
+    expect(axaVerzichtZuschuss(f, beitragsRechnung(f, beratung(150)))).toEqual({ prozent: 50, euro: expect.closeTo(75, 6) });
+    expect(axaVerzichtZuschuss(f, beitragsRechnung(f, beratung(0)))).toEqual({ prozent: 50, euro: null });
+  });
+
+  it('Festbetrag und Matching: ohne Prozent; ohne Umwandlung der feste Betrag des Modells', () => {
+    const fest = angebot({ modell: { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 } });
+    expect(axaVerzichtZuschuss(fest, beitragsRechnung(fest, beratung(150)))).toEqual({ prozent: null, euro: expect.closeTo(50, 6) });
+    expect(axaVerzichtZuschuss(fest, beitragsRechnung(fest, beratung(0)))).toEqual({ prozent: null, euro: 50 });
+    const matching = angebot({ modell: { art: 'matching', weg: 'dv', matchingMonat: 100 } });
+    const r = beitragsRechnung(matching, beratung(150));
+    expect(axaVerzichtZuschuss(matching, r)).toEqual({ prozent: null, euro: expect.closeTo(r.arbeitgeberMonat, 9) });
+    expect(axaVerzichtZuschuss(matching, beitragsRechnung(matching, beratung(0)))).toEqual({ prozent: null, euro: 100 });
   });
 });

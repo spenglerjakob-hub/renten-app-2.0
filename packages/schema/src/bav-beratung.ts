@@ -61,7 +61,7 @@ export const firmenAngebotSchema = z.object({
   beginn: datum(),
   /** AXA-Antrag: Kollektivnummer des Rahmenvertrags der Firma */
   kollektivnummer: z.string().max(40).default(''),
-  /** AXA-Antrag: Organisationsnummer (Organr.) */
+  /** AXA-Antrag: Organisationsnummer (Organr.) — Vorgabe fuer die Beratungen, jede kann eine eigene haben */
   organisationsnummer: z.string().max(40).default(''),
 });
 
@@ -123,11 +123,20 @@ const jaNein = () => z.enum(['', 'ja', 'nein']).default('');
 export const AXA_KANAELE = ['persoenlich', 'telefonisch', 'online'] as const;
 
 /**
- * Was der AXA-Antrag ueber die Beratung hinaus fragt: die drei Fragen zur
- * Gesundheit (Erklaerung des Arbeitnehmers), wie die Beratung erfolgte und
- * welche Besonderheiten erlaeutert wurden (AXA-Gespraechsprotokoll).
+ * Was AXA-Antrag und AXA-Gespraechsprotokoll ueber die Beratung hinaus
+ * fragen: wer beraten hat, ob die Beitragsbefreiung bei Berufsunfaehigkeit
+ * eingeschlossen ist und dann die drei Fragen zur Gesundheit (Erklaerung des
+ * Arbeitnehmers), wie die Beratung erfolgte und welche Besonderheiten
+ * erlaeutert wurden.
  */
 export const axaAngabenSchema = z.object({
+  /** Wer beraten hat — leer: der Name aus „Ihr Auftritt“ */
+  beraterVorname: z.string().max(60).default(''),
+  beraterNachname: z.string().max(60).default(''),
+  /** Organr. des Beraters — leer: die Vorgabe der Firma */
+  organisationsnummer: z.string().max(40).default(''),
+  /** Zusatz Beitragsbefreiung bei Berufsunfaehigkeit; nur mit ihm gibt es die drei Fragen */
+  buBefreiung: jaNein(),
   /** Dienst eingeschraenkt oder in den letzten 12 Monaten laenger als 2 Wochen arbeitsunfaehig? */
   arbeitsunfaehig: jaNein(),
   /** Einschraenkung der Erwerbs- oder Berufsfaehigkeit, Behinderung oder Antrag wegen BU/EU? */
@@ -153,7 +162,7 @@ export const entscheidungSchema = z.object({
   empfehlung: z.string().max(2000).default(''),
   ort: z.string().max(120).default(''),
   datum: datum(),
-  /** Nur beim AXA-Antrag (Versicherer AXA, Direktversicherung) */
+  /** Nur bei AXA und Direktversicherung: AXA-Antrag, bei Verzicht das AXA-Gespraechsprotokoll */
   axa: axaAngabenSchema.default({}),
 });
 

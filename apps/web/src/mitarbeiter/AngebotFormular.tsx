@@ -172,7 +172,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
             {/\baxa\b/i.test(a.versicherer) && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <TextFeld label="Kollektivnummer (AXA)" wert={a.kollektivnummer} onChange={(v) => setze('kollektivnummer', v)} maxLaenge={40} />
-                <TextFeld label="Organisationsnummer (AXA)" wert={a.organisationsnummer} onChange={(v) => setze('organisationsnummer', v)} maxLaenge={40} />
+                <TextFeld label="Organisationsnummer (AXA, Vorgabe)" wert={a.organisationsnummer} onChange={(v) => setze('organisationsnummer', v)} maxLaenge={40} />
               </div>
             )}
             {m.art === 'matching' && (
