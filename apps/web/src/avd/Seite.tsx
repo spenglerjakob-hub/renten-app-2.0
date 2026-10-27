@@ -11,8 +11,9 @@ import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile, NamenFelder,
-  euro, prozent,
+  euro, euroGenau, prozent,
 } from '../components/Feld';
+import { AnteilsRing } from '../components/AnteilsRing';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
   EINLEITUNG, FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Karte, Kernsatz, LINK, Regler, Titel, Vermerk, Zahl,
@@ -189,6 +190,26 @@ export function Seite() {
     );
   }, [lauf, beitragMonat, jahreBisRente, kinderListe,
       alterHeute, startjahr, zveHeute, steuerOpt, p]);
+
+  /**
+   * Ein Monat eines laufenden Jahres — fuer den Ring: Was der Beitrag netto
+   * kostet, was davon die Steuer traegt und was der Staat dazulegt. Zusammen
+   * fliesst das ins Depot; geteilt durch die Netto-Kosten ist es der Hebel
+   * auf jeden Euro, wie „Je Euro Netto-Aufwand“ im Loesungsvergleich des
+   * Rechners. Ohne den einmaligen Berufseinsteigerbonus: Er bliese den Hebel
+   * auf und steht ohnehin unter „Ihre Förderung je Jahr“.
+   */
+  const monat = useMemo(() => {
+    if (beitragMonat <= 0) return null;
+    const zulage = zulagen.dauerhaft / 12;
+    const steuer = bruttoJahr > 0
+      ? avdSteuervorteil({ eigenbeitragJahr: beitragMonat * 12, zulagenJahr: zulagen.dauerhaft, zveHeute }, steuerOpt, p).ueberZulagen / 12
+      : 0;
+    const netto = Math.max(0, beitragMonat - steuer);
+    const depot = beitragMonat + zulage;
+    return { netto, steuer, zulage, depot, hebel: netto > 0 ? depot / netto : 0 };
+  }, [beitragMonat, zulagen.dauerhaft, bruttoJahr, zveHeute, steuerOpt, p]);
+  const zahl2 = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   /** Was in die Beratungsanfrage geschrieben wird. */
   const eckdaten: Eckdaten = {
@@ -431,6 +452,64 @@ export function Seite() {
             </p>
           ) : (
             <div className="mt-4 space-y-4">
+              {/*
+                Im Druck stehen Ring und Belastung nebeneinander: untereinander
+                passte die Karte nicht mehr auf das erste Blatt und zog alles
+                Folgende eine Seite weiter.
+              */}
+              <div className="space-y-4 print:grid print:grid-cols-2 print:items-start print:gap-4 print:space-y-0">
+              {/*
+                Der Monat als Ring wie die Versorgungsluecke: links der Ring mit
+                dem Hebel, rechts die drei Teile. Im Druck ist neben der
+                Belastung nur eine halbe Breite frei — dort stehen die Teile als
+                kleine Aufstellung unter dem Ring, wie die Belastung daneben.
+              */}
+              {monat && (
+                <div className="break-inside-avoid print:pt-3">
+                  <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center print:flex-col print:gap-3">
+                    <h3 className="hidden w-full text-sm font-medium text-ui-tinte print:block">Jeden Monat</h3>
+                    <AnteilsRing
+                      teile={[
+                        { wert: monat.netto, rolle: 'tinte' },
+                        { wert: monat.steuer, rolle: 'daten-3' },
+                        { wert: monat.zulage, rolle: 'knopf' },
+                      ]}
+                      mitte={`${zahl2(monat.hebel)} ×`}
+                      zeilen={['Hebel auf', 'jeden Euro']}
+                      beschreibung={`Im Monat fließen ${euroGenau(monat.depot)} ins Depot: ${euroGenau(monat.netto)} Netto-Kosten, `
+                        + `${euroGenau(monat.steuer)} Steuerersparnis und ${euroGenau(monat.zulage)} Zulagen — `
+                        + `${zahl2(monat.hebel)}-facher Hebel auf jeden Euro, den Sie netto zahlen`}
+                      klasse="print:h-40 print:w-40"
+                    />
+                    <div className="print:hidden">
+                      <dl className="space-y-4">
+                        <Zahl etikett="Netto-Kosten" punkt={PUNKT.eigen} wert={euroGenau(monat.netto)} zusatz="im Monat" />
+                        <Zahl etikett="Steuerersparnis" punkt={PUNKT.steuer}
+                          wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'}
+                          zusatz={bruttoJahr > 0 ? 'im Monat' : 'ohne Einkommen nicht gerechnet'} />
+                        <Zahl etikett="Zulagen" punkt={PUNKT.zulagen} wert={euroGenau(monat.zulage)} zusatz="im Monat" />
+                      </dl>
+                      <p className="mt-4 text-sm text-ui-tinte">
+                        = <span className="font-medium tabular-nums">{euroGenau(monat.depot)}</span> fließen jeden Monat ins Depot.
+                      </p>
+                    </div>
+                    <dl className="hidden w-full space-y-1.5 print:block">
+                      <RingZeile punkt={PUNKT.eigen} text="Netto-Kosten" wert={euroGenau(monat.netto)} />
+                      <RingZeile punkt={PUNKT.steuer} text="Steuerersparnis" wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'} />
+                      <RingZeile punkt={PUNKT.zulagen} text="Zulagen" wert={euroGenau(monat.zulage)} />
+                      <div className="!mt-2 border-t border-ui-linie pt-2">
+                        <RingZeile text="= fließt ins Depot" wert={euroGenau(monat.depot)} />
+                      </div>
+                    </dl>
+                  </div>
+                  {zulagen.bonus > 0 && (
+                    <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+                      Ein laufendes Jahr — ohne den einmaligen Berufseinsteigerbonus von {euro(zulagen.bonus)}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="ui-innen p-4 print:p-3">
                 <h3 className="mb-2 text-sm font-medium text-ui-tinte">
                   Ihre Belastung (Ansparphase)
@@ -457,16 +536,12 @@ export function Seite() {
                     {euro(profit.eigenaufwandNettoGesamt)}
                   </span>
                 </div>
+                {/* Was das im Monat heisst, zeigt der Ring darueber. */}
                 <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                  {profit.steuerersparnisGesamt > 0 && (
-                    <>
-                      Das sind {euro(profit.eigenaufwandNettoMonat)} im Monat statt{' '}
-                      {euro(profit.eigenbeitragMonat)}.{' '}
-                    </>
-                  )}
                   Die Zulagen mindern Ihre Kosten nicht — sie kommen vom Staat und stehen als
                   höheres Kapital auf der anderen Seite.
                 </p>
+              </div>
               </div>
 
               {/*
@@ -746,14 +821,26 @@ const KARTE = 'ui-karte p-5 sm:p-7 print:p-3 print:shadow-none';
 const KARTE_TITEL = 'text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl';
 /** Was steht, solange eine Angabe fehlt. */
 const LEER = 'rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer';
-/** Die Punkte der drei Flaechen — dieselben Farben wie im Diagramm (Diagramme.tsx). */
-const PUNKT = { eigen: 'bg-ui-tinte', zulagen: 'bg-ui-knopf', gewinn: 'bg-ui-luecke' } as const;
+/** Die Punkte der Flaechen — dieselben Farben wie im Diagramm (Diagramme.tsx); Asche fuer die Steuerersparnis im Ring. */
+const PUNKT = { eigen: 'bg-ui-tinte', steuer: 'bg-ui-daten-3', zulagen: 'bg-ui-knopf', gewinn: 'bg-ui-luecke' } as const;
 
 function DruckAngabe({ feld, wert }: { feld: string; wert: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-dotted border-ui-linie py-0.5">
       <dt className="text-ui-schiefer">{feld}</dt>
       <dd className="text-right font-medium tabular-nums text-ui-tinte">{wert}</dd>
+    </div>
+  );
+}
+
+/** Eine Zeile der Ring-Legende im Druck: Farbpunkt wie im Ring, so klein wie die Belastung daneben. */
+function RingZeile({ punkt, text, wert }: { punkt?: string; text: string; wert: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-xs">
+      <dt className="flex items-center gap-2 text-ui-tinte/80">
+        {punkt && <span aria-hidden className={`h-2 w-2 rounded-full ${punkt}`} />}{text}
+      </dt>
+      <dd className="shrink-0 font-medium tabular-nums text-ui-tinte">{wert}</dd>
     </div>
   );
 }
