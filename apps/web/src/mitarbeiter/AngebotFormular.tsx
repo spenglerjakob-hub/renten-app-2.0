@@ -8,6 +8,7 @@ import {
   firmaLoeschen, firmaSpeichern, firmenlogoHochladen, firmenlogosAufraeumen, type Firma,
 } from '../lib/bav-beratung';
 import { logoVorbereiten } from '../lib/bild';
+import { DRUCKFARBEN_HINWEIS } from '../lib/druckfarben';
 import { AuswahlFeld, DatumFeld, ProzentFeld, Schalter, TextFeld, ZahlFeld } from '../components/Feld';
 import { Dialog } from '../components/Dialog';
 import { FELD_LABEL, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from '../components/stil';
@@ -41,7 +42,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
   const [name, setName] = useState(firma.name);
   const [a, setA] = useState<FirmenAngebot>(firma.angebot);
   // null: Logo unveraendert — 'entfernen' oder ein neues
-  const [neuesLogo, setNeuesLogo] = useState<{ blob: Blob; dataUrl: string } | 'entfernen' | null>(null);
+  const [neuesLogo, setNeuesLogo] = useState<{ blob: Blob; dataUrl: string; druckfarben: boolean } | 'entfernen' | null>(null);
   const [status, setStatus] = useState<'bereit' | 'speichert' | 'gespeichert' | 'fehler'>('bereit');
   const [meldung, setMeldung] = useState<string | null>(null);
   const [loeschen, setLoeschen] = useState(false);
@@ -59,7 +60,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
     setMeldung(null);
     const r = await logoVorbereiten(datei);
     if (typeof r === 'string') { setMeldung(LOGO_MELDUNG[r]); return; }
-    setNeuesLogo({ blob: r.blob, dataUrl: r.dataUrl });
+    setNeuesLogo({ blob: r.blob, dataUrl: r.dataUrl, druckfarben: r.druckfarben });
     setStatus('bereit');
   };
 
@@ -122,6 +123,9 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
                 )}
               </div>
               <p className="mt-1 text-xs text-ui-schiefer">PNG, JPG oder WebP. Es erscheint im Gespräch und auf den Unterlagen.</p>
+              {typeof neuesLogo === 'object' && neuesLogo?.druckfarben && (
+                <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">{DRUCKFARBEN_HINWEIS}</p>
+              )}
             </div>
             <TextBereich label="Begrüßung" wert={a.begruessung} onChange={(v) => setze('begruessung', v)} maxLaenge={1500} zeilen={3}
               platzhalter="Liebe Kolleginnen und Kollegen, wir unterstützen Ihre Altersvorsorge …" />
