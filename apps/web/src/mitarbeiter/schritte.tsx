@@ -146,7 +146,8 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
           </div>
           <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
           {istAxaAntrag(firma.angebot) && (
-            <TextFeld label="bAV-ID (für den AXA-Antrag)" wert={a.bavId} onChange={(bavId) => setzeA({ bavId })} maxLaenge={40} />
+            <TextFeld label="Derzeitige Tätigkeit (für den AXA-Antrag)" wert={a.taetigkeit} onChange={(taetigkeit) => setzeA({ taetigkeit })}
+              maxLaenge={80} />
           )}
           <div>
             <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}

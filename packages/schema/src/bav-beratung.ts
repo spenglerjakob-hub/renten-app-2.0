@@ -94,8 +94,8 @@ export const beratungAngabenSchema = z.object({
   rentenbeginn: datum(),
   /** Laufende Beitraege in eine bestehende Direktversicherung oder Pensionskasse, Monat */
   bavBestandMonat: betrag(10_000).default(0),
-  /** AXA-Antrag: bAV-ID des Mitarbeiters */
-  bavId: z.string().max(40).default(''),
+  /** AXA-Antrag: derzeitige Taetigkeit des Mitarbeiters */
+  taetigkeit: z.string().max(80).default(''),
 });
 
 /** Die Werte aus dem Angebot des Versicherers, je Vertrag. */

@@ -132,7 +132,7 @@ export function AxaAntrag(props: DokumentProps) {
         <p className="mt-3 italic">und</p>
         <p className="font-semibold">Arbeitnehmer (versicherte Person)</p>
         <div className="mt-2 w-[60mm] space-y-2">
-          {([['Name', mitarbeiter.nachname], ['Vorname', mitarbeiter.vorname], ['bAV ID', a.bavId]] as const).map(([titel, wert]) => (
+          {([['Name', mitarbeiter.nachname], ['Vorname', mitarbeiter.vorname], ['Derzeitige Tätigkeit', a.taetigkeit]] as const).map(([titel, wert]) => (
             <div key={titel}>
               <p className="border-b border-ui-tinte px-1 font-medium">{wert || leer}</p>
               <p>{titel}</p>

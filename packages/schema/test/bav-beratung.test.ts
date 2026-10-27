@@ -85,11 +85,11 @@ describe('Daten einer Beratung', () => {
 });
 
 describe('Angaben für den AXA-Antrag', () => {
-  it('leer: keine Nummern, keine bAV-ID, nichts beantwortet', () => {
+  it('leer: keine Nummern, keine Tätigkeit, nichts beantwortet', () => {
     const a = firmenAngebotSchema.parse({});
     expect([a.kollektivnummer, a.organisationsnummer]).toEqual(['', '']);
     const d = beratungDatenSchema.parse({});
-    expect(d.angaben.bavId).toBe('');
+    expect(d.angaben.taetigkeit).toBe('');
     expect(d.entscheidung.axa).toEqual({
       beraterVorname: '', beraterNachname: '', organisationsnummer: '', buBefreiung: '',
       arbeitsunfaehig: '', einschraenkung: '', buRente: '', kanal: '',
@@ -119,5 +119,7 @@ describe('Angaben für den AXA-Antrag', () => {
     expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, organisationsnummer: 'x'.repeat(41) } } }).success).toBe(false);
     expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, beraterNachname: 'x'.repeat(61) } } }).success).toBe(false);
     expect(firmenAngebotSchema.safeParse({ kollektivnummer: 'x'.repeat(41) }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'Industriemechanikerin' } }).success).toBe(true);
+    expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'x'.repeat(81) } }).success).toBe(false);
   });
 });

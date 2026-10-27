@@ -245,8 +245,9 @@ function Datenschutz() {
       <P>
         Ist die Firma bei der AXA versichert, tritt der AXA-Antrag auf Entgeltumwandlung an die Stelle der
         Vereinbarung; bei einem Verzicht kommt das AXA-Gesprächsprotokoll zur Verzichtserklärung. Dafür speichern wir
-        zur Firma die Kollektiv- und die Organisationsnummer, zur Beratung die bAV-ID, Name und Organisationsnummer
-        des Beraters, wie die Beratung erfolgte und welche Besonderheiten erläutert wurden. Ist der Zusatz
+        zur Firma die Kollektiv- und die Organisationsnummer, zur Beratung die derzeitige Tätigkeit des Mitarbeiters,
+        Name und Organisationsnummer des Beraters, wie die Beratung erfolgte und welche Besonderheiten erläutert
+        wurden. Ist der Zusatz
         Beitragsbefreiung bei Berufsunfähigkeit gewählt, speichern wir auch die Antworten des Mitarbeiters auf die
         drei Fragen der AXA zu seiner Gesundheit (Arbeitsunfähigkeit, Einschränkung der Erwerbs- oder
         Berufsfähigkeit, Höhe der versicherten BU-/EU-Rente). Das sind Gesundheitsdaten nach Art. 9 DSGVO. Sie stehen
