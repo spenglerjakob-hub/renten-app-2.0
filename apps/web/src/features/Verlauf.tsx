@@ -1,7 +1,25 @@
 import { useMemo, useState, useId } from 'react';
 import type { ProjektionsErgebnis } from '@renten/engine';
-import { Karte, euro } from '../components/Feld';
+import { euro } from '../components/Feld';
+import { Karte } from '../components/stil';
 import { useSchmal } from '../components/useSchmal';
+
+/*
+ * Die Farben des Diagramms aus den Rollen des Stils: Daten einfarbig
+ * abgestuft — Stein fuer die Erwerbsphase, Asche fuer die gemischte Phase,
+ * Tinte fuer den Ruhestand —, der Bedarf als die eine Linie in Cyan. Das
+ * Cyan ist die Kante (Cyan Edge): Die hellere Signalfarbe erreicht als
+ * duenne Linie auf Weiss keine 3:1.
+ */
+const FARBE = {
+  erwerb: 'rgb(var(--ui-luecke))',
+  gemischt: 'rgb(var(--ui-daten-3))',
+  ruhestand: 'rgb(var(--ui-tinte))',
+  bedarf: 'rgb(var(--ui-knopf-rand))',
+  gitter: 'rgb(var(--ui-linie))',
+  achse: 'rgb(var(--ui-asche))',
+  schrift: 'rgb(var(--ui-schiefer))',
+} as const;
 
 /**
  * Einkommensverlauf.
@@ -62,29 +80,30 @@ export function Verlauf({
     if (!start || !ende) return 'Noch keine Ruhestandsphase im Zeitraum.';
     return (
       `Verlauf von Alter ${daten[0]!.alter} bis ${daten[daten.length - 1]!.alter}. ` +
-      `Zu Rentenbeginn (Alter ${start.alter}) betraegt das Haushaltsnetto ${euro(start.netto)} pro Monat ` +
-      `bei einem Bedarf von ${euro(start.ziel)}. Am Ende des Zeitraums ${euro(ende.netto)} gegenueber ${euro(ende.ziel)} Bedarf.`
+      `Zu Rentenbeginn (Alter ${start.alter}) beträgt das Haushaltsnetto ${euro(start.netto)} pro Monat ` +
+      `bei einem Bedarf von ${euro(start.ziel)}. Am Ende des Zeitraums ${euro(ende.netto)} gegenüber ${euro(ende.ziel)} Bedarf.`
     );
   })();
 
   return (
     <Karte
       titel="Einkommensverlauf"
-      kopfzeile={
+      klasse="druckbereich"
+      rechts={
         <button
           type="button"
           onClick={() => setAlsTabelle((v) => !v)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 print:hidden"
+          className="rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden"
         >
           {alsTabelle ? 'Als Diagramm' : 'Als Tabelle'}
         </button>
       }
     >
-      <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-slate-400" aria-hidden /> Erwerbsphase</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" aria-hidden /> gemischt</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" aria-hidden /> Ruhestand</span>
-        <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-rose-500" aria-hidden /> Bedarf</span>
+      <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ui-schiefer">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ui-luecke" aria-hidden /> Erwerbsphase</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ui-daten-3" aria-hidden /> gemischt</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ui-tinte" aria-hidden /> Ruhestand</span>
+        <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-ui-knopf-rand" aria-hidden /> Bedarf</span>
       </div>
 
       {alsTabelle ? (
@@ -97,8 +116,8 @@ export function Verlauf({
           */}
           <table className="w-full text-xs sm:text-sm">
             <caption className="sr-only">Haushaltsnetto und Bedarf je Kalenderjahr</caption>
-            <thead className="sticky top-0 bg-white">
-              <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-500 sm:text-xs">
+            <thead className="sticky top-0 bg-ui-karte">
+              <tr className="border-b border-ui-linie text-left text-xs font-medium text-ui-schiefer">
                 <th scope="col" className="py-2 pr-2">Jahr</th>
                 <th scope="col" className="pr-2">Alter</th>
                 <th scope="col" className="hidden pr-2 sm:table-cell">Phase</th>
@@ -108,14 +127,14 @@ export function Verlauf({
             </thead>
             <tbody>
               {daten.map((d) => (
-                <tr key={d.jahr} className="border-b border-slate-50">
+                <tr key={d.jahr} className="border-b border-ui-linie/60">
                   <td className="py-1.5 pr-2 tabular-nums">{d.jahr}</td>
                   <td className="pr-2 tabular-nums">{d.alter}</td>
-                  <td className="hidden pr-2 text-xs text-slate-500 sm:table-cell">
+                  <td className="hidden pr-2 text-xs text-ui-schiefer sm:table-cell">
                     {d.ruhestand ? 'Ruhestand' : d.gemischt ? 'gemischt' : 'Erwerb'}
                   </td>
                   <td className="pr-2 text-right tabular-nums">{euro(d.netto)}</td>
-                  <td className="text-right tabular-nums text-slate-500">{euro(d.ziel)}</td>
+                  <td className="text-right tabular-nums text-ui-schiefer">{euro(d.ziel)}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,8 +152,8 @@ export function Verlauf({
               const v = maxWert * q;
               return (
                 <g key={q}>
-                  <line x1={L} y1={y(v)} x2={B - R} y2={y(v)} stroke="#e2e8f0" strokeWidth="1" />
-                  <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize={schmal ? 12 : 11} fill="#64748b">
+                  <line x1={L} y1={y(v)} x2={B - R} y2={y(v)} style={{ stroke: FARBE.gitter }} strokeWidth="1" />
+                  <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize={schmal ? 12 : 11} style={{ fill: FARBE.schrift }}>
                     {v >= 1000 ? `${Math.round(v / 1000)}k` : Math.round(v)}
                   </text>
                 </g>
@@ -142,21 +161,21 @@ export function Verlauf({
             })}
             {daten.map((d, i) => {
               const h = Math.max(0, plotH - (y(d.netto) - T));
-              const farbe = d.ruhestand ? '#6366f1' : d.gemischt ? '#fbbf24' : '#94a3b8';
+              const farbe = d.ruhestand ? FARBE.ruhestand : d.gemischt ? FARBE.gemischt : FARBE.erwerb;
               return (
                 <rect key={d.jahr} x={x(i) - balkenBreite / 2} y={y(d.netto)}
-                  width={balkenBreite} height={h} fill={farbe} rx="1.5" />
+                  width={balkenBreite} height={h} style={{ fill: farbe }} rx="1.5" />
               );
             })}
             {ersterRuhestand > 0 && (
               <line x1={x(ersterRuhestand)} y1={T} x2={x(ersterRuhestand)} y2={T + plotH}
-                stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
+                style={{ stroke: FARBE.schrift }} strokeWidth="1" strokeDasharray="3 3" />
             )}
-            <path d={zielPfad} fill="none" stroke="#f43f5e" strokeWidth="2" />
-            <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke="#94a3b8" strokeWidth="1.5" />
+            <path d={zielPfad} fill="none" style={{ stroke: FARBE.bedarf }} strokeWidth="2" />
+            <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} style={{ stroke: FARBE.achse }} strokeWidth="1.5" />
             {daten.map((d, i) =>
               d.alter % (schmal ? 10 : 5) === 0 ? (
-                <text key={d.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize={schmal ? 12 : 11} fill="#64748b">
+                <text key={d.jahr} x={x(i)} y={H - 12} textAnchor="middle" fontSize={schmal ? 12 : 11} style={{ fill: FARBE.schrift }}>
                   {d.alter}
                 </text>
               ) : null,
@@ -168,7 +187,7 @@ export function Verlauf({
               y={H - 1}
               textAnchor={schmal ? 'end' : 'start'}
               fontSize={schmal ? 11 : 10}
-              fill="#94a3b8"
+              style={{ fill: FARBE.schrift }}
             >
               Alter
             </text>
@@ -176,7 +195,7 @@ export function Verlauf({
         </div>
       )}
 
-      <p className="mt-2 text-xs text-slate-500">{zusammenfassung}</p>
+      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">{zusammenfassung}</p>
     </Karte>
   );
 }

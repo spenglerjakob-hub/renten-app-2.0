@@ -1,6 +1,8 @@
 import { useId, useRef, useState } from 'react';
-import { Check, ImagePlus, Trash2 } from 'lucide-react';
-import { TextFeld } from '../components/Feld';
+import { AlertTriangle, Check, ImagePlus, Trash2 } from 'lucide-react';
+import { NamenFelder, TextFeld } from '../components/Feld';
+import { namensTeile, vollerName } from '../lib/namen';
+import { FELD_LABEL, KNOPF_KLEIN } from '../components/stil';
 import { logoVorbereiten, type LogoFehler, type VorbereitetesLogo } from '../lib/bild';
 import {
   FARBVORSCHLAEGE, GRENZEN, farbeNormal, linieKaumSichtbar, titelTauglich, type Auftritt,
@@ -46,25 +48,23 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
     onLogo(r);
   };
 
-  const knopf = 'flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
-
   return (
     <div className="space-y-4">
       {/* ---------- Logo ---------- */}
       <div>
-        <span id={`${id}-logo`} className="mb-1 block text-xs font-semibold text-slate-600">Logo</span>
+        <span id={`${id}-logo`} className={FELD_LABEL}>Logo</span>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex h-16 w-36 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white p-1">
+          <div className="flex h-16 w-36 shrink-0 items-center justify-center rounded-lg border border-dashed border-ui-feld-rand bg-white p-1">
             {wert.logo
               ? <img src={wert.logo} alt="Ihr Logo" className="max-h-full max-w-full object-contain" />
-              : <span className="text-xs text-slate-400">Noch kein Logo</span>}
+              : <span className="text-xs text-ui-schiefer">Noch kein Logo</span>}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => dateiRef.current?.click()} disabled={liest} className={knopf}>
+            <button type="button" onClick={() => dateiRef.current?.click()} disabled={liest} className={KNOPF_KLEIN}>
               <ImagePlus className="h-3.5 w-3.5" aria-hidden /> {liest ? 'Wird gelesen …' : wert.logo ? 'Anderes Logo' : 'Logo wählen'}
             </button>
             {wert.logo && (
-              <button type="button" onClick={() => { setFehler(null); onLogo(null); }} className={knopf}>
+              <button type="button" onClick={() => { setFehler(null); onLogo(null); }} className={KNOPF_KLEIN}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden /> Logo entfernen
               </button>
             )}
@@ -78,10 +78,10 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
             onChange={(e) => void logoGewaehlt(e.target.files?.[0])}
           />
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+        <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
           PNG, JPG oder WebP. Wird im Browser verkleinert. Laden Sie nur ein Logo hoch, das Sie verwenden dürfen.
         </p>
-        {fehler && <p role="alert" className="mt-1 text-xs font-semibold text-rose-700">{fehler}</p>}
+        {fehler && <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{fehler}</p>}
       </div>
 
       {/* ---------- Firma, Name, Kontakt ---------- */}
@@ -92,16 +92,13 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
       {voll && (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld
-              label="Ihr Name" wert={wert.berater} onChange={(s) => onAendern({ berater: s })}
-              maxLaenge={GRENZEN.berater} autoComplete="name"
-            />
+            {/* Vor- und Nachname getrennt; der ganze Name (`berater`) steht im Briefkopf und wird mitgeschrieben. */}
+            <NamenFelder {...namensTeile(wert.berater, wert.vorname, wert.nachname)} beschriftung={['Ihr Vorname', 'Ihr Nachname']}
+              onChange={(teile) => onAendern({ ...teile, berater: vollerName(teile) })} eigener />
             <TextFeld
               label="Telefon" typ="tel" wert={wert.telefon} onChange={(s) => onAendern({ telefon: s })}
               maxLaenge={GRENZEN.telefon} autoComplete="tel"
             />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <TextFeld
                 label="E-Mail" typ="email" wert={wert.email} onChange={(s) => onAendern({ email: s })}
@@ -111,7 +108,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
                 <button
                   type="button"
                   onClick={() => onAendern({ email: anmeldeAdresse })}
-                  className="mt-1 text-xs font-semibold text-indigo-700 hover:underline"
+                  className="mt-1 text-xs font-medium text-ui-tinte underline-offset-4 hover:underline"
                 >
                   Anmelde-Adresse übernehmen
                 </button>
@@ -132,15 +129,15 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
 
       {/* ---------- Akzentfarbe ---------- */}
       <fieldset>
-        <legend className="mb-1 block text-xs font-semibold text-slate-600">Akzentfarbe</legend>
+        <legend className={FELD_LABEL}>Akzentfarbe</legend>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             aria-pressed={!wert.farbe}
             onClick={() => onAendern({ farbe: null })}
             title="Wie bisher: grüne Linie auf dem Deckblatt, Überschriften grau"
-            className={`rounded-md border px-2.5 py-1 text-xs font-bold ${
-              !wert.farbe ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+              !wert.farbe ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-zweit-rand bg-white text-ui-tinte hover:bg-ui-innen'
             }`}
           >
             Standard
@@ -154,33 +151,37 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
               title={v.name}
               onClick={() => onAendern({ farbe: v.farbe })}
               className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${
-                wert.farbe === v.farbe ? 'border-slate-900 ring-2 ring-slate-300' : 'border-white ring-1 ring-slate-300'
+                wert.farbe === v.farbe ? 'border-ui-tinte ring-2 ring-ui-feld-rand' : 'border-white ring-1 ring-ui-feld-rand'
               }`}
               style={{ backgroundColor: v.farbe }}
             >
               {wert.farbe === v.farbe && <Check className="h-4 w-4 text-white" aria-hidden />}
             </button>
           ))}
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-ui-tinte/80">
             <input
               type="color"
-              value={wert.farbe ?? '#10b981'}
+              value={wert.farbe ?? '#0c0a09'}
               onChange={(e) => onAendern({ farbe: farbeNormal(e.target.value) })}
-              className="h-7 w-9 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+              className="h-7 w-9 cursor-pointer rounded border border-ui-feld-rand bg-white p-0.5"
             />
             Eigene Farbe
           </label>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Für Linien und Überschriften im Gutachten. Die Farben der Ergebnisse — Grün und Rot — bleiben.
+        <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+          Für Linien und Überschriften im Gutachten. Die Ergebnisse behalten ihre hellblaue Hervorhebung.
         </p>
         {wert.farbe && !titelTauglich(wert.farbe) && (
-          <p role="status" className="mt-1 text-xs text-amber-800">
-            Diese Farbe ist für Überschriften zu hell. Im Gutachten färbt sie nur die Linien; Überschriften bleiben grau.
+          <p role="status" className="mt-1 flex items-start gap-1.5 text-xs text-ui-tinte">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-ui-schiefer" aria-hidden />
+            Diese Farbe ist für Überschriften zu hell. Im Gutachten färbt sie nur die Linien; Überschriften bleiben schwarz.
           </p>
         )}
         {linieKaumSichtbar(wert.farbe) && (
-          <p className="mt-1 text-xs text-amber-800">Sehr hell — die Linien sind auf weißem Papier kaum zu sehen.</p>
+          <p className="mt-1 flex items-start gap-1.5 text-xs text-ui-tinte">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-ui-schiefer" aria-hidden />
+            Sehr hell — die Linien sind auf weißem Papier kaum zu sehen.
+          </p>
         )}
       </fieldset>
     </div>

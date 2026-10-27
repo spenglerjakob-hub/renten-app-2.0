@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Target } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
 import { anteilAmNetto } from './bezug';
+import { Hervor, Karte, Kernsatz, SCHWEBEND } from '../components/stil';
 import {
   sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
@@ -18,19 +18,15 @@ import {
  * Beitragsdynamik, weil ein Vertrag mit 3 % Steigerung heute deutlich
  * weniger kostet als einer ohne.
  */
-export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHeute = 0 }: {
+export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
   zeile: Jahreszeile;
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Startbeitrag */
   nettoHeute?: number;
-  /** Als eigene Etappe der Beratung: ohne Aufklappen, gleich mit Inhalt */
-  immerOffen?: boolean;
-  /** Meldet den noetigen Startbeitrag — die Loesungen koennen ihn uebernehmen */
+  /** Meldet den noetigen Startbeitrag — der Titel der Etappe nennt ihn, die Loesungen koennen ihn uebernehmen */
   onStartbeitrag?: (n: number | null) => void;
 }) {
   const szenario = useSzenario((x) => x.szenario);
   const schmal = useSchmal();
-  const [aufgeklappt, setOffen] = useState(false);
-  const offen = immerOffen || aufgeklappt;
   const [eingaben, setEingaben] = useState<SparzielEingaben>(SPARZIEL_VORGABE);
 
   const r = useMemo(
@@ -44,255 +40,205 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
   const setze = (teil: Partial<SparzielEingaben>) =>
     setEingaben((x) => ({ ...x, ...teil }));
 
+  if (r === null) {
+    return (
+      <Karte>
+        <p className="text-sm text-ui-schiefer">
+          Für das Jahr {zeile.jahr} besteht keine Lücke — es gibt nichts zu schließen.
+        </p>
+      </Karte>
+    );
+  }
+  const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
+  const gewaehlt = (dynamik: number) => Math.abs(dynamik - eingaben.dynamik) < 1e-9;
+
+  /*
+    WIE EIN SCHRITT DER BERATUNG: links die Annahmen, rechts die Rechnung
+    als das eine schwebende Stueck — Luecke, Kapital, Startbeitrag —,
+    darunter die Tabellen in ruhigen Karten und der Kernsatz, was Warten
+    kostet.
+  */
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
-      <button
-        type="button"
-        onClick={() => setOffen((x) => !x)}
-        aria-expanded={offen}
-        disabled={immerOffen}
-        className="flex w-full items-center justify-between gap-3 p-3 text-left disabled:cursor-default sm:p-4"
-      >
-        <span className="flex items-center gap-2">
-          <Target className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
-          <span>
-            <span className="block text-xs font-bold text-slate-800 sm:text-sm">
-              Sparrechner
-            </span>
-            <span className="block text-xs text-slate-500">
-              Was kostet es, die Versorgungslücke zu schließen?
-            </span>
-          </span>
-        </span>
-        {!immerOffen && (
-          <ChevronDown
-            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
-            aria-hidden
+    <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
+      <Karte titel="Annahmen" klasse="self-start lg:col-span-4">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+          <ProzentFeld
+            label="Rendite p. a. (nach Kosten)"
+            wert={eingaben.rendite}
+            onChange={(n) => setze({ rendite: n })}
+            max={15}
           />
-        )}
-      </button>
+          <ProzentFeld
+            label="Beitragsdynamik p. a."
+            wert={eingaben.dynamik}
+            onChange={(n) => setze({ dynamik: n })}
+            max={15}
+            hilfe="Um wie viel der Beitrag jedes Jahr steigt."
+          />
+          <ZahlFeld
+            label="Auszahldauer"
+            wert={eingaben.auszahldauer}
+            onChange={(n) => setze({ auszahldauer: n })}
+            min={1} max={60} einheit="Jahre"
+            hilfe="Über wie viele Jahre das Kapital reichen soll."
+          />
+        </div>
+        <p className="mt-6 border-t border-ui-linie pt-5 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+          Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
+          <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik beginnen Sie mit{' '}
+          <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und zahlen im letzten Sparjahr{' '}
+          <strong>{euro(r.gewaehlt.endbeitrag)}</strong>. Die Rechnung unterstellt, dass die
+          Entnahme später mit {prozent(szenario.annahmen.inflation)} Inflation mitwächst, und
+          zieht die Abgeltungsteuer auf den Ertragsanteil bereits ab. Sie nennt eine
+          Größenordnung, kein Produkt.
+        </p>
+      </Karte>
 
-      <div className={`border-t border-slate-100 p-3 sm:p-4 ${offen ? 'block' : 'hidden'}`}>
-        {r === null ? (
-          <p className="text-xs text-slate-500">
-            Für das Jahr {zeile.jahr} besteht keine Lücke — es gibt nichts zu schließen.
-          </p>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <ProzentFeld
-                label="Rendite p. a. (nach Kosten)"
-                wert={eingaben.rendite}
-                onChange={(n) => setze({ rendite: n })}
-                max={15}
-              />
-              <ProzentFeld
-                label="Beitragsdynamik p. a."
-                wert={eingaben.dynamik}
-                onChange={(n) => setze({ dynamik: n })}
-                max={15}
-                hilfe="Um wie viel der Beitrag jedes Jahr steigt."
-              />
-              <ZahlFeld
-                label="Auszahldauer"
-                wert={eingaben.auszahldauer}
-                onChange={(n) => setze({ auszahldauer: n })}
-                min={1} max={60} einheit="Jahre"
-                hilfe="Über wie viele Jahre das Kapital reichen soll."
-              />
+      <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-8">
+        <section aria-label="Was die Lücke kostet" className={`${SCHWEBEND} p-5 sm:p-7`}>
+          <dl className="grid gap-5 sm:grid-cols-3">
+            <Kachel
+              titel={`Lücke im Jahr ${zeile.jahr}`}
+              wert={euro(r.luecke)}
+              hinweis={`in heutigem Geld ${euro(r.lueckeHeute)}`}
+            />
+            <Kachel
+              titel="Dafür nötiges Kapital"
+              wert={euro(r.zielkapital)}
+              hinweis={`bei Rentenbeginn, für ${eingaben.auszahldauer} Jahre`}
+            />
+            <Kachel
+              titel="Ihr Startbeitrag"
+              wert={euro(r.gewaehlt.startbeitrag)}
+              hinweis={`im Monat, ${r.jahreBisRente} Jahre lang`}
+            />
+          </dl>
+          {/* Der Beitrag im Verhaeltnis — was er fuer den Haushalt bedeutet. */}
+          {anteil && (
+            <p className="mt-5 border-t border-ui-linie pt-4 text-sm leading-relaxed text-ui-schiefer">
+              Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind{' '}
+              <strong className="font-medium text-ui-tinte">{anteil}</strong> Ihres
+              heutigen Haushaltsnettos von {euro(nettoHeute)} im Monat.
+            </p>
+          )}
+        </section>
+
+        {/*
+          Die Dynamik ist der eigentliche Punkt: sie senkt den Einstieg
+          und hebt das Ende. Eine Tabelle zeigt das in einem Blick, ein
+          einzelner Wert nicht.
+        */}
+        <Karte titel="Mit Beitragsdynamik">
+          {schmal ? (
+            <div className="space-y-2">
+              {r.varianten.map((v) => (
+                <Karteikarte
+                  key={v.dynamik}
+                  titel={v.dynamik === 0 ? 'Gleichbleibender Beitrag' : `${prozent(v.dynamik)} Beitragsdynamik`}
+                  hervor={gewaehlt(v.dynamik)}
+                  zeilen={[
+                    ['Start heute', euro(v.startbeitrag)],
+                    ['Im letzten Sparjahr', euro(v.endbeitrag)],
+                    ['Summe aller Beiträge', euro(v.summeBeitraege)],
+                  ]}
+                />
+              ))}
             </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <Kachel
-                titel={`Lücke im Jahr ${zeile.jahr}`}
-                wert={euro(r.luecke)}
-                hinweis={`in heutigem Geld ${euro(r.lueckeHeute)}`}
-              />
-              <Kachel
-                titel="Dafür nötiges Kapital"
-                wert={euro(r.zielkapital)}
-                hinweis={`bei Rentenbeginn, für ${eingaben.auszahldauer} Jahre`}
-              />
-              <Kachel
-                titel="Ihr Startbeitrag"
-                wert={euro(r.gewaehlt.startbeitrag)}
-                hinweis={`im Monat, ${r.jahreBisRente} Jahre lang`}
-                akzent
-              />
-            </div>
-            {/* Der Beitrag im Verhaeltnis — was er fuer den Haushalt bedeutet. */}
-            {anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute) && (
-              <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind{' '}
-                <strong className="text-slate-800">{anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute)}</strong> Ihres
-                heutigen Haushaltsnettos von {euro(nettoHeute)} im Monat.
-              </p>
-            )}
-
-            {/*
-              Die Dynamik ist der eigentliche Punkt: sie senkt den Einstieg
-              und hebt das Ende. Eine Tabelle zeigt das in einem Blick, ein
-              einzelner Wert nicht.
-            */}
-            {schmal ? (
-              <div className="mt-4 space-y-2">
-                {r.varianten.map((v) => (
-                  <Karteikarte
-                    key={v.dynamik}
-                    titel={v.dynamik === 0 ? 'Gleichbleibender Beitrag' : `${prozent(v.dynamik)} Beitragsdynamik`}
-                    hervor={Math.abs(v.dynamik - eingaben.dynamik) < 1e-9}
-                    zeilen={[
-                      ['Start heute', euro(v.startbeitrag)],
-                      ['Im letzten Sparjahr', euro(v.endbeitrag)],
-                      ['Summe aller Beiträge', euro(v.summeBeitraege)],
-                    ]}
-                  />
-                ))}
-              </div>
-            ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-500">
-                    <th className="py-1.5 pr-3 font-bold">Beitragsdynamik</th>
-                    <th className="py-1.5 pr-3 text-right font-bold">Start heute</th>
-                    <th className="py-1.5 pr-3 text-right font-bold">Im letzten Jahr</th>
-                    <th className="py-1.5 text-right font-bold">Summe aller Beiträge</th>
+                  <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
+                    <th className="py-2 pr-3 font-medium">Beitragsdynamik</th>
+                    <th className="py-2 pr-3 text-right font-medium">Start heute</th>
+                    <th className="py-2 pr-3 text-right font-medium">Im letzten Jahr</th>
+                    <th className="py-2 text-right font-medium">Summe aller Beiträge</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Die gewaehlte Zeile in der Innenflaeche — hervorgehoben durch Flaeche und Gewicht, nicht durch Farbe. */}
                   {r.varianten.map((v) => (
-                    <tr
-                      key={v.dynamik}
-                      className={`border-b border-slate-100 ${
-                        Math.abs(v.dynamik - eingaben.dynamik) < 1e-9 ? 'bg-indigo-50/60 font-bold' : ''
-                      }`}
-                    >
-                      <td className="py-1.5 pr-3 text-slate-700">{prozent(v.dynamik)}</td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums text-slate-900">
-                        {euro(v.startbeitrag)}
-                      </td>
-                      <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
-                        {euro(v.endbeitrag)}
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums text-slate-600">
-                        {euro(v.summeBeitraege)}
-                      </td>
+                    <tr key={v.dynamik} className={`border-b border-ui-linie ${gewaehlt(v.dynamik) ? 'bg-ui-innen font-medium' : ''}`}>
+                      <td className="py-2 pr-3 text-ui-tinte">{prozent(v.dynamik)}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-ui-tinte">{euro(v.startbeitrag)}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-ui-schiefer">{euro(v.endbeitrag)}</td>
+                      <td className="py-2 text-right tabular-nums text-ui-schiefer">{euro(v.summeBeitraege)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            )}
+          )}
+        </Karte>
 
-            {/*
-              Was Warten kostet — dieselbe Rechnung, nur mit spaeterem
-              Beginn. Die Zeile "heute" bleibt als Bezugspunkt stehen.
-            */}
-            {r.aufschub.length > 1 && (
-              <div className="mt-5">
-                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Was es kostet, damit zu warten
-                </div>
-                {schmal ? (
-                  <div className="space-y-2">
+        {/*
+          Was Warten kostet — dieselbe Rechnung, nur mit spaeterem
+          Beginn. Die Zeile "heute" bleibt als Bezugspunkt stehen.
+        */}
+        {r.aufschub.length > 1 && (
+          <Karte titel="Was es kostet, damit zu warten">
+            {schmal ? (
+              <div className="space-y-2">
+                {r.aufschub.map((a) => (
+                  <Karteikarte
+                    key={a.wartenJahre}
+                    titel={
+                      a.wartenJahre === 0
+                        ? `Heute beginnen · ${a.sparjahre} Sparjahre`
+                        : `In ${a.wartenJahre} Jahren · ${a.sparjahre} Sparjahre`
+                    }
+                    hervor={a.wartenJahre === 0}
+                    zeilen={[
+                      ['Startbeitrag', euro(a.startbeitrag)],
+                      ['Summe aller Beiträge', euro(a.summeBeitraege)],
+                      ['Mehr als heute', a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`],
+                    ]}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
+                      <th className="py-2 pr-3 font-medium">Beginn</th>
+                      <th className="py-2 pr-3 text-right font-medium">Sparjahre</th>
+                      <th className="py-2 pr-3 text-right font-medium">Startbeitrag</th>
+                      <th className="py-2 pr-3 text-right font-medium">Summe</th>
+                      <th className="py-2 text-right font-medium">Mehr als heute</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {r.aufschub.map((a) => (
-                      <Karteikarte
-                        key={a.wartenJahre}
-                        titel={
-                          a.wartenJahre === 0
-                            ? `Heute beginnen · ${a.sparjahre} Sparjahre`
-                            : `In ${a.wartenJahre} Jahren · ${a.sparjahre} Sparjahre`
-                        }
-                        hervor={a.wartenJahre === 0}
-                        gut={a.wartenJahre === 0}
-                        zeilen={[
-                          ['Startbeitrag', euro(a.startbeitrag)],
-                          ['Summe aller Beiträge', euro(a.summeBeitraege)],
-                          [
-                            'Mehr als heute',
-                            a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`,
-                            a.wartenJahre === 0 ? undefined : 'text-slate-700',
-                          ],
-                        ]}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-500">
-                        <th className="py-1.5 pr-3 font-bold">Beginn</th>
-                        <th className="py-1.5 pr-3 text-right font-bold">Sparjahre</th>
-                        <th className="py-1.5 pr-3 text-right font-bold">Startbeitrag</th>
-                        <th className="py-1.5 pr-3 text-right font-bold">Summe</th>
-                        <th className="py-1.5 text-right font-bold">Mehr als heute</th>
+                      <tr key={a.wartenJahre} className={`border-b border-ui-linie ${a.wartenJahre === 0 ? 'bg-ui-innen font-medium' : ''}`}>
+                        <td className="py-2 pr-3 text-ui-tinte">{a.wartenJahre === 0 ? 'heute' : `in ${a.wartenJahre} Jahren`}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ui-schiefer">{a.sparjahre}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ui-tinte">{euro(a.startbeitrag)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ui-schiefer">{euro(a.summeBeitraege)}</td>
+                        <td className="py-2 text-right tabular-nums text-ui-tinte">
+                          {a.wartenJahre === 0 ? <span className="text-ui-schiefer">—</span> : `+ ${euro(a.mehrGesamt)}`}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {r.aufschub.map((a) => (
-                        <tr
-                          key={a.wartenJahre}
-                          className={`border-b border-slate-100 ${
-                            a.wartenJahre === 0 ? 'bg-emerald-50/60 font-bold' : ''
-                          }`}
-                        >
-                          <td className="py-1.5 pr-3 text-slate-700">
-                            {a.wartenJahre === 0 ? 'heute' : `in ${a.wartenJahre} Jahren`}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
-                            {a.sparjahre}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-900">
-                            {euro(a.startbeitrag)}
-                          </td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
-                            {euro(a.summeBeitraege)}
-                          </td>
-                          <td className={`py-1.5 text-right tabular-nums ${
-                            a.wartenJahre === 0 ? 'text-slate-400' : 'text-slate-700'
-                          }`}>
-                            {a.wartenJahre === 0 ? '—' : `+ ${euro(a.mehrGesamt)}`}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                )}
-                {/*
-                  DIE Aussage des ganzen Rechners — sie stand als graue
-                  11-px-Fussnote unter einer Tabelle. In Lesegroesse und mit
-                  eigenem Rahmen, wie die uebrigen Hinweiskaesten.
-                */}
-                {/*
-                  Sachlich gesetzt, nicht in Warnrot: Die Zahl ist echt und
-                  gehoert ins Gespraech — draengen soll sie nicht.
-                */}
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                  <p className="text-sm font-bold leading-snug text-slate-800">
-                    Ein Jahr später zu beginnen kostet {euro(r.proJahrWarten.mehrProMonat)} mehr im Monat
-                    — und {euro(r.proJahrWarten.mehrGesamt)} mehr Beiträge insgesamt.
-                  </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                    Obwohl dann über weniger Jahre gezahlt wird: Den späteren Beiträgen fehlen die
-                    Erträge der frühen Jahre. Gleiche Rendite und gleiches Ziel unterstellt.
-                  </p>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-
-            <p className="mt-3 text-xs leading-relaxed text-slate-500">
-              Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
-              <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik beginnen Sie mit{' '}
-              <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und zahlen im letzten Sparjahr{' '}
-              <strong>{euro(r.gewaehlt.endbeitrag)}</strong>. Die Rechnung unterstellt, dass die
-              Entnahme später mit {prozent(szenario.annahmen.inflation)} Inflation mitwächst, und
-              zieht die Abgeltungsteuer auf den Ertragsanteil bereits ab. Sie nennt eine
-              Größenordnung, kein Produkt.
+            {/*
+              DIE Aussage des ganzen Rechners — der Kernsatz der Etappe, in
+              Inter Tight wie in der Beratung. Sachlich gesetzt, nicht in
+              Warnrot: Die Zahl ist echt und gehoert ins Gespraech — draengen
+              soll sie nicht.
+            */}
+            <Kernsatz klasse="mt-6">
+              Ein Jahr später zu beginnen kostet <Hervor>{euro(r.proJahrWarten.mehrProMonat)}</Hervor> mehr im Monat
+              — und {euro(r.proJahrWarten.mehrGesamt)} mehr Beiträge insgesamt.
+            </Kernsatz>
+            <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+              Obwohl dann über weniger Jahre gezahlt wird: Den späteren Beiträgen fehlen die
+              Erträge der frühen Jahre. Gleiche Rendite und gleiches Ziel unterstellt.
             </p>
-          </>
+          </Karte>
         )}
       </div>
     </div>
@@ -307,29 +253,20 @@ export function Sparrechner({ zeile, immerOffen = false, onStartbeitrag, nettoHe
  * Telefon jede Zeile untereinander: Beschriftung links, Betrag rechts. Der
  * Inhalt ist derselbe wie in der Tabelle, nur gedreht.
  */
-function Karteikarte({ titel, zeilen, hervor, gut }: {
+function Karteikarte({ titel, zeilen, hervor }: {
   titel: string;
-  /** Beschriftung, Wert und optional eine Farbklasse fuer den Wert */
-  zeilen: [string, string, string?][];
+  zeilen: [string, string][];
+  /** Die gewaehlte bzw. heutige Zeile — mit Rand in Tinte statt Farbe */
   hervor?: boolean;
-  gut?: boolean;
 }) {
-  const rahmen = !hervor
-    ? 'border-slate-200 bg-white'
-    : gut
-      ? 'border-emerald-300 bg-emerald-50/60'
-      : 'border-indigo-300 bg-indigo-50/60';
-
   return (
-    <div className={`rounded-lg border p-2.5 ${rahmen}`}>
-      <div className="text-xs font-bold text-slate-800">{titel}</div>
-      <dl className="mt-1 space-y-0.5">
-        {zeilen.map(([text, wert, farbe]) => (
+    <div className={`rounded-[10px] border p-3 ${hervor ? 'border-ui-tinte bg-ui-karte' : 'border-ui-linie bg-ui-karte'}`}>
+      <div className="text-sm font-medium text-ui-tinte">{titel}</div>
+      <dl className="mt-1.5 space-y-0.5">
+        {zeilen.map(([text, wert]) => (
           <div key={text} className="flex items-baseline justify-between gap-3">
-            <dt className="text-xs text-slate-500">{text}</dt>
-            <dd className={`text-xs font-semibold tabular-nums ${farbe ?? 'text-slate-900'}`}>
-              {wert}
-            </dd>
+            <dt className="text-xs text-ui-schiefer">{text}</dt>
+            <dd className="text-sm font-medium tabular-nums text-ui-tinte">{wert}</dd>
           </div>
         ))}
       </dl>
@@ -337,16 +274,13 @@ function Karteikarte({ titel, zeilen, hervor, gut }: {
   );
 }
 
-function Kachel({ titel, wert, hinweis, akzent }: {
-  titel: string; wert: string; hinweis: string; akzent?: boolean;
-}) {
+/** Eine Zahl der Rechnung: leises Etikett, die Zahl gross, darunter die Einordnung — wie `Zahl` der Beratung. */
+function Kachel({ titel, wert, hinweis }: { titel: string; wert: string; hinweis: string }) {
   return (
-    <div className={`rounded-lg border p-3 ${akzent ? 'border-indigo-300 bg-indigo-50/60' : 'border-slate-200 bg-slate-50'}`}>
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
-      <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-indigo-900' : 'text-slate-900'}`}>
-        {wert}
-      </div>
-      <div className="mt-0.5 text-xs leading-tight text-slate-500">{hinweis}</div>
+    <div>
+      <dt className="text-sm text-ui-schiefer">{titel}</dt>
+      <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">{wert}</dd>
+      <dd className="mt-1 text-xs leading-snug text-ui-schiefer">{hinweis}</dd>
     </div>
   );
 }

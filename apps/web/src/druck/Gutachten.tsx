@@ -15,7 +15,7 @@ import { personNameAus } from '../features/personen';
 import { kaufkraft } from '../features/kaufkraft';
 import { nettoHeuteMonat } from '../features/bezug';
 import { Seite, GrosseZahl, Text, Untertitel } from './Bausteine';
-import { DeckblattHeute, DeckblattKopf, DeckblattTitel } from './DeckblattKopf';
+import { DeckblattHeute, DeckblattKopf, DeckblattTitel, PAPIER } from './DeckblattKopf';
 import { Angaben } from './Angaben';
 import { Renteneinkuenfte } from './Renteneinkuenfte';
 import { Vertragsliste } from './Vertragsliste';
@@ -337,7 +337,7 @@ export function Gutachten({
             tarifIndex={szenario.annahmen.tarifIndex}
             rentendynamik={szenario.annahmen.rentendynamik}
             inflation={szenario.annahmen.inflation}
-            ohneTitel
+            imGutachten
           />
         </Seite>
       ),
@@ -351,7 +351,7 @@ export function Gutachten({
   return (
     <div
       id="gutachten"
-      className="hidden bg-white text-slate-800 print:block"
+      className={`hidden ${PAPIER} print:block`}
       style={akzentVariablen(auftritt) as CSSProperties}
     >
       {fussCss && <style>{fussCss}</style>}
@@ -365,7 +365,7 @@ export function Gutachten({
           fuer={name}
         >
           {einzelperson && (
-            <p className="mt-1 text-xs font-semibold text-slate-600">
+            <p className="mt-1 text-xs font-medium text-ui-schiefer">
               Nur die eigenen Verträge und Einkünfte von {einzelperson} — allein veranlagt.
             </p>
           )}
@@ -411,25 +411,26 @@ export function Gutachten({
 
         {/*
           Der Balken misst den Fortschritt und bewertet ihn nicht: ob eine
-          Luecke bleibt, sagt schon die Kachel darueber ueber ihre Farbe.
+          Luecke bleibt, sagt schon die Kachel darueber mit der hervorgehobenen
+          Zahl. Tinte auf Stein wie der Ring der Luecke am Bildschirm.
         */}
         <div className="mt-3 flex items-center gap-3">
-          <div className="h-3 flex-1 overflow-hidden rounded-full border border-slate-300 bg-slate-100">
-            <div className="h-full bg-blue-500" style={{ width: `${gedeckt}%` }} />
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-ui-luecke">
+            <div className="h-full bg-ui-tinte" style={{ width: `${gedeckt}%` }} />
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="text-[11px] text-ui-schiefer">
             {gedeckt.toFixed(0)} % erreicht
           </span>
         </div>
 
         <div className="mt-6">
           <Untertitel>Inhalt</Untertitel>
-          <ol className="list-inside list-decimal space-y-0.5 text-[12px] text-slate-700">
+          <ol className="list-inside list-decimal space-y-0.5 text-[12px] text-ui-tinte">
             {abschnitte.map((a, i) => <li key={i}>{a}</li>)}
           </ol>
         </div>
 
-        <div className="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3">
+        <div className="mt-4 rounded-[10px] border border-ui-linie bg-ui-innen p-3">
           <Text>
             <strong>Was dieses Dokument ist.</strong> Eine Modellrechnung auf Grundlage der von
             Ihnen gemachten Angaben und der auf Seite „Ihre Angaben“ genannten Annahmen. Es ist

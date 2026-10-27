@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
+import { Hinweis } from '../components/stil';
 
 /**
  * Impressum, Datenschutzerklaerung und Nutzungsbedingungen.
@@ -10,8 +11,8 @@ import { RechtsLinks } from '../components/RechtsLinks';
  * Daten wohin gehen, wer sie sieht, wie lange sie bleiben. Rechtlich
  * geprueft sind sie nicht: Alles in [eckigen Klammern] muss der Betreiber
  * ausfuellen, und vor der Veroeffentlichung gehoert beides in die Hand eines
- * Anwalts oder eines Generators mit Abmahnschutz. Der gelbe Vermerk oben
- * bleibt, bis `ENTWURF` auf false steht.
+ * Anwalts oder eines Generators mit Abmahnschutz. Der Vermerk oben bleibt,
+ * bis `ENTWURF` auf false steht.
  *
  * Aendert sich die Verarbeitung (neuer Dienst, neue Daten), muss die
  * Datenschutzerklaerung mitgezogen werden. Aendern sich die
@@ -23,41 +24,63 @@ const STAND = '[Datum eintragen]';
 
 export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
 
+/*
+ * GESTALT: ein Blatt Papier auf dem Stein der Seite — Titel in Inter Tight
+ * wie in der Mitarbeiterberatung, Abschnitte mit Luft, Lesetext in
+ * Lesebreite, Listen mit Gedankenstrich wie die Hinweise der Beratung.
+ *
+ * Gestaltet wird nur hier, in Rahmen und Helfern (H1, H2, P, Liste) — nicht
+ * in den Texten selbst: Auf `live` haelt ein eigener Commit die
+ * Nutzungsbedingungen in einer aelteren Fassung, und jede Zeile, die beide
+ * Seiten aendern, wuerde beim Zusammenfuehren zum Konflikt.
+ */
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800">
+    <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
       <SeitenKopf breite="max-w-3xl" verlinkt />
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-10">
         {ENTWURF && (
-          <div role="note" className="mb-6 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <Hinweis symbol={AlertTriangle}>
             <p>
-              <strong>Entwurf.</strong> Angaben in [eckigen Klammern] sind noch auszufüllen. Vor der
+              <strong className="font-medium">Entwurf.</strong> Angaben in [eckigen Klammern] sind noch auszufüllen. Vor der
               Veröffentlichung rechtlich prüfen lassen.
             </p>
-          </div>
+          </Hinweis>
         )}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <article className="ui-karte px-5 py-8 sm:px-12 sm:py-12 [&_strong]:font-medium [&_strong]:text-ui-tinte">
           {seite === 'impressum' ? <Impressum /> : seite === 'datenschutz' ? <Datenschutz /> : <Nutzungsbedingungen />}
         </article>
-        <RechtsLinks klasse="mt-6 justify-center" />
+        <RechtsLinks klasse="justify-center pb-4" />
       </main>
     </div>
   );
 }
 
+/*
+ * Am Telefon kleiner als `Titel gross`: „Datenschutzerklärung“ ist ein
+ * einziges langes Wort und lief in 34 px ueber den Rand des Blatts. Die
+ * Silbentrennung faengt ab, was noch laenger waere.
+ */
 function H1({ children }: { children: ReactNode }) {
-  return <h1 className="text-2xl font-black tracking-tight text-slate-900">{children}</h1>;
+  return (
+    <h1 className="ui-titel text-balance break-words text-[28px] font-normal leading-[1.15] text-ui-tinte hyphens-auto sm:text-[44px]">
+      {children}
+    </h1>
+  );
 }
 function H2({ children }: { children: ReactNode }) {
-  return <h2 className="mt-7 text-base font-black text-slate-900">{children}</h2>;
+  return <h2 className="ui-titel mt-10 text-[22px] font-normal leading-snug text-ui-tinte sm:text-2xl">{children}</h2>;
 }
 function P({ children }: { children: ReactNode }) {
-  return <p className="mt-2 text-sm leading-relaxed text-slate-700">{children}</p>;
+  return <p className="mt-3 text-[15px] leading-[1.7] text-ui-tinte/80">{children}</p>;
 }
 function Liste({ children }: { children: ReactNode }) {
-  return <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-slate-700">{children}</ul>;
+  return (
+    <ul className="mt-3 space-y-2 text-[15px] leading-[1.7] text-ui-tinte/80 [&>li]:relative [&>li]:pl-7 [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:text-ui-asche [&>li]:before:content-['—']">
+      {children}
+    </ul>
+  );
 }
 
 function Impressum() {
@@ -110,12 +133,12 @@ function Datenschutz() {
   return (
     <>
       <H1>Datenschutzerklärung</H1>
-      <p className="mt-1 text-xs text-slate-500">Stand: {STAND}</p>
+      <p className="mt-1 text-xs text-ui-schiefer">Stand: {STAND}</p>
 
       <H2>1. Verantwortlicher</H2>
       <P>
         [Vor- und Nachname bzw. Firma], [Anschrift], E-Mail: info@js-rentenplaner.de. Die vollständigen Angaben
-        stehen im <a href="/impressum" className="text-indigo-700 underline">Impressum</a>.
+        stehen im <a href="/impressum" className="text-ui-tinte underline underline-offset-2">Impressum</a>.
       </P>
 
       <H2>2. Überblick</H2>
@@ -208,9 +231,16 @@ function Datenschutz() {
         sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
         Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
         betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
-        im Browser; gespeichert werden nur die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
+        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
         sichtbar, das sie angelegt hat; das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen
         Speicher bei Supabase in der EU.
+      </P>
+      <P>
+        Unterschreiben Mitarbeiter und Berater am Bildschirm, speichern wir die Unterlagen so, wie sie unterschrieben
+        wurden (Beratungsprotokoll und Vereinbarung oder Verzichtserklärung, mit den Zahlen darin), dazu je
+        Unterschrift den Linienzug, den Namen und den Zeitpunkt. Vom Linienzug speichern wir nur die Form — keine
+        Schreibdynamik wie Druck oder Tempo. Danach lässt sich die Beratung nicht mehr ändern, bis der Berater die
+        Unterschriften aufhebt.
       </P>
       <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
@@ -220,8 +250,9 @@ function Datenschutz() {
         Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
       </P>
       <P>
-        Gelöscht wird eine Beratung, sobald der Berater sie löscht. Mit einer Firma werden ihre Beratungen und ihr
-        Logo gelöscht, mit dem Konto alles.
+        Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen und
+        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Mit einer Firma werden ihre Beratungen
+        und ihr Logo gelöscht, mit dem Konto alles.
       </P>
 
       <H2>8. Vorsorge-Check</H2>
@@ -299,7 +330,7 @@ function Datenschutz() {
         DSGVO). Stripe kann Daten an die Stripe, Inc. in den USA übermitteln. Grundlage dafür ist das
         EU-US Data Privacy Framework, ergänzend gelten EU-Standardvertragsklauseln. Mehr dazu in der
         Datenschutzerklärung von Stripe:{' '}
-        <a href="https://stripe.com/de/privacy" className="text-indigo-700 underline" target="_blank" rel="noopener">stripe.com/de/privacy</a>.
+        <a href="https://stripe.com/de/privacy" className="text-ui-tinte underline underline-offset-2" target="_blank" rel="noopener">stripe.com/de/privacy</a>.
         [Rolle von Stripe — Auftragsverarbeiter bzw. eigener Verantwortlicher — und Angaben zur Übermittlung
         anhand des aktuellen Stripe-DPA prüfen.]
       </P>
@@ -339,8 +370,9 @@ function Datenschutz() {
       <H2>14. Speicherdauer im Überblick</H2>
       <Liste>
         <li>
-          Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung, Ihr Auftritt im Gutachten
-          und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht vorher löschen.
+          Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung samt unterschriebener
+          Unterlagen, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht
+          vorher löschen.
         </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
@@ -391,14 +423,14 @@ function Nutzungsbedingungen() {
   return (
     <>
       <H1>Nutzungsbedingungen</H1>
-      <p className="mt-1 text-xs text-slate-500">Fassung vom 1. Oktober 2026</p>
+      <p className="mt-1 text-xs text-ui-schiefer">Fassung vom 1. Oktober 2026</p>
 
       <H2>1. Geltungsbereich</H2>
       <P>
         Diese Bedingungen gelten für die Nutzung des JS-Rentenplaners unter js-rentenplaner.de — des Rechners,
         der Arbeitgeber-Seiten, des Vorsorge-Checks und aller weiteren Inhalte. Anbieter ist [Vor- und Nachname
         bzw. Firma, Anschrift] (im Folgenden „Anbieter“), siehe{' '}
-        <a href="/impressum" className="text-indigo-700 underline">Impressum</a>. Mit der Registrierung bzw. der
+        <a href="/impressum" className="text-ui-tinte underline underline-offset-2">Impressum</a>. Mit der Registrierung bzw. der
         Zustimmung im Konto akzeptieren Sie diese Bedingungen.
       </P>
 

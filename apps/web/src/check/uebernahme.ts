@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import { TYPEN } from '../features/vertragsarten';
 import type { DokumentEintrag } from '../lib/check';
+import { mitName, namensTeile } from '../lib/namen';
 
 /**
  * Was der Vorsorge-Check abfragt — und wie daraus ein Szenario wird.
@@ -19,7 +20,10 @@ export type Einkommen = SzenarioParsed['einkommenHeute'];
 export type Pkv = SzenarioParsed['haushalt']['pkv'];
 
 export interface PersonAntwort {
+  /** Der ganze Name; Vor- und Nachname getrennt dazu (lib/namen.ts) — fehlen in Antworten von vor der Trennung */
   name: string;
+  vorname?: string;
+  nachname?: string;
   /** TT.MM.JJJJ; leer, solange nichts eingetragen ist */
   geburtsdatum: string;
   /** Leer heisst: Regelaltersgrenze aus dem Geburtsdatum */
@@ -98,7 +102,7 @@ function leereEinkommen(): Einkommen {
 
 function leerePerson(): PersonAntwort {
   return {
-    name: '', geburtsdatum: '', rentenbeginn: '',
+    name: '', vorname: '', nachname: '', geburtsdatum: '', rentenbeginn: '',
     einkommen: leereEinkommen(),
     grvRente: 0,
     endBesoldungsgruppe: 'A13', ruhegehaltssatz: 71.75, dienstbeginn: '',
@@ -159,7 +163,7 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
     const beamter = p.einkommen.modus === 'besoldung';
     return {
       id,
-      name: p.name.trim(),
+      ...mitName(namensTeile(p.name, p.vorname, p.nachname)),
       geburtsdatum,
       rentenbeginn: eigenerBeginn ?? regel,
       rentenbeginnManuell: eigenerBeginn !== null && eigenerBeginn !== regel,

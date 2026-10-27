@@ -81,10 +81,10 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
   if (!supabaseKonfiguriert) {
     return (
       <>
-        <div className="flex items-start gap-2 bg-amber-100 px-4 py-2 text-xs leading-relaxed text-amber-900 print:hidden">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <div className="flex items-start gap-2 border-b border-ui-feld-rand bg-ui-innen px-4 py-2 text-xs leading-relaxed text-ui-tinte print:hidden">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
           <span>
-            <strong>Anmeldung nicht eingerichtet.</strong> Diese Fassung läuft ohne Zugangsschutz,
+            <strong className="font-medium">Anmeldung nicht eingerichtet.</strong> Diese Fassung läuft ohne Zugangsschutz,
             weil die Verbindung zum Konto-Dienst fehlt. Gespeicherte Szenarien stehen nicht zur
             Verfügung.
           </span>
@@ -109,8 +109,8 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
 
 function Moment() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <p className="text-sm text-slate-500">Einen Moment …</p>
+    <div className="flex min-h-screen items-center justify-center bg-ui-flaeche">
+      <p className="text-sm text-ui-schiefer">Einen Moment …</p>
     </div>
   );
 }
@@ -192,7 +192,7 @@ function RueckmeldungsFenster() {
   const schliessen = useZugang((s) => s.schliesseRueckmeldung);
   return (
     <Dialog offen={offen} titel="Feedback geben" beschreibung="Was hilft Ihnen, was fehlt, was stört? Jede Rückmeldung lesen wir selbst." onSchliessen={schliessen}>
-      <Suspense fallback={<p className="text-sm text-slate-500">Einen Moment …</p>}>
+      <Suspense fallback={<p className="text-sm text-ui-schiefer">Einen Moment …</p>}>
         <Rueckmeldung />
       </Suspense>
     </Dialog>
@@ -204,7 +204,7 @@ function AboFenster() {
   const schliessen = useZugang((s) => s.schliesseFenster);
   return (
     <Dialog offen={offen} titel="Abo & Team" beschreibung="Ihr Paket, Ihr Büro und Ihre Kollegen." onSchliessen={schliessen}>
-      <Suspense fallback={<p className="text-sm text-slate-500">Einen Moment …</p>}>
+      <Suspense fallback={<p className="text-sm text-ui-schiefer">Einen Moment …</p>}>
         <AboTeam />
       </Suspense>
     </Dialog>

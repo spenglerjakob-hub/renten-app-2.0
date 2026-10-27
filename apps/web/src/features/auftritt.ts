@@ -6,15 +6,19 @@
  * Funktionen. Gespeichert wird im Browser (`lib/auftritt-lokal.ts`) oder im
  * Konto (`lib/auftritt-konto.ts`, Tabelle `berater_profil`).
  *
- * DIE AKZENTFARBE faerbt nur Linien und Ueberschriften — nie die Farben, die
- * etwas bedeuten (Gruen fuers Ergebnis, Rot fuer die Luecke). Eine Farbe, die
- * auf Weiss zu hell fuer Text ist, faerbt nur die Linien; das Formular sagt
- * das dazu.
+ * DIE AKZENTFARBE faerbt nur Linien und Ueberschriften — nie das, was etwas
+ * bedeutet: Ergebnis und Luecke tragen die Hervorhebung des Stils. Eine Farbe,
+ * die auf Weiss zu hell fuer Text ist, faerbt nur die Linien; das Formular
+ * sagt das dazu.
  */
 
 export interface Auftritt {
   firma: string;
+  /** Der ganze Name — ihn lesen Briefkopf, Fusszeile, Unterschrift und die Live-Seite. */
   berater: string;
+  /** Vor- und Nachname, getrennt erfasst; `berater` wird mitgeschrieben (lib/namen.ts). */
+  vorname: string;
+  nachname: string;
   telefon: string;
   email: string;
   web: string;
@@ -26,17 +30,18 @@ export interface Auftritt {
   logo: string | null;
 }
 
-export type AuftrittText = 'firma' | 'berater' | 'telefon' | 'email' | 'web' | 'zusatz';
+export type AuftrittText = 'firma' | 'berater' | 'vorname' | 'nachname' | 'telefon' | 'email' | 'web' | 'zusatz';
 
 export const AUFTRITT_LEER: Auftritt = {
-  firma: '', berater: '', telefon: '', email: '', web: '', zusatz: '', farbe: null, logo: null,
+  firma: '', berater: '', vorname: '', nachname: '', telefon: '', email: '', web: '', zusatz: '', farbe: null, logo: null,
 };
 
 /** Dieselben Grenzen wie in der Datenbank (`berater_profil`). */
 export const GRENZEN: Record<AuftrittText, number> = {
-  firma: 120, berater: 120, telefon: 40, email: 254, web: 200, zusatz: 300,
+  firma: 120, berater: 120, vorname: 60, nachname: 60, telefon: 40, email: 254, web: 200, zusatz: 300,
 };
 
+/** Was den Auftritt sichtbar macht — der Name als Ganzes; die Teile stehen in `berater`. */
 const TEXTE: AuftrittText[] = ['firma', 'berater', 'telefon', 'email', 'web', 'zusatz'];
 
 /** WCAG: Ab diesem Kontrast auf Weiss taugt eine Farbe fuer Ueberschriften. */
@@ -144,8 +149,9 @@ export function cssZeichenkette(text: string): string {
 export function fusszeileCss(a: Auftritt | null | undefined): string {
   if (!a || !auftrittSichtbar(a)) return '';
   const links = fusszeileText(a);
-  const stil = 'font-family: ui-sans-serif, system-ui, sans-serif; font-size: 8pt; line-height: 1.3; '
-    + 'color: #64748b; vertical-align: top; padding-top: 3mm;';
+  // Schrift und Schiefer des Stils als Werte: die Randfelder der Seite lesen keine CSS-Variablen der Wurzel.
+  const stil = 'font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif; font-size: 8pt; line-height: 1.3; '
+    + 'color: #78716c; vertical-align: top; padding-top: 3mm;';
   return [
     '@media print { @page {',
     links ? `  @bottom-left { content: ${cssZeichenkette(links)}; ${stil} text-align: left; }` : '',

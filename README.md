@@ -234,6 +234,10 @@ In dieser Reihenfolge — jeder Schritt laesst sich einzeln pruefen:
    Kundenportal kuendigen und die Zahlung in Stripe erstatten.
 7. **Freigeben:** Branch `live` auf den geprueften Stand vorziehen. Die neue
    Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt.
+   Bis dahin traegt `live` einen eigenen Commit (`8b7e9b8`, "Live:
+   Nutzungsbedingungen bis zur Prüfung in der Fassung vom 1. Oktober 2026"),
+   der die alte Fassung haelt. Ihn auf `live` mit `git revert` zuruecknehmen,
+   dann den Arbeitszweig in `live` mergen — ein reiner Fast-Forward geht nicht.
 8. **Buchung fuer alle oeffnen:**
    `update privat.einstellungen set zahlung_nur_betreiber = false where id;`
    Ab wann ein Paket Pflicht ist, steuert getrennt davon `abo_pflicht_ab`.

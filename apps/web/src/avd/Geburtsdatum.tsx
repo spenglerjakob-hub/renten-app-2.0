@@ -3,6 +3,7 @@ import { CalendarClock } from 'lucide-react';
 import { parseDatum, regelaltersrentenbeginn } from '@renten/engine';
 import { Dialog } from '../components/Dialog';
 import { DatumFeld } from '../components/Feld';
+import { Hinweis, KNOPF } from '../components/stil';
 
 /**
  * Fragt beim Aufruf der Seite zuerst das Geburtsdatum ab.
@@ -52,24 +53,21 @@ export function GeburtsdatumDialog({
         />
 
         {rentenbeginn && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs leading-relaxed text-indigo-900">
-            <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <span>
-              Ihre Regelaltersgrenze liegt im Jahr <strong>{rentenbeginn.jahr}</strong> — bis dahin
-              sind es noch {Math.max(0, rentenbeginn.jahr - jetzt)} Jahre.
-            </span>
-          </p>
+          <Hinweis symbol={CalendarClock} klasse="mt-4">
+            Ihre Regelaltersgrenze liegt im Jahr <span className="font-medium">{rentenbeginn.jahr}</span> — bis dahin
+            sind es noch {Math.max(0, rentenbeginn.jahr - jetzt)} Jahre.
+          </Hinweis>
         )}
 
         <button
           type="submit"
           disabled={!plausibel}
-          className="mt-4 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`mt-5 w-full ${KNOPF} disabled:cursor-not-allowed`}
         >
           {plausibel ? 'Weiter zur Berechnung' : 'Bitte Geburtsdatum eintragen'}
         </button>
 
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
           Ihre Eingaben bleiben auf Ihrem Gerät. Die Seite rechnet im Browser und schickt nichts
           an uns — auch nicht dieses Datum.
         </p>

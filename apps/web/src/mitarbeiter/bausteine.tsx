@@ -1,69 +1,39 @@
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { BeratungStatus } from '@renten/schema';
 import { firmenlogoLaden } from '../lib/bav-beratung';
 import type { Auftritt } from '../features/auftritt';
 import { useAuftritt } from '../store/auftritt';
 import { euroText } from './texte';
 
-/** Knopf-Klassen der Seite — dieselben wie im Rechner. */
-export const KNOPF = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50';
-export const KNOPF_ZWEIT = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
-export const KNOPF_GEFAHR = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50';
-
-export function Karte({ titel, children, rechts, klasse = '' }: {
-  titel?: ReactNode; children: ReactNode; rechts?: ReactNode; klasse?: string;
-}) {
-  return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
-      {(titel || rechts) && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {titel && <h2 className="text-base font-black text-slate-900">{titel}</h2>}
-          {rechts}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-/** Mehrzeiliges Textfeld — wie `TextFeld`, mit Zeichengrenze. */
-export function TextBereich({ label, wert, onChange, maxLaenge, zeilen = 3, hilfe, platzhalter }: {
-  label: string; wert: string; onChange: (s: string) => void; maxLaenge: number;
-  zeilen?: number; hilfe?: string; platzhalter?: string;
-}) {
-  const id = useId();
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-bold text-slate-700">{label}</label>
-      <textarea
-        id={id}
-        value={wert}
-        rows={zeilen}
-        maxLength={maxLaenge}
-        placeholder={platzhalter}
-        onChange={(e) => onChange(e.target.value)}
-        aria-describedby={hilfe ? `${id}-hilfe` : undefined}
-        className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm leading-relaxed"
-      />
-      <div className="mt-0.5 flex justify-between gap-2 text-[11px] text-slate-500">
-        <span id={`${id}-hilfe`}>{hilfe}</span>
-        <span className="tabular-nums">{wert.length}/{maxLaenge}</span>
-      </div>
-    </div>
-  );
-}
+/*
+ * Bausteine der Mitarbeiterberatung: Status, Firmenlogo, Briefkopf, Druck.
+ * Die Bausteine des Stils (Knoepfe, Karten, Titel, Felder, Kennzahlen,
+ * Pillen, Schritte) liegen in components/stil.tsx, der Luecken-Ring in
+ * components/LueckenRing.tsx — sie gelten fuer alle Seiten.
+ */
 
 const STATUS_TEXT: Record<BeratungStatus, string> = { offen: 'offen', teilnahme: 'Teilnahme', verzicht: 'Verzicht' };
-export const STATUS_FARBE: Record<BeratungStatus, string> = {
-  offen: 'bg-slate-100 text-slate-700',
-  teilnahme: 'bg-emerald-100 text-emerald-800',
-  verzicht: 'bg-amber-100 text-amber-900',
+/*
+ * Status ohne Ampelfarben: ein Punkt und das Wort. Teilnahme in Tinte mit
+ * vollem Punkt, Verzicht leise mit leerem Ring, offen dazwischen — lesbar
+ * auch ohne Farbe.
+ */
+export const STATUS_PUNKT: Record<BeratungStatus, string> = {
+  teilnahme: 'bg-ui-tinte',
+  offen: 'bg-ui-asche',
+  verzicht: 'border border-ui-asche bg-ui-karte',
+};
+const STATUS_SCHRIFT: Record<BeratungStatus, string> = {
+  teilnahme: 'text-ui-tinte',
+  offen: 'text-ui-schiefer',
+  verzicht: 'text-ui-schiefer',
 };
 
 /** „Teilnahme 150 €“, „Verzicht“, „offen“. */
 export function StatusChip({ status, betrag }: { status: BeratungStatus; betrag?: number }) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_FARBE[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm ${STATUS_SCHRIFT[status]}`}>
+      <span aria-hidden className={`h-2 w-2 rounded-full ${STATUS_PUNKT[status]}`} />
       {STATUS_TEXT[status]}{status === 'teilnahme' && betrag !== undefined && betrag > 0 ? ` ${euroText(betrag)}` : ''}
     </span>
   );
@@ -105,7 +75,9 @@ export function FirmenZeichen({ name, logo, gross = false }: { name: string; log
       {logo && (
         <img src={logo} alt={`Logo ${name}`} className={`${gross ? 'h-14 max-w-[10rem]' : 'h-9 max-w-[7rem]'} shrink-0 object-contain`} />
       )}
-      <span className={`min-w-0 break-words font-black text-slate-900 ${gross ? 'text-2xl sm:text-3xl' : 'text-lg'}`}>{name}</span>
+      <span className={`min-w-0 break-words text-ui-tinte ${gross
+        ? 'ui-titel text-balance text-[34px] font-normal leading-[1.15] sm:text-[44px]'
+        : 'text-lg font-medium'}`}>{name}</span>
     </div>
   );
 }
@@ -147,30 +119,5 @@ export function DruckBereich({ children }: { children: ReactNode }) {
       <div className="print:hidden">{children}</div>
       <div id="druckbereich" className="hidden print:block">{inhalt}</div>
     </DruckKontext.Provider>
-  );
-}
-
-/**
- * Der Ring der Versorgungsluecke: gruen die Netto-Rente, rot die Luecke —
- * zusammen der Nettolohn heute, der in der Mitte steht. Die Zahlen stehen
- * zusaetzlich als Text daneben; der Ring ist die Anschauung.
- */
-export function LueckenRing({ nettolohn, rente, luecke, renteProzent, lueckeProzent }: {
-  nettolohn: number; rente: number; luecke: number; renteProzent: number; lueckeProzent: number;
-}) {
-  const r = 42;
-  const umfang = 2 * Math.PI * r;
-  const anteil = nettolohn > 0 ? Math.min(1, Math.max(0, rente / nettolohn)) : 0;
-  const ganz = (x: number) => euroText(Math.round(x));
-  return (
-    <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
-      aria-label={`Nettolohn ${ganz(nettolohn)}: davon ${ganz(rente)} Netto-Altersrente (${renteProzent} %) und ${ganz(luecke)} Versorgungslücke (${lueckeProzent} %)`}>
-      <circle cx="60" cy="60" r={r} fill="none" stroke="#f43f5e" strokeWidth="14" />
-      <circle cx="60" cy="60" r={r} fill="none" stroke="#10b981" strokeWidth="14"
-        strokeDasharray={`${anteil * umfang} ${umfang}`} transform="rotate(-90 60 60)" />
-      <circle cx="60" cy="60" r="33" fill="#f1f5f9" />
-      <text x="60" y="59" textAnchor="middle" fontSize="12.5" fontWeight="800" fill="#334155">{ganz(nettolohn)}</text>
-      <text x="60" y="72" textAnchor="middle" fontSize="7.5" fill="#64748b">Ihr Nettolohn</text>
-    </svg>
   );
 }

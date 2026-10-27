@@ -1,12 +1,73 @@
+/* Die Schriften des Stils — selbst ausgeliefert, keine Anfrage an Google. */
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/inter-tight/wght.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * DER STIL DER APP — „Seline“ (quiet analyst's desk on warm paper).
+ *
+ * Die Seiten sprechen Rollen an (Flaeche, Karte, Innenflaeche, Tinte, Linie,
+ * Knopf …; tailwind.config.js: ui-*), die Werte stehen hier. Farben als
+ * RGB-Kanaele, damit Tailwind-Deckkraft (bg-ui-tinte/30) geht. Die Bausteine
+ * dazu liegen in components/stil.tsx.
+ *
+ * Die Regeln: warmer Stein als Flaeche, weisse Karten mit Haarlinie und
+ * weichem Schatten; Ueberschriften in Inter Tight (Gewicht 400), Fliesstext
+ * in Inter; Hierarchie ueber Groesse und Grau, nicht ueber Fettdruck. Cyan
+ * nur fuer die Hauptaktion und das eine hervorgehobene Wort je Ueberschrift;
+ * Daten einfarbig. Rot bleibt fuer Fehler und Loeschen.
+ */
 @layer base {
-  :root { color-scheme: light; }
-  body { @apply bg-slate-100 text-slate-800 antialiased; }
+  :root {
+    color-scheme: light;
+    --ui-tinte: 12 10 9;           /* Ink Black, warm */
+    --ui-flaeche: 250 250 249;     /* Stone Canvas — Papier, nicht Bildschirmweiss */
+    --ui-karte: 255 255 255;       /* weisse Karten mit Haarlinie und weichem Schatten */
+    --ui-innen: 250 250 249;
+    --ui-linie: 232 230 229;
+    --ui-schiefer: 120 113 108;    /* Warm Gray */
+    --ui-asche: 168 162 158;
+    --ui-dunkel: 28 25 23;         /* Soot: aktiver Reiter */
+    --ui-hover: 250 250 249;
+    --ui-luecke: 214 211 209;      /* Stone Muted — Daten bleiben einfarbig */
+    --ui-daten-2: 120 113 108;
+    --ui-daten-3: 168 162 158;
+    --ui-knopf: 59 166 241;        /* Cyan Signal — die einzige farbige Flaeche */
+    --ui-knopf-rand: 51 152 225;
+    --ui-knopf-schrift: 12 10 9;   /* dunkle Schrift: Weiss auf Cyan erreicht nur 2,8:1 */
+    --ui-knopf-hover: 51 152 225;
+    --ui-zweit-rand: 232 230 229;
+    --ui-regler: 59 166 241;
+    --ui-feld-rand: 214 211 209;
+    --ui-r-karte: 10px;
+    --ui-r-innen: 8px;
+    --ui-r-feld: 6px;
+    --ui-r-schwebend: 16px;
+    --ui-karte-rahmen: #e8e6e5;
+    --ui-karte-schatten: 0 4px 16px rgba(0,0,0,0.05);
+    --ui-schwebend-schatten: 0 12px 45px rgba(17,12,46,0.12);
+    --ui-akzent-flaeche: #ffffff;  /* Seline kennt keine Farbflaechen — der Akzent sitzt in der Hervorhebung */
+    --ui-akzent-schrift: #0c0a09;
+    --ui-akzent-rahmen: #e8e6e5;
+    --ui-akzent-schatten: 0 4px 16px rgba(0,0,0,0.05);
+    --ui-hervor-schrift: #1d6aa8;  /* Cyan Edge #3398e1, dunkler: sonst unter 3:1 auf Sky Wash */
+    --ui-hervor-flaeche: #c1e1f7;  /* Sky Wash */
+    --ui-marke-schrift: #185a8f;   /* noch dunkler fuer kleine Schrift auf Sky Wash: 5,3:1 statt 4,2:1 */
+    --ui-hervor-abstand: 0 0.2em;
+    --ui-titel-sperrung: -0.022em;
+  }
+  body {
+    background-color: rgb(var(--ui-flaeche));
+    color: rgb(var(--ui-tinte));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   /* Barrierefreiheit: Tastaturfokus muss sichtbar sein (Befund D5). */
-  :focus-visible { @apply outline-none ring-2 ring-indigo-500 ring-offset-1; }
+  :focus-visible { @apply outline-none ring-2 ring-offset-1; --tw-ring-color: rgb(var(--ui-regler)); }
+  :is(input[type="checkbox"], input[type="radio"]) { accent-color: rgb(var(--ui-regler)); }
 }
 
 @layer components {
@@ -16,6 +77,88 @@
     -ms-overflow-style: none;
   }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Die Bausteine — Gestalt aus den Rollen oben. */
+  .ui-karte {
+    background-color: rgb(var(--ui-karte));
+    border: 1px solid var(--ui-karte-rahmen);
+    border-radius: var(--ui-r-karte);
+    box-shadow: var(--ui-karte-schatten);
+  }
+  .ui-innen {
+    background-color: rgb(var(--ui-innen));
+    border: 1px solid rgb(var(--ui-linie));
+    border-radius: var(--ui-r-innen);
+  }
+  /* Eingaben: vertiefter Stein ohne Schatten, so gross wie eine Karte (components/Feld.tsx: TON). */
+  .ui-eingabe {
+    background-color: rgb(var(--ui-innen));
+    border: 1px solid rgb(var(--ui-linie));
+    border-radius: var(--ui-r-karte);
+  }
+  .ui-schwebend {
+    background-color: #fff;
+    border-radius: var(--ui-r-schwebend);
+    box-shadow: var(--ui-schwebend-schatten);
+  }
+  .ui-akzentkarte {
+    background-color: var(--ui-akzent-flaeche);
+    color: var(--ui-akzent-schrift);
+    border: 1px solid var(--ui-akzent-rahmen);
+    border-radius: var(--ui-r-karte);
+    box-shadow: var(--ui-akzent-schatten);
+  }
+  /* Das eine hervorgehobene Wort je Ueberschrift. */
+  .ui-hervor {
+    color: var(--ui-hervor-schrift);
+    background-color: var(--ui-hervor-flaeche);
+    padding: var(--ui-hervor-abstand);
+    border-radius: 4px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  /* Eine kleine Marke wie „Empfohlen“ — Sky Wash wie das hervorgehobene Wort, die Schrift dunkler. */
+  .ui-marke {
+    color: var(--ui-marke-schrift);
+    background-color: var(--ui-hervor-flaeche);
+    border-radius: 9999px;
+  }
+  .ui-titel { font-family: theme('fontFamily.titel'); letter-spacing: var(--ui-titel-sperrung); }
+
+  /* Eingabefelder: Rundung und Rand des Stils (components/stil.tsx: FELD). */
+  .ui-feld {
+    border: 1px solid rgb(var(--ui-feld-rand));
+    border-radius: var(--ui-r-feld);
+    background-color: #fff;
+    color: rgb(var(--ui-tinte));
+  }
+  /* Platzhalter in Warm Gray, nicht Asche: Auch er ist Schrift und braucht 4,5:1. */
+  .ui-feld::placeholder { color: rgb(var(--ui-schiefer)); }
+  .ui-feld:disabled { background-color: rgb(var(--ui-innen)); color: rgb(var(--ui-schiefer)); }
+  /*
+   * Der Regler selbst gestaltet: helle Spur, gefuellt bis zum Wert (--anteil
+   * setzt die Seite), Knopf in der Reglerfarbe. Der native Regler malte bei
+   * hellem Cyan den Rest der Spur fast schwarz.
+   */
+  .ui-regler {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(to right, rgb(var(--ui-regler)) var(--anteil, 0%), rgb(var(--ui-linie)) var(--anteil, 0%));
+    cursor: pointer;
+  }
+  .ui-regler::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px; border-radius: 9999px;
+    background: #fff; border: 2px solid rgb(var(--ui-regler));
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .ui-regler::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 9999px;
+    background: #fff; border: 2px solid rgb(var(--ui-regler));
+  }
+  .ui-regler:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 
 @media (prefers-reduced-motion: reduce) {

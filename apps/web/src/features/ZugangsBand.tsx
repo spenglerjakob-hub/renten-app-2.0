@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Eye, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Eye, Info, X, type LucideIcon } from 'lucide-react';
 import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT } from '@renten/schema/preise';
 import {
   aboAktiv, rueckmeldungFaellig, useZugang, wirksam, tageBis, tage, datum,
@@ -15,15 +15,22 @@ import {
  * Bewusst schmal und wegklickbar (fuer diese Sitzung): Ein Berater mit dem
  * Kunden am Tisch soll nicht auf einen Kasten schauen, der ihn ans Bezahlen
  * erinnert. Ein neuer Stand (anderes Datum) zeigt das Band wieder.
+ *
+ * Ohne Ampelfarben: Der Ton steckt im Symbol, die Flaeche bleibt hell. Nur
+ * eine fehlgeschlagene Zahlung steht rot — Rot bleibt fuer Fehler.
  */
 
 const TON = {
-  info: 'border-indigo-200 bg-indigo-50 text-indigo-950',
-  warnung: 'border-amber-200 bg-amber-100 text-amber-950',
-  fehler: 'border-rose-200 bg-rose-100 text-rose-950',
-  gut: 'border-emerald-200 bg-emerald-50 text-emerald-950',
-  neutral: 'border-slate-300 bg-slate-200 text-slate-900',
+  info: 'border-ui-linie bg-ui-karte text-ui-tinte',
+  warnung: 'border-ui-feld-rand bg-ui-innen text-ui-tinte',
+  fehler: 'border-rose-200 bg-rose-50 text-rose-950',
+  gut: 'border-ui-linie bg-ui-karte text-ui-tinte',
+  neutral: 'border-ui-linie bg-ui-innen text-ui-tinte',
 } as const;
+
+const SYMBOL: Record<keyof typeof TON, LucideIcon> = {
+  info: Info, warnung: AlertTriangle, fehler: AlertCircle, gut: CheckCircle2, neutral: Info,
+};
 
 function Band({ ton, children, onWeg, knopf }: {
   ton: keyof typeof TON;
@@ -31,17 +38,19 @@ function Band({ ton, children, onWeg, knopf }: {
   onWeg?: () => void;
   knopf?: { text: string; onKlick: () => void };
 }) {
+  const Zeichen = SYMBOL[ton];
   return (
     <div role="status" className={`border-b print:hidden ${TON[ton]}`}>
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2 text-sm leading-snug">
+        <Zeichen className={`h-4 w-4 shrink-0 ${ton === 'fehler' ? '' : 'text-ui-schiefer'}`} aria-hidden />
         {/* Der Knopf steht neben dem Text — wird es zu eng, rutscht er darunter. */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <p className="min-w-0 flex-[1_1_18rem]">{children}</p>
+          <p className="min-w-0 flex-[1_1_18rem] [&_strong]:font-medium">{children}</p>
           {knopf && (
             <button
               type="button"
               onClick={knopf.onKlick}
-              className="shrink-0 rounded-md bg-white px-2.5 py-1 text-xs font-bold shadow-sm ring-1 ring-black/10 hover:bg-slate-50"
+              className="shrink-0 rounded-full border border-ui-zweit-rand bg-white px-3 py-1 text-xs font-medium text-ui-tinte hover:bg-ui-innen"
             >
               {knopf.text}
             </button>
@@ -49,7 +58,7 @@ function Band({ ton, children, onWeg, knopf }: {
         </div>
         {onWeg && (
           <button type="button" onClick={onWeg} aria-label="Hinweis ausblenden"
-            className="shrink-0 rounded p-1 opacity-60 hover:opacity-100">
+            className="shrink-0 rounded-full p-1 opacity-60 hover:opacity-100">
             <X className="h-4 w-4" aria-hidden />
           </button>
         )}
@@ -272,15 +281,15 @@ export function VorschauBand() {
   const setzeVorschau = useZugang((s) => s.setzeVorschau);
   if (!vorschau) return null;
   return (
-    <div role="status" className="bg-fuchsia-700 text-white print:hidden">
+    <div role="status" className="bg-ui-dunkel text-white print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 text-sm">
         <Eye className="h-4 w-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
-          <strong>Vorschau als Kunde:</strong> {vorschau.titel}.
+          <strong className="font-medium">Vorschau als Kunde:</strong> {vorschau.titel}.
           <span className="hidden sm:inline"> Buchen, Einladen und Löschen sind hier gesperrt.</span>
         </span>
         <button type="button" onClick={() => setzeVorschau(null)}
-          className="rounded-md bg-white px-2.5 py-1 text-xs font-bold text-fuchsia-800 hover:bg-fuchsia-50">
+          className="rounded-full bg-white px-3 py-1 text-xs font-medium text-ui-tinte hover:bg-ui-innen">
           Vorschau beenden
         </button>
       </div>

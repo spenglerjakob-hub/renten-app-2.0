@@ -33,9 +33,9 @@ export function KinderZeilen({
         const inAusbildung = kind.ausbildungBisJahr !== undefined;
 
         return (
-          <div key={i} className="rounded-lg border border-slate-200 bg-white p-2">
+          <div key={i} className="rounded-[10px] border border-ui-linie bg-ui-karte p-2.5">
             <div className="flex items-center gap-2">
-              <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`kind-${i}`}>
+              <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}`}>
                 {i + 1}. Kind, geb.
               </label>
               <input
@@ -45,9 +45,9 @@ export function KinderZeilen({
                 min={1900}
                 max={2200}
                 onChange={(e) => onKind(i, { geburtsjahr: Number(e.target.value) })}
-                className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
+                className="ui-feld w-full p-1.5 text-sm tabular-nums"
               />
-              <span className="w-24 shrink-0 text-right text-xs text-slate-500">
+              <span className="w-24 shrink-0 text-right text-xs text-ui-schiefer">
                 {jahre <= 0 ? 'kein Anspruch' : jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`}
               </span>
             </div>
@@ -69,7 +69,7 @@ export function KinderZeilen({
 
             {inAusbildung && (
               <div className="mt-1.5 flex items-center gap-2 pl-6">
-                <label className="w-24 shrink-0 text-xs text-slate-600" htmlFor={`kind-${i}-bis`}>
+                <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}-bis`}>
                   bis Ende
                 </label>
                 <input
@@ -81,9 +81,9 @@ export function KinderZeilen({
                   // das Gesetz ohnehin nicht mehr foerdert.
                   max={kind.geburtsjahr + a.kinderzulageBisAlterAusbildung - 1}
                   onChange={(e) => onKind(i, { ausbildungBisJahr: Number(e.target.value) })}
-                  className="w-full rounded-md border border-slate-300 p-1.5 text-sm tabular-nums"
+                  className="ui-feld w-full p-1.5 text-sm tabular-nums"
                 />
-                <span className="w-24 shrink-0 text-right text-xs text-slate-500">
+                <span className="w-24 shrink-0 text-right text-xs text-ui-schiefer">
                   dann {(kind.ausbildungBisJahr ?? 0) - kind.geburtsjahr} J. alt
                 </span>
               </div>
@@ -101,7 +101,7 @@ export function KinderZeilen({
  */
 export function KinderHinweis({ a }: { a: AvdParameter }) {
   return (
-    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+    <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
       Die Kinderzulage läuft, solange Kindergeld fließt: bis {a.kinderzulageBisAlter} —
       und bei Ausbildung oder Studium so lange, wie diese dauert, längstens bis{' '}
       {a.kinderzulageBisAlterAusbildung}.

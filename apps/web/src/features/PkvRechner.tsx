@@ -5,6 +5,7 @@ import { useSzenario } from '../store/szenario';
 import { euro, prozent, InfoPunkt } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
 import { pkvRechnen, LEBENSERWARTUNG, SCHWELLE_ANTEIL, type PkvErgebnis } from './pkv-berechnung';
+import { KNOPF_ZWEIT } from '../components/stil';
 
 /**
  * Was die private Krankenversicherung im Ruhestand kostet.
@@ -43,32 +44,36 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
   const heuteHinweis = teile.length > 0 ? teile.join(' · ') : 'im Monat';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:hidden">
+    /* Einklappbar wie die Steuer-Engine: weisse Karte, Symbol in der Innenflaeche, Zahlen einfarbig. */
+    <section className="ui-karte overflow-hidden print:hidden">
       <button
         type="button"
         onClick={() => setOffen((x) => !x)}
         aria-expanded={offen}
-        className="flex w-full items-center justify-between gap-3 p-3 text-left sm:p-4"
+        className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-ui-innen sm:px-7 sm:py-6"
       >
-        <span className="flex items-center gap-2">
-          <HeartPulse className="h-4 w-4 shrink-0 text-rose-600" aria-hidden />
+        <span className="flex items-center gap-3">
+          <span className="ui-innen flex h-10 w-10 shrink-0 items-center justify-center text-ui-tinte">
+            <HeartPulse className="h-5 w-5" aria-hidden />
+          </span>
           <span>
-            <span className="block text-xs font-bold text-slate-800 sm:text-sm">
+            <span className="block text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
               Ihre private Krankenversicherung
             </span>
-            <span className="block text-xs text-slate-500">
+            <span className="mt-0.5 block text-sm text-ui-schiefer">
               Heute {euro(r.heute.gesamtMonat)} — im Jahr {r.rentenjahr} {euro(r.beiRente.praemieMonat)}
             </span>
           </span>
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${offen ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 shrink-0 text-ui-schiefer transition-transform ${offen ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
 
-      <div className={`border-t border-slate-100 p-3 sm:p-4 ${offen ? 'block' : 'hidden'}`}>
-        <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`px-5 pb-5 sm:px-7 sm:pb-7 ${offen ? 'block' : 'hidden'}`}>
+        {/* So viele Spalten, wie mit lesbarer Breite passen: drei ueber die volle Breite, zwei in der Spalte des Ergebnisses. */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-3">
           <Kachel titel="Heute" wert={euro(r.heute.gesamtMonat)} hinweis={heuteHinweis} />
           <Kachel
             /* Alles, was dann abfliesst — die Praemie UND der Restbeitrag
@@ -76,7 +81,6 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
             titel={`Bei Rentenbeginn ${r.rentenjahr}`}
             wert={euro(r.beiRente.gesamtMonat)}
             hinweis={`in heutigem Geld ${euro(r.beiRenteHeutigesGeld)}`}
-            akzent
           />
           {r.mitAchtzig && (
             <Kachel
@@ -92,7 +96,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           schmal={schmal}
         />
 
-        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        <p className="mt-3 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           Die Stufe nach unten liegt bei <strong>{ZUSCHLAG_BIS_ALTER + 1}</strong>: bis zum
           Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}. Geburtstags wird der gesetzliche Zuschlag von
           10 % erhoben, danach entfällt er (§ 149 VAG). Ab 65 senken die daraus angesparten Mittel
@@ -111,9 +115,9 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           waere es Werbung statt eines Befunds.
         */}
         {!r.bet && r.anteilAmZiel >= SCHWELLE_ANTEIL && (
-          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-            <p className="text-xs leading-relaxed text-amber-900">
-              <strong>
+          <div className="ui-innen mt-5 p-4">
+            <p className="text-xs leading-relaxed text-ui-tinte/80">
+              <strong className="font-medium text-ui-tinte">
                 Ihr Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} Ihres
                 Zielnettos
               </strong>{' '}
@@ -123,16 +127,13 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
               Entlastung und Ihrer Lebenserwartung — tragen Sie ihn oben ein, dann steht die
               Gegenüberstellung hier.
             </p>
-            <a
-              href={mailto}
-              className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-500"
-            >
-              <Mail className="h-3.5 w-3.5" aria-hidden /> Beratung dazu anfragen
+            <a href={mailto} className={`mt-3 ${KNOPF_ZWEIT}`}>
+              <Mail className="h-4 w-4" aria-hidden /> Beratung dazu anfragen
             </a>
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -174,22 +175,23 @@ function Verlaufskurve({ punkte, schmal }: {
       <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full" role="img" aria-label="Beitragsverlauf">
         {[0, 0.5, 1].map((q) => (
           <g key={q}>
-            <line x1={L} y1={y(max * q)} x2={B - R} y2={y(max * q)} stroke="#e2e8f0" strokeWidth="1" />
-            <text x={L - 6} y={y(max * q) + 4} textAnchor="end" fontSize="12" fill="#64748b">
+            <line x1={L} y1={y(max * q)} x2={B - R} y2={y(max * q)} style={{ stroke: 'rgb(var(--ui-linie))' }} strokeWidth="1" />
+            <text x={L - 6} y={y(max * q) + 4} textAnchor="end" fontSize="12" style={{ fill: 'rgb(var(--ui-schiefer))' }}>
               {achse(max * q)}
             </text>
           </g>
         ))}
-        <path d={pfad} fill="none" stroke="#e11d48" strokeWidth="2" />
-        <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} stroke="#94a3b8" strokeWidth="1.5" />
+        {/* Die Kurve in Tinte — ein Beitrag ist keine Warnung. */}
+        <path d={pfad} fill="none" style={{ stroke: 'rgb(var(--ui-tinte))' }} strokeWidth="2" />
+        <line x1={L} y1={T + plotH} x2={B - R} y2={T + plotH} style={{ stroke: 'rgb(var(--ui-asche))' }} strokeWidth="1.5" />
         {punkte.map((d, i) =>
           d.alter % (schmal ? 10 : 5) === 0 ? (
-            <text key={d.alter} x={x(i)} y={H - 10} textAnchor="middle" fontSize="12" fill="#64748b">
+            <text key={d.alter} x={x(i)} y={H - 10} textAnchor="middle" fontSize="12" style={{ fill: 'rgb(var(--ui-schiefer))' }}>
               {d.alter}
             </text>
           ) : null,
         )}
-        <text x={B - R} y={H - 1} textAnchor="end" fontSize="11" fill="#94a3b8">Alter</text>
+        <text x={B - R} y={H - 1} textAnchor="end" fontSize="11" style={{ fill: 'rgb(var(--ui-schiefer))' }}>Alter</text>
       </svg>
     </figure>
   );
@@ -219,15 +221,15 @@ function BetKarte({ bet, n, abAlter }: {
   ];
   return (
     <div className="mt-5">
-      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="mb-2 text-sm font-medium text-ui-tinte">
         Ihr Beitragsentlastungstarif
       </div>
-      <table className="w-full overflow-hidden rounded-lg border border-slate-200 text-xs tabular-nums">
-        <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
+      <table className="w-full overflow-hidden rounded-[8px] border border-ui-linie text-xs tabular-nums">
+        <thead className="bg-ui-innen text-xs text-ui-schiefer">
           <tr>
-            <th className="px-2.5 py-1.5 text-left font-bold" />
-            <th className="px-2.5 py-1.5 text-right font-bold">Brutto</th>
-            <th className="px-2.5 py-1.5 text-right font-bold text-emerald-700">
+            <th className="px-2.5 py-1.5 text-left font-medium" />
+            <th className="px-2.5 py-1.5 text-right font-medium">Brutto</th>
+            <th className="px-2.5 py-1.5 text-right font-medium text-ui-tinte">
               Netto
               <InfoPunkt titel="Wie aus brutto netto wird">
                 <strong>Heute:</strong>{' '}
@@ -251,17 +253,17 @@ function BetKarte({ bet, n, abAlter }: {
         </thead>
         <tbody>
           {zeilen.map(([text, brutto, netto], i) => (
-            <tr key={text} className={`border-t border-slate-100 ${i === zeilen.length - 1 ? 'font-bold' : ''}`}>
-              <td className="px-2.5 py-1.5 text-slate-600">{text}</td>
-              <td className="px-2.5 py-1.5 text-right text-slate-500">{brutto}</td>
-              <td className="px-2.5 py-1.5 text-right font-semibold text-slate-900">{netto}</td>
+            <tr key={text} className={`border-t border-ui-linie ${i === zeilen.length - 1 ? 'font-medium' : ''}`}>
+              <td className="px-2.5 py-1.5 text-ui-tinte/80">{text}</td>
+              <td className="px-2.5 py-1.5 text-right text-ui-schiefer">{brutto}</td>
+              <td className="px-2.5 py-1.5 text-right font-medium text-ui-tinte">{netto}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
         Brutto sind die Beträge aus dem Vertrag, die Ersparnis schon nach dem Restbeitrag.{' '}
-        <strong>Netto</strong> nach Arbeitgeberzuschuss und Steuer — darauf kommt es an: Den
+        <strong className="font-medium text-ui-tinte">Netto</strong> nach Arbeitgeberzuschuss und Steuer — darauf kommt es an: Den
         Beitrag mindert heute Ihr höherer Steuersatz, die Entlastung kostet im Ruhestand Abzug zu
         einem meist niedrigeren. Nominal addiert, ohne Abzinsung; die Entlastung ist ein fester
         Betrag und verliert über die Jahre an Kaufkraft. Den genauen abziehbaren Anteil nennt die
@@ -271,16 +273,13 @@ function BetKarte({ bet, n, abAlter }: {
   );
 }
 
-function Kachel({ titel, wert, hinweis, akzent }: {
-  titel: string; wert: string; hinweis: string; akzent?: boolean;
-}) {
+/** Eine Zahl in der Innenflaeche: leises Etikett, der Betrag, darunter die Einordnung — einfarbig. */
+function Kachel({ titel, wert, hinweis }: { titel: string; wert: string; hinweis: string }) {
   return (
-    <div className={`rounded-lg border p-3 ${akzent ? 'border-rose-300 bg-rose-50/60' : 'border-slate-200 bg-slate-50'}`}>
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titel}</div>
-      <div className={`mt-0.5 text-lg font-black tabular-nums ${akzent ? 'text-rose-900' : 'text-slate-900'}`}>
-        {wert}
-      </div>
-      <div className="mt-0.5 text-xs leading-tight text-slate-500">{hinweis}</div>
+    <div className="ui-innen p-4">
+      <div className="text-xs text-ui-schiefer">{titel}</div>
+      <div className="mt-0.5 text-xl font-medium tabular-nums text-ui-tinte">{wert}</div>
+      <div className="mt-1 break-words text-xs leading-snug text-ui-schiefer hyphens-auto">{hinweis}</div>
     </div>
   );
 }

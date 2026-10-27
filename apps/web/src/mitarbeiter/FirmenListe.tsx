@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Building2, ChevronRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { firmenAngebotSchema } from '@renten/schema';
 import { firmaAnlegen, firmenLaden, staendeLaden, type Firma, type Stand } from '../lib/bav-beratung';
 import { TextFeld } from '../components/Feld';
-import { KNOPF, Karte, STATUS_FARBE } from './bausteine';
+import { ETIKETT, KNOPF, Karte, Titel } from '../components/stil';
+import { STATUS_PUNKT } from './bausteine';
 import { MODELL_NAME, regelText } from './texte';
 import { anzahlText } from './uebersicht-daten';
 import type { Ort } from './ort';
@@ -39,19 +40,19 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">bAV-Mitarbeiterberatung</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
+        <Titel gross>bAV-Mitarbeiterberatung</Titel>
+        <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
           Hat sich eine Firma für ein Modell entschieden, stellen Sie hier ihr Angebot ein — Modell, Versicherer, Logo —
           und führen dann jeden Mitarbeiter im Gespräch durch sieben Schritte. Am Ende stehen das Beratungsprotokoll,
           die Entgeltumwandlungsvereinbarung oder die Verzichtserklärung und eine Übersicht für den Arbeitgeber.
         </p>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
           Das Modell übernehmen Sie am schnellsten von der Arbeitgeber-Seite:{' '}
-          <a href="/zuschussmodell" className="font-bold text-indigo-700 hover:underline">Zuschussmodell</a>,{' '}
-          <a href="/festbetrag" className="font-bold text-indigo-700 hover:underline">Festbetrag-Modell</a> oder{' '}
-          <a href="/arbeitgeber" className="font-bold text-indigo-700 hover:underline">Matching-Modell</a> —
+          <a href="/zuschussmodell" className="font-medium text-ui-tinte underline underline-offset-4">Zuschussmodell</a>,{' '}
+          <a href="/festbetrag" className="font-medium text-ui-tinte underline underline-offset-4">Festbetrag-Modell</a> oder{' '}
+          <a href="/arbeitgeber" className="font-medium text-ui-tinte underline underline-offset-4">Matching-Modell</a> —
           dort „Für die Mitarbeiter-Beratung übernehmen“.
         </p>
       </div>
@@ -68,16 +69,16 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
         {meldung && <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
       </Karte>
 
-      {firmen === 'laedt' && <p className="text-sm text-slate-500">Firmen werden geladen …</p>}
+      {firmen === 'laedt' && <p className="text-sm text-ui-schiefer">Firmen werden geladen …</p>}
       {firmen === 'fehler' && (
         <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
           Die Firmen konnten nicht geladen werden. Bitte laden Sie die Seite neu.
         </p>
       )}
       {Array.isArray(firmen) && (firmen.length === 0 ? (
-        <p className="text-sm text-slate-500">Noch keine Firma angelegt.</p>
+        <p className="text-sm text-ui-schiefer">Noch keine Firma angelegt.</p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2" aria-label="Firmen">
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2" aria-label="Firmen">
           {firmen.map((f) => {
             const s = staende[f.id] ?? { offen: 0, teilnahme: 0, verzicht: 0 };
             return (
@@ -85,21 +86,22 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
                 <button
                   type="button"
                   onClick={() => gehe({ firma: f.id, beratung: null, reiter: 'mitarbeiter' })}
-                  className="flex h-full w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-indigo-300 hover:bg-indigo-50/40"
+                  className="ui-karte group flex h-full w-full items-start gap-3 p-6 text-left transition-colors hover:border-ui-asche"
                 >
-                  <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block break-words font-black text-slate-900">{f.name}</span>
-                    <span className="mt-0.5 block text-xs font-bold text-slate-500">{MODELL_NAME[f.angebot.modell.art]}</span>
-                    <span className="mt-1 block text-sm leading-snug text-slate-600">{regelText(f.angebot.modell)}</span>
-                    <span className="mt-2 flex flex-wrap gap-1.5">
+                    <span className={`block ${ETIKETT}`}>{MODELL_NAME[f.angebot.modell.art]}</span>
+                    <span className="mt-1 block break-words text-xl font-medium text-ui-tinte">{f.name}</span>
+                    <span className="mt-2 block text-sm leading-relaxed text-ui-schiefer">{regelText(f.angebot.modell)}</span>
+                    <span className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                       {(['teilnahme', 'verzicht', 'offen'] as const).filter((k) => s[k] > 0).map((k) => (
-                        <span key={k} className={`rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_FARBE[k]}`}>{anzahlText(k, s[k])}</span>
+                        <span key={k} className="inline-flex items-center gap-1.5 text-ui-tinte">
+                          <span aria-hidden className={`h-2 w-2 rounded-full ${STATUS_PUNKT[k]}`} />{anzahlText(k, s[k])}
+                        </span>
                       ))}
-                      {s.teilnahme + s.verzicht + s.offen === 0 && <span className="text-xs text-slate-500">Noch keine Beratung</span>}
+                      {s.teilnahme + s.verzicht + s.offen === 0 && <span className="text-ui-schiefer">Noch keine Beratung</span>}
                     </span>
                   </span>
-                  <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-ui-tinte transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </button>
               </li>
             );

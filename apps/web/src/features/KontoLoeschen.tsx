@@ -28,7 +28,7 @@ export function KontoLoeschen({ sicherung }: { sicherung: string }) {
   if (!offen) {
     return (
       <button type="button" onClick={() => setOffen(true)}
-        className="text-xs text-slate-500 underline-offset-2 hover:text-rose-700 hover:underline">
+        className="text-xs text-ui-schiefer underline-offset-2 hover:text-rose-700 hover:underline">
         Konto löschen …
       </button>
     );
@@ -36,7 +36,7 @@ export function KontoLoeschen({ sicherung }: { sicherung: string }) {
 
   if (vorschau || laufendesAbo) {
     return (
-      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+      <div className="ui-innen space-y-2 p-3 text-xs leading-relaxed text-ui-tinte">
         <p>
           {vorschau
             ? 'In der Vorschau lässt sich das Konto nicht löschen — gelöscht würde Ihr echtes Konto.'
@@ -44,7 +44,7 @@ export function KontoLoeschen({ sicherung }: { sicherung: string }) {
               + 'Kündigen Sie das Abo zuerst unter „Abo & Team“ → „Abo verwalten“; danach geht es hier weiter.'}
         </p>
         <button type="button" onClick={() => setOffen(false)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-50">
+          className="rounded-full border border-ui-zweit-rand bg-white px-3 py-1.5 font-medium text-ui-tinte hover:bg-ui-innen">
           Schließen
         </button>
       </div>
@@ -60,24 +60,24 @@ export function KontoLoeschen({ sicherung }: { sicherung: string }) {
         machen. {sicherung}
         {zugang?.rolle === 'inhaber' && ' Mit Ihrem Konto endet auch Ihr Büro — für alle Mitglieder.'}
       </p>
-      <label htmlFor="konto-loeschen-bestaetigung" className="block font-bold">
+      <label htmlFor="konto-loeschen-bestaetigung" className="block font-medium">
         Zur Bestätigung LÖSCHEN eintippen:
       </label>
       <input
         id="konto-loeschen-bestaetigung" type="text" value={bestaetigung} autoComplete="off"
         onChange={(e) => setBestaetigung(e.target.value)}
-        className="w-full rounded-md border border-rose-300 bg-white p-2 text-sm text-slate-900"
+        className="ui-feld w-full border-rose-300 p-2 text-sm"
       />
       {authMeldung?.art === 'fehler' && <p role="alert">{authMeldung.text}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button"
           disabled={bestaetigung.trim().toUpperCase() !== 'LÖSCHEN' || loeschtKonto}
           onClick={() => void kontoLoeschen()}
-          className="flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 font-bold text-white hover:bg-rose-500 disabled:opacity-40">
+          className="flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1.5 font-medium text-white hover:bg-rose-700 disabled:opacity-40">
           <Trash2 className="h-3.5 w-3.5" aria-hidden /> Konto endgültig löschen
         </button>
         <button type="button" onClick={() => { setOffen(false); setBestaetigung(''); }}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-50">
+          className="rounded-full border border-ui-zweit-rand bg-white px-3 py-1.5 font-medium text-ui-tinte hover:bg-ui-innen">
           Abbrechen
         </button>
       </div>

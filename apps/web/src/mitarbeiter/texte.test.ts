@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { firmenAngebotSchema } from '@renten/schema';
-import { euroText, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName } from './texte';
+import { firmenAngebotSchema, type FirmenModellDaten } from '@renten/schema';
+import { euroText, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelKern, regelText, traegerText, vertragName } from './texte';
 import type { KennzahlenErgebnis, KennzahlenWeg } from './rechnung';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
@@ -104,5 +104,18 @@ describe('Fazit und Herleitung', () => {
     expect(t).toContain('erst nach 21,2 Jahren Rente zurück — später, als bis zum Alter von 85 gerechnet.');
     expect(t).not.toContain('Nicht eingerechnet');
     expect(fazitText(k({}))).toBe('');
+  });
+});
+
+describe('regelKern', () => {
+  it('steht woertlich in der Regel — fuer jedes Modell', () => {
+    const modelle: FirmenModellDaten[] = [
+      { art: 'zuschuss', quote: 0.5, deckelMonat: 100 },
+      { art: 'zuschuss', quote: 0.3, deckelMonat: 0 },
+      { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 },
+      { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: false },
+      { art: 'matching', weg: 'ukasse', matchingMonat: 80, zuschussImMatching: false },
+    ];
+    for (const m of modelle) expect(regelText(m)).toContain(regelKern(m));
   });
 });

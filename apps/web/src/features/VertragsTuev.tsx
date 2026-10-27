@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { SearchCheck, Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, parseDatum, toDe, type ProjektionsErgebnis } from '@renten/engine';
 import {
   tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText,
@@ -10,10 +10,19 @@ import { personNameAus } from './personen';
 import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
-  ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, Abschnitt, euro, euroGenau,
-  prozent, TON,
+  ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, AkkordeonKarte, euro, euroGenau,
+  prozent,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { EINLEITUNG, FELD, Hervor, Kernsatz, Titel } from '../components/stil';
+
+/** Ein Block in der Innenflaeche mit leisem Titel — Belastung, Ertrag, Laufzeit, Kennzahlen. */
+const BLOCK = 'ui-innen p-4';
+const BLOCK_TITEL = 'mb-2 text-xs font-medium text-ui-schiefer';
+/** Die Summe eines Blocks unter einer Linie in Tinte, wie die Aufstellungen der Beratung. */
+const SUMME = 'mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2';
+/** Ein kleiner Knopf mit Kontur in einem Block („Kind“, „Noch eine Änderung“). */
+const KLEIN_KNOPF = 'inline-flex items-center gap-1 rounded-full border border-ui-zweit-rand bg-ui-karte px-2.5 py-1 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden';
 
 type TuevEintrag = SzenarioParsed['tuev'][number];
 
@@ -74,9 +83,9 @@ function FruehereBeitraege({ t, aendern }: {
         const vorBeginn = bis !== null && beginn !== null && bis < beginn.jahr * 12 + beginn.monat - 1;
         const zukunft = bis !== null && bis >= heuteIndex;
         return (
-          <div key={i} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
+          <div key={i} className="space-y-2 rounded-[10px] border border-ui-linie bg-ui-karte p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-medium text-ui-tinte">
                 {stufen.length > 1 ? `Früherer Beitrag ${i + 1}` : 'Früherer Beitrag'}
               </span>
               {stufen.length > 1 && (
@@ -84,7 +93,7 @@ function FruehereBeitraege({ t, aendern }: {
                   type="button"
                   onClick={() => aendern({ fruehereBeitraege: stufen.filter((_, j) => j !== i) })}
                   aria-label={`Früheren Beitrag ${i + 1} entfernen`}
-                  className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
+                  className="rounded-full p-1 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden />
                 </button>
@@ -111,7 +120,8 @@ function FruehereBeitraege({ t, aendern }: {
               hilfe={`Letzter Monat mit diesem Beitrag — zusammen ${euroGenau(st.beitragMonat)}. Danach gilt der Beitrag oben.`}
             />
             {(vorBeginn || zukunft) && (
-              <p className="text-xs leading-relaxed text-amber-700">
+              /* Ein Datum, das so nicht wirken kann, ist ein Eingabefehler — deshalb rot. */
+              <p className="text-xs leading-relaxed text-rose-700">
                 {vorBeginn
                   ? 'Dieses Datum liegt vor dem Beginn des Vertrags — die Stufe wirkt dann nicht.'
                   : 'Dieses Datum liegt in der Zukunft — bis dahin rechnet der TÜV mit diesem Beitrag statt mit dem oben.'}
@@ -124,7 +134,7 @@ function FruehereBeitraege({ t, aendern }: {
         <button
           type="button"
           onClick={() => aendern({ fruehereBeitraege: [...stufen, neueStufe()] })}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
+          className={KLEIN_KNOPF}
         >
           <Plus className="h-3 w-3" aria-hidden /> Noch eine frühere Änderung
         </button>
@@ -137,12 +147,13 @@ function FruehereBeitraege({ t, aendern }: {
 function WegZeile({ text, rente, kapital, hervor }: {
   text: string; rente: string; kapital: string; hervor?: 'rente' | 'kapital';
 }) {
-  const stark = 'font-black text-emerald-700';
+  // Der bessere Weg in Tinte und mittlerem Gewicht, der andere leiser — ohne Ampel.
+  const stark = 'font-medium text-ui-tinte';
   return (
-    <tr className="border-b border-slate-50 last:border-0">
-      <td className="px-3 py-1.5 text-slate-600">{text}</td>
-      <td className={`px-2 py-1.5 text-right ${hervor === 'rente' ? stark : 'text-slate-800'}`}>{rente}</td>
-      <td className={`px-3 py-1.5 text-right ${hervor === 'kapital' ? stark : 'text-slate-800'}`}>{kapital}</td>
+    <tr className="border-b border-ui-linie last:border-0">
+      <td className="px-3 py-1.5 text-ui-schiefer">{text}</td>
+      <td className={`px-2 py-1.5 text-right ${hervor === 'rente' ? stark : 'text-ui-tinte/80'}`}>{rente}</td>
+      <td className={`px-3 py-1.5 text-right ${hervor === 'kapital' ? stark : 'text-ui-tinte/80'}`}>{kapital}</td>
     </tr>
   );
 }
@@ -187,6 +198,7 @@ export function VertragsTuev({
   // Dieselbe Bemessungsgrundlage wie die Rechnung selbst — sie stand hier
   // frueher ein zweites Mal im Code.
   const basis = useMemo(() => tuevBasis(szenario), [szenario]);
+  const [einkommenOffen, setEinkommenOffen] = useState(true);
 
   const nichtGeprueft = vertraege.filter((v) => !tuev.some((t) => t.vertragId === v.id));
 
@@ -198,34 +210,33 @@ export function VertragsTuev({
   );
 
   return (
-    <section id="vertrags-tuev" className="mx-auto mb-24 max-w-6xl scroll-mt-28 p-2 sm:p-6 print:break-before-page">
-      <div className="mb-4 flex flex-col items-start justify-between gap-4 border-b-2 border-amber-200 px-2 pb-3 sm:mb-6 sm:pb-4 md:flex-row md:items-center">
+    /* Ein Abschnitt der Etappe wie die Lösungen: Titel in Inter Tight, Karten darunter, ohne eigene Farbe. */
+    <section id="vertrags-tuev" className="scroll-mt-28 space-y-6 sm:space-y-8 print:break-before-page">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold text-amber-800 sm:gap-3 sm:text-2xl">
-            <SearchCheck className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden /> Vertrags-TÜV
-          </h2>
-          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600 sm:mt-2 sm:text-sm">
+          <Titel als="h2">Vertrags-TÜV</Titel>
+          <p className={`mt-2 ${EINLEITUNG}`}>
             Stellen Sie Ihre Verträge nebeneinander. Gerechnet wird mit Ihrem tatsächlichen
             Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
             Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
           </p>
         </div>
 
-        <div className="w-full shrink-0 rounded-xl border border-amber-200 bg-amber-100 p-1.5 shadow-sm sm:p-2 md:w-auto print:hidden">
+        <div className="w-full shrink-0 md:w-72 print:hidden">
           <label htmlFor="tuev-auswahl" className="sr-only">Vertrag zur Prüfung hinzufügen</label>
           <select
             id="tuev-auswahl"
             value=""
             disabled={nichtGeprueft.length === 0}
             onChange={(e) => { if (e.target.value) tuevHinzufuegen(e.target.value); }}
-            className="w-full cursor-pointer rounded-lg border-2 border-amber-300 bg-white p-2 text-xs font-bold text-amber-900 shadow-sm outline-none hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60 sm:p-2.5 sm:text-sm"
+            className={`${FELD} cursor-pointer font-medium disabled:cursor-not-allowed`}
           >
             <option value="">
               {vertraege.length === 0
                 ? 'Erst einen Vertrag anlegen …'
                 : nichtGeprueft.length === 0
                   ? 'Alle Verträge geprüft'
-                  : '➕ Vertrag hinzufügen …'}
+                  : 'Vertrag zur Prüfung hinzufügen …'}
             </option>
             {nichtGeprueft.map((v) => (
               <option key={v.id} value={v.id}>
@@ -251,18 +262,19 @@ export function VertragsTuev({
         `print:hidden`, weil das Gutachten die Angaben auf seinem eigenen
         Blatt fuehrt.
       */}
-      <div className="mb-4 px-2 print:hidden sm:mb-6">
-        <Abschnitt
+      <div className="print:hidden">
+        <AkkordeonKarte
           titel={szenario.einkommenGetrennt
             ? `Ihr Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
             : 'Ihr Einkommen (Ausgangsbasis)'}
-          einklappbar
+          offen={einkommenOffen}
+          onUmschalten={() => setEinkommenOffen((x) => !x)}
         >
           <EinkommenFelder wert={szenario.einkommenHeute} onChange={setzeEinkommen} />
 
           {szenario.haushalt.verheiratet && szenario.einkommenGetrennt && (
-            <div className="mt-4 border-t border-slate-100 pt-3">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="mt-4 border-t border-ui-linie pt-3">
+              <p className="mb-2 text-xs font-medium text-ui-tinte">
                 {personNameAus(szenario.personen, 'B')}
               </p>
               <EinkommenFelder wert={szenario.einkommenPartner} onChange={setzeEinkommenPartner} />
@@ -277,7 +289,7 @@ export function VertragsTuev({
             `nettoZuBrutto` um) — die drei Zahlen koennen deshalb nicht
             auseinanderlaufen.
           */}
-          <div className="mt-4 grid grid-cols-3 gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="ui-innen mt-5 grid grid-cols-3 gap-3 px-4 py-3">
             <Kennzahl
               titel="Ø Brutto im Monat"
               wert={euro(basis.monatsbrutto)}
@@ -292,7 +304,6 @@ export function VertragsTuev({
             <Kennzahl
               titel="Jahresbrutto"
               wert={euro(basis.jahresbrutto)}
-              farbe="text-slate-900"
               info={(
                 <>
                   {szenario.einkommenHeute.modus === 'netto'
@@ -310,7 +321,6 @@ export function VertragsTuev({
             <Kennzahl
               titel="Ø Netto im Monat"
               wert={euro(basis.jahresnetto / 12)}
-              farbe="text-indigo-700"
               info={(
                 <>
                   Brutto abzüglich Sozialabgaben, Einkommensteuer, Soli und — falls
@@ -321,16 +331,16 @@ export function VertragsTuev({
               )}
             />
           </div>
-        </Abschnitt>
+        </AkkordeonKarte>
       </div>
 
       {tuev.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50/40 px-4 py-8 text-center text-sm text-amber-900">
+        <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
           Noch kein Vertrag zur Prüfung ausgewählt. Wählen Sie oben einen aus, um zu sehen,
           was er Sie wirklich kostet und was er wirklich bringt.
         </p>
       ) : (
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           {tuev.map((t) => {
             const v = vertraege.find((x) => x.id === t.vertragId);
             if (!v) return null;
@@ -362,35 +372,26 @@ export function VertragsTuev({
             });
 
             return (
-              <article key={t.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm druckbereich">
-                <header className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-                  <h3 className="flex items-center gap-2 truncate text-sm font-bold text-slate-800">
-                    <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                      v.schicht === 1 ? 'bg-blue-100 text-blue-700'
-                        : v.schicht === 2 ? 'bg-purple-100 text-purple-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      Schicht {v.schicht}
-                    </span>
-                    <span className="truncate">{v.name || v.typ}</span>
+              <article key={t.id} className="ui-karte overflow-hidden druckbereich">
+                <header className="flex items-center justify-between gap-3 border-b border-ui-linie px-5 py-4 sm:px-7">
+                  <h3 className="min-w-0">
+                    <span className="block text-xs text-ui-schiefer">Schicht {v.schicht}</span>
+                    <span className="block truncate text-lg font-medium tracking-[-0.01em] text-ui-tinte">{v.name || v.typ}</span>
                   </h3>
                   <button
                     type="button"
                     onClick={() => tuevEntfernen(t.id)}
                     aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
-                    className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 print:hidden"
+                    className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
                 </header>
 
-                <div className="grid gap-4 p-4 lg:grid-cols-3 lg:gap-6">
-                  {/* 1) ANNAHMEN
-                      Getoent wie die Eingabespalte oben: die Regel „hier
-                      tragen Sie ein" soll auch hier unten gelten, wo Eingabe
-                      und Auswertung dicht nebeneinander stehen. */}
-                  <div className={`space-y-3 rounded-lg border p-3 ${TON.eingabe}`}>
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-700">
+                <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-3 lg:gap-6">
+                  {/* 1) ANNAHMEN — in der Innenflaeche: hier tragen Sie ein, daneben steht die Auswertung. */}
+                  <div className="ui-innen space-y-3 p-4">
+                    <h4 className="text-sm font-medium text-ui-tinte">
                       1. Ihre Annahmen
                     </h4>
                     <ZahlFeld
@@ -453,21 +454,17 @@ export function VertragsTuev({
                     </div>
 
                     {v.typ === 'riester' && (
-                      <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-ui-tinte">
                             Kinder (Zulage) — für diesen Vertrag
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => tuevKindHinzufuegen(t.id)}
-                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 print:hidden"
-                          >
+                          <button type="button" onClick={() => tuevKindHinzufuegen(t.id)} className={KLEIN_KNOPF}>
                             <Plus className="h-3 w-3" aria-hidden /> Kind
                           </button>
                         </div>
                         {t.kinder.length === 0 ? (
-                          <p className="text-xs text-slate-500">Keine Kinderzulage.</p>
+                          <p className="text-xs text-ui-schiefer">Keine Kinderzulage.</p>
                         ) : (
                           <ul className="space-y-1.5">
                             {t.kinder.map((kind) => (
@@ -480,16 +477,16 @@ export function VertragsTuev({
                                   min={1900}
                                   max={2200}
                                   onChange={(e) => tuevKindAendern(t.id, kind.id, Number(e.target.value))}
-                                  className="w-full rounded border border-slate-300 p-1 text-xs tabular-nums"
+                                  className="ui-feld w-full p-1 text-xs tabular-nums"
                                 />
-                                <span className="shrink-0 text-xs text-slate-500">
+                                <span className="shrink-0 text-xs text-ui-schiefer">
                                   {kind.geburtsjahr >= 2008 ? '300 €' : '185 €'}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => tuevKindEntfernen(t.id, kind.id)}
                                   aria-label={`Kind ${kind.geburtsjahr} entfernen`}
-                                  className="shrink-0 rounded p-0.5 text-slate-400 hover:text-rose-600 print:hidden"
+                                  className="shrink-0 rounded-full p-0.5 text-ui-schiefer hover:text-rose-700 print:hidden"
                                 >
                                   <Trash2 className="h-3 w-3" aria-hidden />
                                 </button>
@@ -509,10 +506,9 @@ export function VertragsTuev({
                       Riester es anders macht, steht in beiden Ueberschriften.
                     */}
                     {v.typ === 'avd' && (
-                      /* Weiss, nicht indigo: der Kasten steht jetzt selbst auf
-                         indigofarbenem Grund und waere darin untergegangen. */
-                      <div className="rounded-lg border border-indigo-300 bg-white p-2.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">
+                      /* Weiss auf der Innenflaeche der Annahmen, wie die Kinder bei Riester. */
+                      <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-3">
+                        <span className="text-xs font-medium text-ui-tinte">
                           Kinder (Zulage) — aus Ihren Basisdaten
                         </span>
                         <div className="mt-1.5">
@@ -530,7 +526,7 @@ export function VertragsTuev({
                           jetzt={jetzt}
                         />
                         <KinderHinweis a={avdParam} />
-                        <p className="mt-1 text-xs leading-relaxed text-indigo-800">
+                        <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
                           Gilt für den ganzen Haushalt: Änderungen wirken auch in den Basisdaten,
                           auf der Zeitachse und im Vertragsblatt.
                         </p>
@@ -555,12 +551,12 @@ export function VertragsTuev({
 
                   {/* 2) EINZAHLUNG GEGEN AUSZAHLUNG */}
                   <div className="space-y-3">
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <h4 className="text-sm font-medium text-ui-tinte">
                       2. Einzahlung gegen Auszahlung
                     </h4>
 
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className={BLOCK}>
+                      <div className={BLOCK_TITEL}>
                         Ihre Belastung (Ansparphase)
                       </div>
                       {/*
@@ -573,7 +569,7 @@ export function VertragsTuev({
                         <GegenueberZeile text="Gesamtbeitrag" wert={euro(treppe.zufluss)} />
                         {treppe.zeilen.map((z) => (
                           z.art === 'summe' ? (
-                            <div key={z.text} className="!mt-2 border-t border-slate-200 pt-2">
+                            <div key={z.text} className="!mt-2 border-t border-ui-linie pt-2">
                               <GegenueberZeile text={z.text} wert={euro(z.betrag)} />
                             </div>
                           ) : (
@@ -581,14 +577,13 @@ export function VertragsTuev({
                               key={z.text}
                               text={z.text}
                               wert={euro(z.betrag)}
-                              farbe="text-emerald-600"
                               info={z.erklaerung}
                             />
                           )
                         ))}
-                        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-slate-200 pt-2">
-                          <span className="text-xs font-bold text-slate-700">Kostet Sie wirklich</span>
-                          <span className="text-base font-black tabular-nums text-slate-900">
+                        <div className={SUMME}>
+                          <span className="text-xs font-medium text-ui-tinte">Kostet Sie wirklich</span>
+                          <span className="text-base font-medium tabular-nums text-ui-tinte">
                             {euro(treppe.aufwand)}
                           </span>
                         </div>
@@ -609,8 +604,8 @@ export function VertragsTuev({
                       doppelt, und "Kostet Sie wirklich" ginge nicht mehr auf.
                     */}
                     {r.zulageMonat > 0 && (
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      <div className={BLOCK}>
+                        <div className={BLOCK_TITEL}>
                           Was der Staat dazugibt — monatlich, 1. Jahr
                         </div>
                         <div className="space-y-1.5">
@@ -632,9 +627,9 @@ export function VertragsTuev({
                                 der Ueberschrift "Jedes Jahr". Aus 540 EUR
                                 Foerderung wurden so 45.
                               */}
-                              <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-emerald-200 pt-2">
-                                <span className="text-xs font-bold text-emerald-900">Jedes Jahr</span>
-                                <span className="text-base font-black tabular-nums text-emerald-700">
+                              <div className={SUMME}>
+                                <span className="text-xs font-medium text-ui-tinte">Jedes Jahr</span>
+                                <span className="text-base font-medium tabular-nums text-ui-tinte">
                                   {euro(laufendeZulageJahr(r))}
                                 </span>
                               </div>
@@ -645,8 +640,8 @@ export function VertragsTuev({
                                 Jahr gibt.
                               */}
                               {r.zulageDetail.bonusEinmalig > 0 && (
-                                <p className="mt-1 text-xs leading-relaxed text-emerald-800">
-                                  Dazu <strong>einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
+                                <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+                                  Dazu <strong className="font-medium text-ui-tinte">einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
                                   {euro(r.zulageDetail.bonusEinmalig)}.
                                 </p>
                               )}
@@ -655,7 +650,7 @@ export function VertragsTuev({
                             <GegenueberZeile text="Zulage" wert={euro(r.zulageMonat)} />
                           )}
                         </div>
-                        <p className="mt-2 text-xs leading-relaxed text-emerald-800">
+                        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
                           Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
                           fließen zusätzlich in den Vertrag und senken Ihren eigenen Beitrag
                           nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als
@@ -670,8 +665,8 @@ export function VertragsTuev({
                       nebeneinander, was der Vertrag monatlich netto kostet und
                       was er monatlich netto bringt.
                     */}
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                    <div className={BLOCK}>
+                      <div className={BLOCK_TITEL}>
                         Ihr Ertrag (Auszahlungsphase)
                       </div>
                       <div className="space-y-1.5">
@@ -680,10 +675,10 @@ export function VertragsTuev({
                           wert={euro(istKapital ? r.bruttoKapital : r.bruttoRenteMonat)}
                         />
                         {!istKapital && r.kvPvMonat > 0 && (
-                          <GegenueberZeile text="− KV/PV-Abzug" wert={euro(r.kvPvMonat)} farbe="text-rose-500" />
+                          <GegenueberZeile text="− KV/PV-Abzug" wert={euro(r.kvPvMonat)} />
                         )}
                         {!istKapital && r.steuerMonat > 0 && (
-                          <GegenueberZeile text="− Steuer-Abzug" wert={euro(r.steuerMonat)} farbe="text-rose-500" />
+                          <GegenueberZeile text="− Steuer-Abzug" wert={euro(r.steuerMonat)} />
                         )}
                         {/*
                           Steuer und Beitraege GETRENNT: Die Steuer faellt im
@@ -694,42 +689,39 @@ export function VertragsTuev({
                           in der Eingabemaske hoeher ausgewiesen ist.
                         */}
                         {istKapital && r.steuerKapital > 0 && (
-                          <GegenueberZeile text="− Steuer im Zuflussjahr" wert={euro(r.steuerKapital)} farbe="text-rose-500" />
+                          <GegenueberZeile text="− Steuer im Zuflussjahr" wert={euro(r.steuerKapital)} />
                         )}
                         {istKapital && r.kvPvKapital > 0 && (
                           <GegenueberZeile
                             text="− Kranken- und Pflegeversicherung"
                             wert={euro(r.kvPvKapital)}
-                            farbe="text-rose-500"
                           />
                         )}
 
-                        <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-amber-200 pt-2">
-                          <span className="text-xs font-bold text-amber-900">
+                        <div className={SUMME}>
+                          <span className="text-xs font-medium text-ui-tinte">
                             {istKapital ? 'Echtes Netto-Kapital' : 'Echte Netto-Rente'}
                           </span>
-                          <span className="text-base font-black tabular-nums text-amber-700">
+                          <span className="text-base font-medium tabular-nums text-ui-tinte">
                             {euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)}
-                            {!istKapital && <span className="text-xs font-normal"> / Monat</span>}
+                            {!istKapital && <span className="text-xs font-normal text-ui-schiefer"> / Monat</span>}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className={BLOCK}>
+                      <div className={BLOCK_TITEL}>
                         Über die gesamte Laufzeit
                       </div>
                       <div className="space-y-1.5">
                         <GegenueberZeile
                           text={`Eingezahlt (${laufzeitText(r.monateEinzahlung)})`}
                           wert={euro(r.summeEinzahlung)}
-                          farbe="text-rose-600"
                         />
                         <GegenueberZeile
                           text={istKapital ? 'Ausgezahlt (einmalig)' : `Ausgezahlt (${r.jahreAuszahlung} Jahre)`}
                           wert={euro(r.summeAuszahlung)}
-                          farbe="text-emerald-600"
                         />
                       </div>
                     </div>
@@ -737,16 +729,25 @@ export function VertragsTuev({
 
                   {/* 3) KENNZAHLEN UND FAZIT */}
                   <div className="space-y-3">
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <h4 className="text-sm font-medium text-ui-tinte">
                       3. Kennzahlen und Fazit
                     </h4>
 
-                    <div className={`rounded-lg border p-3 ${gut ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+                    {/*
+                      DAS FAZIT ALS SATZ statt Gruen oder Rot: was netto von
+                      jedem eingezahlten Euro zurueckkommt — der Netto-Hebel,
+                      ausgesprochen. Er ist die Aussage dieser Karte.
+                    */}
+                    <Kernsatz>
+                      Je eingezahltem Euro kommen netto{gut ? '' : ' nur'}{' '}
+                      <Hervor>{euroGenau(Math.round(r.nettoHebel * 100) / 100)}</Hervor> zurück.
+                    </Kernsatz>
+
+                    <div className={BLOCK}>
                       <div className="grid grid-cols-2 gap-3">
                         <Kennzahl
                           titel="Netto-Hebel"
                           wert={`${r.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ×`}
-                          farbe={gut ? 'text-emerald-700' : 'text-rose-700'}
                           fussnote="Auszahlung je Euro Einzahlung"
                           info={(
                             <>
@@ -763,7 +764,6 @@ export function VertragsTuev({
                         <Kennzahl
                           titel="Nettorendite"
                           wert={prozent(r.rendite, 2)}
-                          farbe={r.rendite > 0 ? 'text-emerald-700' : 'text-rose-700'}
                           fussnote="p. a. nach allen Abzügen"
                           info={(
                             <>
@@ -780,7 +780,6 @@ export function VertragsTuev({
                         <Kennzahl
                           titel="Netto-Gewinn"
                           wert={euro(r.echterGewinn)}
-                          farbe={r.echterGewinn >= 0 ? 'text-emerald-700' : 'text-rose-700'}
                         />
                         {!istKapital && (
                           <Kennzahl
@@ -799,16 +798,16 @@ export function VertragsTuev({
                       und jeder Weg bekommt seine eigene volle Rechnung.
                     */}
                     {wege && (
-                      <div className="overflow-hidden rounded-lg border border-slate-200">
-                        <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="overflow-hidden rounded-[8px] border border-ui-linie">
+                        <div className="border-b border-ui-linie bg-ui-innen px-3 py-2 text-xs font-medium text-ui-schiefer">
                           Rente gegen Kapital — beide Wege gerechnet
                         </div>
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="border-b border-slate-100 text-slate-500">
-                              <th className="px-3 py-1.5 text-left font-semibold"> </th>
-                              <th className="px-2 py-1.5 text-right font-semibold">Rente</th>
-                              <th className="px-3 py-1.5 text-right font-semibold">Kapital</th>
+                            <tr className="border-b border-ui-linie text-ui-schiefer">
+                              <th className="px-3 py-1.5 text-left font-medium"> </th>
+                              <th className="px-2 py-1.5 text-right font-medium">Rente</th>
+                              <th className="px-3 py-1.5 text-right font-medium">Kapital</th>
                             </tr>
                           </thead>
                           <tbody className="tabular-nums">
@@ -840,14 +839,14 @@ export function VertragsTuev({
                             />
                           </tbody>
                         </table>
-                        <p className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                        <p className="border-t border-ui-linie bg-ui-innen px-3 py-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
                           {/*
                             Der Wert ist ein ALTER, nicht eine Dauer:
                             `renteOderKapital` rechnet ab dem Alter bei
                             Rentenbeginn. "Ab 12 Jahren" waere schlicht falsch.
                           */}
                           <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn Sie{' '}
-                          <strong className="text-slate-900">
+                          <strong>
                             {wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                           </strong>{' '}
                           alt werden — ohne Verzinsung.
@@ -862,21 +861,21 @@ export function VertragsTuev({
                     )}
 
                     {r.zulagenGekuerzt && (
-                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-                        <strong>Zulagen werden gekürzt.</strong> Ihr Eigenbeitrag liegt unter dem
+                      <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
+                        <strong className="font-medium text-ui-tinte">Zulagen werden gekürzt.</strong> Ihr Eigenbeitrag liegt unter dem
                         Mindesteigenbeitrag nach § 86 EStG (4 % des Vorjahresbruttos abzüglich
                         Zulagen). Die Zulagen fallen dadurch anteilig geringer aus.
                       </p>
                     )}
 
                     {r.hinweise.map((h, i) => (
-                      <p key={i} className="rounded-lg bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700">
+                      <p key={i} className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
                         {h}
                       </p>
                     ))}
 
                     {!wege && kenntKapitalwahl(v.typ) && (
-                      <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700">
+                      <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
                         Für den Vergleich fehlt {v.brutto > 0 ? 'die Kapitalauszahlung' : 'die monatliche Rente'}.
                         Tragen Sie beide Beträge am Vertrag ein — dann rechnet der TÜV beide Wege
                         und nennt den Break-even. Geschätzt wird nichts.
@@ -892,26 +891,26 @@ export function VertragsTuev({
                     */}
                     {!wege && vergleich && (
                       <div className="space-y-2">
-                        <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-2.5 sm:p-3">
-                          <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                          <p className="text-xs leading-relaxed text-slate-700">
-                            <strong className="text-slate-900">Ohne Verzinsung:</strong> Sie müssten{' '}
-                            <strong className="text-rose-600">
+                        <div className="ui-innen flex items-start gap-2.5 p-3">
+                          <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+                          <p className="text-xs leading-relaxed text-ui-tinte/80 [&_strong]:font-medium [&_strong]:text-ui-tinte">
+                            <strong>Ohne Verzinsung:</strong> Sie müssten{' '}
+                            <strong>
                               {vergleich.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                             </strong>{' '}
                             alt werden, damit die Rente das Kapital einholt.
                           </p>
                         </div>
-                        <div className="flex items-start gap-2.5 rounded-xl border border-indigo-50 bg-indigo-50/50 p-2.5 sm:p-3">
-                          <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" aria-hidden />
-                          <p className="text-xs leading-relaxed text-indigo-900">
+                        <div className="ui-innen flex items-start gap-2.5 p-3">
+                          <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
+                          <p className="text-xs leading-relaxed text-ui-tinte/80 [&_strong]:font-medium [&_strong]:text-ui-tinte">
                             <strong>Mit 2 % Verzinsung:</strong>{' '}
                             {vergleich.kapitalTraegtSichSelbst
                               ? 'Der Kapitalertrag allein trägt die Rente — die Verrentung rechnet sich finanziell nie.'
                               : (
                                 <>
                                   Sie müssten{' '}
-                                  <strong className="text-rose-600">
+                                  <strong>
                                     {vergleich.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                                   </strong>{' '}
                                   alt werden.

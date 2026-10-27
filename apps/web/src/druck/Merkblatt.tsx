@@ -100,12 +100,12 @@ export function Merkblatt() {
       <ol className="space-y-2">
         {CHECKLISTE.map((x, i) => (
           <li key={x.was} className="flex break-inside-avoid gap-2">
-            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-400 text-[10px] font-bold text-slate-600">
+            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-ui-asche text-[10px] font-medium text-ui-schiefer">
               {i + 1}
             </span>
             <span>
-              <span className="block text-[12px] font-semibold text-slate-900">{x.was}</span>
-              <span className="block text-[11px] leading-relaxed text-slate-600">{x.warum}</span>
+              <span className="block text-[12px] font-medium text-ui-tinte">{x.was}</span>
+              <span className="block text-[11px] leading-relaxed text-ui-schiefer">{x.warum}</span>
             </span>
           </li>
         ))}
@@ -122,9 +122,9 @@ export function Merkblatt() {
         {GLOSSAR.map((x) => (
           <div
             key={x.begriff}
-            className="break-inside-avoid text-[11px] leading-relaxed text-slate-600"
+            className="break-inside-avoid text-[11px] leading-relaxed text-ui-schiefer"
           >
-            <dt className="inline font-bold text-slate-900">{x.begriff}</dt>
+            <dt className="inline font-medium text-ui-tinte">{x.begriff}</dt>
             {' — '}
             <dd className="inline">{x.erklaerung}</dd>
           </div>

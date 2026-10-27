@@ -82,7 +82,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4 print:hidden"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-ui-tinte/40 p-0 sm:items-center sm:p-4 print:hidden"
       onMouseDown={(e) => {
         if (schliessbar && e.target === e.currentTarget) onSchliessen();
       }}
@@ -95,11 +95,11 @@ export function Dialog({
         aria-describedby={beschreibung ? 'dialog-text' : undefined}
         className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
       >
-        <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+        <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-ui-linie bg-white px-4 py-3 sm:px-6 sm:py-4">
           <div>
-            <h2 id="dialog-titel" className="text-base font-bold text-slate-800 sm:text-lg">{titel}</h2>
+            <h2 id="dialog-titel" className="ui-titel text-lg font-normal text-ui-tinte sm:text-xl">{titel}</h2>
             {beschreibung && (
-              <p id="dialog-text" className="mt-1 text-xs leading-relaxed text-slate-600 sm:text-sm">
+              <p id="dialog-text" className="mt-1 text-xs leading-relaxed text-ui-schiefer sm:text-sm">
                 {beschreibung}
               </p>
             )}
@@ -109,7 +109,7 @@ export function Dialog({
               type="button"
               onClick={onSchliessen}
               aria-label="Schließen"
-              className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="shrink-0 rounded-full p-1.5 text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
             >
               <X className="h-5 w-5" aria-hidden />
             </button>

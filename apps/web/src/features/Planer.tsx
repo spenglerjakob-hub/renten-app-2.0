@@ -14,9 +14,9 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-indigo-200 bg-white p-3 shadow-sm">
-        <h3 className="mb-3 flex items-center gap-2 border-b border-indigo-50 pb-2 text-xs font-bold text-indigo-900 sm:text-sm">
-          <Wallet className="h-4 w-4" aria-hidden />
+      <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-4">
+        <h3 className="mb-4 flex items-center gap-2 text-base font-medium text-ui-tinte">
+          <Wallet className="h-4 w-4 text-ui-schiefer" aria-hidden />
           Dynamische Verrentung
         </h3>
 
@@ -60,43 +60,39 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
       </div>
 
       {ergebnis ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="ui-innen p-4">
           <dl className="grid grid-cols-2 gap-3">
             <div>
-              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Wirksames Kapital
-              </dt>
-              <dd className="text-sm font-black text-indigo-900 tabular-nums">
+              <dt className="text-xs text-ui-schiefer">Wirksames Kapital</dt>
+              <dd className="text-lg font-medium tabular-nums text-ui-tinte">
                 {euro(ergebnis.gesamtkapital)}
               </dd>
               {ergebnis.uebertragen > 0 && (
-                <p className="mt-0.5 text-xs font-medium text-indigo-600">
+                <p className="mt-0.5 text-xs text-ui-schiefer">
                   inkl. {euro(ergebnis.uebertragen)} aus Verträgen
                 </p>
               )}
             </div>
             <div>
-              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Entnahme netto
-              </dt>
-              <dd className="text-sm font-black text-emerald-700 tabular-nums">
-                {euro(ergebnis.nettoMonat)} <span className="text-xs font-normal">/ Monat</span>
+              <dt className="text-xs text-ui-schiefer">Entnahme netto</dt>
+              <dd className="text-lg font-medium tabular-nums text-ui-tinte">
+                {euro(ergebnis.nettoMonat)} <span className="text-xs font-normal text-ui-schiefer">/ Monat</span>
               </dd>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-ui-schiefer">
                 brutto {euro(ergebnis.bruttoMonat)}
               </p>
             </div>
           </dl>
 
           {!ergebnis.imNettoEnthalten && (
-            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Diese Entnahme ist derzeit <strong>nicht</strong> im Haushaltsnetto enthalten.
+            <p className="mt-3 border-t border-ui-linie pt-3 text-xs leading-relaxed text-ui-tinte">
+              Diese Entnahme ist derzeit <strong className="font-medium">nicht</strong> im Haushaltsnetto enthalten.
               Setzen Sie den Schalter oben, um sie einzurechnen.
             </p>
           )}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
           Noch kein Kapital erfasst. Tragen Sie ein Startkapital ein oder stellen Sie einen
           Vertrag auf „Kapital in den Entnahmeplaner“ um.
         </p>

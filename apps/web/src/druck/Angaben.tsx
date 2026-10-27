@@ -85,7 +85,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
   return (
     <>
       {offeneTexte.length > 0 && (
-        <div className="mb-2 break-inside-avoid rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] leading-snug text-amber-900">
+        <div className="mb-2 break-inside-avoid rounded-[8px] border border-dashed border-ui-schiefer/60 px-3 py-2 text-[12px] leading-snug text-ui-tinte">
           <strong>Noch nicht anhand von Unterlagen geprüft (Beispielwerte):</strong> {offeneTexte.join(', ')}.
         </div>
       )}
@@ -177,7 +177,7 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
           const Spalte = gerechnete.length > 1 ? Einspaltig : Zweispaltig;
           return (
             <div key={p.id} className="break-inside-avoid">
-              <div className="mb-1 text-[12px] font-bold text-slate-800">
+              <div className="mb-1 text-[12px] font-medium text-ui-tinte">
                 {personName(p)}
               </div>
               <Spalte>
@@ -234,20 +234,20 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
       */}
       <Untertitel>Heutiges Einkommen</Untertitel>
       <Zweispaltig>
-        <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
-          <div className="text-[12px] text-slate-600">
+        <div className="break-inside-avoid border-b border-ui-linie py-1">
+          <div className="text-[12px] text-ui-schiefer">
             {szenario.einkommenGetrennt ? personNameAus(szenario.personen, 'A') : 'Haushalt'}
           </div>
-          <div className="text-[12px] font-semibold tabular-nums text-slate-900">
+          <div className="text-[12px] font-medium tabular-nums text-ui-tinte">
             {einkommen(szenario.einkommenHeute, 'einkommenHeute.betrag')}
           </div>
         </div>
         {h.verheiratet && szenario.einkommenGetrennt && (
-          <div className="break-inside-avoid border-b border-dotted border-slate-200 py-1">
-            <div className="text-[12px] text-slate-600">
+          <div className="break-inside-avoid border-b border-ui-linie py-1">
+            <div className="text-[12px] text-ui-schiefer">
               {personNameAus(szenario.personen, 'B')}
             </div>
-            <div className="text-[12px] font-semibold tabular-nums text-slate-900">
+            <div className="text-[12px] font-medium tabular-nums text-ui-tinte">
               {einkommen(szenario.einkommenPartner, 'einkommenPartner.betrag')}
             </div>
           </div>

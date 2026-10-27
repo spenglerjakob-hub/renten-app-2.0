@@ -120,7 +120,15 @@ export const pkvSchema = z.object({
 
 export const personSchema = z.object({
   id: z.enum(['A', 'B']),
+  /** Der ganze Name — ihn lesen Gutachten, Listen und die Live-Seite. */
   name: z.string().default(''),
+  /**
+   * Vor- und Nachname, getrennt erfasst. `name` wird bei jeder Eingabe
+   * mitgeschrieben; passen beide nicht mehr zu ihm, gilt `name`
+   * (apps/web lib/namen.ts). Leer in Dateien von vor der Trennung.
+   */
+  vorname: z.string().default(''),
+  nachname: z.string().default(''),
   geburtsdatum: datumString,
   rentenbeginn: datumString,
   /**

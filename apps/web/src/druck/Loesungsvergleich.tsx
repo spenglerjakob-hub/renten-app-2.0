@@ -12,9 +12,10 @@ import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
  * netto und Rendite. Dieselben Rechnungen wie am Bildschirm
  * (`loesungsvergleich`, `angebotPositionen`); hier wird nichts neu gerechnet.
  *
- * DAS ERGEBNIS STEHT VORN: ein gruen umrandeter Satz ueber der Tabelle und
- * die gruen getoente Spalte darin — dieselbe Auszeichnung wie am Bildschirm
- * (`auszeichnungen`), damit man es nicht aus den Zahlen herauslesen muss.
+ * DAS ERGEBNIS STEHT VORN: ein Satz mit der Marke „Ergebnis“ ueber der
+ * Tabelle und die Marke „★ Meiste“ ueber der Spalte darin — dieselbe
+ * Auszeichnung wie am Bildschirm (`auszeichnungen`), damit man es nicht aus
+ * den Zahlen herauslesen muss.
  */
 
 const zahl = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -162,9 +163,9 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
         )}
 
         <Untertitel>Im Alter</Untertitel>
-        <ul className="space-y-0.5 text-[11px] leading-relaxed text-slate-600">
+        <ul className="space-y-0.5 text-[11px] leading-relaxed text-ui-schiefer">
           {sichtbar.map((l) => (
-            <li key={l.id}><strong className="text-slate-800">{l.titel}:</strong> {l.besteuerung}</li>
+            <li key={l.id}><strong className="text-ui-tinte">{l.titel}:</strong> {l.besteuerung}</li>
           ))}
         </ul>
         {loesungen.filter((l) => !l.verfuegbar).map((l) => (

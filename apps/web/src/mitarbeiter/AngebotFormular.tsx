@@ -10,7 +10,7 @@ import {
 import { logoVorbereiten } from '../lib/bild';
 import { AuswahlFeld, DatumFeld, ProzentFeld, Schalter, TextFeld, ZahlFeld } from '../components/Feld';
 import { Dialog } from '../components/Dialog';
-import { KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from './bausteine';
+import { FELD_LABEL, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from '../components/stil';
 import { MODELL_NAME, WEG_NAME, regelText } from './texte';
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
@@ -98,18 +98,18 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
   ].filter(Boolean).join(' und ');
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Karte titel="Die Firma">
           <div className="space-y-3">
             <TextFeld label="Name der Firma" wert={name} onChange={(v) => { setName(v); setStatus('bereit'); }} maxLaenge={120} autoComplete="organization" />
             <TextBereich label="Anschrift (für die Entgeltumwandlungsvereinbarung)" wert={a.anschrift} onChange={(v) => setze('anschrift', v)} maxLaenge={300} zeilen={3} />
             <div>
-              <span className="mb-1 block text-xs font-bold text-slate-700">Logo der Firma</span>
+              <span className={FELD_LABEL}>Logo der Firma</span>
               <div className="flex flex-wrap items-center gap-3">
                 {vorschau
-                  ? <img src={vorschau} alt="Logo der Firma" className="h-14 max-w-[10rem] rounded border border-slate-200 bg-white object-contain p-1" />
-                  : <span className="text-sm text-slate-500">Kein Logo</span>}
+                  ? <img src={vorschau} alt="Logo der Firma" className="h-14 max-w-[10rem] rounded-xl bg-white object-contain p-1.5" />
+                  : <span className="text-sm text-ui-schiefer">Kein Logo</span>}
                 <label htmlFor={dateiId} className={`${KNOPF_ZWEIT} cursor-pointer`}>
                   <ImagePlus className="h-4 w-4" aria-hidden /> {vorschau ? 'Anderes Logo' : 'Logo wählen'}
                 </label>
@@ -121,7 +121,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
                   </button>
                 )}
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">PNG, JPG oder WebP. Es erscheint im Gespräch und auf den Unterlagen.</p>
+              <p className="mt-1 text-xs text-ui-schiefer">PNG, JPG oder WebP. Es erscheint im Gespräch und auf den Unterlagen.</p>
             </div>
             <TextBereich label="Begrüßung" wert={a.begruessung} onChange={(v) => setze('begruessung', v)} maxLaenge={1500} zeilen={3}
               platzhalter="Liebe Kolleginnen und Kollegen, wir unterstützen Ihre Altersvorsorge …" />
@@ -160,7 +160,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
                 )}
               </>
             )}
-            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{regelText(m)}</p>
+            <p className="ui-innen px-4 py-3 text-sm text-ui-tinte">{regelText(m)}</p>
 
             {(m.art !== 'matching' || m.weg === 'dv') && (
               <AuswahlFeld label="Durchführungsweg der Umwandlung" wert={a.durchfuehrungsweg} optionen={WEGE}
@@ -182,7 +182,7 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
         <button type="button" onClick={() => void speichern()} disabled={status === 'speichert' || !geaendert} className={KNOPF}>
           <Save className="h-4 w-4" aria-hidden /> {status === 'speichert' ? 'Wird gespeichert …' : 'Speichern'}
         </button>
-        <span role="status" className="text-sm text-slate-600">
+        <span role="status" className="text-sm text-ui-schiefer">
           {status === 'gespeichert' && !geaendert ? 'Gespeichert.' : geaendert ? 'Nicht gespeichert.' : ''}
         </span>
         <span className="flex-1" />
@@ -190,10 +190,16 @@ export function AngebotFormular({ firma, logo, beratungen, onGespeichert, onGelo
           <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
         </button>
       </div>
+      {beratungen > 0 && (
+        <p className="text-xs leading-relaxed text-ui-schiefer">
+          Änderungen am Angebot gelten für alle Beratungen, die noch nicht unterschrieben sind. Unterschriebene Unterlagen
+          bleiben, wie sie unterschrieben wurden.
+        </p>
+      )}
       {meldung && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
 
       <Dialog offen={loeschen} titel="Firma löschen?" onSchliessen={() => setLoeschen(false)}>
-        <p className="text-sm leading-relaxed text-slate-700">
+        <p className="text-sm leading-relaxed text-ui-tinte">
           „{firma.name}“ wird {mitGeloescht ? `mit ${mitGeloescht} ` : ''}gelöscht. Ausgedruckte Unterlagen bleiben davon unberührt.
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">

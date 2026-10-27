@@ -3,6 +3,7 @@ import { ArrowRight, Hourglass } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
+import { KNOPF_ZWEIT, Posten } from '../components/stil';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 import { anteilAmNetto } from './bezug';
 
@@ -34,62 +35,49 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
   const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
 
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${klasse}`}>
-      <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-        <Hourglass className="h-4 w-4 shrink-0 text-slate-500" aria-hidden /> Was die Lücke für Sie bedeutet
+    <section className={`ui-karte p-5 sm:p-7 ${klasse}`}>
+      <h3 className="flex items-center gap-2.5 text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
+        <Hourglass className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> Was die Lücke für Sie bedeutet
       </h3>
 
-      <dl className="mt-3 space-y-2 text-sm">
+      {/* Zwei kleine Aufstellungen wie in der Beratung — die zweite fuehrt zur Sparrate. */}
+      <dl className="mt-4 text-sm">
         <Posten
-          label={kaufkraftHeute ? `Im Jahr ${zeile.jahr} (nominal)` : 'In heutiger Kaufkraft'}
+          text={kaufkraftHeute ? `Im Jahr ${zeile.jahr} (nominal)` : 'In heutiger Kaufkraft'}
           wert={`${euro(kaufkraftHeute ? r.luecke : r.lueckeHeute)} im Monat`}
         />
-        <Posten label="Zeit zum Sparen" wert={`${r.jahreBisRente} Jahre, bis ${zeile.jahr}`} />
+        <Posten text="Zeit zum Sparen" wert={`${r.jahreBisRente} Jahre, bis ${zeile.jahr}`} />
       </dl>
 
-      <dl className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
-        <Posten label="Nötiges Kapital zum Rentenbeginn" wert={euro(r.zielkapital)} />
+      <dl className="mt-3 border-t border-ui-linie pt-3 text-sm">
+        <Posten text="Nötiges Kapital zum Rentenbeginn" wert={euro(r.zielkapital)} />
         {/* Mit Bezugsgroesse: was die Rate fuer den Haushalt bedeutet. */}
         <Posten
-          label="Sparrate ab heute"
-          wert={`${euro(r.gewaehlt.startbeitrag)} im Monat`}
-          ton="betont"
-          zusatz={anteil ? `= ${anteil} Ihres heutigen Nettos von ${euro(nettoHeute)}` : undefined}
+          text="Sparrate ab heute"
+          wert={(
+            <>
+              <span className="font-medium">{euro(r.gewaehlt.startbeitrag)} im Monat</span>
+              {anteil && <span className="block text-xs text-ui-schiefer">= {anteil} Ihres heutigen Nettos von {euro(nettoHeute)}</span>}
+            </>
+          )}
         />
         {/*
           Die Zahl bleibt — sie ist echt und aus derselben Rechnung. Gesetzt
           ist sie aber sachlich, nicht in Warnrot: Sie soll informieren, nicht
           draengen.
         */}
-        <Posten label="Ein Jahr später beginnen" wert={`+ ${euro(r.proJahrWarten.mehrProMonat)} Sparrate im Monat`} />
+        <Posten text="Ein Jahr später beginnen" wert={`+ ${euro(r.proJahrWarten.mehrProMonat)} Sparrate im Monat`} />
       </dl>
 
-      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+      <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
         Bei {prozent(SPARZIEL_VORGABE.rendite)} Rendite nach Kosten, gleichbleibendem Beitrag und{' '}
         {SPARZIEL_VORGABE.auszahldauer} Jahren Auszahlung. Anpassen können Sie das im Sparrechner.
       </p>
 
-      <button
-        type="button"
-        onClick={onSparen}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 print:hidden"
-      >
+      {/* Der zweite Knopf: Die Hauptaktion der Etappe ist „Weiter“ am Ende — sie fuehrt ebenfalls dorthin. */}
+      <button type="button" onClick={onSparen} className={`mt-5 w-full print:hidden ${KNOPF_ZWEIT}`}>
         Wie schließe ich die Lücke? <ArrowRight className="h-4 w-4" aria-hidden />
       </button>
     </section>
-  );
-}
-
-function Posten({ label, wert, ton, zusatz }: { label: string; wert: string; ton?: 'betont'; zusatz?: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="shrink-0 text-slate-600">{label}</dt>
-      <dd className={`min-w-0 text-right font-bold tabular-nums ${
-        ton === 'betont' ? 'text-indigo-700' : 'text-slate-900'
-      }`}>
-        {wert}
-        {zusatz && <span className="block text-xs font-normal text-slate-500">{zusatz}</span>}
-      </dd>
-    </div>
   );
 }

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Mail, Copy, Check } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
 import type { AvdKind } from '@renten/engine';
-import { TextFeld, euro } from '../components/Feld';
+import { NamenFelder, TextFeld, euro } from '../components/Feld';
+import { Hinweis, KNOPF, KNOPF_ZWEIT } from '../components/stil';
+import { vollerName, type NamensTeile } from '../lib/namen';
 
 /** Die Eckdaten der Rechnung, die mit in die Anfrage gehen. */
 export interface Eckdaten {
@@ -71,21 +73,22 @@ function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): 
  * glaubt, die Seite verschicke etwas, waere sonst zu Recht veraergert.
  */
 export function BeratungDialog({
-  offen, onSchliessen, empfaenger, eckdaten,
+  offen, onSchliessen, empfaenger, eckdaten, name: teile, onName,
 }: {
   offen: boolean;
   onSchliessen: () => void;
   empfaenger: string;
   eckdaten: Eckdaten;
+  /** Derselbe Name wie auf der Seite — wer ihn dort schon eingetragen hat, tippt ihn hier nicht noch einmal. */
+  name: NamensTeile;
+  onName: (n: NamensTeile) => void;
 }) {
-  const [vorname, setVorname] = useState('');
-  const [nachname, setNachname] = useState('');
   const [telefon, setTelefon] = useState('');
   const [zeit, setZeit] = useState('');
   const [kopiert, setKopiert] = useState(false);
 
-  const name = `${vorname} ${nachname}`.trim();
-  const bereit = vorname.trim().length > 0 && nachname.trim().length > 0;
+  const name = vollerName(teile);
+  const bereit = teile.vorname.trim().length > 0 && teile.nachname.trim().length > 0;
 
   const betreff = `Beratung zum Altersvorsorgedepot${name ? ` — ${name}` : ''}`;
   const text = anfrageText(name, telefon.trim(), zeit.trim(), eckdaten);
@@ -111,44 +114,40 @@ export function BeratungDialog({
     >
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextFeld label="Vorname" wert={vorname} onChange={setVorname} platzhalter="Max" />
-          <TextFeld label="Nachname" wert={nachname} onChange={setNachname} platzhalter="Mustermann" />
+          <NamenFelder vorname={teile.vorname} nachname={teile.nachname} onChange={onName}
+            platzhalter={['Max', 'Mustermann']} eigener />
           <TextFeld label="Telefon (freiwillig)" wert={telefon} onChange={setTelefon}
             platzhalter="0170 1234567" />
           <TextFeld label="Wann erreichbar? (freiwillig)" wert={zeit} onChange={setZeit}
             platzhalter="werktags ab 17 Uhr" />
         </div>
 
-        <div className="rounded-lg bg-slate-50 px-3 py-2">
-          <p className="text-xs font-bold text-slate-700">Das steht in der Mail:</p>
-          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600">
+        <div className="ui-innen px-3 py-2">
+          <p className="text-xs font-medium text-ui-tinte">Das steht in der Mail:</p>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-ui-schiefer">
             {text}
           </pre>
         </div>
 
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-          Beim Klick öffnet sich <strong>Ihr Mailprogramm</strong> mit diesem Text.
+        <Hinweis>
+          Beim Klick öffnet sich <span className="font-medium">Ihr Mailprogramm</span> mit diesem Text.
           Abgeschickt wird die Nachricht erst, wenn Sie dort auf Senden drücken. Diese Seite
           verschickt und speichert nichts.
-        </p>
+        </Hinweis>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-ui-linie pt-4">
           <a
             href={bereit ? mailto : undefined}
             aria-disabled={!bereit}
             onClick={(e) => { if (!bereit) e.preventDefault(); }}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold ${
-              bereit
-                ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                : 'cursor-not-allowed bg-slate-200 text-slate-400'
-            }`}
+            className={`${KNOPF} flex-1 ${bereit ? '' : 'cursor-not-allowed opacity-40'}`}
           >
             <Mail className="h-4 w-4" aria-hidden /> Mail öffnen
           </a>
           <button
             type="button"
             onClick={kopieren}
-            className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className={KNOPF_ZWEIT}
           >
             {kopiert
               ? <><Check className="h-3.5 w-3.5" aria-hidden /> Kopiert</>
@@ -156,9 +155,9 @@ export function BeratungDialog({
           </button>
         </div>
 
-        <p className="text-xs leading-relaxed text-slate-500">
+        <p className="text-xs leading-relaxed text-ui-schiefer">
           Kein Mailprogramm eingerichtet? Kopieren Sie den Text und schreiben Sie an{' '}
-          <span className="font-medium text-slate-700">{empfaenger}</span>.
+          <span className="font-medium text-ui-tinte">{empfaenger}</span>.
         </p>
       </div>
     </Dialog>

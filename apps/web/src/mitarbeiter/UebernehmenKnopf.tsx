@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import { Users } from 'lucide-react';
 import type { FirmenModellDaten } from '@renten/schema';
+import { KNOPF_ZWEIT } from '../components/stil';
 
 const UebernehmenDialog = lazy(() => import('./Uebernehmen').then((m) => ({ default: m.UebernehmenDialog })));
 
@@ -18,7 +19,7 @@ export function UebernehmenKnopf({ modell, bundesland }: { modell: FirmenModellD
       <button
         type="button"
         onClick={() => { setGeladen(true); setOffen(true); }}
-        className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-800 hover:bg-indigo-50 print:hidden"
+        className={`${KNOPF_ZWEIT} print:hidden`}
       >
         <Users className="h-4 w-4" aria-hidden /> Für die Mitarbeiter-Beratung übernehmen
       </button>

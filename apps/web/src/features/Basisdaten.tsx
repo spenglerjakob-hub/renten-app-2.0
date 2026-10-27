@@ -2,17 +2,19 @@ import {
   BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag,
   type ProjektionsErgebnis,
 } from '@renten/engine';
-import { RotateCcw, Target } from 'lucide-react';
+import { ArrowRight, RotateCcw, Target } from 'lucide-react';
+import { Posten } from '../components/stil';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { PkvFelder } from './PkvFelder';
 import { KvdrHinweis } from './KvdrHinweis';
 import { EinkommenFelder } from './EinkommenFelder';
 import {
-  ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
+  ZahlFeld, ProzentFeld, NamenFelder, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
+import { mitName, namensTeile } from '../lib/namen';
 import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
 import { useVorbelegt } from './useVorbelegt';
 import { nettoHeuteMonat as nettoHeute } from './bezug';
@@ -95,28 +97,29 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
     <div className="space-y-4">
       {/* Wer lieber gefuehrt wird: derselbe Datensatz, Schritt fuer Schritt
           und mit Hinweis auf die jeweilige Unterlage. */}
+      {/* In der neutralen Innenflaeche wie ein Hinweis — ein Angebot, kein Alarm. */}
       {teil === undefined && (onAssistent ? (
         <button
           type="button"
           onClick={onAssistent}
-          className="flex w-full items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
+          className="ui-innen flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-left text-sm text-ui-tinte transition-colors hover:bg-ui-linie/40 print:hidden"
         >
           <span>
-            <strong>Lieber Schritt für Schritt?</strong> Der Assistent fragt alle Angaben
+            <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Assistent fragt alle Angaben
             einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
           </span>
-          <span className="shrink-0 font-bold">Zum Assistenten →</span>
+          <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Assistenten <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
         </button>
       ) : (
         <a
           href="/vorsorge-check"
-          className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 hover:bg-emerald-100 print:hidden"
+          className="ui-innen flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm text-ui-tinte transition-colors hover:bg-ui-linie/40 print:hidden"
         >
           <span>
-            <strong>Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
+            <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
             einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
           </span>
-          <span className="shrink-0 font-bold">Zum Check →</span>
+          <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Check <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
         </a>
       ))}
 
@@ -126,10 +129,17 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         dabei misst sich alles Weitere an dieser Zahl: der Bedarf, die
         Versorgungsluecke, die noetige Sparrate, das ganze Gutachten.
       */}
-      {zeige('ziel') && <section className="rounded-xl border-2 border-indigo-300 bg-white p-3 shadow-sm sm:p-4">
-        <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-700">
-          <Target className="h-3.5 w-3.5" aria-hidden /> Ihr Ziel
-        </h3>
+      {/*
+        Im Formular in der Innenflaeche, damit es aus dem Raster faellt; im
+        Assistenten ist der Schritt selbst das Ziel — dort ohne Kasten und
+        ohne zweiten Titel.
+      */}
+      {zeige('ziel') && <section className={einklappbar ? 'ui-innen p-4 sm:p-5' : ''}>
+        {einklappbar && (
+          <h3 className="mb-3 flex items-center gap-2 text-base font-medium text-ui-tinte">
+            <Target className="h-4 w-4 text-ui-schiefer" aria-hidden /> Ihr Ziel
+          </h3>
+        )}
         {/*
           BEI PAAREN ZWEI FELDER, darunter die Summe.
 
@@ -156,14 +166,10 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
                 />
               ))}
             </div>
-            <div className="mt-3 flex items-baseline justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
-                Haushaltsziel gesamt
-              </span>
-              <span className="text-xl font-bold tabular-nums text-indigo-900">
-                {euro(s.haushalt.zielNettoHeute)}
-              </span>
-            </div>
+            {/* Die Summe unter einer Linie in Tinte, wie in den Aufstellungen der Beratung. */}
+            <dl className="mt-3 text-sm">
+              <Posten summe text="Haushaltsziel gesamt" wert={euro(s.haushalt.zielNettoHeute)} />
+            </dl>
           </>
         ) : (
           <ZahlFeld
@@ -176,8 +182,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
           />
         )}
         {zielAnteil !== null && (
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">
-            Das sind <strong className="text-indigo-800">{prozent(zielAnteil, 0)}</strong> Ihres
+          <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> Ihres
             heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
           </p>
         )}
@@ -191,12 +197,12 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
           <button
             type="button"
             onClick={() => setzeHaushalt({ zielNettoHeute: zielVorschlag })}
-            className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 print:hidden"
+            className="mt-3 inline-flex items-center rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-left text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden"
           >
             Faustregel {prozent(FAUSTREGEL_ZIEL, 0)} des heutigen Nettos: {euro(zielVorschlag)} übernehmen
           </button>
         )}
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
           die nötig wäre, um sie zu schließen.
           {paar && (
@@ -346,8 +352,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         )}
 
         {s.haushalt.kinder.length > 0 && (
-          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="ui-innen mt-4 p-3 sm:p-4">
+            <p className="text-xs font-medium text-ui-tinte">
               Für die Kinderzulage des Altersvorsorgedepots
             </p>
             <KinderZeilen
@@ -376,7 +382,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
           verteilt nur den Lohnsteuerabzug uebers Jahr. Weil Berater sie aus
           jedem anderen Rechner kennen, steht hier, warum sie fehlt.
         */}
-        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
           Eine Steuerklasse brauchen Sie nicht: Gerechnet wird die Jahressteuer, bei Verheirateten
           mit Splitting. Die Steuerklasse regelt nur, wie viel Lohnsteuer monatlich einbehalten wird.
         </p>
@@ -401,13 +407,13 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
           marke={(f) => marke(`einkommenHeute.${f}`)} />
 
         {s.haushalt.verheiratet && (
-          <div className="mt-4 border-t border-slate-100 pt-3">
+          <div className="mt-4 border-t border-ui-linie pt-3">
             <Schalter
               label="Einkommen je Partner getrennt erfassen"
               wert={s.einkommenGetrennt}
               onChange={setzeEinkommenGetrennt}
             />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ui-schiefer">
               {s.einkommenGetrennt
                 ? 'Die Sozialabgaben werden je Person mit eigener Beitragsbemessungsgrenze gerechnet.'
                 : 'Der Haushaltsbetrag wird für die Sozialabgaben hälftig auf beide verteilt.'}
@@ -433,8 +439,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
       {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
         <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld label="Name" wert={p.name} onChange={(v) => setzePerson(p.id, { name: v })}
-              platzhalter={`Person ${p.id}`} />
+            <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
+              onChange={(teile) => setzePerson(p.id, mitName(teile))} />
             <AuswahlFeld label="Versorgungsart" wert={p.art}
               onChange={(v) => setzePerson(p.id, { art: v })}
               optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
@@ -456,7 +462,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
                 <button
                   type="button"
                   onClick={() => rentenbeginnZuruecksetzen(p.id)}
-                  className="mt-1 flex items-center gap-1 text-xs font-medium text-indigo-700 hover:underline"
+                  className="mt-1 flex items-center gap-1 text-xs font-medium text-ui-tinte underline-offset-2 hover:underline"
                 >
                   <RotateCcw className="h-3 w-3" aria-hidden /> Auf Regelaltersgrenze zurücksetzen
                 </button>
@@ -491,7 +497,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
             Arbeitnehmerin. Fuer die war bis hierher gar kein Platz.
           */}
           {s.haushalt.verheiratet && (
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-ui-linie pt-3">
               <Schalter
                 label="Abweichend krankenversichert"
                 wert={p.kvStatus !== undefined}
@@ -500,7 +506,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
                   : { kvStatus: undefined, kvErwerb: undefined, zusatzbeitrag: undefined,
                       krankenkasse: undefined, pkv: undefined })}
               />
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
                 {p.kvStatus !== undefined
                   ? 'Eigener Status, eigene Kasse, eigener Beitrag — unabhängig vom Haushalt.'
                   : `Versichert wie der Haushalt: ${KV_TEXT[s.haushalt.kvStatus]}.`}
@@ -554,7 +560,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
       ))}
 
       {zeige('personen') && !s.haushalt.verheiratet && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ui-schiefer">
           Für einen zweiten Haushaltspartner oben &bdquo;Verheiratet&ldquo; aktivieren.
         </p>
       )}

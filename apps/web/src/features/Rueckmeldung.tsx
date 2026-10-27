@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, Send, Star } from 'lucide-react';
 import { rueckmeldungSenden } from '../lib/fruehstart';
 import { useZugang } from '../store/zugang';
+import { FEHLER, KNOPF, KNOPF_ZWEIT } from '../components/stil';
 
 /**
  * "Feedback geben" — fuer jedes angemeldete Konto; von Early Adoptern alle
@@ -43,13 +44,12 @@ export function Rueckmeldung() {
   if (fertig) {
     return (
       <div className="space-y-3 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" aria-hidden />
-        <p className="text-base font-bold text-slate-900">Vielen Dank!</p>
-        <p className="text-sm leading-relaxed text-slate-600">
+        <CheckCircle2 className="mx-auto h-10 w-10 text-ui-tinte" aria-hidden />
+        <p className="ui-titel text-xl font-normal text-ui-tinte">Vielen Dank!</p>
+        <p className="text-sm leading-relaxed text-ui-schiefer">
           Ihre Rückmeldung ist angekommen. Wir lesen jede einzelne und melden uns, wenn wir nachfragen dürfen.
         </p>
-        <button type="button" onClick={schliessen}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={schliessen} className={KNOPF_ZWEIT}>
           Schließen
         </button>
       </div>
@@ -59,7 +59,7 @@ export function Rueckmeldung() {
   return (
     <form onSubmit={(e) => void senden(e)} className="space-y-4">
       <fieldset>
-        <legend className="text-sm font-bold text-slate-800">Wie gefällt Ihnen der JS-Rentenplaner?</legend>
+        <legend className="text-sm font-medium text-ui-tinte">Wie gefällt Ihnen der JS-Rentenplaner?</legend>
         <div role="radiogroup" aria-label="Bewertung" className="mt-1.5 flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
             <button
@@ -69,10 +69,10 @@ export function Rueckmeldung() {
               aria-checked={bewertung === n}
               aria-label={`${n} ${n === 1 ? 'Stern' : 'Sterne'}`}
               onClick={() => setBewertung(bewertung === n ? null : n)}
-              className="rounded-md p-1 hover:bg-amber-50"
+              className="rounded-full p-1 hover:bg-ui-innen"
             >
               <Star
-                className={`h-7 w-7 ${bewertung !== null && n <= bewertung ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`}
+                className={`h-7 w-7 ${bewertung !== null && n <= bewertung ? 'fill-ui-tinte text-ui-tinte' : 'text-ui-schiefer'}`}
                 aria-hidden
               />
             </button>
@@ -81,7 +81,7 @@ export function Rueckmeldung() {
       </fieldset>
 
       <div>
-        <label htmlFor="rueckmeldung-text" className="text-sm font-bold text-slate-800">Was hilft, was fehlt, was stört?</label>
+        <label htmlFor="rueckmeldung-text" className="text-sm font-medium text-ui-tinte">Was hilft, was fehlt, was stört?</label>
         <textarea
           id="rueckmeldung-text"
           value={text}
@@ -89,23 +89,22 @@ export function Rueckmeldung() {
           maxLength={4000}
           rows={5}
           placeholder="Zum Beispiel: Diese Rechnung brauche ich im Kundengespräch oft …"
-          className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm leading-relaxed"
+          className="ui-feld mt-1 w-full p-2.5 text-sm leading-relaxed"
         />
       </div>
 
-      <label className="flex items-start gap-2 text-sm leading-relaxed text-slate-700">
+      <label className="flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
         <input type="checkbox" checked={kontaktOk} onChange={(e) => setKontaktOk(e.target.checked)}
-          className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300" />
+          className="mt-1 h-4 w-4 shrink-0" />
         <span>Sie dürfen mich für Rückfragen per E-Mail kontaktieren.</span>
       </label>
 
-      {fehler && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
+      {fehler && <p role="alert" className={FEHLER}>{fehler}</p>}
 
-      <button type="submit" disabled={leer || laeuft}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+      <button type="submit" disabled={leer || laeuft} className={`w-full ${KNOPF} disabled:cursor-not-allowed`}>
         <Send className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird gesendet …' : 'Rückmeldung senden'}
       </button>
-      <p className="text-xs leading-relaxed text-slate-500">
+      <p className="text-xs leading-relaxed text-ui-schiefer">
         Gespeichert werden Ihre Bewertung, Ihr Text, die Seite, auf der Sie gerade sind, und Ihr Konto; wir erhalten
         die Rückmeldung zusätzlich per E-Mail. Bitte schreiben Sie keine Angaben über Ihre Kunden hinein.
       </p>

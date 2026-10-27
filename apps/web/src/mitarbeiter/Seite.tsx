@@ -38,9 +38,9 @@ export function Seite() {
 
   return (
     <DruckBereich>
-      <div className="min-h-screen bg-slate-100 text-slate-800">
+      <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
         <SeitenKopf verlinkt />
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
           {ort.firma === null ? (
             <FirmenListe gehe={gehe} />
           ) : ort.beratung === null ? (
@@ -49,7 +49,7 @@ export function Seite() {
             <BeratungAnsicht key={ort.beratung} firmaId={ort.firma} beratungId={ort.beratung} gehe={gehe} />
           )}
         </main>
-        <footer className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
+        <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 pb-10 sm:px-6">
           <RechtsLinks />
         </footer>
       </div>

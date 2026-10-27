@@ -58,6 +58,16 @@ export function regelText(m: FirmenModellDaten): string {
     : `${ukasse}, dazu den gesetzlichen Zuschuss von 15 % in Ihre Direktversicherung.`;
 }
 
+/**
+ * Der Kern der Regel — das Wort, das in der Ueberschrift hervorgehoben wird
+ * (`regelText` enthaelt ihn immer woertlich).
+ */
+export function regelKern(m: FirmenModellDaten): string {
+  if (m.art === 'zuschuss') return `${prozentText(m.quote)} Ihres Beitrags`;
+  if (m.art === 'festbetrag') return `${euroText(m.festbetragMonat)} im Monat`;
+  return `${euroText(m.matchingMonat)} im Monat`;
+}
+
 /** Dieselbe Regel in der dritten Person — fuer die Entgeltumwandlungsvereinbarung. */
 export function regelFuerVereinbarung(m: FirmenModellDaten): string {
   if (m.art === 'zuschuss') {

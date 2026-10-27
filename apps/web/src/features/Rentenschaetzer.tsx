@@ -5,6 +5,7 @@ import {
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, euro } from '../components/Feld';
+import { KNOPF_ZWEIT } from '../components/stil';
 
 /**
  * KARRIERE-SCHAETZER
@@ -52,7 +53,7 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   if (selbststaendig && !einkommen.grvPflicht) {
     return (
       <div className="sm:col-span-2">
-        <p className="rounded-lg border border-slate-200 bg-white p-2.5 text-xs leading-relaxed text-slate-500">
+        <p className="ui-innen p-3 text-xs leading-relaxed text-ui-schiefer">
           Sie zahlen nach Ihren Angaben nicht in die gesetzliche Rentenversicherung ein — es
           gibt hier also nichts zu schätzen. Ein Anspruch aus früheren Beitragsjahren steht in
           Ihrer Renteninformation und gehört in das Feld darüber.
@@ -75,28 +76,23 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   return (
     <div className="sm:col-span-2">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <span className="text-xs text-ui-schiefer">
           Rentenanspruch unbekannt?
         </span>
         <button
           type="button"
           onClick={() => setOffen((v) => !v)}
           aria-expanded={offen}
-          className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-200 print:hidden"
+          className="inline-flex items-center gap-1.5 rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden"
         >
           <Calculator className="h-3 w-3" aria-hidden /> {offen ? 'Schließen' : 'Schätzen'}
         </button>
       </div>
 
       {offen && (
-        /*
-          Weiss mit blauem Rand statt blauer Flaeche: die Eingabespalte liegt
-          seit der Farbtrennung auf indigofarbenem Grund, und Blau darauf
-          liegt so dicht daneben, dass der Kasten nur trueb wirkte statt
-          eigenstaendig.
-        */
-        <div className="rounded-lg border-2 border-blue-200 bg-white p-2.5 shadow-sm sm:p-3 print:hidden">
-          <h4 className="mb-2 text-[11px] font-bold uppercase text-blue-800">Karriere-Schätzer</h4>
+        /* In der Innenflaeche wie die Ergebnisse in einer Vertragskarte — ohne eigene Farbe. */
+        <div className="ui-innen p-3 sm:p-4 print:hidden">
+          <h4 className="mb-3 text-sm font-medium text-ui-tinte">Karriere-Schätzer</h4>
 
           <ZahlFeld
             label={selbststaendig ? 'Beitragspflichtiges Entgelt im Jahr' : 'Heutiges Bruttojahresgehalt'}
@@ -110,19 +106,15 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
 
           <dl className="mt-3 grid grid-cols-2 gap-3">
             <div>
-              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Entgeltpunkte
-              </dt>
-              <dd className="text-sm font-black tabular-nums text-slate-800">
+              <dt className="text-xs text-ui-schiefer">Entgeltpunkte</dt>
+              <dd className="text-lg font-medium tabular-nums text-ui-tinte">
                 {schaetzung.entgeltpunkte.toLocaleString('de-DE', { maximumFractionDigits: 1 })}
               </dd>
             </div>
             <div>
-              <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Rente heutiger Wert
-              </dt>
-              <dd className="text-sm font-black tabular-nums text-blue-800">
-                {euro(betrag)} <span className="text-xs font-normal">/ Monat</span>
+              <dt className="text-xs text-ui-schiefer">Rente heutiger Wert</dt>
+              <dd className="text-lg font-medium tabular-nums text-ui-tinte">
+                {euro(betrag)} <span className="text-xs font-normal text-ui-schiefer">/ Monat</span>
               </dd>
             </div>
           </dl>
@@ -131,12 +123,12 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
             type="button"
             disabled={betrag <= 0}
             onClick={() => { setzePerson(personId, { grvBruttoHeute: betrag }); setOffen(false); }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded bg-blue-600 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50 sm:py-2"
+            className={`mt-4 w-full ${KNOPF_ZWEIT}`}
           >
-            <CheckCircle className="h-3.5 w-3.5" aria-hidden /> ca. {euro(betrag)} übernehmen
+            <CheckCircle className="h-4 w-4" aria-hidden /> ca. {euro(betrag)} übernehmen
           </button>
 
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+          <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
             {schaetzung.hinweis}
           </p>
         </div>

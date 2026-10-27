@@ -1,8 +1,12 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Lock, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
-import { beratungLaden, beratungSpeichern, firmaLaden, type Beratung, type Firma } from '../lib/bav-beratung';
-import { FirmenZeichen, KNOPF, KNOPF_ZWEIT, useBeraterAuftritt, useFirmenlogo } from './bausteine';
+import {
+  beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
+} from '../lib/bav-beratung';
+import { Etappen, KNOPF, KNOPF_ZWEIT, LINK } from '../components/stil';
+import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
+import { zeitpunktText } from './unterschrift-daten';
 import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
 import {
   SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung, SchrittUnterlagen,
@@ -23,6 +27,11 @@ export const SCHRITTE = [
  * der Browser nach. Die Leistung
  * im Alter braucht mehrere Projektionen; sie rechnet mit einem
  * aufgeschobenen Stand, damit das Tippen fluessig bleibt.
+ *
+ * UNTERSCHRIEBEN (Unterschrift.tsx): Mit der ersten Unterschrift sind die
+ * Unterlagen festgeschrieben und die Beratung ist gesperrt — die Schritte 1
+ * bis 6 nur noch zum Ansehen, gespeichert wird nichts mehr (die Datenbank
+ * wiese es ab). Wer die Unterschriften aufhebt, kann wieder aendern.
  */
 export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string; beratungId: string; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
@@ -30,18 +39,23 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const [daten, setDaten] = useState<BeratungDaten | null>(null);
   const [gespeichert, setGespeichert] = useState('');
   const [speichern, setSpeichern] = useState<'bereit' | 'speichert' | 'fehler'>('bereit');
+  const [unterlagen, setUnterlagen] = useState<Unterlagen | null | 'fehler'>(null);
   // Fuer das Speichern beim Verlassen: der neueste Stand, ohne auf das naechste Rendern zu warten.
   const datenRef = useRef<BeratungDaten | null>(null);
   const gespeichertRef = useRef('');
   datenRef.current = daten;
+  const gesperrt = unterlagen !== null && unterlagen !== 'fehler';
+  const gesperrtRef = useRef(gesperrt);
+  gesperrtRef.current = gesperrt;
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
   const auftritt = useBeraterAuftritt();
 
   useEffect(() => {
     let aktiv = true;
-    void Promise.all([firmaLaden(firmaId), beratungLaden(beratungId)]).then(([f, b]) => {
+    void Promise.all([firmaLaden(firmaId), beratungLaden(beratungId), unterlagenLaden(beratungId)]).then(([f, b, u]) => {
       if (!aktiv) return;
       setFirma(f);
+      setUnterlagen(u);
       // Eine Beratung gehoert zu genau einer Firma — eine fremde Kombination in der Adresse gilt nicht.
       const passt = b && typeof b === 'object' && b.firma === firmaId ? b : b === 'fehler' ? 'fehler' : null;
       setBeratung(passt);
@@ -57,10 +71,11 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   // Wer die Beratung verlaesst — mit „Zurueck“ im Browser oder einem Link —, verliert nichts.
   useEffect(() => () => {
     const d = datenRef.current;
-    if (d && JSON.stringify(d) !== gespeichertRef.current) void beratungSpeichern(beratungId, d);
+    if (d && !gesperrtRef.current && JSON.stringify(d) !== gespeichertRef.current) void beratungSpeichern(beratungId, d);
   }, [beratungId]);
 
-  const geaendert = daten !== null && JSON.stringify(daten) !== gespeichert;
+  // Gesperrt aendert sich nur der Schritt — das ist nichts, was verloren ginge.
+  const geaendert = !gesperrt && daten !== null && JSON.stringify(daten) !== gespeichert;
   useEffect(() => {
     if (!geaendert) return;
     const warnen = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
@@ -89,12 +104,12 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
   const zurFirma = () => gehe({ firma: firmaId, beratung: null, reiter: 'mitarbeiter' });
   const zurueck = (onClick: () => void) => (
-    <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-sm font-bold text-indigo-700 hover:underline">
+    <button type="button" onClick={onClick} className={LINK}>
       <ArrowLeft className="h-4 w-4" aria-hidden /> {f ? f.name : 'Zur Firma'}
     </button>
   );
 
-  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-slate-500">Die Beratung wird geladen …</p>;
+  if (firma === 'laedt' || beratung === 'laedt') return <p className="text-sm text-ui-schiefer">Die Beratung wird geladen …</p>;
   if (!f || !daten || !r || beratung === null || beratung === 'fehler') {
     return (
       <div className="space-y-3">
@@ -108,7 +123,9 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     );
   }
 
+  const aktualisieren = async () => { setUnterlagen(await unterlagenLaden(beratungId)); };
   const sichern = async (d: BeratungDaten) => {
+    if (gesperrt) return true;
     setSpeichern('speichert');
     const ok = await beratungSpeichern(beratungId, d);
     if (ok) {
@@ -120,7 +137,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   };
   // Erst gespeichert, dann zur Liste. Klappt das Speichern nicht, bleibt man hier — die Meldung steht oben.
   const fertig = () => (geaendert ? void sichern(daten).then((ok) => { if (ok) zurFirma(); }) : zurFirma());
-  const setze = (fn: (d: BeratungDaten) => BeratungDaten) => setDaten((d) => (d ? fn(d) : d));
+  const setze = (fn: (d: BeratungDaten) => BeratungDaten) => { if (!gesperrt) setDaten((d) => (d ? fn(d) : d)); };
   const geheZu = (i: number) => {
     const d = { ...daten, schritt: Math.max(0, Math.min(SCHRITTE.length - 1, i)) };
     setDaten(d);
@@ -131,55 +148,61 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const props = { firma: f, logo, daten, setze, r, leistung, geheZu };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {zurueck(fertig)}
-        <div className="flex items-center gap-3">
-          <span role="status" className="text-xs text-slate-500">
-            {speichern === 'speichert' ? 'Wird gespeichert …' : speichern === 'fehler' ? 'Nicht gespeichert — bitte erneut versuchen.' : geaendert ? 'Nicht gespeichert' : 'Gespeichert'}
+        {gesperrt ? (
+          <span role="status" className="inline-flex items-center gap-1.5 text-sm text-ui-tinte">
+            <Lock className="h-4 w-4" aria-hidden /> Unterschrieben
           </span>
-          <button type="button" onClick={() => void sichern(daten)} disabled={!geaendert || speichern === 'speichert'} className={KNOPF_ZWEIT}>
-            <Save className="h-4 w-4" aria-hidden /> Speichern
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span role="status" className="text-xs text-ui-schiefer">
+              {speichern === 'speichert' ? 'Wird gespeichert …' : speichern === 'fehler' ? 'Nicht gespeichert — bitte erneut versuchen.' : geaendert ? 'Nicht gespeichert' : 'Gespeichert'}
+            </span>
+            <button type="button" onClick={() => void sichern(daten)} disabled={!geaendert || speichern === 'speichert'} className={KNOPF_ZWEIT}>
+              <Save className="h-4 w-4" aria-hidden /> Speichern
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FirmenZeichen name={f.name} logo={logo} />
-        <p className="text-sm font-bold text-slate-700">{daten.angaben.name || 'Neue Beratung'}</p>
+        <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
       </div>
 
-      <nav aria-label="Schritte der Beratung">
-        <ol className="grid grid-cols-7 gap-1">
-          {SCHRITTE.map((t, i) => (
-            <li key={t}>
-              <button
-                type="button"
-                onClick={() => geheZu(i)}
-                aria-current={i === schritt ? 'step' : undefined}
-                aria-label={`Schritt ${i + 1}: ${t}`}
-                className="group flex w-full flex-col items-center gap-1"
-              >
-                <span className={`h-1.5 w-full rounded-full ${i === schritt ? 'bg-indigo-600' : i < schritt ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                <span className={`hidden text-xs font-semibold leading-tight sm:block ${i === schritt ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-700'}`}>
-                  {t}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-2 text-xs font-semibold text-slate-500 sm:hidden">Schritt {schritt + 1} von {SCHRITTE.length}: {SCHRITTE[schritt]}</p>
-      </nav>
+      <Etappen schritte={SCHRITTE} aktiv={schritt} onWechsel={geheZu} beschriftung="Schritte der Beratung" />
 
-      {schritt === 0 && <SchrittAngebot {...props} />}
-      {schritt === 1 && <SchrittAngaben {...props} />}
-      {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
-      {schritt === 3 && <SchrittRechnung {...props} />}
-      {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} aktuell={aufgeschoben === daten} />}
-      {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
-      {schritt === 6 && <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
+      {gesperrt && schritt < 6 && (
+        <div role="note" className="ui-innen flex flex-wrap items-center gap-3 p-4">
+          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-ui-tinte">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              Unterschrieben am {zeitpunktText(unterlagen.erstelltAm)} — die Angaben sind festgeschrieben. Zum Ändern heben
+              Sie unter „Unterlagen“ die Unterschriften auf.
+            </span>
+          </p>
+          <button type="button" onClick={() => geheZu(6)} className={KNOPF_ZWEIT}>Zu den Unterlagen</button>
+        </div>
+      )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+      {/* Gesperrt: alles nur zum Ansehen — ein deaktiviertes fieldset sperrt jedes Feld und jeden Knopf darin. */}
+      {schritt < 6 ? (
+        <fieldset disabled={gesperrt} className="min-w-0">
+          {schritt === 0 && <SchrittAngebot {...props} />}
+          {schritt === 1 && <SchrittAngaben {...props} />}
+          {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
+          {schritt === 3 && <SchrittRechnung {...props} />}
+          {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} aktuell={aufgeschoben === daten} />}
+          {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
+        </fieldset>
+      ) : (
+        <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen}
+          beratungId={beratungId} unterlagen={unterlagen} aktualisieren={aktualisieren} aktuell={aufgeschoben === daten} />
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ui-linie pt-6">
         <button type="button" onClick={() => geheZu(schritt - 1)} disabled={schritt === 0} className={KNOPF_ZWEIT}>
           <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
         </button>

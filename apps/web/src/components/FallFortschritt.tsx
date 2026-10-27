@@ -10,8 +10,9 @@ import type { FallSchritt, FallSchrittId } from '../features/fortschritt';
  * angefeuert werden. Offene Schritte sind Knoepfe und fuehren an die Stelle.
  *
  * Eingeklappt auf eine Zeile — auf jedem Geraet. Die sechs Schritte als
- * gelbe Pillen standen sonst als dritte Leiste zwischen Etappen-Navigation
- * und erstem Eingabefeld. Sichtbar bleibt der naechste offene Schritt als
+ * Pillen standen sonst als dritte Leiste zwischen Etappen-Navigation und
+ * erstem Eingabefeld. Offene Schritte gestrichelt wie ein Beispielwert,
+ * erledigte mit Haken — ohne Ampelfarben. Sichtbar bleibt der naechste offene Schritt als
  * Sprung; die ganze Liste klappt auf Wunsch auf.
  */
 export function FallFortschritt({ schritte, onSprung }: {
@@ -24,10 +25,10 @@ export function FallFortschritt({ schritte, onSprung }: {
   const naechster = schritte.find((x) => !x.erledigt);
 
   return (
-    <section aria-label="Fortschritt des Falls" className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm print:hidden">
+    <section aria-label="Fortschritt des Falls" className="ui-karte px-3 py-2 print:hidden">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex items-center gap-2">
-          <p className="text-xs font-bold text-slate-800 sm:text-sm">
+          <p className="text-xs font-medium text-ui-tinte sm:text-sm">
             Fall erfasst: {erledigt} von {schritte.length}
           </p>
           <div
@@ -36,19 +37,19 @@ export function FallFortschritt({ schritte, onSprung }: {
             aria-valuemin={0}
             aria-valuemax={schritte.length}
             aria-valuenow={erledigt}
-            className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200 sm:w-28"
+            className="h-1.5 w-20 overflow-hidden rounded-full bg-ui-linie sm:w-28"
           >
-            <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(erledigt / schritte.length) * 100}%` }} />
+            <div className="h-full rounded-full bg-ui-tinte" style={{ width: `${(erledigt / schritte.length) * 100}%` }} />
           </div>
         </div>
         {naechster && (
           <button
             type="button"
             onClick={() => onSprung(naechster.id)}
-            className="hidden items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 sm:inline-flex"
+            className="hidden items-center gap-1 rounded-full px-2 py-0.5 text-sm text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte sm:inline-flex"
           >
-            Als Nächstes: <span className="font-semibold text-indigo-700">{naechster.text}</span>
-            <ArrowRight className="h-3.5 w-3.5 text-indigo-600" aria-hidden />
+            Als Nächstes: <span className="font-medium text-ui-tinte">{naechster.text}</span>
+            <ArrowRight className="h-3.5 w-3.5 text-ui-tinte" aria-hidden />
           </button>
         )}
         {offen > 0 && (
@@ -56,7 +57,7 @@ export function FallFortschritt({ schritte, onSprung }: {
             type="button"
             onClick={() => setAuf((v) => !v)}
             aria-expanded={auf}
-            className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 sm:text-sm"
+            className="ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte sm:text-sm"
           >
             {offen} offen {auf ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
           </button>
@@ -65,18 +66,18 @@ export function FallFortschritt({ schritte, onSprung }: {
           {schritte.map((x) => (
             <li key={x.id}>
               {x.erledigt ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                <span className="inline-flex items-center gap-1 rounded-full border border-ui-linie bg-ui-innen px-2 py-0.5 text-xs font-medium text-ui-tinte">
                   <Check className="h-3 w-3" aria-hidden />
-                  <span>{x.text}{x.mitStandard && <span className="font-normal text-emerald-700"> · mit Standardwerten</span>}</span>
+                  <span>{x.text}{x.mitStandard && <span className="font-normal text-ui-schiefer"> · mit Standardwerten</span>}</span>
                   <span className="sr-only"> — erledigt</span>
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={() => onSprung(x.id)}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-left text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-ui-schiefer/60 bg-ui-karte px-2 py-0.5 text-left text-xs font-medium text-ui-tinte hover:bg-ui-innen"
                 >
-                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-amber-500" />
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-ui-schiefer" />
                   <span>{x.text}{x.offen.length > 0 && <span className="font-normal"> — {x.offen.join(', ')}</span>}</span>
                 </button>
               )}

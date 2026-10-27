@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { ZahlFeld, AuswahlFeld, Schalter, euro, type Vorbelegt } from '../components/Feld';
+import { Hinweis } from '../components/stil';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -118,7 +119,7 @@ export function EinkommenFelder({
         nicht sicher treffen — ihren Beitrag kennen sie.
       */}
       {wert.modus === 'selbststaendig' && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div className="ui-innen mt-3 p-3 sm:p-4">
           <Schalter
             label="Zahlt in die gesetzliche Rentenversicherung ein"
             wert={wert.grvPflicht}
@@ -143,7 +144,7 @@ export function EinkommenFelder({
               />
             </div>
           ) : (
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
               Die meisten Selbstständigen sind nicht pflichtversichert. Das hat einen
               steuerlichen Vorteil: Der Höchstbetrag für Altersvorsorgeaufwendungen ist dann
               nicht durch Rentenbeiträge belegt und steht einer Basisrente in voller Höhe
@@ -154,11 +155,11 @@ export function EinkommenFelder({
       )}
 
       {wert.modus === 'besoldung' && !belegt && (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <strong>Näherung:</strong> Für {wert.besoldungsland} ist noch keine amtliche
+        <Hinweis klasse="mt-3">
+          <strong className="font-medium">Näherung:</strong> Für {wert.besoldungsland} ist noch keine amtliche
           Besoldungstabelle hinterlegt. Der Wert wird aus einer linearen Näherung geschätzt und kann
           um mehrere hundert Euro im Monat abweichen.
-        </p>
+        </Hinweis>
       )}
     </>
   );

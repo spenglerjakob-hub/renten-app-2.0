@@ -4,7 +4,7 @@ import { firmenAngebotSchema, firmenModellSchema, type FirmenModellDaten } from 
 import { firmaAnlegen, firmaSpeichern, firmenLaden, type Firma } from '../lib/bav-beratung';
 import { Dialog } from '../components/Dialog';
 import { TextFeld } from '../components/Feld';
-import { KNOPF, KNOPF_ZWEIT } from './bausteine';
+import { FEHLER, FELD_LABEL, KNOPF, KNOPF_ZWEIT } from '../components/stil';
 import { MODELL_NAME, regelText } from './texte';
 import { ortSuche } from './ort';
 
@@ -67,14 +67,14 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
     <Dialog offen={offen} titel="Für die Mitarbeiter-Beratung übernehmen" onSchliessen={onSchliessen}>
       {fertig ? (
         <div className="space-y-4">
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-slate-700">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+          <p className="flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-ui-tinte" aria-hidden />
             <span>
-              Das {MODELL_NAME[fertig.angebot.modell.art]} gilt jetzt für <strong>{fertig.name}</strong>. Ergänzen Sie
+              Das {MODELL_NAME[fertig.angebot.modell.art]} gilt jetzt für <span className="font-medium">{fertig.name}</span>. Ergänzen Sie
               dort Logo, Begrüßung und Versicherer — dann kann die erste Beratung beginnen.
             </span>
           </p>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
             <button type="button" onClick={onSchliessen} className={KNOPF_ZWEIT}>Schließen</button>
             <a href={`/mitarbeiterberatung${ortSuche({ firma: fertig.id, beratung: null, reiter: 'angebot' })}`}
               target="_blank" rel="noopener" className={KNOPF}>
@@ -84,31 +84,31 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
         </div>
       ) : (
         <form onSubmit={(e) => void uebernehmen(e)} className="space-y-4">
-          <div className="rounded-xl bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
-            <strong className="text-slate-900">{MODELL_NAME[modell.art]}:</strong> {regelText(modell)}
-            <span className="block text-xs text-slate-500">Sitz der Firma: {bundesland}</span>
+          <div className="ui-innen p-3 text-sm leading-relaxed text-ui-tinte">
+            <span className="font-medium">{MODELL_NAME[modell.art]}:</span> {regelText(modell)}
+            <span className="mt-0.5 block text-xs text-ui-schiefer">Sitz der Firma: {bundesland}</span>
           </div>
           {!geprueft.success && (
-            <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            <p role="alert" className={FEHLER}>
               Die Werte des Modells liegen außerhalb dessen, was die Mitarbeiter-Beratung annimmt. Bitte prüfen Sie die Eingaben.
             </p>
           )}
 
           <fieldset>
-            <legend className="mb-1 text-xs font-bold text-slate-700">Für welche Firma?</legend>
-            {firmen === 'laedt' && <p className="text-sm text-slate-500">Ihre Firmen werden geladen …</p>}
+            <legend className={FELD_LABEL}>Für welche Firma?</legend>
+            {firmen === 'laedt' && <p className="text-sm text-ui-schiefer">Ihre Firmen werden geladen …</p>}
             {firmen === 'fehler' && <p className="text-sm text-rose-800">Ihre Firmen konnten nicht geladen werden — eine neue geht trotzdem.</p>}
             <div className="max-h-64 space-y-1 overflow-y-auto">
-              <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+              <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-ui-innen">
                 <input type="radio" name="firma" checked={wahl === NEU} onChange={() => setWahl(NEU)} />
-                <span className="font-bold text-slate-900">Neue Firma</span>
+                <span className="font-medium text-ui-tinte">Neue Firma</span>
               </label>
               {liste.map((f) => (
-                <label key={f.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                <label key={f.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-ui-innen">
                   <input type="radio" name="firma" className="mt-1" checked={wahl === f.id} onChange={() => setWahl(f.id)} />
                   <span className="min-w-0">
-                    <span className="block break-words font-bold text-slate-900">{f.name}</span>
-                    <span className="block text-xs text-slate-500">bisher: {MODELL_NAME[f.angebot.modell.art]}</span>
+                    <span className="block break-words font-medium text-ui-tinte">{f.name}</span>
+                    <span className="block text-xs text-ui-schiefer">bisher: {MODELL_NAME[f.angebot.modell.art]}</span>
                   </span>
                 </label>
               ))}
@@ -116,7 +116,7 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
           </fieldset>
 
           {ziel ? (
-            <p className="text-xs leading-relaxed text-slate-600">
+            <p className="text-xs leading-relaxed text-ui-schiefer">
               Modell und Bundesland von „{ziel.name}“ werden ersetzt; Logo, Texte und Versicherer bleiben. Bereits geführte
               Beratungen rechnen danach mit dem neuen Modell.
             </p>
@@ -124,8 +124,8 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
             <TextFeld label="Name der Firma" wert={name} onChange={setName} maxLaenge={120} platzhalter="z. B. Muster GmbH" />
           )}
 
-          {meldung && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
-          <div className="flex flex-wrap justify-end gap-2">
+          {meldung && <p role="alert" className={FEHLER}>{meldung}</p>}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
             <button type="button" onClick={onSchliessen} className={KNOPF_ZWEIT}>Abbrechen</button>
             <button type="submit" disabled={laeuft || !geprueft.success} className={KNOPF}>
               {laeuft ? 'Wird übernommen …' : 'Übernehmen'}
