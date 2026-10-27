@@ -153,7 +153,7 @@ function Datenschutz() {
 
       <H2>3. Aufruf der Website und Server-Logdateien</H2>
       <P>
-        Die Website liegt bei [Hostinger — Vertragspartner laut Hosting-Vertrag eintragen]. Beim Aufruf
+        Die Website liegt bei der Hostinger International Ltd. (Zypern). Beim Aufruf
         verarbeitet der Server technisch notwendige Daten: IP-Adresse, Zeitpunkt, aufgerufene Adresse,
         übertragene Datenmenge, Browser und Betriebssystem. Rechtsgrundlage ist unser berechtigtes Interesse
         an einem sicheren und stabilen Betrieb (Art. 6 Abs. 1 lit. f DSGVO). Die Logdateien werden nach
@@ -294,7 +294,7 @@ function Datenschutz() {
       <P>
         Geht ein Vorsorge-Check ein, erhält der Berater eine E-Mail an seine Konto-Adresse. Sie enthält nur den
         Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden.
-        Versandt wird über unser Postfach bei [Hostinger].
+        Versandt wird über unser Postfach bei Hostinger.
       </P>
 
       <H2>10. Rückmeldungen und Anfragen als Early Adopter</H2>
@@ -313,7 +313,7 @@ function Datenschutz() {
         wir Ihren Namen, Ihre E-Mail-Adresse und — wenn Sie sie angeben — Ihr Büro und die Zahl der Berater, um
         Ihre Anfrage zu prüfen und zu beantworten (Art. 6 Abs. 1 lit. b DSGVO, vorvertragliche Maßnahme). Die
         Anfrage liegt bei Supabase in der EU; wir erhalten sie zusätzlich per E-Mail, versandt über unser Postfach
-        bei [Hostinger]. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
+        bei Hostinger. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
@@ -369,8 +369,8 @@ function Datenschutz() {
           prüfen.]
         </li>
         <li>
-          <strong>[Hostinger — Vertragspartner eintragen]</strong> — Webhosting und E-Mail-Versand, auf
-          Grundlage eines Auftragsverarbeitungsvertrags.
+          <strong>Hostinger International Ltd.</strong> (Zypern) [Anschrift laut Vertrag eintragen] — Webhosting und
+          E-Mail-Versand, auf Grundlage eines Auftragsverarbeitungsvertrags.
         </li>
         <li>
           <strong>Stripe Payments Europe, Ltd.</strong> (Dublin, Irland) — Zahlungsabwicklung, Rechnungen und
