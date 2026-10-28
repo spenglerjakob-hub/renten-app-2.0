@@ -4,6 +4,7 @@ import { NamenFelder, TextFeld } from '../components/Feld';
 import { namensTeile, vollerName } from '../lib/namen';
 import { FELD_LABEL, KNOPF_KLEIN } from '../components/stil';
 import { logoVorbereiten, type LogoFehler, type VorbereitetesLogo } from '../lib/bild';
+import { DRUCKFARBEN_HINWEIS } from '../lib/druckfarben';
 import {
   FARBVORSCHLAEGE, GRENZEN, farbeNormal, linieKaumSichtbar, titelTauglich, type Auftritt,
 } from './auftritt';
@@ -34,6 +35,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
   const id = useId();
   const dateiRef = useRef<HTMLInputElement>(null);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [druckfarben, setDruckfarben] = useState(false);
   const [liest, setLiest] = useState(false);
 
   const logoGewaehlt = async (datei: File | undefined) => {
@@ -45,6 +47,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
     // Dieselbe Datei soll sich gleich noch einmal waehlen lassen.
     if (dateiRef.current) dateiRef.current.value = '';
     if (typeof r === 'string') { setFehler(LOGO_FEHLER[r]); return; }
+    setDruckfarben(r.druckfarben);
     onLogo(r);
   };
 
@@ -64,7 +67,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
               <ImagePlus className="h-3.5 w-3.5" aria-hidden /> {liest ? 'Wird gelesen …' : wert.logo ? 'Anderes Logo' : 'Logo wählen'}
             </button>
             {wert.logo && (
-              <button type="button" onClick={() => { setFehler(null); onLogo(null); }} className={KNOPF_KLEIN}>
+              <button type="button" onClick={() => { setFehler(null); setDruckfarben(false); onLogo(null); }} className={KNOPF_KLEIN}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden /> Logo entfernen
               </button>
             )}
@@ -81,6 +84,7 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
         <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
           PNG, JPG oder WebP. Wird im Browser verkleinert. Laden Sie nur ein Logo hoch, das Sie verwenden dürfen.
         </p>
+        {druckfarben && wert.logo && <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">{DRUCKFARBEN_HINWEIS}</p>}
         {fehler && <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{fehler}</p>}
       </div>
 

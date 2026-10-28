@@ -9,9 +9,11 @@ import { zufallsname } from './check';
  * (`bav_beratungen`) und Firmenlogos (Bucket `bav-firmenlogos`), Migration
  * 20261021120000.
  *
- * Gesehen wird nur, was dem angemeldeten Berater gehoert — das regelt die
- * Datenbank (Row Level Security). Gelesenes JSON geht durch das Schema
- * (`angebotLesen`, `beratungLesen`): Was nicht passt, bekommt seine Vorgabe.
+ * Gesehen wird nur, was dem angemeldeten Berater gehoert — und Firmen, die
+ * ein Kollege fuer sein Buero freigegeben hat, mit allen ihren Beratungen
+ * (`bav-gemeinsam.ts`). Das regelt die Datenbank (Row Level Security).
+ * Gelesenes JSON geht durch das Schema (`angebotLesen`, `beratungLesen`):
+ * Was nicht passt, bekommt seine Vorgabe.
  *
  * Ein Logo liegt unter <Nutzer-ID>/<Firma>-<24 hex>.png|webp. Ein neues
  * bekommt einen neuen Namen — die Policies erlauben kein Ueberschreiben.
@@ -30,6 +32,12 @@ export interface Firma {
   /** Pfad im Bucket, oder null */
   logoPfad: string | null;
   geaendertAm: string;
+  /** Wer die Firma angelegt hat: Er pflegt das Angebot und gibt sie frei. */
+  besitzer: string;
+  /** Gehoert die Firma dem angemeldeten Berater? Sonst hat ein Kollege sie freigegeben. */
+  eigene: boolean;
+  /** Das Buero, fuer das die Firma freigegeben ist — oder null */
+  buero: string | null;
 }
 
 export interface Beratung {
@@ -41,6 +49,10 @@ export interface Beratung {
   beratenAm: string | null;
   daten: BeratungDaten;
   geaendertAm: string;
+  /** Wer sie angelegt hat — loeschen duerfen sie er und wer die Firma angelegt hat. */
+  besitzer: string;
+  /** Hat der angemeldete Berater sie angelegt? */
+  eigene: boolean;
 }
 
 /** Stand der Beratungen einer Firma — fuer die Liste. */
@@ -69,26 +81,35 @@ export interface Unterlagen {
   unterschriften: Unterschrift[];
 }
 
-const FIRMA_SPALTEN = 'id, name, angebot, logo, geaendert_am';
-const BERATUNG_SPALTEN = 'id, firma, mitarbeiter, status, beraten_am, daten, geaendert_am';
+// Firmen mit allen Spalten: So laeuft die App auch gegen eine Datenbank, die die Spalte `buero` (Migration
+// 20261027160000) noch nicht hat — Test- und Live-Seite teilen sie, ausgeliefert wird getrennt.
+const FIRMA_SPALTEN = '*';
+const BERATUNG_SPALTEN = 'id, firma, mitarbeiter, status, beraten_am, daten, geaendert_am, besitzer';
 
-interface FirmaZeile { id: string; name: string; angebot: unknown; logo: string | null; geaendert_am: string }
+interface FirmaZeile {
+  id: string; name: string; angebot: unknown; logo: string | null; geaendert_am: string; besitzer: string; buero?: string | null;
+}
 interface BeratungZeile {
   id: string; firma: string; mitarbeiter: string; status: string; beraten_am: string | null; daten: unknown; geaendert_am: string;
+  besitzer: string;
 }
 
-const firmaAus = (z: FirmaZeile): Firma => ({
+/** `ich`: der angemeldete Berater — ohne Sitzung gehoert ihm nichts. */
+const firmaAus = (z: FirmaZeile, ich: string | null): Firma => ({
   id: z.id, name: z.name, angebot: angebotLesen(z.angebot),
   logoPfad: typeof z.logo === 'string' && z.logo !== '' ? z.logo : null,
   geaendertAm: z.geaendert_am,
+  besitzer: z.besitzer, eigene: ich !== null && z.besitzer === ich,
+  buero: typeof z.buero === 'string' && z.buero !== '' ? z.buero : null,
 });
 
 const STATUS: readonly BeratungStatus[] = ['offen', 'teilnahme', 'verzicht'];
 const statusAus = (s: string): BeratungStatus => (STATUS as readonly string[]).includes(s) ? s as BeratungStatus : 'offen';
 
-const beratungAus = (z: BeratungZeile): Beratung => ({
+const beratungAus = (z: BeratungZeile, ich: string | null): Beratung => ({
   id: z.id, firma: z.firma, mitarbeiter: z.mitarbeiter, status: statusAus(z.status),
   beratenAm: z.beraten_am, daten: beratungLesen(z.daten), geaendertAm: z.geaendert_am,
+  besitzer: z.besitzer, eigene: ich !== null && z.besitzer === ich,
 });
 
 async function nutzerId(): Promise<string | null> {
@@ -118,9 +139,10 @@ const name120 = (s: string) => s.trim().slice(0, 120);
 
 export async function firmenLaden(): Promise<Firma[] | 'fehler'> {
   if (!supabase) return 'fehler';
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_firmen').select(FIRMA_SPALTEN).order('name');
-    return error ? 'fehler' : (data as FirmaZeile[]).map(firmaAus);
+    return error ? 'fehler' : (data as FirmaZeile[]).map((z) => firmaAus(z, ich));
   } catch {
     return 'fehler';
   }
@@ -129,10 +151,11 @@ export async function firmenLaden(): Promise<Firma[] | 'fehler'> {
 /** null: gibt es nicht (oder nicht fuer dieses Konto). */
 export async function firmaLaden(id: string): Promise<Firma | null | 'fehler'> {
   if (!supabase) return 'fehler';
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_firmen').select(FIRMA_SPALTEN).eq('id', id).maybeSingle();
     if (error) return 'fehler';
-    return data ? firmaAus(data as FirmaZeile) : null;
+    return data ? firmaAus(data as FirmaZeile, ich) : null;
   } catch {
     return 'fehler';
   }
@@ -141,35 +164,37 @@ export async function firmaLaden(id: string): Promise<Firma | null | 'fehler'> {
 /** 'grenze': hoechstens 200 Firmen je Konto. */
 export async function firmaAnlegen(name: string, angebot: FirmenAngebot): Promise<Firma | 'fehler' | 'grenze'> {
   if (!supabase || name120(name) === '') return 'fehler';
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_firmen')
       .insert({ name: name120(name), angebot })
       .select(FIRMA_SPALTEN).single();
     if (error) return error.code === '23514' && /200 Firmen/.test(error.message) ? 'grenze' : 'fehler';
-    return firmaAus(data as FirmaZeile);
+    return firmaAus(data as FirmaZeile, ich);
   } catch {
     return 'fehler';
   }
 }
 
+/** false auch, wenn keine Zeile getroffen wurde — das Angebot aendert nur, wer die Firma angelegt hat. */
 export async function firmaSpeichern(f: Pick<Firma, 'id' | 'name' | 'angebot' | 'logoPfad'>): Promise<boolean> {
   if (!supabase || name120(f.name) === '') return false;
   try {
-    const { error } = await supabase.from('bav_firmen')
+    const { data, error } = await supabase.from('bav_firmen')
       .update({ name: name120(f.name), angebot: f.angebot, logo: f.logoPfad })
-      .eq('id', f.id);
-    return !error;
+      .eq('id', f.id).select('id');
+    return !error && (data ?? []).length > 0;
   } catch {
     return false;
   }
 }
 
-/** Firma, ihre Beratungen (Kaskade) und ihre Logos entfernen. */
+/** Firma, ihre Beratungen (Kaskade, auch die der Kollegen) und ihre Logos entfernen — nur wer sie angelegt hat. */
 export async function firmaLoeschen(id: string): Promise<boolean> {
   if (!supabase) return false;
   try {
-    const { error } = await supabase.from('bav_firmen').delete().eq('id', id);
-    if (error) return false;
+    const { data, error } = await supabase.from('bav_firmen').delete().eq('id', id).select('id');
+    if (error || (data ?? []).length === 0) return false;
   } catch {
     return false;
   }
@@ -200,10 +225,11 @@ export async function staendeLaden(): Promise<Record<string, Stand> | 'fehler'> 
 export async function beratungenLaden(firma: string): Promise<Beratung[] | 'fehler'> {
   if (!supabase) return 'fehler';
   await laufendeAbwarten();
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_beratungen').select(BERATUNG_SPALTEN)
       .eq('firma', firma).order('erstellt_am');
-    return error ? 'fehler' : (data as BeratungZeile[]).map(beratungAus);
+    return error ? 'fehler' : (data as BeratungZeile[]).map((z) => beratungAus(z, ich));
   } catch {
     return 'fehler';
   }
@@ -212,10 +238,11 @@ export async function beratungenLaden(firma: string): Promise<Beratung[] | 'fehl
 export async function beratungLaden(id: string): Promise<Beratung | null | 'fehler'> {
   if (!supabase) return 'fehler';
   await laufendeAbwarten();
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_beratungen').select(BERATUNG_SPALTEN).eq('id', id).maybeSingle();
     if (error) return 'fehler';
-    return data ? beratungAus(data as BeratungZeile) : null;
+    return data ? beratungAus(data as BeratungZeile, ich) : null;
   } catch {
     return 'fehler';
   }
@@ -223,11 +250,12 @@ export async function beratungLaden(id: string): Promise<Beratung | null | 'fehl
 
 export async function beratungAnlegen(firma: string, daten: BeratungDaten): Promise<Beratung | 'fehler'> {
   if (!supabase) return 'fehler';
+  const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_beratungen')
       .insert({ firma, mitarbeiter: name120(daten.angaben.name), status: daten.entscheidung.status, daten })
       .select(BERATUNG_SPALTEN).single();
-    return error ? 'fehler' : beratungAus(data as BeratungZeile);
+    return error ? 'fehler' : beratungAus(data as BeratungZeile, ich);
   } catch {
     return 'fehler';
   }
@@ -257,11 +285,12 @@ export function beratungSpeichern(id: string, daten: BeratungDaten): Promise<boo
   return speichern;
 }
 
+/** Nur wer sie angelegt hat, und wer die Firma angelegt hat — sonst trifft es keine Zeile: false. */
 export async function beratungLoeschen(id: string): Promise<boolean> {
   if (!supabase) return false;
   try {
-    const { error } = await supabase.from('bav_beratungen').delete().eq('id', id);
-    return !error;
+    const { data, error } = await supabase.from('bav_beratungen').delete().eq('id', id).select('id');
+    return !error && (data ?? []).length > 0;
   } catch {
     return false;
   }

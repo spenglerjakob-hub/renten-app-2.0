@@ -356,6 +356,65 @@ select 31, 'Funktionen ohne security definer, mit festem search_path', 'ja',
  where pronamespace = 'public'::regnamespace
    and proname in ('bav_unterschreiben', 'bav_unterlagen_festschreiben', 'bav_unterschrift_eintragen', 'bav_beratung_sperre_pruefen');
 
+-- ---------- AXA-Antrag: der Berater unterschreibt in der Vereinbarung mit ----------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-0000000000e1"}';
+insert into ids values ('axa_a', 'a7a7a7a7-0000-4000-8000-0000000000af');
+insert into public.bav_beratungen (id, firma, mitarbeiter, status, daten) values
+  ((select id from ids where name = 'axa_a'), (select id from ids where name = 'firma_a'), 'Alex Axa', 'teilnahme',
+   '{"schritt":6,"angaben":{"name":"Alex Axa"}}');
+
+do $$
+declare v jsonb;
+begin
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_a'), 'mitarbeiter', 'Alex Axa', 'M10 20L80 60',
+         (select inhalt from html where name = 'protokoll'),
+         repeat('<p>AXA-Antrag</p>', 20) || '<div data-unterschrift="mitarbeiter"></div><div data-unterschrift="berater"></div>',
+         null);
+  insert into ergebnis values (32, 'AXA-Antrag: Mitarbeiter wie bisher', 'protokoll+vereinbarung', v->>'dokumente',
+    v->'dokumente' = '["protokoll", "vereinbarung"]'::jsonb);
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_a'), 'berater', 'Max Berater', 'M5 5L100 50');
+  insert into ergebnis values (33, 'AXA-Antrag mit Berater-Feld: Berater deckt die Vereinbarung mit ab', 'protokoll+vereinbarung',
+    v->>'dokumente', v->'dokumente' = '["protokoll", "vereinbarung"]'::jsonb);
+exception when others then
+  insert into ergebnis values (33, 'AXA-Antrag mit Berater-Feld: Berater deckt die Vereinbarung mit ab', 'angenommen', sqlerrm, false);
+end $$;
+-- Ohne Berater-Feld (Mustervereinbarung) bleibt es beim Protokoll: Pruefung 3.
+
+-- ---------- AXA bei Verzicht: der Berater unterschreibt im Gespraechsprotokoll hinter der Verzichtserklaerung ----------
+insert into ids values ('axa_verzicht_a', 'a8a8a8a8-0000-4000-8000-0000000000b0');
+insert into public.bav_beratungen (id, firma, mitarbeiter, status, daten) values
+  ((select id from ids where name = 'axa_verzicht_a'), (select id from ids where name = 'firma_a'), 'Vito Verzicht', 'verzicht',
+   '{"schritt":6,"angaben":{"name":"Vito Verzicht"}}');
+
+do $$
+declare v jsonb;
+begin
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_verzicht_a'), 'mitarbeiter', 'Vito Verzicht', 'M10 20L80 60',
+         (select inhalt from html where name = 'protokoll'), null,
+         repeat('<p>Verzicht und AXA-Protokoll</p>', 20) || '<div data-unterschrift="mitarbeiter"></div><div data-unterschrift="berater"></div>');
+  insert into ergebnis values (34, 'AXA bei Verzicht: Mitarbeiter wie bisher', 'protokoll+verzicht', v->>'dokumente',
+    v->'dokumente' = '["protokoll", "verzicht"]'::jsonb);
+  v := public.bav_unterschreiben((select id from ids where name = 'axa_verzicht_a'), 'berater', 'Max Berater', 'M5 5L100 50');
+  insert into ergebnis values (35, 'AXA bei Verzicht mit Berater-Feld: Berater deckt die Verzichtserklaerung mit ab', 'protokoll+verzicht',
+    v->>'dokumente', v->'dokumente' = '["protokoll", "verzicht"]'::jsonb);
+exception when others then
+  insert into ergebnis values (35, 'AXA bei Verzicht mit Berater-Feld: Berater deckt die Verzichtserklaerung mit ab', 'angenommen', sqlerrm, false);
+end $$;
+
+-- Die bisherige Verzichtserklaerung hat kein Berater-Feld: Der Berater deckt nur das Protokoll ab.
+do $$
+declare v jsonb;
+begin
+  v := public.bav_unterschreiben((select id from ids where name = 'verzicht_a'), 'berater', 'Max Berater', 'M5 5L100 50');
+  insert into ergebnis values (36, 'Verzicht ohne Berater-Feld: Berater nur das Protokoll', 'protokoll', v->>'dokumente',
+    v->'dokumente' = '["protokoll"]'::jsonb);
+exception when others then
+  insert into ergebnis values (36, 'Verzicht ohne Berater-Feld: Berater nur das Protokoll', 'angenommen', sqlerrm, false);
+end $$;
+
+reset role;
+
 select * from ergebnis order by nr;
 
 rollback;

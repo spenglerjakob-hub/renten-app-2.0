@@ -1,3 +1,5 @@
+import { browserRechnetEinfach, druckfarbenUmrechnen, istCmykJpeg } from './druckfarben';
+
 /**
  * Fotos vor dem Hochladen vorbereiten.
  *
@@ -49,6 +51,9 @@ export async function bildVorbereiten(datei: File): Promise<{ blob: Blob; name: 
  *
  * Kein SVG: Es kann Skripte tragen. Neu gezeichnet ist auch das Logo ohne
  * Metadaten.
+ *
+ * Druckdateien (JPEG in CMYK) rechnet der Browser zu grell in Bildschirm-
+ * farben um; sie werden auf die Farben im Druck nachgerechnet (druckfarben.ts).
  */
 export const LOGO_MAX_KANTE = 800;
 /** Wie der Bucket `branding` */
@@ -56,6 +61,8 @@ export const LOGO_MAX_BYTES = 1024 * 1024;
 const LOGO_PNG_BIS = 900 * 1024;
 /** Was groesser ankommt, wird gar nicht erst gelesen. */
 const LOGO_EINGANG_MAX = 15 * 1024 * 1024;
+/** So viel vom Anfang der Datei reicht bis zum Bildkopf eines JPEG, auch mit langen Metadaten. */
+const JPEG_KOPF = 512 * 1024;
 
 const LOGO_TYP_AUS_ENDUNG: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
@@ -69,6 +76,8 @@ export interface VorbereitetesLogo {
   dataUrl: string;
   breite: number;
   hoehe: number;
+  /** Eine Druckdatei (CMYK), deren Farben fuer den Bildschirm nachgerechnet wurden */
+  druckfarben: boolean;
 }
 
 export async function logoVorbereiten(datei: File): Promise<VorbereitetesLogo | LogoFehler> {
@@ -76,6 +85,9 @@ export async function logoVorbereiten(datei: File): Promise<VorbereitetesLogo | 
   if (!/^image\/(png|jpeg|webp)$/.test(typ)) return 'typ';
   if (datei.size > LOGO_EINGANG_MAX) return 'zu-gross';
   try {
+    const druckfarben = typ === 'image/jpeg'
+      && istCmykJpeg(new Uint8Array(await datei.slice(0, JPEG_KOPF).arrayBuffer()))
+      && await browserRechnetEinfach();
     const bild = await createImageBitmap(datei, { imageOrientation: 'from-image' });
     const faktor = Math.min(1, LOGO_MAX_KANTE / Math.max(bild.width, bild.height));
     const breite = Math.max(1, Math.round(bild.width * faktor));
@@ -87,6 +99,7 @@ export async function logoVorbereiten(datei: File): Promise<VorbereitetesLogo | 
     if (!ctx) return 'fehler';
     ctx.drawImage(bild, 0, 0, breite, hoehe);
     bild.close();
+    if (druckfarben) druckfarbenUmrechnen(ctx, breite, hoehe);
     const alsBlob = (art: string, qualitaet?: number) =>
       new Promise<Blob | null>((fertig) => leinwand.toBlob(fertig, art, qualitaet));
     let blob = await alsBlob('image/png');
@@ -97,7 +110,7 @@ export async function logoVorbereiten(datei: File): Promise<VorbereitetesLogo | 
     }
     if (!blob) return 'fehler';
     if (blob.size > LOGO_MAX_BYTES) return 'zu-gross';
-    return { blob, dataUrl: await alsDataUrl(blob), breite, hoehe };
+    return { blob, dataUrl: await alsDataUrl(blob), breite, hoehe, druckfarben };
   } catch {
     // Unlesbar: beschaedigt, oder ein Format, das der Browser nicht kennt.
     return 'fehler';

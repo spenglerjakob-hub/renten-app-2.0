@@ -67,12 +67,23 @@ describe('Welche Unterlagen eine Unterschrift abdeckt', () => {
     expect(dokumenteFuer('verzicht', 'mitarbeiter')).toEqual(['protokoll', 'verzicht']);
     expect(dokumenteFuer('teilnahme', 'berater')).toEqual(['protokoll']);
     expect(dokumenteFuer('offen', 'mitarbeiter')).toEqual([]);
+    // AXA-Antrag: Der Berater unterschreibt auch dort (Einwilligung, Gespraechsprotokoll)
+    expect(dokumenteFuer('teilnahme', 'berater', true)).toEqual(['protokoll', 'vereinbarung']);
+    // Bei Verzicht unterschreibt er im AXA-Gespraechsprotokoll hinter der Verzichtserklaerung.
+    expect(dokumenteFuer('verzicht', 'berater', true)).toEqual(['protokoll', 'verzicht']);
+    expect(dokumenteFuer('verzicht', 'berater')).toEqual(['protokoll']);
+    expect(dokumenteFuer('offen', 'berater', true)).toEqual([]);
+    expect(dokumenteFuer('teilnahme', 'mitarbeiter', true)).toEqual(['protokoll', 'vereinbarung']);
   });
 
   it('in Worten', () => {
     expect(dokumenteText(['protokoll', 'vereinbarung'])).toBe('Beratungsprotokoll und Vereinbarung über Entgeltumwandlung');
     expect(dokumenteText(['protokoll'])).toBe(DOKUMENT_NAME.protokoll);
     expect(dokumenteText([])).toBe('');
+    expect(dokumenteText(['protokoll', 'vereinbarung'], true)).toBe('Beratungsprotokoll und AXA-Antrag auf Entgeltumwandlung');
+    expect(dokumenteText(['protokoll', 'verzicht'], true))
+      .toBe('Beratungsprotokoll und Erklärung zum Verzicht auf die Entgeltumwandlung mit AXA-Gesprächsprotokoll');
+    expect(dokumenteText(['protokoll', 'verzicht'])).toBe('Beratungsprotokoll und Erklärung zum Verzicht auf die Entgeltumwandlung');
   });
 });
 

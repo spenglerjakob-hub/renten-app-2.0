@@ -153,7 +153,7 @@ function Datenschutz() {
 
       <H2>3. Aufruf der Website und Server-Logdateien</H2>
       <P>
-        Die Website liegt bei [Hostinger — Vertragspartner laut Hosting-Vertrag eintragen]. Beim Aufruf
+        Die Website liegt bei der Hostinger International Ltd. (Zypern). Beim Aufruf
         verarbeitet der Server technisch notwendige Daten: IP-Adresse, Zeitpunkt, aufgerufene Adresse,
         übertragene Datenmenge, Browser und Betriebssystem. Rechtsgrundlage ist unser berechtigtes Interesse
         an einem sicheren und stabilen Betrieb (Art. 6 Abs. 1 lit. f DSGVO). Die Logdateien werden nach
@@ -231,9 +231,10 @@ function Datenschutz() {
         sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
         Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
         betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
-        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind ausschließlich für das Konto
-        sichtbar, das sie angelegt hat; das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen
-        Speicher bei Supabase in der EU.
+        im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind nur für das Konto sichtbar, das sie
+        angelegt hat, und — gibt der Berater eine Firma für sein Büro frei — für die Mitglieder dieses Büros (siehe
+        unten); das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen Speicher bei Supabase in
+        der EU.
       </P>
       <P>
         Unterschreiben Mitarbeiter und Berater am Bildschirm, speichern wir die Unterlagen so, wie sie unterschrieben
@@ -243,16 +244,39 @@ function Datenschutz() {
         Unterschriften aufhebt.
       </P>
       <P>
+        Ist die Firma bei der AXA versichert, tritt der AXA-Antrag auf Entgeltumwandlung an die Stelle der
+        Vereinbarung; bei einem Verzicht kommt das AXA-Gesprächsprotokoll zur Verzichtserklärung. Dafür speichern wir
+        zur Firma die Kollektiv- und die Organisationsnummer, zur Beratung die derzeitige Tätigkeit des Mitarbeiters,
+        Name und Organisationsnummer des Beraters, wie die Beratung erfolgte und welche Besonderheiten erläutert
+        wurden. Ist der Zusatz
+        Beitragsbefreiung bei Berufsunfähigkeit gewählt, speichern wir auch die Antworten des Mitarbeiters auf die
+        drei Fragen der AXA zu seiner Gesundheit (Arbeitsunfähigkeit, Einschränkung der Erwerbs- oder
+        Berufsfähigkeit, Höhe der versicherten BU-/EU-Rente). Das sind Gesundheitsdaten nach Art. 9 DSGVO. Sie stehen
+        auch im unterschriebenen Antrag; wird der Zusatz abgewählt, löschen wir sie, sonst mit der Beratung.
+      </P>
+      <P>
+        <strong>Gemeinsam im Büro.</strong> Gehört ein Berater zu einem Büro (Abschnitt 11), kann er eine Firma für
+        sein Büro freigeben. Dann sehen alle Mitglieder des Büros das Angebot der Firma (ändern kann es nur, wer die
+        Firma angelegt hat) und sehen und bearbeiten alle ihre Beratungen, einschließlich Gehalt, Steuer- und
+        Gesundheitsangaben und der unterschriebenen Unterlagen. Voneinander sehen sie Namen und Agentur aus „Ihr
+        Auftritt“, ist dort nichts eingetragen, die E-Mail-Adresse. Endet die Freigabe, gehen die Beratungen der
+        Kollegen an den Berater, der die Firma angelegt hat. Verlässt ein Mitglied das Büro, wird es entfernt oder
+        löscht es sein Konto, bleiben seine Beratungen samt unterschriebener Unterlagen bei den Firmen; Firmen, die es
+        für das Büro freigegeben hat, übernimmt mit allen Beratungen, wer das Büro verwaltet.
+      </P>
+      <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
-        Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht als Angabe
-        besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
+        Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht und die
+        Antworten zur Gesundheit im AXA-Antrag als Angaben besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
         was der Berater ihnen zeigt, druckt oder als Datei gibt. Die Übersicht für den Arbeitgeber enthält Namen,
         Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
       </P>
       <P>
         Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen und
-        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Mit einer Firma werden ihre Beratungen
-        und ihr Logo gelöscht, mit dem Konto alles.
+        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Löschen kann eine Beratung, wer sie
+        angelegt hat, und der Berater, der die Firma angelegt hat. Mit einer Firma werden ihre Beratungen, auch die
+        der Kollegen, und ihr Logo gelöscht, mit dem Konto alles, was ihm gehört — Beratungen in Firmen von Kollegen
+        bleiben dort, freigegebene Firmen eines Büro-Mitglieds übernimmt, wer das Büro verwaltet.
       </P>
 
       <H2>8. Vorsorge-Check</H2>
@@ -283,7 +307,7 @@ function Datenschutz() {
       <P>
         Geht ein Vorsorge-Check ein, erhält der Berater eine E-Mail an seine Konto-Adresse. Sie enthält nur den
         Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden.
-        Versandt wird über unser Postfach bei [Hostinger].
+        Versandt wird über unser Postfach bei Hostinger.
       </P>
 
       <H2>10. Rückmeldungen und Anfragen als Early Adopter</H2>
@@ -302,7 +326,7 @@ function Datenschutz() {
         wir Ihren Namen, Ihre E-Mail-Adresse und — wenn Sie sie angeben — Ihr Büro und die Zahl der Berater, um
         Ihre Anfrage zu prüfen und zu beantworten (Art. 6 Abs. 1 lit. b DSGVO, vorvertragliche Maßnahme). Die
         Anfrage liegt bei Supabase in der EU; wir erhalten sie zusätzlich per E-Mail, versandt über unser Postfach
-        bei [Hostinger]. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
+        bei Hostinger. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
@@ -312,7 +336,8 @@ function Datenschutz() {
         den Namen des Büros, wer ihm angehört und seit wann, wer es verwaltet, die Einladungslinks (wer sie wann
         erstellt und wer sie wann eingelöst hat) sowie den Stand des Abos: Paket, Zahlweise, Zahl der Plätze,
         Status, Laufzeit und gegebenenfalls das Kündigungsdatum. Die Mitglieder eines Büros sehen die
-        E-Mail-Adressen der anderen Mitglieder; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
+        E-Mail-Adressen der anderen Mitglieder, in der Mitarbeiterberatung auch Name und Agentur aus „Ihr
+        Auftritt“; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
         Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Angaben werden mit dem Konto der Person gelöscht, die das
         Büro verwaltet.
       </P>
@@ -358,8 +383,8 @@ function Datenschutz() {
           prüfen.]
         </li>
         <li>
-          <strong>[Hostinger — Vertragspartner eintragen]</strong> — Webhosting und E-Mail-Versand, auf
-          Grundlage eines Auftragsverarbeitungsvertrags.
+          <strong>Hostinger International Ltd.</strong> (Zypern) [Anschrift laut Vertrag eintragen] — Webhosting und
+          E-Mail-Versand, auf Grundlage eines Auftragsverarbeitungsvertrags.
         </li>
         <li>
           <strong>Stripe Payments Europe, Ltd.</strong> (Dublin, Irland) — Zahlungsabwicklung, Rechnungen und
@@ -373,6 +398,10 @@ function Datenschutz() {
           Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung samt unterschriebener
           Unterlagen, Ihr Auftritt im Gutachten und Rückmeldungen: bis zur Löschung des Kontos, sofern Sie sie nicht
           vorher löschen.
+        </li>
+        <li>
+          Beratungen in einer Firma, die ein Kollege für Ihr Büro freigegeben hat: bis er sie oder die Firma löscht,
+          auch über Ihr Ausscheiden aus dem Büro hinaus.
         </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
@@ -404,7 +433,8 @@ function Datenschutz() {
         Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
-        Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann. Zahlungsdaten gibt
+        Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann — ein Firmenlogo auch die
+        Kollegen, für deren Büro die Firma freigegeben ist. Zahlungsdaten gibt
         es bei uns nicht; Meldungen von Stripe über Ihr Abo nehmen wir nur mit gültiger Signatur an.
       </P>
     </>

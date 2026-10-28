@@ -1,7 +1,9 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
-import type { BeratungAngaben, BeratungDaten, BeratungStatus, VersichererWerte } from '@renten/schema';
+import {
+  AXA_KANAELE, type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
+} from '@renten/schema';
 import {
   speicherungenAbwarten, unterschreiben, type Firma, type UnterlagenArt, type Unterlagen, type UnterlagenHtml, type UnterschriftPerson,
 } from '../lib/bav-beratung';
@@ -10,7 +12,7 @@ import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
   AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, NamenFelder, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
-import { mitName, namensTeile } from '../lib/namen';
+import { mitName, namensTeile, vollerName } from '../lib/namen';
 import { laufzeitText } from '../features/tuev-berechnung';
 import {
   AKZENT, Anteile, ETIKETT, FELD_LABEL, Hervor, Hinweise, KNOPF, KNOPF_ZWEIT, Karte, LINK, Posten, SCHWEBEND, TextBereich, Titel,
@@ -26,6 +28,8 @@ import {
 } from './rechnung';
 import { fazitText, festePunkte, firmenHinweise, regelKern, regelText, traegerText, vertragName } from './texte';
 import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
+import { AxaAntrag, AxaVerzicht } from './axa-antrag';
+import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBerater, axaFehlt, istAxaAntrag } from './axa';
 import { unterlageErfassen } from './festschreiben';
 import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzeichner } from './Unterschrift';
 
@@ -141,6 +145,10 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
             <NamenFelder {...namensTeile(a.name, a.vorname, a.nachname)} onChange={(teile) => setzeA(mitName(teile))} />
           </div>
           <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
+          {istAxaAntrag(firma.angebot) && (
+            <TextFeld label="Derzeitige Tätigkeit (für den AXA-Antrag)" wert={a.taetigkeit} onChange={(taetigkeit) => setzeA({ taetigkeit })}
+              maxLaenge={80} />
+          )}
           <div>
             <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}
               hilfe={!regel ? 'Wird aus dem Geburtsdatum berechnet: die Regelaltersgrenze.'
@@ -926,6 +934,11 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
         )}
       </Karte>
 
+      {e.status !== 'offen' && istAxaAntrag(firma.angebot) && (
+        <AxaKarte x={e.axa} setze={(p) => setzeE({ axa: { ...e.axa, ...p } })} antrag={e.status === 'teilnahme'}
+          auftritt={auftritt} angebot={firma.angebot} />
+      )}
+
       <Karte titel="Empfehlung und Ort">
         <div className="space-y-3">
           <TextBereich label="Empfehlung des Beraters" wert={e.empfehlung} onChange={(empfehlung) => setzeE({ empfehlung })} maxLaenge={2000} zeilen={4}
@@ -937,6 +950,129 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
         </div>
       </Karte>
     </div>
+  );
+}
+
+/** Ja oder Nein als Pillen, wie die Vorgabe im Loesungsvergleich. */
+function JaNeinWahl({ label, wert, onChange }: { label: string; wert: '' | 'ja' | 'nein'; onChange: (w: 'ja' | 'nein') => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex shrink-0 gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
+      {(['ja', 'nein'] as const).map((w) => (
+        <button key={w} type="button" role="radio" aria-checked={wert === w} onClick={() => onChange(w)}
+          className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            wert === w ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
+          }`}>
+          {w === 'ja' ? 'Ja' : 'Nein'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const KANAL_TEXT: Record<(typeof AXA_KANAELE)[number], string> = {
+  persoenlich: 'persönlich', telefonisch: 'telefonisch', online: 'online (z. B. Video)',
+};
+
+/**
+ * Was AXA-Antrag und AXA-Gespraechsprotokoll ueber die Beratung hinaus
+ * fragen: wer beraten hat (mit Organr.), ob die Beitragsbefreiung bei
+ * Berufsunfaehigkeit eingeschlossen ist und dann die drei Fragen zur
+ * Gesundheit mit der Belehrung davor, wie die Beratung erfolgte und was
+ * erlaeutert wurde. Bei Verzicht nur, was ins Protokoll gehoert. Fuer die
+ * Unterschrift am Bildschirm muss alles beantwortet sein; auf Papier kreuzt
+ * man von Hand an.
+ */
+function AxaKarte({ x, setze, antrag, auftritt, angebot }: {
+  x: AxaAngaben; setze: (p: Partial<AxaAngaben>) => void; antrag: boolean; auftritt: Auftritt | null; angebot: FirmenAngebot;
+}) {
+  // Leer gelten der Name aus „Ihr Auftritt“ und die Organr. der Firma — eingetragen die der Beratung.
+  const eigenerName = vollerName({ vorname: x.beraterVorname, nachname: x.beraterNachname }) !== '';
+  const berater = eigenerName ? { vorname: x.beraterVorname, nachname: x.beraterNachname } : axaBerater(x, auftritt);
+  const organr = x.organisationsnummer || angebot.organisationsnummer;
+  const herkunft = [
+    eigenerName ? 'Name für diese Beratung eingetragen.'
+      : vollerName(berater) ? 'Name aus „Ihr Auftritt“ — ändern, wenn ein Kollege berät.' : 'Name bitte eintragen.',
+    antrag && (x.organisationsnummer ? 'Organr. für diese Beratung eingetragen.' : organr ? 'Organr. laut Firma.' : ''),
+  ].filter(Boolean).join(' ');
+
+  return (
+    <Karte titel={antrag ? 'Für den AXA-Antrag' : 'Für das AXA-Gesprächsprotokoll'}>
+      <p className="text-sm leading-relaxed text-ui-schiefer">
+        {antrag
+          ? 'Bei dieser Firma tritt der AXA-Antrag an die Stelle der Mustervereinbarung. Diese Angaben stehen darin und im '
+            + 'AXA-Gesprächsprotokoll; vor der Unterschrift am Bildschirm braucht es alle.'
+          : 'Bei dieser Firma kommt zur Verzichtserklärung das AXA-Gesprächsprotokoll mit „Nein“. Diese Angaben stehen '
+            + 'darin; vor der Unterschrift am Bildschirm braucht es alle.'}
+      </p>
+
+      <h3 className="mt-5 text-sm font-medium text-ui-tinte">Beratung durch</h3>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <NamenFelder {...berater} beschriftung={['Vorname des Beraters', 'Nachname des Beraters']}
+          onChange={(t) => setze({ beraterVorname: t.vorname, beraterNachname: t.nachname })} />
+        {antrag && (
+          <TextFeld label="Organisationsnummer (Organr.)" wert={organr} onChange={(organisationsnummer) => setze({ organisationsnummer })}
+            maxLaenge={40} />
+        )}
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed text-ui-schiefer">{herkunft}</p>
+
+      {antrag && (
+        <>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <div className="min-w-0 flex-1 basis-72">
+              <h3 className="text-sm font-medium text-ui-tinte">Beitragsbefreiung bei Berufsunfähigkeit</h3>
+              <p className="mt-0.5 text-xs leading-relaxed text-ui-schiefer">Nur mit diesem Zusatz stellt der Antrag die Fragen zur Gesundheit.</p>
+            </div>
+            {/* Ohne den Zusatz braucht es keine Angaben zur Gesundheit — schon gegebene werden geloescht. */}
+            <JaNeinWahl label="Beitragsbefreiung bei Berufsunfähigkeit" wert={x.buBefreiung}
+              onChange={(w) => setze(w === 'ja' ? { buBefreiung: w } : { buBefreiung: w, arbeitsunfaehig: '', einschraenkung: '', buRente: '' })} />
+          </div>
+
+          {x.buBefreiung === 'ja' && (
+            <>
+              <h3 className="mt-5 text-sm font-medium text-ui-tinte">Erklärung des Mitarbeiters zur Gesundheit</h3>
+              <div className="ui-innen mt-2 space-y-1.5 p-4 text-xs leading-relaxed text-ui-tinte">
+                <p className="font-medium">Belehrung</p>
+                {AXA_BELEHRUNG.map(({ titel, text }) => <p key={text}>{titel && <>{titel} </>}{text}</p>)}
+              </div>
+              <ul className="mt-2 divide-y divide-ui-linie">
+                {AXA_FRAGEN.map(({ feld, text }) => (
+                  <li key={feld} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3">
+                    <p className="min-w-0 flex-1 basis-72 text-sm leading-relaxed text-ui-tinte">{text}</p>
+                    <JaNeinWahl label={text} wert={x[feld]} onChange={(w) => setze({ [feld]: w })} />
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-ui-schiefer">
+                {AXA_FUSSNOTEN.map((f) => <p key={f}>{f}</p>)}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      <h3 className="mt-6 text-sm font-medium text-ui-tinte">Die Beratung erfolgte</h3>
+      <div role="radiogroup" aria-label="Die Beratung erfolgte" className="mt-2 inline-flex max-w-full flex-wrap gap-1 rounded-[22px] border border-ui-linie bg-ui-karte p-1">
+        {AXA_KANAELE.map((k) => (
+          <button key={k} type="button" role="radio" aria-checked={x.kanal === k} onClick={() => setze({ kanal: k })}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              x.kanal === k ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
+            }`}>
+            {KANAL_TEXT[k]}
+          </button>
+        ))}
+      </div>
+
+      <h3 className="mt-6 text-sm font-medium text-ui-tinte">Erläutert wurden</h3>
+      <ul className="mt-1 divide-y divide-ui-linie">
+        {AXA_ERLAEUTERT.map(({ feld, text }) => (
+          <li key={feld} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3">
+            <p className="min-w-0 flex-1 basis-72 text-sm leading-relaxed text-ui-tinte">{text}</p>
+            <JaNeinWahl label={text} wert={x.erlaeutert[feld]} onChange={(w) => setze({ erlaeutert: { ...x.erlaeutert, [feld]: w } })} />
+          </li>
+        ))}
+      </ul>
+    </Karte>
   );
 }
 
@@ -952,6 +1088,13 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
   const dok = { firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen };
   const fest = unterlagen && typeof unterlagen === 'object' ? unterlagen : null;
   const name = daten.angaben.name.trim();
+  // Bei AXA und Direktversicherung tritt der AXA-Antrag an die Stelle der Mustervereinbarung;
+  // bei Verzicht kommt das AXA-Gespraechsprotokoll mit „Nein“ zur Verzichtserklaerung.
+  const axa = istAxaAntrag(firma.angebot);
+  const Zweites = axa ? AxaAntrag : Vereinbarung;
+  const VerzichtDokument = axa ? AxaVerzicht : Verzicht;
+  const beraterName = axa ? vollerName(axaBerater(daten.entscheidung.axa, auftritt)) : auftritt?.berater.trim() ?? '';
+  const axaZiel = status === 'teilnahme' ? 'für den AXA-Antrag' : 'für das AXA-Gesprächsprotokoll';
 
   // Festgeschrieben druckt die unterschriebene Fassung; sonst wie bisher die aktuelle.
   const knopf = (text: string, symbol: ReactNode, inhalt: ReactNode, haupt = false, art?: UnterlagenArt) => (
@@ -968,12 +1111,13 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
 
   const unterzeichner: Unterzeichner[] = [
     { person: 'mitarbeiter', rolle: 'Mitarbeiter', name, nameFest: true },
-    { person: 'berater', rolle: 'Berater', name: auftritt?.berater.trim() ?? '', nameFest: false },
+    { person: 'berater', rolle: 'Berater', name: beraterName, nameFest: false },
   ];
   const luecken: Luecke[] = [
     ...(name ? [] : [{ text: 'der Name des Mitarbeiters', schritt: 1 }]),
     ...(daten.entscheidung.ort.trim() ? [] : [{ text: 'der Ort der Beratung', schritt: 5 }]),
     ...(status === 'teilnahme' && r.umwandlungMonat <= 0 ? [{ text: 'eine Umwandlung über 0 €', schritt: 3 }] : []),
+    ...(status !== 'offen' && axa ? axaFehlt(daten, beraterName).map((text) => ({ text: `${axaZiel} ${text}`, schritt: 5 })) : []),
   ];
 
   // Die erste Unterschrift schreibt die Unterlagen fest: erst speichern, dann genau das, was gedruckt wuerde.
@@ -984,8 +1128,8 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
       if (!(await sichern(daten))) return 'Die Beratung konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.';
       const protokoll = await unterlageErfassen(<Protokoll {...dok} />);
       html = status === 'teilnahme'
-        ? { protokoll, vereinbarung: await unterlageErfassen(<Vereinbarung {...dok} />) }
-        : { protokoll, verzicht: await unterlageErfassen(<Verzicht {...dok} />) };
+        ? { protokoll, vereinbarung: await unterlageErfassen(<Zweites {...dok} />) }
+        : { protokoll, verzicht: await unterlageErfassen(<VerzichtDokument {...dok} />) };
     }
     const u = await unterschreiben(beratungId, person, n, zug, html);
     await aktualisieren();
@@ -996,7 +1140,7 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
     <div className="space-y-6">
       <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
         bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben} onAufgehoben={aktualisieren}
-        beratungId={beratungId} />
+        beratungId={beratungId} axa={axa} />
 
       <Karte titel="Unterlagen">
         <p className="text-sm leading-relaxed text-ui-schiefer">
@@ -1010,8 +1154,10 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
         <div className="mt-5 flex flex-wrap gap-2">
           {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
           {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen', 'protokoll')}
-          {status === 'teilnahme' && knopf('Entgeltumwandlungs\u00ADvereinbarung', <FileSignature className="h-4 w-4" aria-hidden />, <Vereinbarung {...dok} />, false, 'vereinbarung')}
-          {status === 'verzicht' && knopf('Verzichtserklärung', <FileSignature className="h-4 w-4" aria-hidden />, <Verzicht {...dok} />, false, 'verzicht')}
+          {status === 'teilnahme' && knopf(axa ? 'AXA-Antrag auf Entgelt\u00ADumwandlung' : 'Entgeltumwandlungs\u00ADvereinbarung',
+            <FileSignature className="h-4 w-4" aria-hidden />, <Zweites {...dok} />, false, 'vereinbarung')}
+          {status === 'verzicht' && knopf(axa ? 'Verzichtserklärung mit AXA-Protokoll' : 'Verzichtserklärung',
+            <FileSignature className="h-4 w-4" aria-hidden />, <VerzichtDokument {...dok} />, false, 'verzicht')}
           {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
         </div>
         {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
@@ -1022,8 +1168,11 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
           </p>
         )}
         <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
-          Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der
-          Versorgungsordnung der Firma abgleichen.
+          {axa
+            ? 'AXA-Antrag und AXA-Gesprächsprotokoll folgen im Wortlaut den Vorlagen der AXA. Die Verzichtserklärung ist ein '
+              + 'Muster: Bitte vor der Verwendung rechtlich prüfen lassen und mit der Versorgungsordnung der Firma abgleichen.'
+            : 'Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der '
+              + 'Versorgungsordnung der Firma abgleichen.'}
         </p>
       </Karte>
     </div>

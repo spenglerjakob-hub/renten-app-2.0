@@ -83,3 +83,43 @@ describe('Daten einer Beratung', () => {
     expect(beratungLesen({ angaben: { name: 'Anna Beispiel' } }).angaben.name).toBe('Anna Beispiel');
   });
 });
+
+describe('Angaben für den AXA-Antrag', () => {
+  it('leer: keine Nummern, keine Tätigkeit, nichts beantwortet', () => {
+    const a = firmenAngebotSchema.parse({});
+    expect([a.kollektivnummer, a.organisationsnummer]).toEqual(['', '']);
+    const d = beratungDatenSchema.parse({});
+    expect(d.angaben.taetigkeit).toBe('');
+    expect(d.entscheidung.axa).toEqual({
+      beraterVorname: '', beraterNachname: '', organisationsnummer: '', buBefreiung: '',
+      arbeitsunfaehig: '', einschraenkung: '', buRente: '', kanal: '',
+      erlaeutert: { versteuerung: '', funktionsweise: '', ausscheiden: '', insolvenz: '' },
+    });
+  });
+
+  it('Beratungen mit dem ersten AXA-Antrag lesen sich ohne Berater, Organr. und BU-Zusatz', () => {
+    const d = beratungLesen({ version: 2, entscheidung: { status: 'teilnahme', axa: { arbeitsunfaehig: 'nein', kanal: 'online' } } });
+    expect(d.entscheidung.axa).toMatchObject({ beraterVorname: '', organisationsnummer: '', buBefreiung: '', arbeitsunfaehig: 'nein', kanal: 'online' });
+  });
+
+  it('Beratungen von vorher lesen sich ohne die neuen Felder', () => {
+    const d = beratungLesen({ version: 2, entscheidung: { status: 'teilnahme', ort: 'Köln' } });
+    expect(d.entscheidung.status).toBe('teilnahme');
+    expect(d.entscheidung.axa.arbeitsunfaehig).toBe('');
+  });
+
+  it('nimmt nur Ja, Nein oder leer und die drei Wege der Beratung', () => {
+    const gut = { arbeitsunfaehig: 'nein', einschraenkung: 'ja', buRente: 'nein', kanal: 'persoenlich',
+      erlaeutert: { versteuerung: 'ja', funktionsweise: 'ja', ausscheiden: 'ja', insolvenz: 'nein' } };
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: gut } }).success).toBe(true);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, buRente: 'vielleicht' } } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, kanal: 'brief' } } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, buBefreiung: 'ja' } } }).success).toBe(true);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, buBefreiung: 'vielleicht' } } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, organisationsnummer: 'x'.repeat(41) } } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ entscheidung: { axa: { ...gut, beraterNachname: 'x'.repeat(61) } } }).success).toBe(false);
+    expect(firmenAngebotSchema.safeParse({ kollektivnummer: 'x'.repeat(41) }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'Industriemechanikerin' } }).success).toBe(true);
+    expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'x'.repeat(81) } }).success).toBe(false);
+  });
+});

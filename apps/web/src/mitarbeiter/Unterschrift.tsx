@@ -171,8 +171,8 @@ export interface Unterzeichner {
   nameFest: boolean;
 }
 
-function UnterschriftDialog({ offen, wer, status, onSchliessen, onUnterschreiben }: {
-  offen: boolean; wer: Unterzeichner; status: BeratungStatus;
+function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschreiben }: {
+  offen: boolean; wer: Unterzeichner; status: BeratungStatus; axa: boolean;
   onSchliessen: () => void;
   /** true: geklappt; sonst die Meldung */
   onUnterschreiben: (name: string, zug: string) => Promise<true | string>;
@@ -190,7 +190,7 @@ function UnterschriftDialog({ offen, wer, status, onSchliessen, onUnterschreiben
 
   const zug = zugAusStrichen(striche, ZUG_BREITE, FELD_HOEHE);
   const bereit = tinteGenug(striche, ZUG_BREITE) && zugGueltig(zug) && name.trim() !== '' && !laeuft;
-  const fuer = dokumenteText(dokumenteFuer(status, wer.person));
+  const fuer = dokumenteText(dokumenteFuer(status, wer.person, axa), axa);
 
   const abschicken = async () => {
     if (!bereit) return;
@@ -242,8 +242,10 @@ export interface Luecke { text: string; schritt: number }
  * und das Aufheben. `onUnterschreiben` schreibt bei der ersten Unterschrift
  * die Unterlagen fest (Beratung.tsx kennt die Daten dafuer).
  */
-export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken, bereit, geheZu, onUnterschreiben, onAufgehoben, beratungId }: {
+export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken, bereit, geheZu, onUnterschreiben, onAufgehoben, beratungId, axa = false }: {
   status: BeratungStatus;
+  /** An Stelle der Vereinbarung steht der AXA-Antrag — der Berater unterschreibt dort mit. */
+  axa?: boolean;
   unterlagen: Unterlagen | null | 'fehler';
   unterzeichner: readonly Unterzeichner[];
   /** Nur vor der ersten Unterschrift von Belang */
@@ -277,7 +279,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
       <li key={wer.person} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <div className="min-w-0">
           <p className="text-base font-medium text-ui-tinte">{wer.rolle}{u ? ` · ${u.name}` : wer.name ? ` · ${wer.name}` : ''}</p>
-          <p className={ETIKETT}>für {dokumenteText(dokumenteFuer(status, wer.person))}</p>
+          <p className={ETIKETT}>für {dokumenteText(dokumenteFuer(status, wer.person, axa), axa)}</p>
         </div>
         {u ? (
           <div className="flex min-w-0 items-center gap-3">
@@ -345,7 +347,7 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
       </p>
 
       {dialog && (
-        <UnterschriftDialog offen wer={dialog} status={status} onSchliessen={() => setDialog(null)}
+        <UnterschriftDialog offen wer={dialog} status={status} axa={axa} onSchliessen={() => setDialog(null)}
           onUnterschreiben={(name, zug) => onUnterschreiben(dialog.person, name, zug)} />
       )}
 

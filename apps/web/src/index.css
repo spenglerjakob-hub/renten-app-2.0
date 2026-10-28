@@ -169,6 +169,10 @@
   /* A4 mit ordentlichem Rand. Ohne @page-Regel gelten die Browservorgaben,
      und der Satzspiegel wechselt je nach Rechner. */
   @page { size: A4; margin: 18mm 16mm 20mm; }
+  /* Das AXA-Gespraechsprotokoll (mitarbeiter/axa-antrag.tsx) steht wie das
+     Formular auf einer Seite mit schmalem Rand. Unterschriebene Fassungen
+     tragen die Seite im HTML — die Regel nicht entfernen. */
+  @page axa-formular { margin: 8mm 12mm 8mm; }
 
   /*
    * Bedienelemente verschwinden im Druck — ABER nicht die Koepfe der

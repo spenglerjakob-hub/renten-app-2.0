@@ -59,6 +59,10 @@ export const firmenAngebotSchema = z.object({
   bundesland: z.string().max(40).default('Nordrhein-Westfalen'),
   /** Erster Monat der Umwandlung; leer: der naechste Monatserste */
   beginn: datum(),
+  /** AXA-Antrag: Kollektivnummer des Rahmenvertrags der Firma */
+  kollektivnummer: z.string().max(40).default(''),
+  /** AXA-Antrag: Organisationsnummer (Organr.) — Vorgabe fuer die Beratungen, jede kann eine eigene haben */
+  organisationsnummer: z.string().max(40).default(''),
 });
 
 export const beratungAngabenSchema = z.object({
@@ -90,6 +94,8 @@ export const beratungAngabenSchema = z.object({
   rentenbeginn: datum(),
   /** Laufende Beitraege in eine bestehende Direktversicherung oder Pensionskasse, Monat */
   bavBestandMonat: betrag(10_000).default(0),
+  /** AXA-Antrag: derzeitige Taetigkeit des Mitarbeiters */
+  taetigkeit: z.string().max(80).default(''),
 });
 
 /** Die Werte aus dem Angebot des Versicherers, je Vertrag. */
@@ -112,6 +118,40 @@ export const versichererWerteSchema = z.object({
 
 export const BERATUNG_STATUS = ['offen', 'teilnahme', 'verzicht'] as const;
 
+/** Eine Ja/Nein-Antwort im AXA-Antrag; leer: noch nicht beantwortet. */
+const jaNein = () => z.enum(['', 'ja', 'nein']).default('');
+export const AXA_KANAELE = ['persoenlich', 'telefonisch', 'online'] as const;
+
+/**
+ * Was AXA-Antrag und AXA-Gespraechsprotokoll ueber die Beratung hinaus
+ * fragen: wer beraten hat, ob die Beitragsbefreiung bei Berufsunfaehigkeit
+ * eingeschlossen ist und dann die drei Fragen zur Gesundheit (Erklaerung des
+ * Arbeitnehmers), wie die Beratung erfolgte und welche Besonderheiten
+ * erlaeutert wurden.
+ */
+export const axaAngabenSchema = z.object({
+  /** Wer beraten hat — leer: der Name aus „Ihr Auftritt“ */
+  beraterVorname: z.string().max(60).default(''),
+  beraterNachname: z.string().max(60).default(''),
+  /** Organr. des Beraters — leer: die Vorgabe der Firma */
+  organisationsnummer: z.string().max(40).default(''),
+  /** Zusatz Beitragsbefreiung bei Berufsunfaehigkeit; nur mit ihm gibt es die drei Fragen */
+  buBefreiung: jaNein(),
+  /** Dienst eingeschraenkt oder in den letzten 12 Monaten laenger als 2 Wochen arbeitsunfaehig? */
+  arbeitsunfaehig: jaNein(),
+  /** Einschraenkung der Erwerbs- oder Berufsfaehigkeit, Behinderung oder Antrag wegen BU/EU? */
+  einschraenkung: jaNein(),
+  /** BU-/EU-Rente insgesamt ueber 60 % des Brutto-Arbeitseinkommens? */
+  buRente: jaNein(),
+  kanal: z.enum(['', ...AXA_KANAELE]).default(''),
+  erlaeutert: z.object({
+    versteuerung: jaNein(),
+    funktionsweise: jaNein(),
+    ausscheiden: jaNein(),
+    insolvenz: jaNein(),
+  }).default({}),
+});
+
 export const entscheidungSchema = z.object({
   /** Dasselbe wie die Spalte `status` — dort fuer Liste und Uebersicht */
   status: z.enum(BERATUNG_STATUS).default('offen'),
@@ -122,6 +162,8 @@ export const entscheidungSchema = z.object({
   empfehlung: z.string().max(2000).default(''),
   ort: z.string().max(120).default(''),
   datum: datum(),
+  /** Nur bei AXA und Direktversicherung: AXA-Antrag, bei Verzicht das AXA-Gespraechsprotokoll */
+  axa: axaAngabenSchema.default({}),
 });
 
 /**
@@ -158,6 +200,7 @@ export type FirmenAngebot = z.infer<typeof firmenAngebotSchema>;
 export type BeratungAngaben = z.infer<typeof beratungAngabenSchema>;
 export type VersichererWerte = z.infer<typeof versichererWerteSchema>;
 export type Entscheidung = z.infer<typeof entscheidungSchema>;
+export type AxaAngaben = z.infer<typeof axaAngabenSchema>;
 export type BeratungDaten = z.infer<typeof beratungDatenSchema>;
 export type BeratungStatus = (typeof BERATUNG_STATUS)[number];
 
