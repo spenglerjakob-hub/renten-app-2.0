@@ -389,17 +389,18 @@ select 28, 'M2 beraet in F1 weiter (Firma/Logo)', '1/1',
 set local request.jwt.claims = '{"sub":"11111111-0000-4000-8000-0000000b0001"}';
 select public.mitglied_entfernen((select id from ids where name = 'm2'));
 reset role;
+-- Als postgres ohne RLS: nur die Unterlagen der Test-Beratungen zaehlen, nicht die echter Konten.
 insert into ergebnis
 select 29, 'M2 entfernt: Beratungen in F1 und F2 und alle Unterlagen an I, F4 bleibt bei M2', 'i/i/i/m2',
        format('%s/%s/%s/%s',
          (select case besitzer when (select id from ids where name = 'i') then 'i' else besitzer::text end from public.bav_beratungen where id = (select id from ids where name = 'm2c')),
          (select case besitzer when (select id from ids where name = 'i') then 'i' else besitzer::text end from public.bav_beratungen where id = (select id from ids where name = 'm2d')),
-         (select string_agg(distinct case besitzer when (select id from ids where name = 'i') then 'i' else besitzer::text end, ',') from public.bav_unterlagen),
+         (select string_agg(distinct case besitzer when (select id from ids where name = 'i') then 'i' else besitzer::text end, ',') from public.bav_unterlagen where beratung in (select id from ids)),
          (select case besitzer when (select id from ids where name = 'm2') then 'm2' else besitzer::text end from public.bav_firmen where id = (select id from ids where name = 'f4'))),
        (select besitzer = (select id from ids where name = 'i') from public.bav_beratungen where id = (select id from ids where name = 'm2c'))
        and (select besitzer = (select id from ids where name = 'i') from public.bav_beratungen where id = (select id from ids where name = 'm2d'))
-       and (select bool_and(besitzer = (select id from ids where name = 'i')) from public.bav_unterlagen)
-       and (select bool_and(besitzer = (select id from ids where name = 'i')) from public.bav_unterschriften)
+       and (select bool_and(besitzer = (select id from ids where name = 'i')) from public.bav_unterlagen where beratung in (select id from ids))
+       and (select bool_and(besitzer = (select id from ids where name = 'i')) from public.bav_unterschriften where beratung in (select id from ids))
        and (select besitzer = (select id from ids where name = 'm2') from public.bav_firmen where id = (select id from ids where name = 'f4'));
 
 set local role authenticated;
