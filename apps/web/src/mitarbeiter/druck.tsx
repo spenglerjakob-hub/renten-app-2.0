@@ -449,7 +449,8 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
         </Abschnitt>
       )}
 
-      <Abschnitt titel={`${nr()}Ihre Rechnung`} teilbar>
+      {/* Rechnung und Leistung sind die langen Abschnitte: jeweils auf einer frischen Seite statt quer ueber den Seitenrand */}
+      <Abschnitt titel={`${nr()}Ihre Rechnung`} teilbar umbruch>
         <p className="break-inside-avoid">
           Sie wandeln <strong>{euroGenau(r.umwandlungMonat)}</strong> brutto im Monat um, Ihr Arbeitgeber gibt{' '}
           {euroGenau(r.arbeitgeberMonat)} dazu — in Ihre Vorsorge fließen <strong>{euroGenau(r.gesamtMonat)}</strong>. Netto kostet
@@ -512,7 +513,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
       </Abschnitt>
 
       {leistung && leistung.vertraege.length > 0 && (
-        <Abschnitt titel={`${nr()}Ihre Leistung im Alter ${quelleDerLeistung(leistung.vertraege.map((l) => daten.versicherer[l.weg].ausHochrechnung))}`} teilbar>
+        <Abschnitt titel={`${nr()}Ihre Leistung im Alter ${quelleDerLeistung(leistung.vertraege.map((l) => daten.versicherer[l.weg].ausHochrechnung))}`} teilbar umbruch>
           <p className="text-[9pt] text-ui-schiefer">
             Im ersten Rentenjahr {leistung.rentenbeginnJahr}, nach Kranken- und Pflegeversicherung und Steuer.
           </p>
@@ -578,16 +579,19 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
         </ul>
       </Abschnitt>
 
-      <Abschnitt titel="Ihre Fragen beantworte ich gern">
-        {kontakt.length > 0
-          ? <p className="whitespace-pre-line">{kontakt.join('\n')}</p>
-          : <p>Sprechen Sie mich jederzeit an.</p>}
-      </Abschnitt>
+      {/* Kontakt und Schlusshinweis bleiben zusammen — sonst stuende der Hinweis womoeglich allein auf einer letzten Seite */}
+      <div className="break-inside-avoid">
+        <Abschnitt titel="Ihre Fragen beantworte ich gern">
+          {kontakt.length > 0
+            ? <p className="whitespace-pre-line">{kontakt.join('\n')}</p>
+            : <p>Sprechen Sie mich jederzeit an.</p>}
+        </Abschnitt>
 
-      <p className="mt-6 text-[8pt] text-ui-schiefer">
-        Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
-        mit den Regeln von heute fortgeschrieben.
-      </p>
+        <p className="mt-6 text-[8pt] text-ui-schiefer">
+          Modellrechnung zum Rechtsstand {P.jahr}, keine Steuer- oder Rechtsberatung. Steuer und Krankenversicherung im Alter sind
+          mit den Regeln von heute fortgeschrieben.
+        </p>
+      </div>
     </article>
   );
 }
