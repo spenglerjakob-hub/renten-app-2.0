@@ -70,9 +70,12 @@ export function AuftrittFormular({ wert, onAendern, onLogo, voll = false, anmeld
     <div className="space-y-4">
       {buero && (
         <Hinweis symbol={Users}>
-          {gesperrt
-            ? <>Logo, Firmenname und Akzentfarbe legt {buero.inhaber || 'der Inhaber Ihres Büros'} für Ihr Büro{bueroName} fest.</>
-            : <>Logo, Firmenname und Akzentfarbe gelten für alle Kollegen in Ihrem Büro{bueroName}.</>}
+          {/* text-pretty: kein einzelnes Wort des Bueronamens allein in der letzten Zeile */}
+          <p className="text-pretty">
+            {gesperrt
+              ? <>Logo, Firmenname und Akzentfarbe legt {buero.inhaber || 'der Inhaber Ihres Büros'} für Ihr Büro{bueroName} fest.</>
+              : <>Logo, Firmenname und Akzentfarbe gelten für alle Kollegen in Ihrem Büro{bueroName}.</>}
+          </p>
         </Hinweis>
       )}
 
