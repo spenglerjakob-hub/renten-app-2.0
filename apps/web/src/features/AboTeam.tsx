@@ -214,6 +214,12 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
           ))}
         </ul>
       )}
+      {/* Logo, Firmenname und Akzentfarbe gelten fuers ganze Buero (Migration …_buero_auftritt) */}
+      {inhaber && (
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+          Logo, Firmenname und Akzentfarbe aus „Ihr Auftritt“ gelten für alle Kollegen im Büro; ändern können nur Sie sie.
+        </p>
+      )}
       {/* Was beim Ausscheiden mit den Firmen der Mitarbeiterberatung geschieht (Migration …_bav_gemeinsam) */}
       {inhaber && mitarbeiterberatung && mitglieder?.some((m) => m.rolle === 'mitglied') && (
         <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
@@ -255,7 +261,8 @@ function Buero({ z, vorschau }: { z: Zugang; vorschau: boolean }) {
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ui-schiefer">
           <span className="flex-1">
-            Sie sind Mitglied. Das Abo verwaltet die Person mit dem Vermerk oben.
+            Sie sind Mitglied. Das Abo verwaltet die Person mit dem Vermerk oben; sie legt auch Logo, Firmenname und
+            Akzentfarbe Ihrer Unterlagen fest.
             {mitarbeiterberatung && ' Treten Sie aus, gehen die Firmen, die Sie in der Mitarbeiterberatung fürs Büro freigegeben haben, mit allen Beratungen an diese Person.'}
           </span>
           <Sicher text="Büro verlassen" frage="Wirklich austreten?" ja="Ja, austreten" deaktiviert={vorschau}

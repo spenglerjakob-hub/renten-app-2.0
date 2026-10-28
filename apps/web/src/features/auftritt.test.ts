@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AUFTRITT_LEER, FARBVORSCHLAEGE, akzentVariablen, auftrittLeer, auftrittSichtbar, cssZeichenkette,
-  farbeNormal, fusszeileCss, fusszeileText, kontaktZeile, kontrastZuWeiss, linieKaumSichtbar, titelTauglich,
+  AUFTRITT_LEER, FARBVORSCHLAEGE, akzentVariablen, auftrittLeer, auftrittSichtbar, bueroAuftrittAus, cssZeichenkette,
+  farbeNormal, fusszeileCss, fusszeileText, kontaktZeile, kontrastZuWeiss, linieKaumSichtbar, mitBueroAuftritt, titelTauglich,
   type Auftritt,
 } from './auftritt';
 
@@ -115,5 +115,39 @@ describe('Fusszeile', () => {
     const css = fusszeileCss({ ...AUFTRITT_LEER, logo: 'data:image/png;base64,AAAA' });
     expect(css).not.toContain('@bottom-left');
     expect(css).toContain('@bottom-right');
+  });
+});
+
+describe('Im Büro: Logo, Firmenname und Akzentfarbe vom Inhaber', () => {
+  const buero = { firma: 'Agentur K GmbH', farbe: '#0f766e', logo: 'inhaber/logo-0123456789abcdef01234567.png', inhaber: 'Ingrid Inhaberin' };
+  const eigen: Auftritt = { ...muster, farbe: '#7f1d1d', logo: 'blob:eigenes', zusatz: 'Reg.-Nr. D-1' };
+
+  it('die Antwort der Datenbank: nur ein Objekt zaehlt, Werte werden geprueft', () => {
+    expect(bueroAuftrittAus(null)).toBeNull();
+    expect(bueroAuftrittAus([])).toBeNull();
+    expect(bueroAuftrittAus('x')).toBeNull();
+    expect(bueroAuftrittAus(buero)).toEqual(buero);
+    expect(bueroAuftrittAus({ firma: 3, farbe: '#ABC', logo: '', inhaber: null }))
+      .toEqual({ firma: '', farbe: null, logo: null, inhaber: '' });
+    expect(bueroAuftrittAus({ farbe: '#0F766E' })?.farbe).toBe('#0f766e');
+  });
+
+  it('Logo, Firmenname und Farbe vom Buero, Name und Kontakt bleiben die eigenen', () => {
+    const a = mitBueroAuftritt(eigen, buero, 'blob:buero');
+    expect([a.firma, a.farbe, a.logo]).toEqual(['Agentur K GmbH', '#0f766e', 'blob:buero']);
+    expect([a.berater, a.telefon, a.email, a.web, a.zusatz]).toEqual(['Max Mustermann', '0711 123456', 'max@muster.de', 'www.muster.de', 'Reg.-Nr. D-1']);
+  });
+
+  it('hat der Inhaber nichts eingetragen, bleibt es leer — auch wenn das Mitglied eigene Werte hat', () => {
+    const a = mitBueroAuftritt(eigen, { firma: '', farbe: null, logo: null, inhaber: 'Ingrid Inhaberin' }, null);
+    expect([a.firma, a.farbe, a.logo]).toEqual(['', null, null]);
+    expect(a.berater).toBe('Max Mustermann');
+  });
+
+  it('ohne eigene Angaben: nur das, was das Buero vorgibt', () => {
+    const a = mitBueroAuftritt(null, buero, 'blob:buero');
+    expect(a).toEqual({ ...AUFTRITT_LEER, firma: 'Agentur K GmbH', farbe: '#0f766e', logo: 'blob:buero' });
+    expect(auftrittSichtbar(a)).toBe(true);
+    expect(auftrittLeer(mitBueroAuftritt(null, { firma: '', farbe: null, logo: null, inhaber: '' }, null))).toBe(true);
   });
 });
