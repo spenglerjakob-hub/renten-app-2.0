@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Save, Trash2 } from 'lucide-react';
 import { useAuftritt, type SpeichernErgebnis } from '../store/auftritt';
+import { useZugang, wirksam } from '../store/zugang';
 import { AUFTRITT_LEER, type Auftritt } from './auftritt';
-import { AuftrittFormular } from './AuftrittFormular';
+import { AuftrittFormular, type BueroVorgabe } from './AuftrittFormular';
 import { DeckblattVorschau } from './DeckblattVorschau';
 import { FEHLER, Hinweis, KNOPF, KNOPF_KLEIN, KNOPF_KLEIN_GEFAHR } from '../components/stil';
 
@@ -20,12 +21,22 @@ const MELDUNG: Record<SpeichernErgebnis, string> = {
  *
  * Gespeichert wird erst mit „Speichern“ — anders als in der Schnellrechnung,
  * die im Browser bei jeder Aenderung ablegt: Hier geht es auf den Server.
+ *
+ * Im Buero legt der Inhaber Logo, Firmenname und Akzentfarbe fest; Mitglieder
+ * pflegen hier nur ihre eigenen Angaben (`store/auftritt.ts`).
  */
 export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | null }) {
   const status = useAuftritt((s) => s.status);
   const gespeichert = useAuftritt((s) => s.auftritt);
   const speichern = useAuftritt((s) => s.speichern);
   const entfernen = useAuftritt((s) => s.entfernen);
+  const eigenes = useAuftritt((s) => s.eigenes);
+  const bueroAuftritt = useAuftritt((s) => s.buero);
+  const z = useZugang(wirksam);
+  const buero: BueroVorgabe | null = bueroAuftritt
+    ? { rolle: 'mitglied', buero: z?.bueroName ?? null, inhaber: bueroAuftritt.inhaber }
+    : z?.buero && z.rolle === 'inhaber' ? { rolle: 'inhaber', buero: z.bueroName, inhaber: '' } : null;
+  const mitglied = buero?.rolle === 'mitglied';
 
   const [entwurf, setEntwurf] = useState<Auftritt>(gespeichert ?? AUFTRITT_LEER);
   // weggelassen = unveraendert, null = entfernen, Blob = neu
@@ -63,12 +74,15 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
     setLaeuft(false);
     setEntfernenFrage(false);
     if (ok) {
-      setEntwurf(AUFTRITT_LEER);
+      // Im Buero bleibt, was der Inhaber festlegt.
+      setEntwurf(useAuftritt.getState().auftritt ?? AUFTRITT_LEER);
       setNeuesLogo(undefined);
       setGeaendert(false);
     }
     setMeldung(ok
-      ? { ok: true, text: 'Entfernt. Das Gutachten erscheint wieder ohne Logo.' }
+      ? { ok: true, text: mitglied
+        ? 'Entfernt. Logo, Firmenname und Akzentfarbe kommen weiter aus Ihrem Büro.'
+        : 'Entfernt. Das Gutachten erscheint wieder ohne Logo.' }
       : { ok: false, text: MELDUNG.fehler });
   };
 
@@ -90,6 +104,7 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
         onLogo={(l) => { aendern({ logo: l ? l.dataUrl : null }); setNeuesLogo(l ? l.blob : null); }}
         voll
         anmeldeAdresse={anmeldeAdresse}
+        buero={buero}
       />
 
       <DeckblattVorschau auftritt={entwurf} />
@@ -111,10 +126,10 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
         <button type="button" onClick={() => void sichern()} disabled={laeuft || !geaendert} className={KNOPF}>
           <Save className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird gespeichert …' : 'Speichern'}
         </button>
-        {gespeichert && (
+        {(mitglied ? eigenes : gespeichert) && (
           entfernenFrage ? (
             <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-ui-tinte">
-              Logo und Angaben löschen?
+              {mitglied ? 'Ihre Angaben löschen?' : 'Logo und Angaben löschen?'}
               <button type="button" onClick={() => void wegnehmen()} disabled={laeuft} className={KNOPF_KLEIN_GEFAHR}>
                 Wirklich entfernen
               </button>
@@ -124,7 +139,7 @@ export function AuftrittFenster({ anmeldeAdresse }: { anmeldeAdresse: string | n
             </span>
           ) : (
             <button type="button" onClick={() => setEntfernenFrage(true)} disabled={laeuft} className={KNOPF_KLEIN}>
-              <Trash2 className="h-3.5 w-3.5" aria-hidden /> Auftritt entfernen
+              <Trash2 className="h-3.5 w-3.5" aria-hidden /> {mitglied ? 'Ihre Angaben entfernen' : 'Auftritt entfernen'}
             </button>
           )
         )}

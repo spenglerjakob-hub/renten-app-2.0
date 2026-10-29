@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { zufallsname } from './check';
-import { GRENZEN, farbeNormal, type Auftritt, type AuftrittText } from '../features/auftritt';
+import { GRENZEN, bueroAuftrittAus, farbeNormal, type Auftritt, type AuftrittText, type BueroAuftritt } from '../features/auftritt';
 import { namensTeile } from './namen';
 
 /**
@@ -64,17 +64,37 @@ export async function profilLaden(): Promise<Profil | null | 'fehler'> {
   }
 }
 
-export async function profilSpeichern(angaben: Angaben, logoPfad: string | null): Promise<boolean> {
+/**
+ * `nurPersoenlich`: im Buero — Logo, Firmenname und Akzentfarbe legt der
+ * Inhaber fest. Sie gehen dann gar nicht mit; die eigene Zeile behaelt ihre
+ * Werte fuer die Zeit nach einem Austritt (das Upsert aendert nur, was es
+ * mitbringt).
+ */
+export async function profilSpeichern(angaben: Angaben, logoPfad: string | null, nurPersoenlich = false): Promise<boolean> {
   const id = await nutzerId();
   if (!supabase || !id) return false;
+  const { firma, ...persoenlich } = gekappt(angaben);
   try {
     const { error } = await supabase.from('berater_profil').upsert(
-      { besitzer: id, ...gekappt(angaben), farbe: farbeNormal(angaben.farbe), logo: logoPfad },
+      nurPersoenlich
+        ? { besitzer: id, ...persoenlich }
+        : { besitzer: id, firma, ...persoenlich, farbe: farbeNormal(angaben.farbe), logo: logoPfad },
       { onConflict: 'besitzer' },
     );
     return !error;
   } catch {
     return false;
+  }
+}
+
+/** Logo, Firmenname und Akzentfarbe des Bueros — null: kein Mitglied eines Bueros (Migration 20261028120000). */
+export async function bueroAuftrittLaden(): Promise<BueroAuftritt | null | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.rpc('buero_auftritt');
+    return error ? 'fehler' : bueroAuftrittAus(data);
+  } catch {
+    return 'fehler';
   }
 }
 

@@ -337,7 +337,8 @@ function Datenschutz() {
         erstellt und wer sie wann eingelöst hat) sowie den Stand des Abos: Paket, Zahlweise, Zahl der Plätze,
         Status, Laufzeit und gegebenenfalls das Kündigungsdatum. Die Mitglieder eines Büros sehen die
         E-Mail-Adressen der anderen Mitglieder, in der Mitarbeiterberatung auch Name und Agentur aus „Ihr
-        Auftritt“; sonst sieht niemand diese Angaben. Rechtsgrundlage ist der
+        Auftritt“; sonst sieht niemand diese Angaben. Logo, Firmenname und Akzentfarbe aus „Ihr Auftritt“ der Person,
+        die das Büro verwaltet, erscheinen in den Gutachten und Unterlagen aller Mitglieder. Rechtsgrundlage ist der
         Nutzungsvertrag (Art. 6 Abs. 1 lit. b DSGVO). Die Angaben werden mit dem Konto der Person gelöscht, die das
         Büro verwaltet.
       </P>

@@ -168,3 +168,36 @@ export const FARBVORSCHLAEGE: { farbe: string; name: string }[] = [
   { farbe: '#7f1d1d', name: 'Bordeaux' },
   { farbe: '#334155', name: 'Anthrazit' },
 ];
+
+/**
+ * IM BUERO („Abo & Team“) legt der Inhaber Logo, Firmenname und Akzentfarbe
+ * fest — in seinem eigenen Auftritt (Migration 20261028120000). Fuer die
+ * Mitglieder gelten sie, auch wenn er sie leer gelassen hat; Name, Kontakt,
+ * Website und Zusatzzeile bleiben die eigenen.
+ */
+export interface BueroAuftritt {
+  firma: string;
+  farbe: string | null;
+  /** Pfad im Bucket des Inhabers, oder null */
+  logo: string | null;
+  /** Name des Inhabers, sonst seine E-Mail — fuer den Hinweis im Formular */
+  inhaber: string;
+}
+
+/** Die Antwort von `buero_auftritt` — null: kein Mitglied eines Bueros. */
+export function bueroAuftrittAus(roh: unknown): BueroAuftritt | null {
+  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return null;
+  const r = roh as Record<string, unknown>;
+  const text = (x: unknown) => (typeof x === 'string' ? x : '');
+  return {
+    firma: text(r.firma),
+    farbe: farbeNormal(typeof r.farbe === 'string' ? r.farbe : null),
+    logo: typeof r.logo === 'string' && r.logo !== '' ? r.logo : null,
+    inhaber: text(r.inhaber),
+  };
+}
+
+/** Der Auftritt eines Mitglieds: Logo, Firmenname und Akzentfarbe vom Buero, alles andere das eigene. */
+export function mitBueroAuftritt(eigen: Auftritt | null, buero: BueroAuftritt, logo: string | null): Auftritt {
+  return { ...(eigen ?? AUFTRITT_LEER), firma: buero.firma, farbe: buero.farbe, logo };
+}

@@ -404,11 +404,13 @@ export default function App() {
   const auftrittLeeren = useAuftritt((s) => s.zuruecksetzen);
   const [auftrittOffen, setAuftrittOffen] = useState(false);
   const schliesseAuftritt = useCallback(() => setAuftrittOffen(false), []);
+  // Tritt jemand einem Buero bei oder aus, gelten andere Logo, Firmenname und Akzentfarbe — neu laden.
+  const bueroSchluessel = useZugang((s) => { const z = wirksam(s); return z?.buero ? `${z.buero}|${z.rolle ?? ''}` : ''; });
   useEffect(() => {
     if (!supabaseKonfiguriert) return;
     if (angemeldet) void auftrittLaden();
     else auftrittLeeren();
-  }, [angemeldet, auftrittLaden, auftrittLeeren]);
+  }, [angemeldet, bueroSchluessel, auftrittLaden, auftrittLeeren]);
 
   /*
     DER AUFTRITT AUS DER SCHNELLRECHNUNG (`lib/auftritt-lokal.ts`). Ist im
@@ -439,6 +441,8 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!auftrittLokal || auftrittStatus !== 'bereit' || auftrittBand || auftrittUebernahme.current) return;
+    // Im Buero legt der Inhaber Logo, Firma und Farbe fest — mehr bringt die Schnellrechnung nicht mit. Der Entwurf bleibt liegen.
+    if (useAuftritt.getState().buero) return;
     if (useAuftritt.getState().auftritt) { setAuftrittBand('frage'); return; }
     auftrittUebernahme.current = true;
     void auftrittUebernehmen(auftrittLokal).then((ok) => {

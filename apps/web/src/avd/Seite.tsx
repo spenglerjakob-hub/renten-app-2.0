@@ -226,9 +226,11 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
-      <SeitenKopf />
+      {/* Im Druck so knapp wie auf den Arbeitgeber-Seiten: Mit dem Namen unter
+          dem Titel passte die erste Ergebniskarte sonst nicht mehr auf Seite 1. */}
+      <SeitenKopf innen="print:max-w-none print:px-0 print:py-1" />
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         {/* Der Titel als Aussage wie in der Beratung; im Druck so gross wie bisher. */}
         <Titel gross klasse="print:text-3xl">
           Altersvorsorgedepot: Was Ihnen der Staat ab 2027 <Hervor>dazugibt</Hervor>
@@ -442,7 +444,11 @@ export function Seite() {
         <div className="space-y-4 lg:col-span-7">
 
         {/* --- Profitabilitaet --- */}
-        <section className={`break-inside-avoid ${KARTE}`}>
+        {/* Im Druck darf diese Karte zwischen ihren Teilen umbrechen: Als
+            Ganzes sprang sie auf Seite 2, sobald sie nicht mehr ganz auf
+            Seite 1 passte (Name, Bonus, Hinweise), und liess Seite 1 fast
+            leer. Jedes Stueck behaelt Rand und Innenabstand. */}
+        <section className={`${KARTE} print:box-decoration-clone`}>
           <h2 className={KARTE_TITEL}>Was es kostet, was es bringt</h2>
 
           {!profit ? (
@@ -457,7 +463,7 @@ export function Seite() {
                 passte die Karte nicht mehr auf das erste Blatt und zog alles
                 Folgende eine Seite weiter.
               */}
-              <div className="space-y-4 print:grid print:grid-cols-2 print:items-start print:gap-4 print:space-y-0">
+              <div className="break-inside-avoid space-y-4 print:grid print:grid-cols-2 print:items-start print:gap-4 print:space-y-0">
               {/*
                 Der Monat als Ring wie die Versorgungsluecke: links der Ring mit
                 dem Hebel, rechts die drei Teile. Im Druck ist neben der
@@ -550,12 +556,12 @@ export function Seite() {
                 am Telefon 26 Punkt und gilt damit als grosse Schrift — Cyan auf
                 Sky Wash erreicht 4,2:1, genug ab 24 Punkt, zu wenig darunter.
               */}
-              <Kernsatz gross etikett="Ihr Kapital zum Rentenbeginn" klasse="print:p-4">
+              <Kernsatz gross etikett="Ihr Kapital zum Rentenbeginn" klasse="break-inside-avoid print:p-4">
                 Angespart bis {rentenbeginn!.jahr}:{' '}
                 <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(profit.endkapital)}</Hervor></span>
               </Kernsatz>
 
-              {profit.hinweise.map((h) => <Hinweis key={h}>{h}</Hinweis>)}
+              {profit.hinweise.map((h) => <Hinweis key={h} klasse="break-inside-avoid">{h}</Hinweis>)}
 
               <p className="text-xs leading-relaxed text-ui-schiefer">
                 Die Steuerersparnis ist mit Ihrem heutigen Einkommen gerechnet und auf die Laufzeit
