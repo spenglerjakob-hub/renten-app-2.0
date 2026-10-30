@@ -651,11 +651,7 @@ export function hochrechnung(
 ): Hochrechnung {
   const n = monateDerUmwandlung(d, f, heute);
   const c = r.gesamtMonat;
-  const angelegt = c * (1 - a.ausgabeaufschlag);
-  // Wie im Depot: Rendite nach laufenden Kosten, nicht unter null
-  const i = Math.pow(1 + Math.max(0, a.renditeAnsparphase - a.ter), 1 / 12) - 1;
-  const kapital = i > 0 ? angelegt * ((Math.pow(1 + i, n) - 1) / i) * (1 + i) : angelegt * n;
-  const plan = entnahmeplan(kapital, kapital, a.entnahmedauer, Math.max(0, a.renditeEntnahme - a.ter));
+  const kapital = kapitalNach(c, n, a);
   const beitraegeSumme = c * n;
   return {
     monate: n,
@@ -667,8 +663,67 @@ export function hochrechnung(
     beitraegeSumme,
     ertrag: kapital - beitraegeSumme,
     kapital,
-    renteMonat: plan.bruttoProJahr / 12,
+    renteMonat: renteAus(kapital, a),
   };
+}
+
+/** Das Kapital nach `monate` Beitraegen von `beitragMonat` — vorschuessig, nach Ausgabeaufschlag und laufenden Kosten. */
+export function kapitalNach(beitragMonat: number, monate: number, a: HochrechnungAnnahmen): number {
+  const angelegt = beitragMonat * (1 - a.ausgabeaufschlag);
+  // Wie im Depot: Rendite nach laufenden Kosten, nicht unter null
+  const i = Math.pow(1 + Math.max(0, a.renditeAnsparphase - a.ter), 1 / 12) - 1;
+  return i > 0 ? angelegt * ((Math.pow(1 + i, monate) - 1) / i) * (1 + i) : angelegt * monate;
+}
+
+/** Die geschaetzte Rente brutto im Monat aus dem Kapital: die Entnahme ueber `entnahmedauer` Jahre. */
+export function renteAus(kapital: number, a: HochrechnungAnnahmen): number {
+  return entnahmeplan(kapital, kapital, a.entnahmedauer, Math.max(0, a.renditeEntnahme - a.ter)).bruttoProJahr / 12;
+}
+
+/* --------------------------------------------------------------------------
+ * SPAETER BEGINNEN — dieselbe Hochrechnung, je Jahr Warten zwoelf Beitraege
+ * weniger. Dagegen steht, was man bis dahin netto nicht aufwendet.
+ * ------------------------------------------------------------------------ */
+
+export interface SpaeterZeile {
+  /** Jahre spaeter; 0 ist der Beginn wie geplant */
+  jahre: number;
+  monate: number;
+  kapital: number;
+  renteMonat: number;
+  /** Weniger als bei Beginn wie geplant */
+  wenigerKapital: number;
+  wenigerRente: number;
+  /** Der Anteil weniger Kapital */
+  wenigerAnteil: number;
+  /** Was man bis dahin netto nicht aufwendet: der Netto-Aufwand der Jahre des Wartens */
+  nettoGespart: number;
+}
+
+/**
+ * Was es kostet, 1 bis `bisJahre` Jahre spaeter zu beginnen — mit denselben
+ * Annahmen und demselben Beitrag, solange vor dem Rentenbeginn noch Monate
+ * bleiben. Die erste Zeile ist der Beginn wie geplant. Leer ohne Hochrechnung.
+ */
+export function spaeterBeginnen(h: Hochrechnung, nettoAufwandMonat: number, bisJahre = 5): SpaeterZeile[] {
+  if (h.monate <= 0 || h.beitragMonat <= 0) return [];
+  const zeilen: SpaeterZeile[] = [];
+  for (let k = 0; k <= bisJahre && h.monate - 12 * k > 0; k++) {
+    const monate = h.monate - 12 * k;
+    const kapital = k === 0 ? h.kapital : kapitalNach(h.beitragMonat, monate, h.annahmen);
+    const renteMonat = k === 0 ? h.renteMonat : renteAus(kapital, h.annahmen);
+    zeilen.push({
+      jahre: k,
+      monate,
+      kapital,
+      renteMonat,
+      wenigerKapital: h.kapital - kapital,
+      wenigerRente: h.renteMonat - renteMonat,
+      wenigerAnteil: h.kapital > 0 ? (h.kapital - kapital) / h.kapital : 0,
+      nettoGespart: nettoAufwandMonat * 12 * k,
+    });
+  }
+  return zeilen;
 }
 
 /**

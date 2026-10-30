@@ -24,9 +24,9 @@ import { AnteilsRing } from '../components/AnteilsRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
-  probeabrechnung, reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
+  probeabrechnung, reglerGrenzen, rentenbeginnVon, spaeterBeginnen, umwandlungFuerNetto,
   type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
-  type LueckeMitBetriebsrente, type Probeabrechnung, type Versorgungsluecke,
+  type LueckeMitBetriebsrente, type Probeabrechnung, type SpaeterZeile, type Versorgungsluecke,
 } from './rechnung';
 import {
   GEHAELTER_OPTIONEN, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, lohnsteuerHinweis, nettolohnGrundlage,
@@ -570,6 +570,65 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
   );
 }
 
+/** „1 Jahr später“, „2 Jahre später“ — die erste Zeile ist der Beginn wie geplant. Am Telefon kurz: „+ 1 Jahr“. */
+function BeginnText({ jahre }: { jahre: number }) {
+  if (jahre === 0) return <>wie geplant</>;
+  const jahr = jahre === 1 ? 'Jahr' : 'Jahre';
+  return <><span className="sm:hidden">+ {jahre} {jahr}</span><span className="hidden sm:inline">{jahre} {jahr} später</span></>;
+}
+
+/**
+ * Was es kostet, spaeter zu beginnen — dieselbe Hochrechnung, je Jahr Warten
+ * zwoelf Beitraege weniger. Daneben, was man bis dahin netto nicht aufwendet:
+ * Das fehlende Kapital ist stets mehr, denn mit dem Netto-Aufwand fehlen auch
+ * Arbeitgeber, Steuer- und Sozialabgabenersparnis und die Ertraege.
+ */
+function SpaeterKarte({ zeilen }: { zeilen: SpaeterZeile[] }) {
+  const eins = zeilen[1];
+  if (!eins) return null;
+  return (
+    <Karte titel="Später beginnen? Was das kostet" rechts={<Vermerk>geschätzt</Vermerk>}>
+      <div className={`${AKZENT} px-5 py-4`}>
+        <p className="ui-titel text-[22px] leading-snug sm:text-[24px]">
+          Ein Jahr warten spart Ihnen {euro(eins.nettoGespart)} netto — und kostet{' '}
+          <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(eins.wenigerKapital)}</Hervor></span> Kapital.
+        </p>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[17rem] text-[13px] tabular-nums sm:text-sm">
+          <thead>
+            <tr className="whitespace-nowrap text-xs text-ui-schiefer">
+              <th className="py-2 text-left font-normal">Beginn</th>
+              <th className="py-2 pl-2 text-right font-normal">Kapital</th>
+              <th className="py-2 pl-2 text-right font-normal">Rente<span className="hidden sm:inline"> im Monat</span></th>
+              <th className="py-2 pl-2 text-right font-normal">weniger<span className="hidden sm:inline"> Kapital</span></th>
+            </tr>
+          </thead>
+          <tbody className="whitespace-nowrap text-ui-tinte">
+            {zeilen.map((z) => (
+              <tr key={z.jahre} className={`border-t border-ui-linie ${z.jahre === 0 ? 'font-medium' : ''}`}>
+                <td className="py-2"><BeginnText jahre={z.jahre} /></td>
+                <td className="py-2 pl-2 text-right">{euro(z.kapital)}</td>
+                <td className="py-2 pl-2 text-right">{euro(z.renteMonat)}</td>
+                <td className="py-2 pl-2 text-right">
+                  {z.jahre === 0 ? '—' : (
+                    <>− {euro(z.wenigerKapital)}<span className="hidden text-ui-schiefer sm:inline"> ({Math.round(z.wenigerAnteil * 100)}{'\u00a0'}%)</span></>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+        Dieselbe beispielhafte Hochrechnung mit gleichem Beitrag und gleicher Rendite, nur später begonnen; Rente brutto.
+        Jedes Jahr Warten spart {euro(eins.nettoGespart)} Netto-Aufwand — dafür fehlen im Vertrag auch der Arbeitgeberbeitrag, die
+        Steuer- und Sozialabgabenersparnis und die Erträge dieser Jahre.
+      </p>
+    </Karte>
+  );
+}
+
 export function SchrittRechnung(props: SchrittProps) {
   const { firma, daten, setze, r } = props;
   const abrechnung = useMemo(() => probeabrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
@@ -615,6 +674,8 @@ export function SchrittRechnung(props: SchrittProps) {
 
       <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
         setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
+
+      <SpaeterKarte zeilen={spaeterBeginnen(h, r.nettoAufwandMonat)} />
     </div>
   );
 }

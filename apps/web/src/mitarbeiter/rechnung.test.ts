@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, kapitalNach, spaeterBeginnen, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   laufendesJahresbrutto, lueckeMitBetriebsrente, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
@@ -295,6 +295,40 @@ describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner, mit feste
     const d = anna();
     const h = hochrechnung(firma, d, beitragsRechnung(firma, d), HEUTE, annahmen({ renditeEntnahme: 0.01, entnahmedauer: 25 }));
     expect(h.renteMonat).toBeCloseTo(h.kapital / (25 * 12), 6);
+  });
+});
+
+describe('Später beginnen — dieselbe Hochrechnung, je Jahr zwölf Beiträge weniger', () => {
+  it('die erste Zeile ist die Hochrechnung; jedes Jahr Warten kostet Kapital und Rente', () => {
+    const d = anna();
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    const z = spaeterBeginnen(h, r.nettoAufwandMonat);
+    expect(z.map((x) => x.jahre)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(z[0]!.kapital).toBe(h.kapital);
+    expect(z[0]!.renteMonat).toBe(h.renteMonat);
+    expect(z[0]!.wenigerKapital).toBe(0);
+    for (let k = 1; k < z.length; k++) {
+      expect(z[k]!.monate).toBe(h.monate - 12 * k);
+      expect(z[k]!.kapital).toBeLessThan(z[k - 1]!.kapital);
+      expect(z[k]!.renteMonat).toBeLessThan(z[k - 1]!.renteMonat);
+      expect(z[k]!.nettoGespart).toBeCloseTo(r.nettoAufwandMonat * 12 * k, 9);
+      // Das fehlende Kapital ist mehr als der gesparte Netto-Aufwand: Arbeitgeber, Ersparnis und Ertraege fehlen mit
+      expect(z[k]!.wenigerKapital).toBeGreaterThan(z[k]!.nettoGespart);
+    }
+    // Gleich gerechnet wie die Hochrechnung: dieselbe Formel mit weniger Monaten
+    expect(z[1]!.kapital).toBeCloseTo(kapitalNach(h.beitragMonat, h.monate - 12, h.annahmen), 9);
+  });
+
+  it('kurz vor der Rente nur so viele Jahre, wie noch Monate bleiben; ohne Beitrag nichts', () => {
+    const d = { ...anna(), angaben: { ...anna().angaben, geburtsdatum: '15.03.1962' } };
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    const z = spaeterBeginnen(h, r.nettoAufwandMonat);
+    expect(z.length).toBeGreaterThan(0);
+    expect(z.every((x) => x.monate > 0)).toBe(true);
+    expect(z.length).toBeLessThanOrEqual(Math.ceil(h.monate / 12));
+    expect(spaeterBeginnen({ ...h, beitragMonat: 0 }, 0)).toEqual([]);
   });
 });
 

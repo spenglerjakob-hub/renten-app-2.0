@@ -10,6 +10,7 @@ import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
   P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, lueckeMitBetriebsrente, monatsgehalt, probeabrechnung, rentenbeginnVon,
+  spaeterBeginnen,
   type AuszahlungsWerte, type BelastungsTreppe, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
@@ -392,6 +393,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
   const fussCss = fusszeileCss(auftritt);
   const abrechnung = probeabrechnung(angebot, daten, r);
   const h = hochrechnung(angebot, daten, r);
+  const spaeter = spaeterBeginnen(h, r.nettoAufwandMonat);
   const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
   const offen = daten.entscheidung.status === 'offen';
   const datum = daten.entscheidung.datum || heuteText();
@@ -528,6 +530,36 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
               Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine Zusage.
               Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab; die Rente ist brutto, vor Kranken- und
               Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers.
+            </p>
+          </div>
+        )}
+        {spaeter.length > 1 && (
+          <div className="mt-3 break-inside-avoid">
+            <p className="font-medium">Später beginnen? Was das kostet</p>
+            <table className="mt-1 w-full max-w-[34rem] tabular-nums">
+              <thead>
+                <tr className="text-[9pt] text-ui-schiefer">
+                  <th className="text-left font-medium">Beginn</th>
+                  <th className="pl-2 text-right font-medium">Kapital</th>
+                  <th className="pl-2 text-right font-medium">Rente im Monat</th>
+                  <th className="pl-2 text-right font-medium">weniger Kapital</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spaeter.map((z) => (
+                  <tr key={z.jahre} className="border-t border-ui-linie">
+                    <td className="py-0.5">{z.jahre === 0 ? 'wie geplant' : `${z.jahre} ${z.jahre === 1 ? 'Jahr' : 'Jahre'} später`}</td>
+                    <td className="py-0.5 pl-2 text-right">{euroGenau(Math.round(z.kapital))}</td>
+                    <td className="py-0.5 pl-2 text-right">{euroGenau(Math.round(z.renteMonat))}</td>
+                    <td className="py-0.5 pl-2 text-right">{z.jahre === 0 ? '—' : `− ${euroGenau(Math.round(z.wenigerKapital))}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-1">
+              Ein Jahr warten spart Ihnen {euroGenau(Math.round(spaeter[1]!.nettoGespart))} netto — und kostet{' '}
+              {euroGenau(Math.round(spaeter[1]!.wenigerKapital))} Kapital: Mit dem Netto-Aufwand fehlen auch Arbeitgeberbeitrag,
+              Steuer- und Sozialabgabenersparnis und die Erträge dieser Jahre.
             </p>
           </div>
         )}
