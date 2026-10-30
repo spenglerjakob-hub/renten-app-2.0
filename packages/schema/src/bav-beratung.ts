@@ -65,7 +65,27 @@ export const firmenAngebotSchema = z.object({
   organisationsnummer: z.string().max(40).default(''),
 });
 
-export const beratungAngabenSchema = z.object({
+/** Die Steuerklassen der Beratung — VI (zweites Dienstverhaeltnis) gibt es nicht. */
+export const STEUERKLASSEN_BERATUNG = [1, 2, 3, 4, 5] as const;
+export type SteuerklasseBeratung = (typeof STEUERKLASSEN_BERATUNG)[number];
+
+/** Gehaelter im Jahr — wie „Auszahlungen pro Jahr“ im Rechner. */
+export const GEHAELTER_IM_JAHR = [12, 12.5, 13, 14] as const;
+
+/**
+ * Die Steuerklasse einer Beratung. Beratungen von vor der Steuerklasse
+ * kennen nur „verheiratet“ und das Gehalt des Partners: ledig wird I,
+ * verheiratet ohne Einkommen des Partners III — gerechnet wie bisher im
+ * Splittingtarif —, mit Einkommen IV.
+ */
+export function steuerklasseAus(a: { steuerklasse?: number; verheiratet: boolean; partnerBrutto: number }): SteuerklasseBeratung {
+  const k = STEUERKLASSEN_BERATUNG.find((x) => x === a.steuerklasse);
+  if (k) return k;
+  if (!a.verheiratet) return 1;
+  return a.partnerBrutto > 0 ? 4 : 3;
+}
+
+const angabenFelder = z.object({
   /** Der ganze Name — ihn lesen Liste, Unterlagen, Unterschrift und die Live-Seite. */
   name: z.string().max(120).default(''),
   /**
@@ -76,11 +96,23 @@ export const beratungAngabenSchema = z.object({
   vorname: z.string().max(60).default(''),
   nachname: z.string().max(60).default(''),
   geburtsdatum: datum(),
+  /** Mit Sonderzahlungen; das Monatsgehalt ist `jahresbrutto / gehaelter` */
   jahresbrutto: betrag(2_000_000).default(0),
+  /** Gehaelter im Jahr (`GEHAELTER_IM_JAHR`) — erfasst wird das Monatsgehalt */
+  gehaelter: z.number().min(12).max(14).default(12),
   /** Leer: das Bundesland der Firma */
   bundesland: z.string().max(40).default(''),
+  /**
+   * Steuerklasse der Gehaltsabrechnung, 1–5. Fehlt sie, leitet das Lesen
+   * sie ab (`steuerklasseAus`).
+   */
+  steuerklasse: z.number().int().min(1).max(5).optional(),
+  /**
+   * Wird mit der Steuerklasse mitgeschrieben (III, IV, V: verheiratet) —
+   * fuer Live-Fassungen ohne Steuerklasse. Gerechnet wird mit der Klasse.
+   */
   verheiratet: z.boolean().default(false),
-  /** Jahresbrutto des Partners — fuer die Steuerersparnis im Splitting; 0: ohne Einkommen */
+  /** Nur in Beratungen von vor der Steuerklasse: Jahresbrutto des Partners; 0: ohne Einkommen */
   partnerBrutto: betrag(2_000_000).default(0),
   kirchensteuer: z.boolean().default(false),
   kinder: z.array(kindSchema).max(15).default([]),
@@ -97,6 +129,9 @@ export const beratungAngabenSchema = z.object({
   /** AXA-Antrag: derzeitige Taetigkeit des Mitarbeiters */
   taetigkeit: z.string().max(80).default(''),
 });
+
+/** Die Angaben eines Mitarbeiters — immer mit Steuerklasse, auch in Beratungen von vorher. */
+export const beratungAngabenSchema = angabenFelder.transform((a) => ({ ...a, steuerklasse: steuerklasseAus(a) }));
 
 /** Die Werte aus dem Angebot des Versicherers, je Vertrag. */
 export const versichererWerteSchema = z.object({

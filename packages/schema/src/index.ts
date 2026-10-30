@@ -18,6 +18,7 @@ export {
   firmenModellSchema, firmenAngebotSchema, beratungAngabenSchema, versichererWerteSchema,
   entscheidungSchema, axaAngabenSchema, hochrechnungSchema, beratungDatenSchema, angebotLesen, beratungLesen,
   MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS, AXA_KANAELE,
+  STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, steuerklasseAus, type SteuerklasseBeratung,
   type FirmenModellDaten, type FirmenAngebot, type BeratungAngaben, type VersichererWerte,
   type Entscheidung, type AxaAngaben, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   firmenAngebotSchema, beratungDatenSchema, angebotLesen, beratungLesen, MODELL_VORGABE,
+  STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, steuerklasseAus,
 } from '../src/bav-beratung.js';
 
 describe('Firmenangebot', () => {
@@ -121,5 +122,34 @@ describe('Angaben für den AXA-Antrag', () => {
     expect(firmenAngebotSchema.safeParse({ kollektivnummer: 'x'.repeat(41) }).success).toBe(false);
     expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'Industriemechanikerin' } }).success).toBe(true);
     expect(beratungDatenSchema.safeParse({ angaben: { taetigkeit: 'x'.repeat(81) } }).success).toBe(false);
+  });
+});
+
+describe('Steuerklasse und Gehälter im Jahr', () => {
+  it('neue Beratung: Steuerklasse I, 12 Gehälter', () => {
+    const a = beratungDatenSchema.parse({}).angaben;
+    expect(a.steuerklasse).toBe(1);
+    expect(a.gehaelter).toBe(12);
+  });
+
+  it('Beratungen von vorher: ledig I, verheiratet ohne Einkommen des Partners III, mit IV', () => {
+    expect(beratungLesen({ angaben: { verheiratet: false } }).angaben.steuerklasse).toBe(1);
+    expect(beratungLesen({ angaben: { verheiratet: true, partnerBrutto: 0 } }).angaben.steuerklasse).toBe(3);
+    expect(beratungLesen({ angaben: { verheiratet: true, partnerBrutto: 36_000 } }).angaben.steuerklasse).toBe(4);
+    expect(steuerklasseAus({ verheiratet: true, partnerBrutto: 0, steuerklasse: 5 })).toBe(5);
+  });
+
+  it('eine eingetragene Klasse gilt; nur I bis V, nur 12 bis 14 Gehälter', () => {
+    expect(beratungLesen({ angaben: { steuerklasse: 2, verheiratet: false } }).angaben.steuerklasse).toBe(2);
+    expect(beratungDatenSchema.safeParse({ angaben: { steuerklasse: 6 } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ angaben: { gehaelter: 15 } }).success).toBe(false);
+    expect(beratungDatenSchema.parse({ angaben: { gehaelter: 13, jahresbrutto: 52_000 } }).angaben.gehaelter).toBe(13);
+    expect(STEUERKLASSEN_BERATUNG).toEqual([1, 2, 3, 4, 5]);
+    expect(GEHAELTER_IM_JAHR).toEqual([12, 12.5, 13, 14]);
+  });
+
+  it('Rundlauf: was gelesen und wieder gespeichert wird, bleibt gleich', () => {
+    const d = beratungLesen({ angaben: { verheiratet: true, partnerBrutto: 0, jahresbrutto: 48_000 } });
+    expect(beratungLesen(JSON.parse(JSON.stringify(d)))).toEqual(d);
   });
 });
