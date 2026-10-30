@@ -402,8 +402,11 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
     .filter((x): x is { v: typeof x.v; t: BelastungsTreppe } => x.t !== null);
   const haupt = kennzahlen ? kennzahlen.prognose ?? kennzahlen.garantiert ?? kennzahlen.kapital : null;
   const wege = kennzahlen ? [kennzahlen.garantiert, kennzahlen.prognose, kennzahlen.kapital].filter((x): x is KennzahlenWeg => x !== null) : [];
+  // Zwei Zeilen statt bis zu fuenf — wer und wie erreichbar, mit „ · “ wie die Fusszeile: So passt der Kontakt noch
+  // auf die Seite von „Gut zu wissen“.
+  const zeile = (xs: (string | false)[]) => xs.filter((x): x is string => !!x && x.trim() !== '').map((x) => x.trim()).join(' · ');
   const kontakt = auftritt
-    ? [auftritt.berater, auftritt.firma, auftritt.telefon && `Telefon ${auftritt.telefon}`, auftritt.email, auftritt.web].filter(Boolean)
+    ? [zeile([auftritt.berater, auftritt.firma]), zeile([auftritt.telefon && `Telefon ${auftritt.telefon}`, auftritt.email, auftritt.web])].filter(Boolean)
     : [];
   let n = 0;
   const nr = () => `${(n += 1)}. `;
@@ -632,11 +635,12 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
         </ul>
       </Abschnitt>
 
-      {/* Kontakt und Schlusshinweis bleiben zusammen — sonst stuende der Hinweis womoeglich allein auf einer letzten Seite */}
-      <div className="break-inside-avoid">
+      {/* Kontakt und Schlusshinweis bleiben zusammen — und nie allein auf einer letzten Seite: Passen sie nicht mehr,
+          geht „Gut zu wissen“ mit auf die neue Seite (break-before-avoid). */}
+      <div className="break-inside-avoid break-before-avoid">
         <Abschnitt titel="Ihre Fragen beantworte ich gern">
           {kontakt.length > 0
-            ? <p className="whitespace-pre-line">{kontakt.join('\n')}</p>
+            ? kontakt.map((z) => <p key={z}>{z}</p>)
             : <p>Sprechen Sie mich jederzeit an.</p>}
         </Abschnitt>
 

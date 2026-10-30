@@ -311,3 +311,4 @@ w-auto
 w-full
 whitespace-nowrap
 whitespace-pre-line
+break-before-avoid
