@@ -1,5 +1,6 @@
 import type { LegalParameters } from '../params/types.js';
 import { zusatzsteuer } from '../tax/haushalt.js';
+import { lohnsteuerZusatz, type Steuerklasse } from '../tax/lohnsteuer.js';
 import { bruttoZuNetto } from '../erwerb/netto.js';
 import type { KinderStatus } from '../social/kv-pv.js';
 import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './vertrags-tuev.js';
@@ -138,11 +139,23 @@ export interface MatchingSteuer {
    * rechnen die Arbeitgeber-Seiten.
    */
   partnerZveJahr?: number;
+  /**
+   * Steuerklasse der Gehaltsabrechnung (Mitarbeiterberatung). Gesetzt:
+   * Ersparnis und Netto rechnen mit der Lohnsteuer dieser Klasse, wie die
+   * Abrechnung und das Angebot des Versicherers — `verheiratet` und
+   * `partnerZveJahr` zaehlen dann nicht.
+   */
+  steuerklasse?: Steuerklasse;
 }
 
-/** Das zvE, auf dem die Steuerersparnis des Mitarbeiters aufsetzt — mit dem des Partners. */
+/** Das zvE, auf dem die Steuerersparnis des Mitarbeiters aufsetzt — mit dem des Partners, ausser nach Steuerklasse. */
 const zveBasis = (eigenesZve: number, s: MatchingSteuer) =>
-  eigenesZve + (s.verheiratet ? Math.max(0, s.partnerZveJahr ?? 0) : 0);
+  eigenesZve + (s.verheiratet && !s.steuerklasse ? Math.max(0, s.partnerZveJahr ?? 0) : 0);
+
+/** Was die Minderung des zvE an Steuer spart: Lohnsteuer nach Klasse, sonst die Jahressteuer. */
+const ersparteSteuer = (zveHeute: number, minderung: number, s: MatchingSteuer, p: LegalParameters) => (s.steuerklasse
+  ? lohnsteuerZusatz(zveBasis(zveHeute, s) - minderung, minderung, s.steuerklasse, s, p)
+  : zusatzsteuer(zveBasis(zveHeute, s) - minderung, minderung, s, p));
 
 /**
  * Dieselben Kosten vor Steuern als Gehaltserhoehung — mit allen
@@ -483,7 +496,7 @@ export function matchingModell(
   const steuerFrei = e.weg === 'dv' ? Math.min(a.e, Math.max(0, steuerGrenze - a.z)) : a.e;
   const wirkung = svWirkung(a.svFrei, sk, p);
   const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
-  const steuerAn = zusatzsteuer(zveBasis(heute.zve, steuerOpt) - zveMinderung, zveMinderung, steuerOpt, p);
+  const steuerAn = ersparteSteuer(heute.zve, zveMinderung, steuerOpt, p);
   const aufwandAn = Math.max(0, a.e - wirkung.ersparnis - steuerAn);
 
   // --- Arbeitgeber ---------------------------------------------------------
@@ -739,7 +752,7 @@ function zuschussKern(
   const steuerFrei = Math.min(a.e, Math.max(0, steuerGrenze - a.ag));
   const wirkung = svWirkung(a.svFrei, sk, p);
   const zveMinderung = Math.max(0, steuerFrei - wirkung.wegfallenderAbzug);
-  const steuerAn = zusatzsteuer(zveBasis(heute.zve, steuerOpt) - zveMinderung, zveMinderung, steuerOpt, p);
+  const steuerAn = ersparteSteuer(heute.zve, zveMinderung, steuerOpt, p);
   const aufwandAn = Math.max(0, a.e - wirkung.ersparnis - steuerAn);
 
   // --- Arbeitgeber ---------------------------------------------------------

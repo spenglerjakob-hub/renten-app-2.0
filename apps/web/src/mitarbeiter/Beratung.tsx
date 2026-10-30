@@ -96,9 +96,9 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     () => (f && aufgeschoben && leistung ? kennzahlenRechnung(f.angebot, aufgeschoben, leistung) : null),
     [f, aufgeschoben, leistung],
   );
-  // Fuer den Schritt selbst und fuer die Unterlagen (Gespraechsunterlagen ab der Entscheidung)
+  // Fuer den Schritt selbst, fuer den Anteil, den die Betriebsrente schliesst (Leistung im Alter), und fuer die Unterlagen
   const luecke = useMemo(() => {
-    if (!f || !aufgeschoben || (schritt !== 2 && schritt < 5)) return null;
+    if (!f || !aufgeschoben || (schritt !== 2 && schritt < 4)) return null;
     return versorgungslueckeRechnung(f.angebot, aufgeschoben);
   }, [f, aufgeschoben, schritt]);
 
@@ -194,7 +194,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
           {schritt === 1 && <SchrittAngaben {...props} />}
           {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
           {schritt === 3 && <SchrittRechnung {...props} />}
-          {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} aktuell={aufgeschoben === daten} />}
+          {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} luecke={luecke} aktuell={aufgeschoben === daten} />}
           {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
         </fieldset>
       ) : (

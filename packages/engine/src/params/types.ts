@@ -77,6 +77,23 @@ export interface Pauschbetraege {
   sparer: number;
 }
 
+/**
+ * Was die Lohnsteuer nach Steuerklasse (§ 39b EStG) ueber den Tarif hinaus
+ * braucht. Die Grenzen der Steuerklasse V (§ 39b Abs. 2 Satz 7) setzt der
+ * Gesetzgeber jedes Jahr neu; die Programmablaufplaene des BMF nennen sie
+ * W1STKL5 bis W3STKL5.
+ */
+export interface LohnsteuerParameter {
+  /** Bis hier mindestens 14 %, auf den Teil darueber hoechstens 42 % (W1STKL5) */
+  w1Stkl5: number;
+  /** Auf den Teil darueber 42 % (W2STKL5) */
+  w2Stkl5: number;
+  /** Auf den Teil darueber 45 % (W3STKL5) */
+  w3Stkl5: number;
+  /** § 24b — Entlastungsbetrag fuer Alleinerziehende, in Steuerklasse II */
+  entlastungAlleinerziehend: number;
+}
+
 export interface LegalParameters {
   jahr: number;
   /** true, wenn der Satz aus dem letzten belegten Jahr fortgeschrieben wurde */
@@ -111,6 +128,9 @@ export interface LegalParameters {
   durchschnittsentgelt: number;
 
   pauschbetraege: Pauschbetraege;
+
+  /** Lohnsteuer nach Steuerklasse: Grenzen der Klasse V, Entlastung in Klasse II */
+  lohnsteuer: LohnsteuerParameter;
 
   /** Beitragssaetze Arbeitnehmeranteil */
   rvSatzGesamt: number;

@@ -2,7 +2,8 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import {
-  AXA_KANAELE, type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
+  AXA_KANAELE, steuerklasseAus,
+  type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
 } from '@renten/schema';
 import {
   speicherungenAbwarten, unterschreiben, type Firma, type UnterlagenArt, type Unterlagen, type UnterlagenHtml, type UnterschriftPerson,
@@ -19,14 +20,18 @@ import {
   Vermerk, WertKarte, Zahl,
 } from '../components/stil';
 import { LueckenRing } from '../components/LueckenRing';
+import { AnteilsRing } from '../components/AnteilsRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
-  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, probeabrechnung,
-  reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
+  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
+  probeabrechnung, reglerGrenzen, rentenbeginnVon, spaeterBeginnen, umwandlungFuerNetto,
   type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
-  type Probeabrechnung, type Versorgungsluecke,
+  type LueckeMitBetriebsrente, type Probeabrechnung, type SpaeterZeile, type Versorgungsluecke,
 } from './rechnung';
-import { fazitText, festePunkte, firmenHinweise, regelKern, regelText, traegerText, vertragName } from './texte';
+import {
+  GEHAELTER_OPTIONEN, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, lohnsteuerHinweis, nettolohnGrundlage,
+  regelKern, regelText, traegerText, vertragName,
+} from './texte';
 import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
 import { AxaAntrag, AxaVerzicht } from './axa-antrag';
 import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBerater, axaFehlt, istAxaAntrag } from './axa';
@@ -164,13 +169,23 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
 
       <Karte titel="Einkommen und Steuer">
         <div className="space-y-3">
-          <ZahlFeld label="Bruttogehalt im Jahr" wert={a.jahresbrutto} onChange={(jahresbrutto) => setzeA({ jahresbrutto })} einheit="€" schritt={1000} />
+          {/* Das Monatsgehalt wie auf der Abrechnung; gespeichert wird das Jahr mit Sonderzahlungen. */}
+          <div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ZahlFeld label="Bruttogehalt im Monat" wert={Math.round(monatsgehalt(a) * 100) / 100} einheit="€" schritt={100}
+                onChange={(m) => setzeA({ jahresbrutto: m * a.gehaelter })} />
+              <AuswahlFeld label="Gehälter im Jahr" wert={String(a.gehaelter)} optionen={GEHAELTER_OPTIONEN}
+                onChange={(v) => setzeA({ gehaelter: Number(v), jahresbrutto: monatsgehalt(a) * Number(v) })} />
+            </div>
+            <p className="mt-1 text-xs text-ui-schiefer">
+              = {euro(a.jahresbrutto)} im Jahr{a.gehaelter > 12 ? ', mit Weihnachts- und Urlaubsgeld' : ''}
+            </p>
+          </div>
           <AuswahlFeld label="Bundesland" wert={a.bundesland || firma.angebot.bundesland} optionen={LAENDER} onChange={(bundesland) => setzeA({ bundesland })} />
-          <Schalter label="verheiratet" wert={a.verheiratet} onChange={(verheiratet) => setzeA({ verheiratet })} />
-          {a.verheiratet && (
-            <ZahlFeld label="Bruttogehalt des Partners im Jahr" wert={a.partnerBrutto} onChange={(partnerBrutto) => setzeA({ partnerBrutto })} einheit="€" schritt={1000}
-              hilfe="Für die Steuer im Splittingtarif. 0, wenn der Partner kein Einkommen hat." />
-          )}
+          {/* „verheiratet“ wird mitgeschrieben — fuer Fassungen, die die Steuerklasse noch nicht kennen */}
+          <AuswahlFeld label="Steuerklasse" wert={String(a.steuerklasse)} optionen={STEUERKLASSE_OPTIONEN}
+            onChange={(v) => { const steuerklasse = steuerklasseAus({ steuerklasse: Number(v), verheiratet: false, partnerBrutto: 0 }); setzeA({ steuerklasse, verheiratet: steuerklasse >= 3 }); }}
+            hilfe="Wie auf der Gehaltsabrechnung. Bei III/V gleicht die Steuererklärung aus." />
           <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
           <div>
             <span className={FELD_LABEL}>Kinder</span>
@@ -317,8 +332,8 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
           {luecke && (
             <dl className={`mt-4 divide-y divide-ui-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
               {([
-                ['Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
-                ['Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
+                [a.gehaelter > 12 ? 'Ihr Bruttolohn im Monatsdurchschnitt' : 'Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
+                [a.gehaelter > 12 ? 'Ihr Nettolohn heute, im Monatsdurchschnitt' : 'Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
                 ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
                 ['Angenommene Inflation', prozentText(luecke.inflation)],
                 ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
@@ -341,8 +356,9 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
       <p className="max-w-4xl text-xs leading-relaxed text-ui-schiefer">
         Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
         mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
-        Der Nettolohn rechnet die Steuer als Monatsanteil der Jahressteuer
-        {a.verheiratet && a.partnerBrutto > 0 ? ', bei Verheirateten mit eigenem Einkommen des Partners wie Steuerklasse IV' : ''}.
+        Der Nettolohn rechnet {nettolohnGrundlage(a.steuerklasse, a.gehaelter)}
+        {a.steuerklasse === 5 ? ' — den höheren Abzug der Klasse V gleicht die Steuererklärung aus' : ''}, die Steuer im Alter
+        {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
         Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
       </p>
     </div>
@@ -498,9 +514,8 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
           <div className="h-1.5 rounded-full bg-ui-tinte" style={{ width: `${anteil * 100}%` }} />
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-        ¹ Als Monatsanteil der Jahressteuer. Auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je nach Steuerklasse
-        anders; über das Jahr gleicht die Steuererklärung das aus.
+      <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+        ¹ {lohnsteuerHinweis(a.steuerklasse)}
       </p>
     </section>
   );
@@ -555,6 +570,65 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
   );
 }
 
+/** „1 Jahr später“, „2 Jahre später“ — die erste Zeile ist der Beginn wie geplant. Am Telefon kurz: „+ 1 Jahr“. */
+function BeginnText({ jahre }: { jahre: number }) {
+  if (jahre === 0) return <>wie geplant</>;
+  const jahr = jahre === 1 ? 'Jahr' : 'Jahre';
+  return <><span className="sm:hidden">+ {jahre} {jahr}</span><span className="hidden sm:inline">{jahre} {jahr} später</span></>;
+}
+
+/**
+ * Was es kostet, spaeter zu beginnen — dieselbe Hochrechnung, je Jahr Warten
+ * zwoelf Beitraege weniger. Daneben, was man bis dahin netto nicht aufwendet:
+ * Das fehlende Kapital ist stets mehr, denn mit dem Netto-Aufwand fehlen auch
+ * Arbeitgeber, Steuer- und Sozialabgabenersparnis und die Ertraege.
+ */
+function SpaeterKarte({ zeilen }: { zeilen: SpaeterZeile[] }) {
+  const eins = zeilen[1];
+  if (!eins) return null;
+  return (
+    <Karte titel="Später beginnen? Was das kostet" rechts={<Vermerk>geschätzt</Vermerk>}>
+      <div className={`${AKZENT} px-5 py-4`}>
+        <p className="ui-titel text-[22px] leading-snug sm:text-[24px]">
+          Ein Jahr warten spart Ihnen {euro(eins.nettoGespart)} netto — und kostet{' '}
+          <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(eins.wenigerKapital)}</Hervor></span> Kapital.
+        </p>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[17rem] text-[13px] tabular-nums sm:text-sm">
+          <thead>
+            <tr className="whitespace-nowrap text-xs text-ui-schiefer">
+              <th className="py-2 text-left font-normal">Beginn</th>
+              <th className="py-2 pl-2 text-right font-normal">Kapital</th>
+              <th className="py-2 pl-2 text-right font-normal">Rente<span className="hidden sm:inline"> im Monat</span></th>
+              <th className="py-2 pl-2 text-right font-normal">weniger<span className="hidden sm:inline"> Kapital</span></th>
+            </tr>
+          </thead>
+          <tbody className="whitespace-nowrap text-ui-tinte">
+            {zeilen.map((z) => (
+              <tr key={z.jahre} className={`border-t border-ui-linie ${z.jahre === 0 ? 'font-medium' : ''}`}>
+                <td className="py-2"><BeginnText jahre={z.jahre} /></td>
+                <td className="py-2 pl-2 text-right">{euro(z.kapital)}</td>
+                <td className="py-2 pl-2 text-right">{euro(z.renteMonat)}</td>
+                <td className="py-2 pl-2 text-right">
+                  {z.jahre === 0 ? '—' : (
+                    <>− {euro(z.wenigerKapital)}<span className="hidden text-ui-schiefer sm:inline"> ({Math.round(z.wenigerAnteil * 100)}{'\u00a0'}%)</span></>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+        Dieselbe beispielhafte Hochrechnung mit gleichem Beitrag und gleicher Rendite, nur später begonnen; Rente brutto.
+        Jedes Jahr Warten spart {euro(eins.nettoGespart)} Netto-Aufwand — dafür fehlen im Vertrag auch der Arbeitgeberbeitrag, die
+        Steuer- und Sozialabgabenersparnis und die Erträge dieser Jahre.
+      </p>
+    </Karte>
+  );
+}
+
 export function SchrittRechnung(props: SchrittProps) {
   const { firma, daten, setze, r } = props;
   const abrechnung = useMemo(() => probeabrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
@@ -600,6 +674,8 @@ export function SchrittRechnung(props: SchrittProps) {
 
       <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
         setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
+
+      <SpaeterKarte zeilen={spaeterBeginnen(h, r.nettoAufwandMonat)} />
     </div>
   );
 }
@@ -753,10 +829,62 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
   );
 }
 
-export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, aktuell }: SchrittProps & {
-  kennzahlen: KennzahlenErgebnis | null; aktuell: boolean;
+/**
+ * Wie viel der Versorgungsluecke die Betriebsrente schliesst — der Ring aus
+ * Schritt 3, um die Betriebsrente ergaenzt: gesetzliche Rente, Betriebsrente,
+ * was offen bleibt. Alles netto im Monat, in heutiger Kaufkraft.
+ */
+function LueckeMitBetriebsrenteKarte({ luecke, x, aktuell }: { luecke: Versorgungsluecke; x: LueckeMitBetriebsrente; aktuell: boolean }) {
+  const haupt = x.prognose ?? x.garantiert!;
+  const art = x.prognose ? (x.geschaetzt ? 'Prognose, geschätzt' : 'Prognose') : 'garantiert';
+  // Im Ring hoechstens die Luecke — was darueber hinausgeht, hat im Nettolohn keinen Platz
+  const imRing = Math.min(haupt.betriebsrenteMonat, x.lueckeMonat);
+  return (
+    <Karte titel="Ihre Versorgungslücke mit Betriebsrente">
+      <div className={`grid grid-cols-1 items-center gap-6 lg:grid-cols-2 ${aktuell ? '' : 'opacity-60'}`}>
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+          <AnteilsRing
+            teile={[
+              { wert: luecke.rente.nettoMonat, rolle: 'tinte' },
+              { wert: imRing, rolle: 'knopf' },
+              { wert: haupt.restMonat, rolle: 'luecke' },
+            ]}
+            mitte={`${haupt.prozent} %`}
+            zeilen={['der Lücke', 'geschlossen']}
+            beschreibung={`Nettolohn ${euro(luecke.lohn.nettoMonat)}: gesetzliche Rente ${euro(luecke.rente.nettoMonat)}, `
+              + `Betriebsrente ${euro(haupt.betriebsrenteMonat)}, offen ${euro(haupt.restMonat)} — `
+              + `die Betriebsrente schließt ${haupt.prozent} % der Versorgungslücke`}
+          />
+          <dl className="space-y-4">
+            <Zahl etikett="Gesetzliche Rente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} />
+            <Zahl etikett="Betriebsrente" punkt="bg-ui-knopf" wert={euro(haupt.betriebsrenteMonat)} zusatz={art} />
+            <Zahl etikett="Bleibt offen" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(haupt.restMonat)} />
+          </dl>
+        </div>
+        <div>
+          <div className={`${AKZENT} px-5 py-4`}>
+            <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
+              {haupt.anteil >= 1
+                ? <>Ihre Betriebsrente schließt Ihre Versorgungslücke <Hervor>ganz</Hervor>.</>
+                : <>Ihre Betriebsrente schließt <span className="whitespace-nowrap tabular-nums"><Hervor>{haupt.prozent} %</Hervor></span> Ihrer Versorgungslücke.</>}
+            </p>
+          </div>
+          <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+            Netto im Monat, in heutiger Kaufkraft: Von {euro(x.lueckeMonat)} Versorgungslücke (Schritt 3) schließt die
+            Betriebsrente {euro(Math.min(haupt.betriebsrenteMonat, x.lueckeMonat))}
+            {x.prognose && x.garantiert ? ` — mit der garantierten Rente\u00a0${x.garantiert.prozent}\u00a0%` : ''}.
+          </p>
+        </div>
+      </div>
+    </Karte>
+  );
+}
+
+export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, luecke, aktuell }: SchrittProps & {
+  kennzahlen: KennzahlenErgebnis | null; luecke: Versorgungsluecke | null; aktuell: boolean;
 }) {
   const a = firma.angebot;
+  const geschlossen = lueckeMitBetriebsrente(luecke, leistung, daten);
   const setzeW = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) =>
     setze((d) => ({ ...d, versicherer: { ...d.versicherer, [weg]: { ...d.versicherer[weg], ...p } } }));
   // Von Hand geaenderte Prognosewerte stammen nicht mehr aus der Hochrechnung
@@ -851,6 +979,8 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
           </Karte>
         );
       })}
+
+      {luecke && geschlossen && <LueckeMitBetriebsrenteKarte luecke={luecke} x={geschlossen} aktuell={aktuell} />}
 
       {kennzahlen && (
         <KennzahlenKarte k={kennzahlen} daten={daten} setze={setze} aktuell={aktuell} />

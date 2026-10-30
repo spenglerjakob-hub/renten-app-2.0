@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
-  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
-  monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
+  HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, kapitalNach, spaeterBeginnen, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
+  laufendesJahresbrutto, lueckeMitBetriebsrente, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
 
@@ -40,11 +40,48 @@ describe('Beitragsseite der Mitarbeiterberatung', () => {
     expect(r.arbeitgeberMonat).toBeCloseTo(75, 6);
   });
 
-  it('leeres Bundesland: das der Firma; verheiratet: das zvE des Partners', () => {
-    expect(steuerVon(beratung().angaben, firma).bundesland).toBe('Bayern');
+  it('leeres Bundesland: das der Firma; gerechnet wird mit der Steuerklasse, das Gehalt des Partners zählt nicht', () => {
+    expect(steuerVon(beratung().angaben, firma)).toMatchObject({ bundesland: 'Bayern', steuerklasse: 1, verheiratet: false });
     expect(steuerVon(beratung({ bundesland: 'Hessen' }).angaben, firma).bundesland).toBe('Hessen');
-    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBeGreaterThan(25_000);
-    expect(steuerVon(beratung({ verheiratet: false, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBe(0);
+    // Beratungen von vorher: verheiratet ohne Einkommen des Partners ist III, mit Einkommen IV
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 0 }).angaben, firma)).toMatchObject({ steuerklasse: 3, verheiratet: true });
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma)).toMatchObject({ steuerklasse: 4, verheiratet: false });
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBeUndefined();
+  });
+
+  it('Beratungen von vorher rechnen wie bisher: ledig im Grundtarif, verheiratet ohne Einkommen des Partners im Splitting', () => {
+    const ma = { jahresbrutto: 48_000, umwandlungMonat: 150, privatVersichert: false, pkvPraemieMonat: 0, kinder: { hatKinder: false, kinderUnter25: 0 }, bavBestandMonat: 0 };
+    const modell = { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } as const;
+    const bisher = (verheiratet: boolean) => bavMitarbeiter(modell, ma, { verheiratet, bundesland: 'Bayern', kirchensteuerpflichtig: false, partnerZveJahr: 0 }, P);
+    expect(beitragsRechnung(firma, beratung()).nettoAufwandMonat).toBeCloseTo(bisher(false).nettoAufwandMonat, 9);
+    expect(beitragsRechnung(firma, beratung({ verheiratet: true, partnerBrutto: 0 })).nettoAufwandMonat).toBeCloseTo(bisher(true).nettoAufwandMonat, 9);
+  });
+
+  it('Versorgungslücke: V rechnet im Grundtarif wie IV — die Abrechnung bleibt bei V', () => {
+    const fuenf = beratung({ steuerklasse: 5, verheiratet: true });
+    const vier = beratung({ steuerklasse: 4, verheiratet: true });
+    expect(versorgungslueckeRechnung(firma, fuenf)!.lohn.nettoMonat).toBe(versorgungslueckeRechnung(firma, vier)!.lohn.nettoMonat);
+    expect(probeabrechnung(firma, fuenf, beitragsRechnung(firma, fuenf)).netto.ohne)
+      .toBeLessThan(probeabrechnung(firma, vier, beitragsRechnung(firma, vier)).netto.ohne);
+  });
+
+  it('Steuerklasse V spart bei der Umwandlung mehr Lohnsteuer als I, III weniger', () => {
+    const netto = (steuerklasse: 1 | 3 | 5) => beitragsRechnung(firma, beratung({ steuerklasse })).nettoAufwandMonat;
+    expect(netto(5)).toBeLessThan(netto(1));
+    expect(netto(3)).toBeGreaterThan(netto(1));
+  });
+
+  it('Monatsgehalt: der Monat rechnet mit zwölf Monatsgehältern, die Versorgungslücke mit dem ganzen Jahr', () => {
+    // 3.750 € × 13 = 48.750 € im Jahr
+    const d = beratung({ jahresbrutto: 48_750, gehaelter: 13 });
+    expect(monatsgehalt(d.angaben)).toBeCloseTo(3750, 9);
+    expect(laufendesJahresbrutto(d.angaben)).toBeCloseTo(45_000, 9);
+    expect(probeabrechnung(firma, d, beitragsRechnung(firma, d)).bruttoMonat).toBeCloseTo(3750, 9);
+    expect(nettolohnHeute(d.angaben, firma, P, 'jahr').bruttoMonat).toBeCloseTo(48_750 / 12, 9);
+    // Mit zwölf Gehältern ist der Monat ein Zwölftel des Jahres — wie bisher
+    const zwoelf = beratung();
+    expect(laufendesJahresbrutto(zwoelf.angaben)).toBe(48_000);
+    expect(nettolohnHeute(zwoelf.angaben, firma).nettoMonat).toBe(nettolohnHeute(zwoelf.angaben, firma, P, 'jahr').nettoMonat);
   });
 
   it('„Rahmen voll nutzen“ füllt den beitragsfreien Rahmen', () => {
@@ -261,6 +298,40 @@ describe('Beispielhafte Hochrechnung — wie das ETF-Depot im Rechner, mit feste
   });
 });
 
+describe('Später beginnen — dieselbe Hochrechnung, je Jahr zwölf Beiträge weniger', () => {
+  it('die erste Zeile ist die Hochrechnung; jedes Jahr Warten kostet Kapital und Rente', () => {
+    const d = anna();
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    const z = spaeterBeginnen(h, r.nettoAufwandMonat);
+    expect(z.map((x) => x.jahre)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(z[0]!.kapital).toBe(h.kapital);
+    expect(z[0]!.renteMonat).toBe(h.renteMonat);
+    expect(z[0]!.wenigerKapital).toBe(0);
+    for (let k = 1; k < z.length; k++) {
+      expect(z[k]!.monate).toBe(h.monate - 12 * k);
+      expect(z[k]!.kapital).toBeLessThan(z[k - 1]!.kapital);
+      expect(z[k]!.renteMonat).toBeLessThan(z[k - 1]!.renteMonat);
+      expect(z[k]!.nettoGespart).toBeCloseTo(r.nettoAufwandMonat * 12 * k, 9);
+      // Das fehlende Kapital ist mehr als der gesparte Netto-Aufwand: Arbeitgeber, Ersparnis und Ertraege fehlen mit
+      expect(z[k]!.wenigerKapital).toBeGreaterThan(z[k]!.nettoGespart);
+    }
+    // Gleich gerechnet wie die Hochrechnung: dieselbe Formel mit weniger Monaten
+    expect(z[1]!.kapital).toBeCloseTo(kapitalNach(h.beitragMonat, h.monate - 12, h.annahmen), 9);
+  });
+
+  it('kurz vor der Rente nur so viele Jahre, wie noch Monate bleiben; ohne Beitrag nichts', () => {
+    const d = { ...anna(), angaben: { ...anna().angaben, geburtsdatum: '15.03.1962' } };
+    const r = beitragsRechnung(firma, d);
+    const h = hochrechnung(firma, d, r, HEUTE);
+    const z = spaeterBeginnen(h, r.nettoAufwandMonat);
+    expect(z.length).toBeGreaterThan(0);
+    expect(z.every((x) => x.monate > 0)).toBe(true);
+    expect(z.length).toBeLessThanOrEqual(Math.ceil(h.monate / 12));
+    expect(spaeterBeginnen({ ...h, beitragMonat: 0 }, 0)).toEqual([]);
+  });
+});
+
 describe('Kennzahlen: Vertrag allein, wie im Vertrags-TÜV', () => {
   const werte = { garantierteRente: 180, prognoseRente: 260, prognoseKapital: 75_000 };
 
@@ -308,15 +379,20 @@ describe('Kennzahlen: Vertrag allein, wie im Vertrags-TÜV', () => {
 });
 
 describe('Szenario aus den Angaben', () => {
-  it('ledig: eine Person; verheiratet: zwei, der Partner mit seinem Brutto', () => {
+  it('Steuer im Alter: bei III im Splitting mit einem Partner ohne Einkommen und Rente, sonst eine Person im Grundtarif', () => {
     const ledig = szenarioAusBeratung(beratung().angaben, firma, 1400);
     expect(ledig.personen).toHaveLength(1);
     expect(ledig.personen[0]!.grvBruttoHeute).toBe(1400);
     expect(ledig.haushalt.bundesland).toBe('Bayern');
-    const paar = szenarioAusBeratung(beratung({ verheiratet: true, partnerBrutto: 36_000 }).angaben, firma, 1400);
-    expect(paar.personen).toHaveLength(2);
-    expect(paar.haushalt.verheiratet).toBe(true);
-    expect(paar.personen[1]!.grvBruttoHeute).toBeGreaterThan(0);
+    const drei = szenarioAusBeratung(beratung({ steuerklasse: 3 }).angaben, firma, 1400);
+    expect(drei.personen).toHaveLength(2);
+    expect(drei.haushalt.verheiratet).toBe(true);
+    expect(drei.personen[1]!.grvBruttoHeute).toBe(0);
+    for (const steuerklasse of [4, 5] as const) {
+      const s = szenarioAusBeratung(beratung({ steuerklasse, verheiratet: true }).angaben, firma, 1400);
+      expect(s.personen).toHaveLength(1);
+      expect(s.haushalt.verheiratet).toBe(false);
+    }
   });
 
   it('privat versichert: die Prämie steht im Haushalt', () => {
@@ -381,5 +457,51 @@ describe('Leistung im Alter aus den Werten des Versicherers', () => {
     expect(leistungsRechnung(firma, d, beitragsRechnung(firma, d))).toBeNull();
     const ohneWerte = beratung();
     expect(leistungsRechnung(firma, ohneWerte, beitragsRechnung(firma, ohneWerte))!.vertraege).toEqual([]);
+  });
+});
+
+describe('Wie viel der Versorgungslücke die Betriebsrente schließt', () => {
+  const mit = (direkt: Partial<BeratungDaten['versicherer']['direkt']>, f = firma) => {
+    const d0 = beratung({ grvRente: 1450 });
+    const d = { ...d0, versicherer: { ...d0.versicherer, direkt: { ...d0.versicherer.direkt, ...direkt } } };
+    const l = leistungsRechnung(f, d, beitragsRechnung(f, d));
+    return { d, l, luecke: versorgungslueckeRechnung(f, d)! };
+  };
+
+  it('die Netto-Rente in heutiger Kaufkraft gegen die Lücke — Prognose und garantiert', () => {
+    const { d, l, luecke } = mit({ garantierteRente: 120, prognoseRente: 185 });
+    const x = lueckeMitBetriebsrente(luecke, l, d)!;
+    const heute = l!.vertraege[0]!.prognose!.nettoMonat / l!.kaufkraftfaktor;
+    expect(x.prognose!.betriebsrenteMonat).toBeCloseTo(heute, 9);
+    expect(x.prognose!.anteil).toBeCloseTo(heute / luecke.lueckeMonat, 9);
+    expect(x.prognose!.restMonat).toBeCloseTo(luecke.lueckeMonat - heute, 9);
+    expect(x.prognose!.prozent).toBe(Math.round(x.prognose!.anteil * 100));
+    expect(x.garantiert!.anteil).toBeLessThan(x.prognose!.anteil);
+    expect(x.geschaetzt).toBe(false);
+  });
+
+  it('höchstens 100 %; 100 % nur, wenn die Lücke ganz geschlossen ist', () => {
+    const { d, l, luecke } = mit({ prognoseRente: 20_000 });
+    const x = lueckeMitBetriebsrente(luecke, l, d)!;
+    expect(x.prognose!.anteil).toBe(1);
+    expect(x.prognose!.prozent).toBe(100);
+    expect(x.prognose!.restMonat).toBe(0);
+  });
+
+  it('Matching-Modell: beide Verträge zusammen', () => {
+    const { d, l, luecke } = mit({ prognoseRente: 150 }, matchingFirma);
+    const d2 = { ...d, versicherer: { ...d.versicherer, ukasse: { ...d.versicherer.ukasse, prognoseRente: 100 } } };
+    const l2 = leistungsRechnung(matchingFirma, d2, beitragsRechnung(matchingFirma, d2))!;
+    const x = lueckeMitBetriebsrente(luecke, l2, d2)!;
+    const summe = l2.vertraege.reduce((s, v) => s + v.prognose!.nettoMonat, 0) / l2.kaufkraftfaktor;
+    expect(x.prognose!.betriebsrenteMonat).toBeCloseTo(summe, 9);
+    expect(l).not.toBeNull();
+  });
+
+  it('ohne Lücke, ohne Leistung oder nur mit Kapital: nichts', () => {
+    const { d, l, luecke } = mit({ prognoseKapital: 40_000 });
+    expect(lueckeMitBetriebsrente(luecke, l, d)).toBeNull();
+    expect(lueckeMitBetriebsrente(null, l, d)).toBeNull();
+    expect(lueckeMitBetriebsrente({ ...luecke, lueckeMonat: 0 }, l, d)).toBeNull();
   });
 });

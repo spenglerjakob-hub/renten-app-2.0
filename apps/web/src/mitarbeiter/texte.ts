@@ -1,4 +1,4 @@
-import type { FirmenAngebot, FirmenModellDaten } from '@renten/schema';
+import { GEHAELTER_IM_JAHR, type FirmenAngebot, type FirmenModellDaten, type SteuerklasseBeratung } from '@renten/schema';
 import type { MitarbeiterVertrag } from '@renten/engine';
 import type { KennzahlenErgebnis } from './rechnung';
 
@@ -15,6 +15,45 @@ const euroFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency:
 /** 100 € statt 100,00 €, aber 12,50 € */
 export const euroText = (n: number) => euroFormat.format(Math.round(n * 100) / 100).replace(/,00(\s)/, '$1');
 const prozentText = (q: number) => `${Math.round(q * 1000) / 10} %`.replace('.', ',');
+
+/** Die Steuerklasse in roemischen Ziffern, wie auf der Gehaltsabrechnung. */
+export const KLASSE_ROEMISCH: Record<SteuerklasseBeratung, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V' };
+
+/** Die Auswahl der Steuerklasse — mit dem, wofuer sie steht. */
+export const STEUERKLASSE_OPTIONEN: { wert: string; text: string }[] = [
+  { wert: '1', text: 'I – ledig' },
+  { wert: '2', text: 'II – alleinerziehend' },
+  { wert: '3', text: 'III – verheiratet, Partner in V oder ohne Lohn' },
+  { wert: '4', text: 'IV – verheiratet, beide in IV' },
+  { wert: '5', text: 'V – verheiratet, Partner in III' },
+];
+
+/** Gehaelter im Jahr wie im Rechner („Auszahlungen pro Jahr“). */
+export const GEHAELTER_OPTIONEN: { wert: string; text: string }[] = GEHAELTER_IM_JAHR.map((g) => ({
+  wert: String(g), text: g === 12.5 ? '12,5 (halbes 13.)' : `${g} Gehälter`,
+}));
+
+/** „12,5“ statt „12.5“ */
+export const gehaelterText = (g: number) => g.toLocaleString('de-DE');
+
+/**
+ * Womit der Nettolohn der Versorgungsluecke rechnet: mit der Lohnsteuer der
+ * Klasse — bei V im Grundtarif wie IV, denn den hohen Abzug der Klasse V
+ * gleicht die Steuererklaerung aus (`nettolohnHeute`, Basis `jahr`).
+ */
+export function nettolohnGrundlage(k: SteuerklasseBeratung, gehaelter: number): string {
+  const klasse = k === 5 ? 'bei Steuerklasse V im Grundtarif wie IV' : `mit der Lohnsteuer der Steuerklasse ${KLASSE_ROEMISCH[k]}`;
+  return `${klasse}${gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(gehaelter)} Gehältern` : ''}`;
+}
+
+/**
+ * Die Fussnote zur Steuer im Monat: Lohnsteuer der Klasse, genaehert — bei
+ * III und V weicht der Monat vom Jahresergebnis ab.
+ */
+export function lohnsteuerHinweis(k: SteuerklasseBeratung): string {
+  return `Lohnsteuer der Steuerklasse ${KLASSE_ROEMISCH[k]}, genähert — auf der Gehaltsabrechnung kann sie um wenige Euro abweichen.`
+    + (k === 3 || k === 5 ? ' Bei III und V gleicht die Steuererklärung das über das Jahr aus.' : '');
+}
 
 export const MODELL_NAME: Record<FirmenModellDaten['art'], string> = {
   zuschuss: 'Zuschussmodell',

@@ -15,6 +15,10 @@ export {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer,
   type Einkunftsquelle, type HaushaltsSteuer, type SteuerAufteilung,
 } from './tax/haushalt.js';
+export {
+  lohnsteuerJahr, lohnsteuerMitZuschlaegen, lohnsteuerZusatz, grenzLohnsteuersatz, STEUERKLASSEN,
+  type Steuerklasse,
+} from './tax/lohnsteuer.js';
 
 // Sozialversicherung
 export {

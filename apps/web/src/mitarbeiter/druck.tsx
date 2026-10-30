@@ -9,11 +9,13 @@ import { LueckenRing } from '../components/LueckenRing';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
-  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
+  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, lueckeMitBetriebsrente, monatsgehalt, probeabrechnung, rentenbeginnVon,
+  spaeterBeginnen,
   type AuszahlungsWerte, type BelastungsTreppe, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
-  MODELL_NAME, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+  KLASSE_ROEMISCH, MODELL_NAME, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
+  nettolohnGrundlage, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
 import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
 
@@ -140,9 +142,11 @@ function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][
   const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
   return [
     ['Geburtsdatum', a.geburtsdatum || '—'],
-    ['Bruttogehalt im Jahr', euroGenau(a.jahresbrutto)],
+    ['Bruttogehalt', a.gehaelter === 12
+      ? `${euroGenau(monatsgehalt(a))} im Monat (${euroGenau(a.jahresbrutto)} im Jahr)`
+      : `${euroGenau(monatsgehalt(a))} im Monat × ${gehaelterText(a.gehaelter)} = ${euroGenau(a.jahresbrutto)} im Jahr`],
     ['Bundesland', a.bundesland || firma.angebot.bundesland],
-    ['Familienstand', a.verheiratet ? `verheiratet${a.partnerBrutto > 0 ? `, Partner ${euroGenau(a.partnerBrutto)} brutto im Jahr` : ', Partner ohne Einkommen'}` : 'ledig'],
+    ['Steuerklasse', STEUERKLASSE_OPTIONEN.find((o) => o.wert === String(a.steuerklasse))?.text ?? KLASSE_ROEMISCH[a.steuerklasse]],
     ['Kirchensteuer', a.kirchensteuer ? 'ja' : 'nein'],
     ['Kinder', kinder],
     ['Krankenversicherung', a.kv === 'privat'
@@ -154,6 +158,23 @@ function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][
     ['Rentenbeginn', rentenbeginnVon(a) ?? '—'],
     ['Bestehende Betriebsrente', a.bavBestandMonat > 0 ? `${euroGenau(a.bavBestandMonat)} Beitrag im Monat` : 'keine'],
   ];
+}
+
+/**
+ * Wie viel der Versorgungsluecke die Betriebsrente schliesst — ein Satz im
+ * Abschnitt zur Versorgungsluecke, im Protokoll und in den
+ * Gespraechsunterlagen. Dort hat er Platz und schliesst den Gedanken: erst was
+ * fehlt, dann was das Angebot davon traegt.
+ */
+function lueckeSatz(luecke: Versorgungsluecke | null | undefined, leistung: Leistung | null, daten: BeratungDaten): string | null {
+  const x = lueckeMitBetriebsrente(luecke ?? null, leistung, daten);
+  if (!x) return null;
+  const haupt = x.prognose ?? x.garantiert!;
+  const art = x.prognose ? (x.geschaetzt ? 'Prognose, geschätzt' : 'Prognose') : 'garantiert';
+  const betrag = euroGenau(Math.round(Math.min(haupt.betriebsrenteMonat, x.lueckeMonat)));
+  if (haupt.anteil >= 1) return `Die Betriebsrente schließt diese Lücke ganz (${art}): ${betrag} im Monat, netto in heutiger Kaufkraft.`;
+  return `Die Betriebsrente schließt davon ${haupt.prozent}\u00a0% (${art}): ${betrag} von ${euroGenau(Math.round(x.lueckeMonat))} im Monat, `
+    + `netto in heutiger Kaufkraft${x.prognose && x.garantiert ? `; mit der garantierten Rente ${x.garantiert.prozent}\u00a0%` : ''}.`;
 }
 
 /** Woher die Leistung stammt — je Vertrag aus dem Angebot oder aus der geschaetzten Hochrechnung. */
@@ -224,9 +245,10 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           ]} />
           <p className="mt-1 text-[9pt] text-ui-schiefer">
             Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
-            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Steuer als Monatsanteil
-            der Jahressteuer.
+            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Nettolohn
+            {' '}{nettolohnGrundlage(a.steuerklasse, a.gehaelter)}.
           </p>
+          {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
         </Abschnitt>
       )}
 
@@ -371,6 +393,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
   const fussCss = fusszeileCss(auftritt);
   const abrechnung = probeabrechnung(angebot, daten, r);
   const h = hochrechnung(angebot, daten, r);
+  const spaeter = spaeterBeginnen(h, r.nettoAufwandMonat);
   const zahl = (x: number, stellen = 2) => x.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
   const offen = daten.entscheidung.status === 'offen';
   const datum = daten.entscheidung.datum || heuteText();
@@ -440,6 +463,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
                   Im Alter fehlen Ihnen <span className="ui-hervor whitespace-nowrap">{luecke.lueckeProzent} %</span> Ihres heutigen Nettolohns.
                 </p>
               )}
+              {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
               <p className="mt-1 text-[9pt] text-ui-schiefer">
                 In heutiger Kaufkraft. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung{' '}
                 {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr.
@@ -479,8 +503,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           </table>
           <p className="mt-1 text-[9pt] text-ui-schiefer">
             Eigenbeteiligung aus dem Nettolohn {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)}{' '}
-            Gesamtbeitrag. Steuern als Monatsanteil der Jahressteuer — auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je
-            nach Steuerklasse anders.
+            Gesamtbeitrag. {lohnsteuerHinweis(abrechnung.steuerklasse)}
           </p>
         </div>
         {belastungen.map(({ v, t }) => (
@@ -507,6 +530,36 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
               Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine Zusage.
               Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab; die Rente ist brutto, vor Kranken- und
               Pflegeversicherung und Steuer. Verbindlich ist allein das Angebot des Versicherers.
+            </p>
+          </div>
+        )}
+        {spaeter.length > 1 && (
+          <div className="mt-3 break-inside-avoid">
+            <p className="font-medium">Später beginnen? Was das kostet</p>
+            <table className="mt-1 w-full max-w-[34rem] tabular-nums">
+              <thead>
+                <tr className="text-[9pt] text-ui-schiefer">
+                  <th className="text-left font-medium">Beginn</th>
+                  <th className="pl-2 text-right font-medium">Kapital</th>
+                  <th className="pl-2 text-right font-medium">Rente im Monat</th>
+                  <th className="pl-2 text-right font-medium">weniger Kapital</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spaeter.map((z) => (
+                  <tr key={z.jahre} className="border-t border-ui-linie">
+                    <td className="py-0.5">{z.jahre === 0 ? 'wie geplant' : `${z.jahre} ${z.jahre === 1 ? 'Jahr' : 'Jahre'} später`}</td>
+                    <td className="py-0.5 pl-2 text-right">{euroGenau(Math.round(z.kapital))}</td>
+                    <td className="py-0.5 pl-2 text-right">{euroGenau(Math.round(z.renteMonat))}</td>
+                    <td className="py-0.5 pl-2 text-right">{z.jahre === 0 ? '—' : `− ${euroGenau(Math.round(z.wenigerKapital))}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-1">
+              Ein Jahr warten spart Ihnen {euroGenau(Math.round(spaeter[1]!.nettoGespart))} netto — und kostet{' '}
+              {euroGenau(Math.round(spaeter[1]!.wenigerKapital))} Kapital: Mit dem Netto-Aufwand fehlen auch Arbeitgeberbeitrag,
+              Steuer- und Sozialabgabenersparnis und die Erträge dieser Jahre.
             </p>
           </div>
         )}

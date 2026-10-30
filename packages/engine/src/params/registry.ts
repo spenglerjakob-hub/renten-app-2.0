@@ -77,6 +77,14 @@ function skaliere(basis: LegalParameters, jahr: number, indexRate: number): Lega
       sonderausgaben: r(basis.pauschbetraege.sonderausgaben),
       sparer: r(basis.pauschbetraege.sparer),
     },
+    // Die Grenzen der Steuerklasse V folgen dem Tarif; der Entlastungsbetrag
+    // fuer Alleinerziehende ist ein fester Betrag ohne Indexierung.
+    lohnsteuer: {
+      ...basis.lohnsteuer,
+      w1Stkl5: r(basis.lohnsteuer.w1Stkl5),
+      w2Stkl5: r(basis.lohnsteuer.w2Stkl5),
+      w3Stkl5: r(basis.lohnsteuer.w3Stkl5),
+    },
     riester: { ...basis.riester },
     // Die Zulagen des Altersvorsorgedepots sind feste Euro-Betraege ohne
     // gesetzliche Indexierung — sie werden bewusst nicht fortgeschrieben.
