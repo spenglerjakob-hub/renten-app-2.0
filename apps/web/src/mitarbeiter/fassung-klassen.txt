@@ -312,3 +312,10 @@ w-full
 whitespace-nowrap
 whitespace-pre-line
 break-before-avoid
+gap-0.5
+overflow-hidden
+bg-ui-daten-2
+bg-ui-daten-3
+bg-ui-luecke
+space-y-3
+h-2.5

@@ -56,6 +56,34 @@ function Abschnitt({ titel, children, umbruch = false, teilbar = false }: {
   );
 }
 
+/**
+ * Ein Ganzes und seine Teile als Balken mit Legende — wie `Anteile` am
+ * Bildschirm (Hochrechnung), mit denselben Farben. Die Legende steht in zwei
+ * Spalten wie Belastung und Hochrechnung darueber; frei fliessend brach ein
+ * Teil allein in die naechste Zeile.
+ */
+function AnteileDruck({ titel, teile }: { titel: string; teile: { text: string; wert: number; farbe: string }[] }) {
+  const summe = teile.reduce((x, t) => x + Math.max(0, t.wert), 0);
+  return (
+    <div>
+      <p className="font-medium">{titel}</p>
+      <div className="mt-1 flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+        {teile.map((t) => (
+          <div key={t.text} className={t.farbe} style={{ width: `${summe > 0 ? (Math.max(0, t.wert) / summe) * 100 : 0}%` }} />
+        ))}
+      </div>
+      <dl className="mt-1.5 grid grid-cols-2 gap-x-8">
+        {teile.map((t) => (
+          <div key={t.text} className="flex items-center justify-between gap-4">
+            <dt className="flex items-center gap-1.5"><span className={`h-2 w-2 shrink-0 rounded-full ${t.farbe}`} aria-hidden />{t.text}</dt>
+            <dd className="tabular-nums">{euroGenau(Math.round(t.wert))}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function Paare({ zeilen }: { zeilen: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] gap-x-4 gap-y-0.5">
@@ -66,6 +94,15 @@ function Paare({ zeilen }: { zeilen: [string, ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Wie `Betrag`, mit fertigem Text als Wert — fuer Rendite, Laufzeit und Datum neben Betraegen. */
+function AngabeDruck({ text, wert }: { text: string; wert: string }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <span>{text}</span><span className="tabular-nums">{wert}</span>
+    </div>
   );
 }
 
@@ -509,26 +546,44 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
             Gesamtbeitrag. {lohnsteuerHinweis(abrechnung.steuerklasse)}
           </p>
         </div>
-        {belastungen.map(({ v, t }) => (
-          <div key={v.weg} className="mt-3 break-inside-avoid">
-            <p className="font-medium">Ihre Belastung im Monat{belastungen.length > 1 ? ` — ${vertragName(v.weg, angebot)}` : ''}</p>
-            <BelastungDruck t={t} />
+        {/*
+          Belastung und Hochrechnung nebeneinander: Rechts von der Belastung war
+          Platz frei. So passen der Balken „Woraus das Kapital besteht“ und
+          „Später beginnen“ noch auf die Seite — sonst schoebe die Leistung im
+          Alter, die auf einer frischen Seite beginnt, eine Seite weiter.
+        */}
+        {(belastungen.length > 0 || h.monate > 0) && (
+          <div className="mt-3 grid grid-cols-2 items-start gap-x-8 break-inside-avoid">
+            {belastungen.length > 0 && (
+              <div className="space-y-3">
+                {belastungen.map(({ v, t }) => (
+                  <div key={v.weg}>
+                    <p className="font-medium">Ihre Belastung im Monat{belastungen.length > 1 ? ` — ${vertragName(v.weg, angebot)}` : ''}</p>
+                    <BelastungDruck t={t} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {h.monate > 0 && (
+              <div>
+                <p className="font-medium">Beispielhafte und geschätzte Hochrechnung</p>
+                <AngabeDruck text="Angenommene Rendite" wert={`${prozentZahl(h.annahmen.renditeAnsparphase)} im Jahr`} />
+                <AngabeDruck text="Bis zum Rentenbeginn" wert={laufzeitText(h.monate)} />
+                {rentenbeginnVon(a) && <AngabeDruck text="Rentenbeginn" wert={rentenbeginnVon(a)!} />}
+                <AngabeDruck text="Kapital bei Rentenbeginn" wert={euroGenau(Math.round(h.kapital))} />
+                <AngabeDruck text="Geschätzte Rente brutto" wert={`${euroGenau(Math.round(h.renteMonat))} im Monat`} />
+              </div>
+            )}
           </div>
-        ))}
+        )}
         {h.monate > 0 && (
           <div className="mt-3 break-inside-avoid">
-            <p className="font-medium">Beispielhafte und geschätzte Hochrechnung</p>
-            <Paare zeilen={[
-              ['Angenommene Rendite', `${prozentZahl(h.annahmen.renditeAnsparphase)} im Jahr`],
-              ['Bis zum Rentenbeginn', `${laufzeitText(h.monate)}${rentenbeginnVon(a) ? `, am ${rentenbeginnVon(a)}` : ''}`],
-              ['Kapital bei Rentenbeginn', euroGenau(Math.round(h.kapital))],
-              ['Geschätzte Rente brutto', `${euroGenau(Math.round(h.renteMonat))} im Monat`],
+            <AnteileDruck titel="Woraus das Kapital besteht" teile={[
+              { text: 'Ihr Netto-Aufwand', wert: h.nettoSumme, farbe: 'bg-ui-tinte' },
+              { text: 'Steuer- und SV-Ersparnis', wert: h.ersparnisSumme, farbe: 'bg-ui-daten-2' },
+              { text: 'Arbeitgeber', wert: h.arbeitgeberSumme, farbe: 'bg-ui-daten-3' },
+              { text: 'Erträge', wert: h.ertrag, farbe: 'bg-ui-luecke' },
             ]} />
-            <p className="mt-1">
-              Woraus das Kapital besteht: Ihr Netto-Aufwand {euroGenau(Math.round(h.nettoSumme))}, Steuer- und SV-Ersparnis{' '}
-              {euroGenau(Math.round(h.ersparnisSumme))}, Arbeitgeber {euroGenau(Math.round(h.arbeitgeberSumme))}, Erträge{' '}
-              {euroGenau(Math.round(h.ertrag))}.
-            </p>
             <p className="mt-1 text-[9pt] text-ui-schiefer">
               Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine Zusage.
               Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab; die Rente ist brutto, vor Kranken- und
