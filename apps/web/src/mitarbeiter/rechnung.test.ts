@@ -3,7 +3,7 @@ import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
   HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
-  monateDerUmwandlung, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
+  laufendesJahresbrutto, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
 
@@ -40,11 +40,40 @@ describe('Beitragsseite der Mitarbeiterberatung', () => {
     expect(r.arbeitgeberMonat).toBeCloseTo(75, 6);
   });
 
-  it('leeres Bundesland: das der Firma; verheiratet: das zvE des Partners', () => {
-    expect(steuerVon(beratung().angaben, firma).bundesland).toBe('Bayern');
+  it('leeres Bundesland: das der Firma; gerechnet wird mit der Steuerklasse, das Gehalt des Partners zählt nicht', () => {
+    expect(steuerVon(beratung().angaben, firma)).toMatchObject({ bundesland: 'Bayern', steuerklasse: 1, verheiratet: false });
     expect(steuerVon(beratung({ bundesland: 'Hessen' }).angaben, firma).bundesland).toBe('Hessen');
-    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBeGreaterThan(25_000);
-    expect(steuerVon(beratung({ verheiratet: false, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBe(0);
+    // Beratungen von vorher: verheiratet ohne Einkommen des Partners ist III, mit Einkommen IV
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 0 }).angaben, firma)).toMatchObject({ steuerklasse: 3, verheiratet: true });
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma)).toMatchObject({ steuerklasse: 4, verheiratet: false });
+    expect(steuerVon(beratung({ verheiratet: true, partnerBrutto: 40_000 }).angaben, firma).partnerZveJahr).toBeUndefined();
+  });
+
+  it('Beratungen von vorher rechnen wie bisher: ledig im Grundtarif, verheiratet ohne Einkommen des Partners im Splitting', () => {
+    const ma = { jahresbrutto: 48_000, umwandlungMonat: 150, privatVersichert: false, pkvPraemieMonat: 0, kinder: { hatKinder: false, kinderUnter25: 0 }, bavBestandMonat: 0 };
+    const modell = { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } as const;
+    const bisher = (verheiratet: boolean) => bavMitarbeiter(modell, ma, { verheiratet, bundesland: 'Bayern', kirchensteuerpflichtig: false, partnerZveJahr: 0 }, P);
+    expect(beitragsRechnung(firma, beratung()).nettoAufwandMonat).toBeCloseTo(bisher(false).nettoAufwandMonat, 9);
+    expect(beitragsRechnung(firma, beratung({ verheiratet: true, partnerBrutto: 0 })).nettoAufwandMonat).toBeCloseTo(bisher(true).nettoAufwandMonat, 9);
+  });
+
+  it('Steuerklasse V spart bei der Umwandlung mehr Lohnsteuer als I, III weniger', () => {
+    const netto = (steuerklasse: 1 | 3 | 5) => beitragsRechnung(firma, beratung({ steuerklasse })).nettoAufwandMonat;
+    expect(netto(5)).toBeLessThan(netto(1));
+    expect(netto(3)).toBeGreaterThan(netto(1));
+  });
+
+  it('Monatsgehalt: der Monat rechnet mit zwölf Monatsgehältern, die Versorgungslücke mit dem ganzen Jahr', () => {
+    // 3.750 € × 13 = 48.750 € im Jahr
+    const d = beratung({ jahresbrutto: 48_750, gehaelter: 13 });
+    expect(monatsgehalt(d.angaben)).toBeCloseTo(3750, 9);
+    expect(laufendesJahresbrutto(d.angaben)).toBeCloseTo(45_000, 9);
+    expect(probeabrechnung(firma, d, beitragsRechnung(firma, d)).bruttoMonat).toBeCloseTo(3750, 9);
+    expect(nettolohnHeute(d.angaben, firma, P, 'jahr').bruttoMonat).toBeCloseTo(48_750 / 12, 9);
+    // Mit zwölf Gehältern ist der Monat ein Zwölftel des Jahres — wie bisher
+    const zwoelf = beratung();
+    expect(laufendesJahresbrutto(zwoelf.angaben)).toBe(48_000);
+    expect(nettolohnHeute(zwoelf.angaben, firma).nettoMonat).toBe(nettolohnHeute(zwoelf.angaben, firma, P, 'jahr').nettoMonat);
   });
 
   it('„Rahmen voll nutzen“ füllt den beitragsfreien Rahmen', () => {
@@ -308,15 +337,20 @@ describe('Kennzahlen: Vertrag allein, wie im Vertrags-TÜV', () => {
 });
 
 describe('Szenario aus den Angaben', () => {
-  it('ledig: eine Person; verheiratet: zwei, der Partner mit seinem Brutto', () => {
+  it('Steuer im Alter: bei III im Splitting mit einem Partner ohne Einkommen und Rente, sonst eine Person im Grundtarif', () => {
     const ledig = szenarioAusBeratung(beratung().angaben, firma, 1400);
     expect(ledig.personen).toHaveLength(1);
     expect(ledig.personen[0]!.grvBruttoHeute).toBe(1400);
     expect(ledig.haushalt.bundesland).toBe('Bayern');
-    const paar = szenarioAusBeratung(beratung({ verheiratet: true, partnerBrutto: 36_000 }).angaben, firma, 1400);
-    expect(paar.personen).toHaveLength(2);
-    expect(paar.haushalt.verheiratet).toBe(true);
-    expect(paar.personen[1]!.grvBruttoHeute).toBeGreaterThan(0);
+    const drei = szenarioAusBeratung(beratung({ steuerklasse: 3 }).angaben, firma, 1400);
+    expect(drei.personen).toHaveLength(2);
+    expect(drei.haushalt.verheiratet).toBe(true);
+    expect(drei.personen[1]!.grvBruttoHeute).toBe(0);
+    for (const steuerklasse of [4, 5] as const) {
+      const s = szenarioAusBeratung(beratung({ steuerklasse, verheiratet: true }).angaben, firma, 1400);
+      expect(s.personen).toHaveLength(1);
+      expect(s.haushalt.verheiratet).toBe(false);
+    }
   });
 
   it('privat versichert: die Prämie steht im Haushalt', () => {

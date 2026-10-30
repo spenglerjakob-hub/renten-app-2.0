@@ -9,11 +9,12 @@ import { LueckenRing } from '../components/LueckenRing';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
-  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, probeabrechnung, rentenbeginnVon,
+  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, monatsgehalt, probeabrechnung, rentenbeginnVon,
   type AuszahlungsWerte, type BelastungsTreppe, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
-  MODELL_NAME, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+  KLASSE_ROEMISCH, MODELL_NAME, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
+  regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
 import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
 
@@ -140,9 +141,11 @@ function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][
   const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
   return [
     ['Geburtsdatum', a.geburtsdatum || '—'],
-    ['Bruttogehalt im Jahr', euroGenau(a.jahresbrutto)],
+    ['Bruttogehalt', a.gehaelter === 12
+      ? `${euroGenau(monatsgehalt(a))} im Monat (${euroGenau(a.jahresbrutto)} im Jahr)`
+      : `${euroGenau(monatsgehalt(a))} im Monat × ${gehaelterText(a.gehaelter)} = ${euroGenau(a.jahresbrutto)} im Jahr`],
     ['Bundesland', a.bundesland || firma.angebot.bundesland],
-    ['Familienstand', a.verheiratet ? `verheiratet${a.partnerBrutto > 0 ? `, Partner ${euroGenau(a.partnerBrutto)} brutto im Jahr` : ', Partner ohne Einkommen'}` : 'ledig'],
+    ['Steuerklasse', STEUERKLASSE_OPTIONEN.find((o) => o.wert === String(a.steuerklasse))?.text ?? KLASSE_ROEMISCH[a.steuerklasse]],
     ['Kirchensteuer', a.kirchensteuer ? 'ja' : 'nein'],
     ['Kinder', kinder],
     ['Krankenversicherung', a.kv === 'privat'
@@ -224,8 +227,8 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           ]} />
           <p className="mt-1 text-[9pt] text-ui-schiefer">
             Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
-            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Steuer als Monatsanteil
-            der Jahressteuer.
+            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Nettolohn mit der
+            Lohnsteuer der Steuerklasse {KLASSE_ROEMISCH[a.steuerklasse]}{a.gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(a.gehaelter)} Gehältern` : ''}.
           </p>
         </Abschnitt>
       )}
@@ -479,8 +482,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           </table>
           <p className="mt-1 text-[9pt] text-ui-schiefer">
             Eigenbeteiligung aus dem Nettolohn {euroGenau(abrechnung.eigenbeteiligungMonat)} für {euroGenau(abrechnung.gesamtMonat)}{' '}
-            Gesamtbeitrag. Steuern als Monatsanteil der Jahressteuer — auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je
-            nach Steuerklasse anders.
+            Gesamtbeitrag. {lohnsteuerHinweis(abrechnung.steuerklasse)}
           </p>
         </div>
         {belastungen.map(({ v, t }) => (

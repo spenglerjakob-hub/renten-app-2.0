@@ -2,7 +2,8 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import {
-  AXA_KANAELE, type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
+  AXA_KANAELE, steuerklasseAus,
+  type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
 } from '@renten/schema';
 import {
   speicherungenAbwarten, unterschreiben, type Firma, type UnterlagenArt, type Unterlagen, type UnterlagenHtml, type UnterschriftPerson,
@@ -21,12 +22,15 @@ import {
 import { LueckenRing } from '../components/LueckenRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
-  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, probeabrechnung,
+  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, monatsgehalt, probeabrechnung,
   reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
   type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
   type Probeabrechnung, type Versorgungsluecke,
 } from './rechnung';
-import { fazitText, festePunkte, firmenHinweise, regelKern, regelText, traegerText, vertragName } from './texte';
+import {
+  GEHAELTER_OPTIONEN, KLASSE_ROEMISCH, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
+  regelKern, regelText, traegerText, vertragName,
+} from './texte';
 import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
 import { AxaAntrag, AxaVerzicht } from './axa-antrag';
 import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBerater, axaFehlt, istAxaAntrag } from './axa';
@@ -164,13 +168,23 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
 
       <Karte titel="Einkommen und Steuer">
         <div className="space-y-3">
-          <ZahlFeld label="Bruttogehalt im Jahr" wert={a.jahresbrutto} onChange={(jahresbrutto) => setzeA({ jahresbrutto })} einheit="€" schritt={1000} />
+          {/* Das Monatsgehalt wie auf der Abrechnung; gespeichert wird das Jahr mit Sonderzahlungen. */}
+          <div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ZahlFeld label="Bruttogehalt im Monat" wert={Math.round(monatsgehalt(a) * 100) / 100} einheit="€" schritt={100}
+                onChange={(m) => setzeA({ jahresbrutto: m * a.gehaelter })} />
+              <AuswahlFeld label="Gehälter im Jahr" wert={String(a.gehaelter)} optionen={GEHAELTER_OPTIONEN}
+                onChange={(v) => setzeA({ gehaelter: Number(v), jahresbrutto: monatsgehalt(a) * Number(v) })} />
+            </div>
+            <p className="mt-1 text-xs text-ui-schiefer">
+              = {euro(a.jahresbrutto)} im Jahr{a.gehaelter > 12 ? ', mit Weihnachts- und Urlaubsgeld' : ''}
+            </p>
+          </div>
           <AuswahlFeld label="Bundesland" wert={a.bundesland || firma.angebot.bundesland} optionen={LAENDER} onChange={(bundesland) => setzeA({ bundesland })} />
-          <Schalter label="verheiratet" wert={a.verheiratet} onChange={(verheiratet) => setzeA({ verheiratet })} />
-          {a.verheiratet && (
-            <ZahlFeld label="Bruttogehalt des Partners im Jahr" wert={a.partnerBrutto} onChange={(partnerBrutto) => setzeA({ partnerBrutto })} einheit="€" schritt={1000}
-              hilfe="Für die Steuer im Splittingtarif. 0, wenn der Partner kein Einkommen hat." />
-          )}
+          {/* „verheiratet“ wird mitgeschrieben — fuer Fassungen, die die Steuerklasse noch nicht kennen */}
+          <AuswahlFeld label="Steuerklasse" wert={String(a.steuerklasse)} optionen={STEUERKLASSE_OPTIONEN}
+            onChange={(v) => { const steuerklasse = steuerklasseAus({ steuerklasse: Number(v), verheiratet: false, partnerBrutto: 0 }); setzeA({ steuerklasse, verheiratet: steuerklasse >= 3 }); }}
+            hilfe="Wie auf der Gehaltsabrechnung. Bei III/V gleicht die Steuererklärung aus." />
           <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
           <div>
             <span className={FELD_LABEL}>Kinder</span>
@@ -317,8 +331,8 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
           {luecke && (
             <dl className={`mt-4 divide-y divide-ui-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
               {([
-                ['Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
-                ['Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
+                [a.gehaelter > 12 ? 'Ihr Bruttolohn im Monatsdurchschnitt' : 'Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
+                [a.gehaelter > 12 ? 'Ihr Nettolohn heute, im Monatsdurchschnitt' : 'Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
                 ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
                 ['Angenommene Inflation', prozentText(luecke.inflation)],
                 ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
@@ -341,8 +355,9 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
       <p className="max-w-4xl text-xs leading-relaxed text-ui-schiefer">
         Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
         mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
-        Der Nettolohn rechnet die Steuer als Monatsanteil der Jahressteuer
-        {a.verheiratet && a.partnerBrutto > 0 ? ', bei Verheirateten mit eigenem Einkommen des Partners wie Steuerklasse IV' : ''}.
+        Der Nettolohn rechnet mit der Lohnsteuer der Steuerklasse {KLASSE_ROEMISCH[a.steuerklasse]}
+        {a.gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(a.gehaelter)} Gehältern` : ''}, die Steuer im Alter
+        {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
         Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
       </p>
     </div>
@@ -498,9 +513,8 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
           <div className="h-1.5 rounded-full bg-ui-tinte" style={{ width: `${anteil * 100}%` }} />
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-        ¹ Als Monatsanteil der Jahressteuer. Auf der Gehaltsabrechnung verteilt sich die Lohnsteuer je nach Steuerklasse
-        anders; über das Jahr gleicht die Steuererklärung das aus.
+      <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+        ¹ {lohnsteuerHinweis(a.steuerklasse)}
       </p>
     </section>
   );

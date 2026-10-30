@@ -229,8 +229,9 @@ function Datenschutz() {
         In der bAV-Mitarbeiterberatung legen Berater Firmen und Beratungen in ihrem Konto an. Zu einer Firma
         speichern wir Name, Anschrift, Begrüßung und Hinweise, das Modell der Betriebsrente, Versicherer und Tarif
         sowie ein Logo. Zu einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, Geburtsdatum, Gehalt,
-        Familienstand und Einkommen des Partners, Kinder, Krankenversicherung, Ansprüche auf gesetzliche und
-        betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. Gerechnet wird
+        Steuerklasse (in älteren Beratungen Familienstand und Einkommen des Partners), Kinder, Krankenversicherung,
+        Ansprüche auf gesetzliche und betriebliche Rente, die Werte des Versicherers sowie Entscheidung, Empfehlung,
+        Ort und Datum. Gerechnet wird
         im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind nur für das Konto sichtbar, das sie
         angelegt hat, und — gibt der Berater eine Firma für sein Büro frei — für die Mitglieder dieses Büros (siehe
         unten); das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen Speicher bei Supabase in

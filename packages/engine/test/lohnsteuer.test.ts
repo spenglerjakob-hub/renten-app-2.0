@@ -65,7 +65,12 @@ describe('Lohnsteuer nach Steuerklasse: der Tarif', () => {
 
   it('Zusatz und Grenzsatz: in I wie die Jahressteuer, in V höher, in III niedriger', () => {
     const o = { ...ort, verheiratet: false };
-    expect(lohnsteuerZusatz(40_000, 1_800, 1, ort, p)).toBeCloseTo(zusatzsteuer(40_000, 1_800, o, p), 6);
+    // Aufs Bit gleich — sonst kippt in seltenen Faellen ein halber Cent
+    for (const kirche of [false, true]) {
+      const mit = { ...ort, kirchensteuerpflichtig: kirche };
+      expect(lohnsteuerZusatz(40_000, 1_800, 1, mit, p)).toBe(zusatzsteuer(40_000, 1_800, { ...mit, verheiratet: false }, p));
+      expect(lohnsteuerZusatz(40_000, 1_800, 3, mit, p)).toBe(zusatzsteuer(40_000, 1_800, { ...mit, verheiratet: true }, p));
+    }
     expect(lohnsteuerZusatz(40_000, 1_800, 5, ort, p)).toBeGreaterThan(lohnsteuerZusatz(40_000, 1_800, 1, ort, p));
     expect(lohnsteuerZusatz(40_000, 1_800, 3, ort, p)).toBeLessThan(lohnsteuerZusatz(40_000, 1_800, 1, ort, p));
     expect(grenzLohnsteuersatz(60_000, 5, p)).toBeCloseTo(0.42, 2);

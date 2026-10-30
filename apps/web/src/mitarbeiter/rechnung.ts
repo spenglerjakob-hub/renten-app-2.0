@@ -28,8 +28,6 @@ import type { SzenarioParsed } from '../store/szenario';
 export const P = parameterFuer(new Date().getFullYear(), { indexRate: 0 });
 const JETZT = new Date().getFullYear();
 
-const OHNE_KINDER: KinderStatus = { hatKinder: false, kinderUnter25: 0 };
-
 /** Das Bundesland der Angaben, sonst das der Firma. */
 export const bundeslandVon = (a: BeratungAngaben, f: FirmenAngebot) => a.bundesland || f.bundesland;
 
@@ -41,21 +39,32 @@ export function kinderStatus(a: BeratungAngaben): KinderStatus {
 }
 
 /**
- * Die Steuer des Mitarbeiters. Verheiratet mit Einkommen des Partners: dessen
- * zvE aus seinem Brutto (gesetzlich versichert, ohne Kinder gerechnet) —
- * die Ersparnis entsteht dann im gemeinsamen Splittingtarif.
+ * Die Steuer des Mitarbeiters: die Lohnsteuer seiner Steuerklasse — wie auf
+ * der Gehaltsabrechnung und im Angebot des Versicherers. Bei III und V
+ * gleicht die Steuererklaerung das Jahr aus; das sagt die Fussnote.
  */
-export function steuerVon(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P): MatchingSteuer {
-  const bundesland = bundeslandVon(a, f);
-  const partnerZveJahr = a.verheiratet && a.partnerBrutto > 0
-    ? bruttoZuNetto(a.partnerBrutto, { verheiratet: false, bundesland, kirchensteuerpflichtig: false, kinder: OHNE_KINDER }, p).zve
-    : 0;
-  return { verheiratet: a.verheiratet, bundesland, kirchensteuerpflichtig: a.kirchensteuer, partnerZveJahr };
+export function steuerVon(a: BeratungAngaben, f: FirmenAngebot): MatchingSteuer {
+  return {
+    verheiratet: a.steuerklasse === 3, bundesland: bundeslandVon(a, f), kirchensteuerpflichtig: a.kirchensteuer,
+    steuerklasse: a.steuerklasse,
+  };
 }
+
+/** Das Monatsgehalt: erfasst wird es, gespeichert das Jahr mit Sonderzahlungen. */
+export const monatsgehalt = (a: BeratungAngaben) => a.jahresbrutto / (a.gehaelter > 0 ? a.gehaelter : 12);
+
+/**
+ * Das laufende Gehalt aufs Jahr: zwoelf Monatsgehaelter, ohne Weihnachts- und
+ * Urlaubsgeld. Damit rechnet der Monat — Probeabrechnung, Umwandlung, Regler —
+ * wie die Lohnsteuer auf der Abrechnung. Rente und Versorgungsluecke rechnen
+ * mit dem ganzen Jahr (`jahresbrutto`).
+ */
+export const laufendesJahresbrutto = (a: BeratungAngaben) =>
+  (a.gehaelter === 12 ? a.jahresbrutto : monatsgehalt(a) * 12);
 
 export function eingabenVon(a: BeratungAngaben, umwandlungMonat: number): MitarbeiterEingaben {
   return {
-    jahresbrutto: a.jahresbrutto,
+    jahresbrutto: laufendesJahresbrutto(a),
     umwandlungMonat,
     privatVersichert: a.kv === 'privat',
     pkvPraemieMonat: a.pkvPraemieMonat,
@@ -66,7 +75,7 @@ export function eingabenVon(a: BeratungAngaben, umwandlungMonat: number): Mitarb
 
 /** Schritt 4: was die Umwandlung kostet und was in den Vertrag fliesst. */
 export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): MitarbeiterBav {
-  return bavMitarbeiter(f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f, p), p);
+  return bavMitarbeiter(f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f), p);
 }
 
 /** „Rahmen voll nutzen“: die Umwandlung, mit der der beitragsfreie Rahmen genau voll ist. */
@@ -143,14 +152,14 @@ export const RENTENANPASSUNG = 0.015;
 
 /**
  * Das Szenario des Mitarbeiters — ueber `szenarioAusCheck`, wie beim
- * Vorsorge-Check, mit der Rentenanpassung der Beratung. Verheiratet: der
- * Partner gleich alt, mit seinem Brutto und einer daraus geschaetzten
- * gesetzlichen Rente. Mehr fragt die Beratung nicht; fuer Steuer und
+ * Vorsorge-Check, mit der Rentenanpassung der Beratung. Die Steuer im Alter
+ * folgt der Steuerklasse: bei III im Splittingtarif mit einem Partner ohne
+ * eigenes Einkommen und ohne eigene Rente, sonst im Grundtarif — das
+ * Einkommen des Partners fragt die Beratung nicht. Fuer Steuer und
  * Krankenversicherung im Alter reicht das.
  */
-export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMonatA: number, p: LegalParameters = P): SzenarioParsed {
+export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMonatA: number): SzenarioParsed {
   const x = leereAntworten();
-  const rentenbeginn = rentenbeginnVon(a);
   x.a = {
     ...x.a,
     name: a.name,
@@ -159,13 +168,13 @@ export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMon
     einkommen: { ...x.a.einkommen, modus: 'brutto', betrag: a.jahresbrutto / 12, auszahlungen: 12 },
     grvRente: grvMonatA,
   };
-  x.verheiratet = a.verheiratet;
-  if (a.verheiratet) {
+  x.verheiratet = a.steuerklasse === 3;
+  if (x.verheiratet) {
     x.b = {
       ...x.b,
       geburtsdatum: a.geburtsdatum,
-      einkommen: { ...x.b.einkommen, modus: 'brutto', betrag: a.partnerBrutto / 12, auszahlungen: 12 },
-      grvRente: grvVon(a.partnerBrutto, 0, a.geburtsdatum, rentenbeginn, p).monat,
+      einkommen: { ...x.b.einkommen, modus: 'brutto', betrag: 0, auszahlungen: 12 },
+      grvRente: 0,
     };
   }
   x.bundesland = bundeslandVon(a, f);
@@ -185,7 +194,7 @@ export function szenarioAusBeratung(a: BeratungAngaben, f: FirmenAngebot, grvMon
  */
 export function basisProjektion(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P) {
   const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a), p);
-  const szenario = szenarioAusBeratung(a, f, grv.monat, p);
+  const szenario = szenarioAusBeratung(a, f, grv.monat);
   const projektion = projiziere(szenario);
   const zeile = projektion.zeilen.find((z) => z.jahr === projektion.ruhestandsjahr) ?? null;
   return { grv, szenario, projektion, zeile };
@@ -303,7 +312,7 @@ export function leistungsRechnung(
  * beides in heutiger Kaufkraft.
  * ------------------------------------------------------------------------ */
 
-/** Lohn heute, im Monat: Steuern als Anteil der Jahressteuer, Sozialabgaben, Netto. */
+/** Lohn heute, im Monat: Lohnsteuer samt Zuschlaegen, Sozialabgaben, Netto. */
 export interface Lohn {
   bruttoMonat: number;
   steuernMonat: number;
@@ -311,21 +320,23 @@ export interface Lohn {
   nettoMonat: number;
   /** Zu versteuerndes Einkommen im Jahr — fuer die Erklaerung der Steuerersparnis */
   zveJahr: number;
-  /** Splittingtarif (verheiratet, Partner ohne Einkommen) */
+  /** Splittingtarif: Steuerklasse III */
   splitting: boolean;
 }
 
 /**
- * Der Nettolohn des Mitarbeiters heute — `bruttoZuNetto`, mit denselben
- * Angaben wie die Modelle. Verheiratet zaehlt der Splittingtarif nur, wenn
- * der Partner kein Einkommen hat; sonst rechnet es wie Steuerklasse IV mit
- * dem Grundtarif. Die Steuer ist der Monatsanteil der Jahressteuer — die
- * Lohnsteuer der Abrechnung verteilt sie je nach Steuerklasse anders.
+ * Der Nettolohn des Mitarbeiters heute — `bruttoZuNetto` mit der Lohnsteuer
+ * seiner Steuerklasse, mit denselben Angaben wie die Modelle.
+ *
+ * `monat`: ein gewoehnlicher Monat wie auf der Abrechnung — zwoelf
+ * Monatsgehaelter aufs Jahr (`laufendesJahresbrutto`). `jahr`: das ganze
+ * Jahr mit Weihnachts- und Urlaubsgeld, im Monatsdurchschnitt — fuer die
+ * Versorgungsluecke, deren Rente aus demselben Jahr geschaetzt ist.
  */
-export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P): Lohn {
-  const splitting = a.verheiratet && a.partnerBrutto <= 0;
-  const n = bruttoZuNetto(Math.max(0, a.jahresbrutto), {
-    verheiratet: splitting,
+export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P, basis: 'monat' | 'jahr' = 'monat'): Lohn {
+  const n = bruttoZuNetto(Math.max(0, basis === 'monat' ? laufendesJahresbrutto(a) : a.jahresbrutto), {
+    verheiratet: a.steuerklasse === 3,
+    steuerklasse: a.steuerklasse,
     bundesland: bundeslandVon(a, f),
     kirchensteuerpflichtig: a.kirchensteuer,
     kinder: kinderStatus(a),
@@ -338,7 +349,7 @@ export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalPar
     svMonat: n.sv / 12,
     nettoMonat: n.monatsnetto,
     zveJahr: n.zve,
-    splitting,
+    splitting: a.steuerklasse === 3,
   };
 }
 
@@ -386,7 +397,8 @@ export function versorgungslueckeRechnung(f: FirmenAngebot, d: BeratungDaten, p:
     steuerMonat: posten.steuerJahr / 12 / kk,
     nettoMonat: posten.nettoJahr / 12 / kk,
   };
-  const lohn = nettolohnHeute(a, f, p);
+  // Das ganze Jahr wie die Rente, die daraus geschaetzt ist — mit Sonderzahlungen
+  const lohn = nettolohnHeute(a, f, p, 'jahr');
   const lueckeMonat = Math.max(0, lohn.nettoMonat - rente.nettoMonat);
   const anteil = lohn.nettoMonat > 0 ? rente.nettoMonat / lohn.nettoMonat : 0;
   // Ganze Prozent, die sich zu 100 ergaenzen: die Luecke als Rest der gerundeten Rente
@@ -476,6 +488,8 @@ export interface Probeabrechnung {
   /** = Netto ohne − Netto mit, genau der Netto-Aufwand der Rechnung */
   eigenbeteiligungMonat: number;
   gesamtMonat: number;
+  /** Fuer die Fussnote: nach welcher Klasse die Lohnsteuer gerechnet ist */
+  steuerklasse: BeratungAngaben['steuerklasse'];
 }
 
 /**
@@ -498,6 +512,7 @@ export function probeabrechnung(f: FirmenAngebot, d: BeratungDaten, r: Mitarbeit
     netto: { ohne: lohn.nettoMonat, mit: lohn.nettoMonat - r.nettoAufwandMonat },
     eigenbeteiligungMonat: r.nettoAufwandMonat,
     gesamtMonat: r.gesamtMonat,
+    steuerklasse: d.angaben.steuerklasse,
   };
 }
 
@@ -524,6 +539,7 @@ export function belastungJeVertrag(
     echterAufwandMonat: r.nettoAufwandMonat,
   }, {
     zve: lohn.zveJahr, p, beamter: false, selbststaendig: false, privatVersichert: a.kv === 'privat', splitting: lohn.splitting,
+    steuerklasse: a.steuerklasse,
   });
 }
 

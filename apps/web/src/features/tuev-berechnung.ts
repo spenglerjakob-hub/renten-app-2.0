@@ -1,7 +1,7 @@
 import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, SV_FREI_QUOTE, euroText,
-  type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
+  versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, grenzLohnsteuersatz, SV_FREI_QUOTE, euroText,
+  type Steuerklasse, type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung, type LoesungsOptionen,
   type Loesung, type LoesungId,
@@ -678,6 +678,8 @@ export function belastungsTreppe(
     privatVersichert: boolean;
     /** Grenzsteuersatz im Splittingtarif — fehlt die Angabe, gilt der Grundtarif */
     splitting?: boolean;
+    /** Mitarbeiterberatung: Die Ersparnis ist Lohnsteuer dieser Klasse, nicht Jahressteuer */
+    steuerklasse?: Steuerklasse;
   },
 ): {
   zufluss: number;
@@ -773,15 +775,20 @@ function svErklaerung(
     + 'Sozialabgaben.';
 }
 
+const ROEMISCH: Record<Steuerklasse, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V' };
+
 /** Woher die Steuerersparnis kommt — am zvE und am Grenzsteuersatz. */
 function steuerErklaerung(
   steuerMonat: number,
   beitragMonat: number,
-  k: { zve: number; p: LegalParameters; splitting?: boolean },
+  k: { zve: number; p: LegalParameters; splitting?: boolean; steuerklasse?: Steuerklasse },
 ): string {
-  const grenz = grenzsteuersatz(k.zve, k.splitting ?? false, k.p);
+  const grenz = k.steuerklasse
+    ? grenzLohnsteuersatz(k.zve, k.steuerklasse, k.p)
+    : grenzsteuersatz(k.zve, k.splitting ?? false, k.p);
+  const steuer = k.steuerklasse ? `Lohnsteuer in Steuerklasse ${ROEMISCH[k.steuerklasse]}` : 'Jahressteuer';
   return `Der Beitrag mindert Ihr zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
-    + 'wird die DIFFERENZ Ihrer Jahressteuer mit und ohne Beitrag — nicht ein '
+    + `wird die DIFFERENZ Ihrer ${steuer} mit und ohne Beitrag — nicht ein `
     + `Durchschnittssatz: Der letzte Euro Ihres Einkommens kostet rund `
     + `${(grenz * 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} % Steuer, und `
     + `genau dort setzt der Beitrag an. Von ${euroText(beitragMonat)} bleiben so `

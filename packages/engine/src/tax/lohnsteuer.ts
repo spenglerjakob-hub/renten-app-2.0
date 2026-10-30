@@ -80,11 +80,13 @@ export function lohnsteuerZusatz(
   p: LegalParameters,
 ): number {
   if (zusatz <= 0) return 0;
-  const summe = (z: number) => {
-    const s = lohnsteuerMitZuschlaegen(z, klasse, o, p);
-    return s.lohnsteuer + s.soli + s.kirchensteuer;
-  };
-  return summe(zveBasis + zusatz) - summe(zveBasis);
+  // Dieselbe Reihenfolge wie `zusatzsteuer`: In I, IV und III ist das Ergebnis dann aufs Bit dasselbe.
+  const kistSatz = o.kirchensteuerpflichtig ? kirchensteuersatz(o.bundesland) : 0;
+  const vorher = lohnsteuerJahr(zveBasis, klasse, p);
+  const nachher = lohnsteuerJahr(zveBasis + zusatz, klasse, p);
+  const d = nachher - vorher;
+  const dSoli = solidaritaetszuschlag(nachher, klasse === 3, p) - solidaritaetszuschlag(vorher, klasse === 3, p);
+  return d + dSoli + d * kistSatz;
 }
 
 /** Der Grenzsteuersatz der Lohnsteuer — wie `grenzsteuersatz`, nach Steuerklasse. */
