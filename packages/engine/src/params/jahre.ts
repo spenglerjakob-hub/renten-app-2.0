@@ -64,6 +64,8 @@ export const PARAMETER_2024: LegalParameters = {
   rentenwert: 39.32,
   durchschnittsentgelt: 45358,
   pauschbetraege: { arbeitnehmer: 1230, versorgungsbezuege: 102, renten: 102, sonderausgaben: 36, sparer: 1000 },
+  // Programmablaufplan 2024 (BMF)
+  lohnsteuer: { w1Stkl5: 13279, w2Stkl5: 33380, w3Stkl5: 222260, entlastungAlleinerziehend: 4260 },
   rvSatzGesamt: 0.186,
   avSatzGesamt: 0.026,
   riester: riesterStandard,
@@ -87,6 +89,8 @@ export const PARAMETER_2025: LegalParameters = {
   rentenwert: 40.79,
   durchschnittsentgelt: 50493,
   pauschbetraege: { arbeitnehmer: 1230, versorgungsbezuege: 102, renten: 102, sonderausgaben: 36, sparer: 1000 },
+  // Geaenderter Programmablaufplan 2025 (BMF, Januar 2025)
+  lohnsteuer: { w1Stkl5: 13785, w2Stkl5: 34240, w3Stkl5: 222260, entlastungAlleinerziehend: 4260 },
   rvSatzGesamt: 0.186,
   avSatzGesamt: 0.026,
   riester: riesterStandard,
@@ -110,6 +114,8 @@ export const PARAMETER_2026: LegalParameters = {
   rentenwert: 42.52,
   durchschnittsentgelt: 51944,
   pauschbetraege: { arbeitnehmer: 1230, versorgungsbezuege: 102, renten: 102, sonderausgaben: 36, sparer: 1000 },
+  // Programmablaufplan 2026 (BMF, 12.11.2025)
+  lohnsteuer: { w1Stkl5: 14071, w2Stkl5: 34939, w3Stkl5: 222260, entlastungAlleinerziehend: 4260 },
   rvSatzGesamt: 0.186,
   avSatzGesamt: 0.026,
   riester: riesterStandard,

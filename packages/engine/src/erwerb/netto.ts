@@ -1,5 +1,6 @@
 import type { LegalParameters } from '../params/types.js';
 import { einkommensteuer, solidaritaetszuschlag, kirchensteuersatz } from '../tax/estg.js';
+import { lohnsteuerMitZuschlaegen, type Steuerklasse } from '../tax/lohnsteuer.js';
 import {
   kvPvArbeitnehmer, kvSatzVoll, pvSatzMitglied, mindestbemessungMonat,
   type KinderStatus,
@@ -44,6 +45,12 @@ export interface ErwerbsOptionen {
    * Arbeitgeberzuschuss. Fortgeschrieben auf das jeweilige Jahr.
    */
   pkvPraemieMonat?: number;
+  /**
+   * Steuerklasse der Gehaltsabrechnung. Gesetzt: Die Steuer ist die
+   * Lohnsteuer dieser Klasse (`lohnsteuerJahr`) statt der Jahressteuer —
+   * `verheiratet` zaehlt dann nicht. So rechnet die Mitarbeiterberatung.
+   */
+  steuerklasse?: Steuerklasse;
 }
 
 export interface ErwerbsNetto {
@@ -225,9 +232,10 @@ export function bruttoZuNetto(
   const sv = a.sv;
   const zve = a.zveBeitrag;
 
-  const est = einkommensteuer(zve, o.verheiratet, p);
-  const soli = solidaritaetszuschlag(est, o.verheiratet, p);
-  const kist = o.kirchensteuerpflichtig ? est * kirchensteuersatz(o.bundesland) : 0;
+  const lst = o.steuerklasse ? lohnsteuerMitZuschlaegen(zve, o.steuerklasse, o, p) : null;
+  const est = lst ? lst.lohnsteuer : einkommensteuer(zve, o.verheiratet, p);
+  const soli = lst ? lst.soli : solidaritaetszuschlag(est, o.verheiratet, p);
+  const kist = lst ? lst.kirchensteuer : o.kirchensteuerpflichtig ? est * kirchensteuersatz(o.bundesland) : 0;
 
   const netto = brutto - sv - est - soli - kist;
   return {
