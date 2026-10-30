@@ -9,12 +9,12 @@ import { LueckenRing } from '../components/LueckenRing';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
-  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, monatsgehalt, probeabrechnung, rentenbeginnVon,
+  P, beginnDatum, belastungJeVertrag, grvVon, hochrechnung, lueckeMitBetriebsrente, monatsgehalt, probeabrechnung, rentenbeginnVon,
   type AuszahlungsWerte, type BelastungsTreppe, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung, type Versorgungsluecke,
 } from './rechnung';
 import {
   KLASSE_ROEMISCH, MODELL_NAME, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
-  regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+  nettolohnGrundlage, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
 import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
 
@@ -159,6 +159,23 @@ function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][
   ];
 }
 
+/**
+ * Wie viel der Versorgungsluecke die Betriebsrente schliesst — ein Satz im
+ * Abschnitt zur Versorgungsluecke, im Protokoll und in den
+ * Gespraechsunterlagen. Dort hat er Platz und schliesst den Gedanken: erst was
+ * fehlt, dann was das Angebot davon traegt.
+ */
+function lueckeSatz(luecke: Versorgungsluecke | null | undefined, leistung: Leistung | null, daten: BeratungDaten): string | null {
+  const x = lueckeMitBetriebsrente(luecke ?? null, leistung, daten);
+  if (!x) return null;
+  const haupt = x.prognose ?? x.garantiert!;
+  const art = x.prognose ? (x.geschaetzt ? 'Prognose, geschätzt' : 'Prognose') : 'garantiert';
+  const betrag = euroGenau(Math.round(Math.min(haupt.betriebsrenteMonat, x.lueckeMonat)));
+  if (haupt.anteil >= 1) return `Die Betriebsrente schließt diese Lücke ganz (${art}): ${betrag} im Monat, netto in heutiger Kaufkraft.`;
+  return `Die Betriebsrente schließt davon ${haupt.prozent}\u00a0% (${art}): ${betrag} von ${euroGenau(Math.round(x.lueckeMonat))} im Monat, `
+    + `netto in heutiger Kaufkraft${x.prognose && x.garantiert ? `; mit der garantierten Rente ${x.garantiert.prozent}\u00a0%` : ''}.`;
+}
+
 /** Woher die Leistung stammt — je Vertrag aus dem Angebot oder aus der geschaetzten Hochrechnung. */
 function quelleDerLeistung(ausHochrechnung: boolean[]): string {
   if (ausHochrechnung.every(Boolean)) return 'laut geschätzter Hochrechnung';
@@ -227,9 +244,10 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
           ]} />
           <p className="mt-1 text-[9pt] text-ui-schiefer">
             Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
-            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Nettolohn mit der
-            Lohnsteuer der Steuerklasse {KLASSE_ROEMISCH[a.steuerklasse]}{a.gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(a.gehaelter)} Gehältern` : ''}.
+            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Nettolohn
+            {' '}{nettolohnGrundlage(a.steuerklasse, a.gehaelter)}.
           </p>
+          {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
         </Abschnitt>
       )}
 
@@ -443,6 +461,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
                   Im Alter fehlen Ihnen <span className="ui-hervor whitespace-nowrap">{luecke.lueckeProzent} %</span> Ihres heutigen Nettolohns.
                 </p>
               )}
+              {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
               <p className="mt-1 text-[9pt] text-ui-schiefer">
                 In heutiger Kaufkraft. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung{' '}
                 {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr.

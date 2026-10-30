@@ -37,6 +37,16 @@ export const GEHAELTER_OPTIONEN: { wert: string; text: string }[] = GEHAELTER_IM
 export const gehaelterText = (g: number) => g.toLocaleString('de-DE');
 
 /**
+ * Womit der Nettolohn der Versorgungsluecke rechnet: mit der Lohnsteuer der
+ * Klasse — bei V im Grundtarif wie IV, denn den hohen Abzug der Klasse V
+ * gleicht die Steuererklaerung aus (`nettolohnHeute`, Basis `jahr`).
+ */
+export function nettolohnGrundlage(k: SteuerklasseBeratung, gehaelter: number): string {
+  const klasse = k === 5 ? 'bei Steuerklasse V im Grundtarif wie IV' : `mit der Lohnsteuer der Steuerklasse ${KLASSE_ROEMISCH[k]}`;
+  return `${klasse}${gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(gehaelter)} Gehältern` : ''}`;
+}
+
+/**
  * Die Fussnote zur Steuer im Monat: Lohnsteuer der Klasse, genaehert — bei
  * III und V weicht der Monat vom Jahresergebnis ab.
  */

@@ -20,15 +20,16 @@ import {
   Vermerk, WertKarte, Zahl,
 } from '../components/stil';
 import { LueckenRing } from '../components/LueckenRing';
+import { AnteilsRing } from '../components/AnteilsRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
-  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, monatsgehalt, probeabrechnung,
-  reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
+  P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
+  probeabrechnung, reglerGrenzen, rentenbeginnVon, umwandlungFuerNetto,
   type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
-  type Probeabrechnung, type Versorgungsluecke,
+  type LueckeMitBetriebsrente, type Probeabrechnung, type Versorgungsluecke,
 } from './rechnung';
 import {
-  GEHAELTER_OPTIONEN, KLASSE_ROEMISCH, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
+  GEHAELTER_OPTIONEN, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, lohnsteuerHinweis, nettolohnGrundlage,
   regelKern, regelText, traegerText, vertragName,
 } from './texte';
 import { Gespraechsunterlagen, Protokoll, Vereinbarung, Verzicht } from './druck';
@@ -355,8 +356,8 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
       <p className="max-w-4xl text-xs leading-relaxed text-ui-schiefer">
         Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
         mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
-        Der Nettolohn rechnet mit der Lohnsteuer der Steuerklasse {KLASSE_ROEMISCH[a.steuerklasse]}
-        {a.gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(a.gehaelter)} Gehältern` : ''}, die Steuer im Alter
+        Der Nettolohn rechnet {nettolohnGrundlage(a.steuerklasse, a.gehaelter)}
+        {a.steuerklasse === 5 ? ' — den höheren Abzug der Klasse V gleicht die Steuererklärung aus' : ''}, die Steuer im Alter
         {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
         Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
       </p>
@@ -767,10 +768,62 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
   );
 }
 
-export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, aktuell }: SchrittProps & {
-  kennzahlen: KennzahlenErgebnis | null; aktuell: boolean;
+/**
+ * Wie viel der Versorgungsluecke die Betriebsrente schliesst — der Ring aus
+ * Schritt 3, um die Betriebsrente ergaenzt: gesetzliche Rente, Betriebsrente,
+ * was offen bleibt. Alles netto im Monat, in heutiger Kaufkraft.
+ */
+function LueckeMitBetriebsrenteKarte({ luecke, x, aktuell }: { luecke: Versorgungsluecke; x: LueckeMitBetriebsrente; aktuell: boolean }) {
+  const haupt = x.prognose ?? x.garantiert!;
+  const art = x.prognose ? (x.geschaetzt ? 'Prognose, geschätzt' : 'Prognose') : 'garantiert';
+  // Im Ring hoechstens die Luecke — was darueber hinausgeht, hat im Nettolohn keinen Platz
+  const imRing = Math.min(haupt.betriebsrenteMonat, x.lueckeMonat);
+  return (
+    <Karte titel="Ihre Versorgungslücke mit Betriebsrente">
+      <div className={`grid grid-cols-1 items-center gap-6 lg:grid-cols-2 ${aktuell ? '' : 'opacity-60'}`}>
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+          <AnteilsRing
+            teile={[
+              { wert: luecke.rente.nettoMonat, rolle: 'tinte' },
+              { wert: imRing, rolle: 'knopf' },
+              { wert: haupt.restMonat, rolle: 'luecke' },
+            ]}
+            mitte={`${haupt.prozent} %`}
+            zeilen={['der Lücke', 'geschlossen']}
+            beschreibung={`Nettolohn ${euro(luecke.lohn.nettoMonat)}: gesetzliche Rente ${euro(luecke.rente.nettoMonat)}, `
+              + `Betriebsrente ${euro(haupt.betriebsrenteMonat)}, offen ${euro(haupt.restMonat)} — `
+              + `die Betriebsrente schließt ${haupt.prozent} % der Versorgungslücke`}
+          />
+          <dl className="space-y-4">
+            <Zahl etikett="Gesetzliche Rente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} />
+            <Zahl etikett="Betriebsrente" punkt="bg-ui-knopf" wert={euro(haupt.betriebsrenteMonat)} zusatz={art} />
+            <Zahl etikett="Bleibt offen" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(haupt.restMonat)} />
+          </dl>
+        </div>
+        <div>
+          <div className={`${AKZENT} px-5 py-4`}>
+            <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
+              {haupt.anteil >= 1
+                ? <>Ihre Betriebsrente schließt Ihre Versorgungslücke <Hervor>ganz</Hervor>.</>
+                : <>Ihre Betriebsrente schließt <span className="whitespace-nowrap tabular-nums"><Hervor>{haupt.prozent} %</Hervor></span> Ihrer Versorgungslücke.</>}
+            </p>
+          </div>
+          <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
+            Netto im Monat, in heutiger Kaufkraft: Von {euro(x.lueckeMonat)} Versorgungslücke (Schritt 3) schließt die
+            Betriebsrente {euro(Math.min(haupt.betriebsrenteMonat, x.lueckeMonat))}
+            {x.prognose && x.garantiert ? ` — mit der garantierten Rente\u00a0${x.garantiert.prozent}\u00a0%` : ''}.
+          </p>
+        </div>
+      </div>
+    </Karte>
+  );
+}
+
+export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, luecke, aktuell }: SchrittProps & {
+  kennzahlen: KennzahlenErgebnis | null; luecke: Versorgungsluecke | null; aktuell: boolean;
 }) {
   const a = firma.angebot;
+  const geschlossen = lueckeMitBetriebsrente(luecke, leistung, daten);
   const setzeW = (weg: 'direkt' | 'ukasse', p: Partial<VersichererWerte>) =>
     setze((d) => ({ ...d, versicherer: { ...d.versicherer, [weg]: { ...d.versicherer[weg], ...p } } }));
   // Von Hand geaenderte Prognosewerte stammen nicht mehr aus der Hochrechnung
@@ -865,6 +918,8 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
           </Karte>
         );
       })}
+
+      {luecke && geschlossen && <LueckeMitBetriebsrenteKarte luecke={luecke} x={geschlossen} aktuell={aktuell} />}
 
       {kennzahlen && (
         <KennzahlenKarte k={kennzahlen} daten={daten} setze={setze} aktuell={aktuell} />

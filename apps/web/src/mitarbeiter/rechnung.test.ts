@@ -3,7 +3,7 @@ import { bavMitarbeiter } from '@renten/engine';
 import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
   HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
-  laufendesJahresbrutto, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
+  laufendesJahresbrutto, lueckeMitBetriebsrente, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
   umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
 } from './rechnung';
 
@@ -55,6 +55,14 @@ describe('Beitragsseite der Mitarbeiterberatung', () => {
     const bisher = (verheiratet: boolean) => bavMitarbeiter(modell, ma, { verheiratet, bundesland: 'Bayern', kirchensteuerpflichtig: false, partnerZveJahr: 0 }, P);
     expect(beitragsRechnung(firma, beratung()).nettoAufwandMonat).toBeCloseTo(bisher(false).nettoAufwandMonat, 9);
     expect(beitragsRechnung(firma, beratung({ verheiratet: true, partnerBrutto: 0 })).nettoAufwandMonat).toBeCloseTo(bisher(true).nettoAufwandMonat, 9);
+  });
+
+  it('Versorgungslücke: V rechnet im Grundtarif wie IV — die Abrechnung bleibt bei V', () => {
+    const fuenf = beratung({ steuerklasse: 5, verheiratet: true });
+    const vier = beratung({ steuerklasse: 4, verheiratet: true });
+    expect(versorgungslueckeRechnung(firma, fuenf)!.lohn.nettoMonat).toBe(versorgungslueckeRechnung(firma, vier)!.lohn.nettoMonat);
+    expect(probeabrechnung(firma, fuenf, beitragsRechnung(firma, fuenf)).netto.ohne)
+      .toBeLessThan(probeabrechnung(firma, vier, beitragsRechnung(firma, vier)).netto.ohne);
   });
 
   it('Steuerklasse V spart bei der Umwandlung mehr Lohnsteuer als I, III weniger', () => {
@@ -415,5 +423,51 @@ describe('Leistung im Alter aus den Werten des Versicherers', () => {
     expect(leistungsRechnung(firma, d, beitragsRechnung(firma, d))).toBeNull();
     const ohneWerte = beratung();
     expect(leistungsRechnung(firma, ohneWerte, beitragsRechnung(firma, ohneWerte))!.vertraege).toEqual([]);
+  });
+});
+
+describe('Wie viel der Versorgungslücke die Betriebsrente schließt', () => {
+  const mit = (direkt: Partial<BeratungDaten['versicherer']['direkt']>, f = firma) => {
+    const d0 = beratung({ grvRente: 1450 });
+    const d = { ...d0, versicherer: { ...d0.versicherer, direkt: { ...d0.versicherer.direkt, ...direkt } } };
+    const l = leistungsRechnung(f, d, beitragsRechnung(f, d));
+    return { d, l, luecke: versorgungslueckeRechnung(f, d)! };
+  };
+
+  it('die Netto-Rente in heutiger Kaufkraft gegen die Lücke — Prognose und garantiert', () => {
+    const { d, l, luecke } = mit({ garantierteRente: 120, prognoseRente: 185 });
+    const x = lueckeMitBetriebsrente(luecke, l, d)!;
+    const heute = l!.vertraege[0]!.prognose!.nettoMonat / l!.kaufkraftfaktor;
+    expect(x.prognose!.betriebsrenteMonat).toBeCloseTo(heute, 9);
+    expect(x.prognose!.anteil).toBeCloseTo(heute / luecke.lueckeMonat, 9);
+    expect(x.prognose!.restMonat).toBeCloseTo(luecke.lueckeMonat - heute, 9);
+    expect(x.prognose!.prozent).toBe(Math.round(x.prognose!.anteil * 100));
+    expect(x.garantiert!.anteil).toBeLessThan(x.prognose!.anteil);
+    expect(x.geschaetzt).toBe(false);
+  });
+
+  it('höchstens 100 %; 100 % nur, wenn die Lücke ganz geschlossen ist', () => {
+    const { d, l, luecke } = mit({ prognoseRente: 20_000 });
+    const x = lueckeMitBetriebsrente(luecke, l, d)!;
+    expect(x.prognose!.anteil).toBe(1);
+    expect(x.prognose!.prozent).toBe(100);
+    expect(x.prognose!.restMonat).toBe(0);
+  });
+
+  it('Matching-Modell: beide Verträge zusammen', () => {
+    const { d, l, luecke } = mit({ prognoseRente: 150 }, matchingFirma);
+    const d2 = { ...d, versicherer: { ...d.versicherer, ukasse: { ...d.versicherer.ukasse, prognoseRente: 100 } } };
+    const l2 = leistungsRechnung(matchingFirma, d2, beitragsRechnung(matchingFirma, d2))!;
+    const x = lueckeMitBetriebsrente(luecke, l2, d2)!;
+    const summe = l2.vertraege.reduce((s, v) => s + v.prognose!.nettoMonat, 0) / l2.kaufkraftfaktor;
+    expect(x.prognose!.betriebsrenteMonat).toBeCloseTo(summe, 9);
+    expect(l).not.toBeNull();
+  });
+
+  it('ohne Lücke, ohne Leistung oder nur mit Kapital: nichts', () => {
+    const { d, l, luecke } = mit({ prognoseKapital: 40_000 });
+    expect(lueckeMitBetriebsrente(luecke, l, d)).toBeNull();
+    expect(lueckeMitBetriebsrente(null, l, d)).toBeNull();
+    expect(lueckeMitBetriebsrente({ ...luecke, lueckeMonat: 0 }, l, d)).toBeNull();
   });
 });

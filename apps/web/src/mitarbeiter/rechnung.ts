@@ -331,12 +331,16 @@ export interface Lohn {
  * `monat`: ein gewoehnlicher Monat wie auf der Abrechnung — zwoelf
  * Monatsgehaelter aufs Jahr (`laufendesJahresbrutto`). `jahr`: das ganze
  * Jahr mit Weihnachts- und Urlaubsgeld, im Monatsdurchschnitt — fuer die
- * Versorgungsluecke, deren Rente aus demselben Jahr geschaetzt ist.
+ * Versorgungsluecke, deren Rente aus demselben Jahr geschaetzt ist; dort
+ * Klasse V im Grundtarif wie IV.
  */
 export function nettolohnHeute(a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P, basis: 'monat' | 'jahr' = 'monat'): Lohn {
+  // Fuer die Luecke rechnet V im Grundtarif wie IV: Den hohen Abzug der Klasse V gleicht die
+  // Steuererklaerung aus, und die Steuer im Alter rechnet ebenso im Grundtarif.
+  const steuerklasse = basis === 'jahr' && a.steuerklasse === 5 ? 4 : a.steuerklasse;
   const n = bruttoZuNetto(Math.max(0, basis === 'monat' ? laufendesJahresbrutto(a) : a.jahresbrutto), {
     verheiratet: a.steuerklasse === 3,
-    steuerklasse: a.steuerklasse,
+    steuerklasse,
     bundesland: bundeslandVon(a, f),
     kirchensteuerpflichtig: a.kirchensteuer,
     kinder: kinderStatus(a),
@@ -416,6 +420,54 @@ export function versorgungslueckeRechnung(f: FirmenAngebot, d: BeratungDaten, p:
     alterBeiRentenbeginn: rb.jahr - g.jahr,
     inflation: b.szenario.annahmen.inflation,
     rentenanpassung: b.szenario.annahmen.rentendynamik,
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * WIE VIEL DER LUECKE DIE BETRIEBSRENTE SCHLIESST — ihre Netto-Rente im
+ * ersten Rentenjahr, in heutiger Kaufkraft, gegen die Versorgungsluecke aus
+ * Schritt 3. Beide teilen die Teuerung derselben Projektion.
+ * ------------------------------------------------------------------------ */
+
+export interface LueckenAnteil {
+  /** Netto-Betriebsrente aller Vertraege im Monat, heutige Kaufkraft */
+  betriebsrenteMonat: number;
+  /** Was von der Luecke bleibt, im Monat */
+  restMonat: number;
+  /** Der geschlossene Teil der Luecke, hoechstens 1 */
+  anteil: number;
+  /** In ganzen Prozent: 100 nur, wenn die Luecke ganz geschlossen ist; ab 1, wenn ueberhaupt etwas */
+  prozent: number;
+}
+
+export interface LueckeMitBetriebsrente {
+  lueckeMonat: number;
+  prognose: LueckenAnteil | null;
+  garantiert: LueckenAnteil | null;
+  /** Die Prognose stammt (auch) aus der geschaetzten Hochrechnung */
+  geschaetzt: boolean;
+}
+
+/** Null ohne Luecke, ohne Leistung oder ohne Rente — mit Kapital allein gibt es keinen Monatsbetrag. */
+export function lueckeMitBetriebsrente(
+  luecke: Versorgungsluecke | null, l: Leistung | null, d: BeratungDaten,
+): LueckeMitBetriebsrente | null {
+  if (!luecke || !l || luecke.lueckeMonat < 0.5 || l.vertraege.length === 0) return null;
+  const kk = l.kaufkraftfaktor > 0 ? l.kaufkraftfaktor : 1;
+  const teil = (nettoMonat: number): LueckenAnteil | null => {
+    if (nettoMonat <= 0) return null;
+    const heute = nettoMonat / kk;
+    const anteil = Math.min(1, heute / luecke.lueckeMonat);
+    const prozent = anteil >= 1 ? 100 : Math.max(1, Math.min(99, Math.round(anteil * 100)));
+    return { betriebsrenteMonat: heute, restMonat: Math.max(0, luecke.lueckeMonat - heute), anteil, prozent };
+  };
+  const summe = (w: (v: VertragsLeistung) => AuszahlungsWerte | null) => l.vertraege.reduce((s, v) => s + (w(v)?.nettoMonat ?? 0), 0);
+  const prognose = teil(summe((v) => v.prognose));
+  const garantiert = teil(summe((v) => v.garantiert));
+  if (!prognose && !garantiert) return null;
+  return {
+    lueckeMonat: luecke.lueckeMonat, prognose, garantiert,
+    geschaetzt: l.vertraege.some((v) => d.versicherer[v.weg].ausHochrechnung),
   };
 }
 
