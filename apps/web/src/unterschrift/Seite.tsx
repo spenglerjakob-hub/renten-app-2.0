@@ -144,10 +144,10 @@ function CodeEingabe({ meldung, laeuft, onCode }: { meldung: string | null; laeu
         dem Code öffnen Sie Ihre Unterlagen, lesen sie und unterschreiben auf diesem Gerät.
       </p>
       <form onSubmit={absenden} className="ui-karte mt-6 max-w-md p-5 sm:p-7">
-        <label htmlFor="link-code" className="text-sm font-medium text-ui-tinte">Code</label>
+        <label htmlFor="link-code" className="text-sm font-medium text-ui-tinte">Code <span className="font-normal text-ui-schiefer">(6 Ziffern)</span></label>
         <input
           id="link-code" value={code} onChange={(e) => setCode(codeEingabe(e.target.value))}
-          inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} placeholder="6 Ziffern"
+          inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7}
           aria-describedby={meldung ? 'link-code-meldung' : undefined}
           className="ui-feld mt-2 w-full p-3 font-mono text-2xl tracking-[0.3em]"
         />
