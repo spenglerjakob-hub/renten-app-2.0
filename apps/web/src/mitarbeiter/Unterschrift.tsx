@@ -1,165 +1,35 @@
-import { useEffect, useRef, useState, type PointerEvent as ZeigerEreignis, type ReactNode } from 'react';
-import { CheckCircle2, Eraser, Lock, PenLine } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { CheckCircle2, Eraser, FileCheck2, Link2, Lock, Mail, PenLine, Printer, RefreshCw } from 'lucide-react';
 import type { BeratungStatus } from '@renten/schema';
 import { Dialog } from '../components/Dialog';
 import { TextFeld } from '../components/Feld';
+import { LinkFeld } from '../components/LinkFeld';
 import {
-  unterlageHtmlLaden, unterschriftenAufheben, type UnterlagenArt, type Unterlagen, type Unterschrift, type UnterschriftPerson,
+  linkLaden, linkZurueckziehen, unterlageHtmlLaden, unterschriftenAufheben, type LinkStand, type NeuerLink, type UnterlagenArt,
+  type Unterlagen, type Unterschrift, type UnterschriftPerson,
 } from '../lib/bav-beratung';
-import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
+import { LINK_TAGE, LINK_VERSUCHE, unterschriftLink } from '../lib/unterschrift-link';
+import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_KLEIN, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
+import { useDrucken } from './bausteine';
 import { UnterschriebeneUnterlage, mitUnterschriften, pruefsummeVon } from './festschreiben';
+import { FELD_HOEHE, UnterschriftBild, UnterschriftFeld } from './UnterschriftFeld';
 import {
-  ZUG_BREITE, dokumenteFuer, dokumenteText, tinteGenug, zeitpunktText, zugAusStrichen, zugGueltig, zugRahmen, type Strich,
+  ZUG_BREITE, codeText, dokumenteFuer, dokumenteText, nachweisZeilen, tinteGenug, zeitpunktText, zugAusStrichen, zugGueltig,
+  type Strich,
 } from './unterschrift-daten';
 
 /*
- * UNTERSCHRIFT AM BILDSCHIRM — einfache elektronische Signatur. Der
- * Mitarbeiter unterschreibt einmal fuer Protokoll und Vereinbarung bzw.
- * Verzicht, der Berater fuer das Protokoll; der Arbeitgeber auf Papier.
- * Mit der ersten Unterschrift sind die Unterlagen festgeschrieben und die
- * Beratung gesperrt — bis die Unterschriften aufgehoben werden.
+ * UNTERSCHRIFT — einfache elektronische Signatur. Der Mitarbeiter
+ * unterschreibt einmal fuer Protokoll und Vereinbarung bzw. Verzicht, der
+ * Berater fuer das Protokoll; der Arbeitgeber auf Papier.
+ *
+ * Am Bildschirm des Beraters — oder der Mitarbeiter per Link auf dem eigenen
+ * Geraet: Der Berater schickt ihm den Link und nennt den Code getrennt davon
+ * (lib/unterschrift-link.ts, Seite /unterschrift).
+ *
+ * Mit der ersten Unterschrift — oder dem ersten Link — sind die Unterlagen
+ * festgeschrieben und die Beratung gesperrt, bis sie aufgehoben werden.
  */
-
-/** Breite zu Hoehe des Feldes. Die Striche stehen in Einheiten der Breite 1000 — so passen sie zu jeder Groesse. */
-const FELD_VERHAELTNIS = 2.5;
-const FELD_HOEHE = ZUG_BREITE / FELD_VERHAELTNIS;
-const TINTE = '#17191c';
-
-/** Zeichnet die Striche — geglaettet wie der gespeicherte Zug. Farbe und Staerke stellt `neu` ein. */
-function zeichne(ctx: CanvasRenderingContext2D, striche: readonly Strich[], massstab: number) {
-  for (const s of striche) {
-    const [erster, ...innen] = s;
-    if (!erster) continue;
-    const letzter = innen.pop();
-    ctx.beginPath();
-    ctx.moveTo(erster[0] * massstab, erster[1] * massstab);
-    if (!letzter) ctx.lineTo(erster[0] * massstab + 0.5, erster[1] * massstab);
-    else {
-      innen.forEach((p, i) => {
-        const n = innen[i + 1] ?? letzter;
-        ctx.quadraticCurveTo(p[0] * massstab, p[1] * massstab, ((p[0] + n[0]) / 2) * massstab, ((p[1] + n[1]) / 2) * massstab);
-      });
-      ctx.lineTo(letzter[0] * massstab, letzter[1] * massstab);
-    }
-    ctx.stroke();
-  }
-}
-
-/**
- * Das Feld: Finger, Stift oder Maus (Pointer Events). `touch-action: none`
- * haelt die Seite still, solange gezeichnet wird; gezeichnet wird in der
- * Schaerfe des Bildschirms.
- */
-function UnterschriftFeld({ striche, setStriche, beschriftung }: {
-  striche: Strich[]; setStriche: (s: Strich[]) => void; beschriftung: string;
-}) {
-  const leinwand = useRef<HTMLCanvasElement>(null);
-  const strich = useRef<[number, number][] | null>(null);
-  const stricheRef = useRef(striche);
-  stricheRef.current = striche;
-
-  // Groesse und Schaerfe folgen dem Feld; danach alles neu zeichnen.
-  useEffect(() => {
-    const c = leinwand.current;
-    if (!c) return;
-    const neu = () => {
-      const r = c.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      c.width = Math.max(1, Math.round(r.width * dpr));
-      c.height = Math.max(1, Math.round(r.height * dpr));
-      const ctx = c.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, c.width, c.height);
-      // Eine neue Groesse setzt den Zustand des Canvas zurueck — darum hier, nicht einmal beim Start.
-      ctx.strokeStyle = TINTE;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 2.6 * dpr;
-      zeichne(ctx, stricheRef.current, c.width / ZUG_BREITE);
-    };
-    neu();
-    const beobachter = new ResizeObserver(neu);
-    beobachter.observe(c);
-    return () => beobachter.disconnect();
-  }, []);
-
-  // „Neu“ leert die Striche von aussen — dann auch das Bild.
-  useEffect(() => {
-    const c = leinwand.current;
-    const ctx = c?.getContext('2d');
-    if (!c || !ctx) return;
-    ctx.clearRect(0, 0, c.width, c.height);
-    zeichne(ctx, striche, c.width / ZUG_BREITE);
-  }, [striche]);
-
-  const punkt = (e: { clientX: number; clientY: number }): [number, number] => {
-    const r = leinwand.current!.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * ZUG_BREITE, ((e.clientY - r.top) / r.width) * ZUG_BREITE];
-  };
-
-  const runter = (e: ZeigerEreignis<HTMLCanvasElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    strich.current = [punkt(e)];
-  };
-  const weiter = (e: ZeigerEreignis<HTMLCanvasElement>) => {
-    const s = strich.current;
-    const c = leinwand.current;
-    const ctx = c?.getContext('2d');
-    if (!s || !c || !ctx) return;
-    const massstab = c.width / ZUG_BREITE;
-    const ereignisse = e.nativeEvent.getCoalescedEvents?.() ?? [];
-    for (const ev of ereignisse.length > 0 ? ereignisse : [e.nativeEvent]) {
-      const p = punkt(ev);
-      const letzter = s[s.length - 1];
-      if (letzter) {
-        ctx.beginPath();
-        ctx.moveTo(letzter[0] * massstab, letzter[1] * massstab);
-        ctx.lineTo(p[0] * massstab, p[1] * massstab);
-        ctx.stroke();
-      }
-      s.push(p);
-    }
-  };
-  const fertig = () => {
-    const s = strich.current;
-    strich.current = null;
-    if (s) setStriche([...stricheRef.current, s]);
-  };
-
-  return (
-    <div className="relative">
-      <canvas
-        ref={leinwand}
-        role="img"
-        aria-label={beschriftung}
-        onPointerDown={runter}
-        onPointerMove={weiter}
-        onPointerUp={fertig}
-        onPointerCancel={fertig}
-        className="block w-full cursor-crosshair touch-none rounded-2xl border border-ui-linie bg-white"
-        style={{ aspectRatio: `${FELD_VERHAELTNIS}` }}
-      />
-      {/* Die Linie zum Unterschreiben — nur zur Orientierung, nicht Teil der Unterschrift. */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-6 bottom-[22%] flex items-end gap-2 border-b border-ui-asche/60 pb-1 text-ui-asche">
-        <span className="text-lg leading-none">×</span>
-      </div>
-    </div>
-  );
-}
-
-/** Die Unterschrift als kleines Bild — am Bildschirm, wie sie in den Unterlagen steht. */
-export function UnterschriftBild({ zug, name, klasse = 'h-12' }: { zug: string; name: string; klasse?: string }) {
-  const rahmen = zugGueltig(zug) ? zugRahmen(zug) : null;
-  if (!rahmen) return null;
-  return (
-    <svg viewBox={`${rahmen.x} ${rahmen.y} ${rahmen.breite} ${rahmen.hoehe}`} className={`${klasse} w-auto max-w-full`}
-      role="img" aria-label={`Unterschrift ${name}`} preserveAspectRatio="xMinYMid meet">
-      <path d={zug} fill="none" stroke={TINTE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
-}
 
 /** Wer unterschreibt — mit dem, was die Unterschrift abdeckt. */
 export interface Unterzeichner {
@@ -234,15 +104,195 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
   );
 }
 
+const SYMBOL_KNOPF = 'shrink-0 rounded-full p-2 text-ui-schiefer transition-colors hover:bg-ui-innen hover:text-ui-tinte';
+const DATUM = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' });
+const datum = (iso: string) => DATUM.format(new Date(iso));
+
+/**
+ * Link fuer den Mitarbeiter: erst erklaeren (und festschreiben), dann Link
+ * und Code zeigen. Den Token gibt es nur in diesem Moment — die Datenbank
+ * kennt nur seine Pruefsumme.
+ */
+function LinkDialog({ offen, mitarbeiter, berater, festgeschrieben, ersetzt, beraterFehlt, onErstellen, onSchliessen }: {
+  offen: boolean;
+  mitarbeiter: string;
+  /** Fuer den Gruss in der E-Mail */
+  berater: string;
+  /** Die Unterlagen sind schon festgeschrieben */
+  festgeschrieben: boolean;
+  /** Ein offener Link wird ersetzt */
+  ersetzt: boolean;
+  /** Der Berater hat noch nicht unterschrieben */
+  beraterFehlt: boolean;
+  onErstellen: () => Promise<NeuerLink | string>;
+  onSchliessen: () => void;
+}) {
+  const [neu, setNeu] = useState<NeuerLink | null>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
+  useEffect(() => {
+    if (!offen) return;
+    setNeu(null);
+    setFehler(null);
+  }, [offen]);
+
+  const erstellen = async () => {
+    setLaeuft(true);
+    setFehler(null);
+    const x = await onErstellen();
+    setLaeuft(false);
+    if (typeof x === 'string') setFehler(x);
+    else setNeu(x);
+  };
+
+  const link = neu ? unterschriftLink(neu.token, window.location.origin) : '';
+  const mail = () => {
+    const text = `Guten Tag ${mitarbeiter},\n\n`
+      + 'unter diesem Link finden Sie die Unterlagen aus unserem Gespräch zur betrieblichen Altersversorgung. '
+      + 'Sie können sie dort lesen, als PDF speichern und unterschreiben — ein Konto ist nicht nötig.\n\n'
+      + `${link}\n\n`
+      + `Den Code zum Öffnen nenne ich Ihnen getrennt. Der Link ist bis zum ${neu ? datum(neu.gueltigBis) : ''} gültig.\n\n`
+      + `Viele Grüße${berater ? `\n${berater}` : ''}`;
+    return `mailto:?subject=${encodeURIComponent('Ihre Unterlagen zur betrieblichen Altersversorgung')}&body=${encodeURIComponent(text)}`;
+  };
+
+  return (
+    <Dialog offen={offen} titel={`Unterschrift per Link · ${mitarbeiter}`} onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
+      {!neu ? (
+        <div className="space-y-4 text-sm leading-relaxed text-ui-tinte">
+          <p>
+            {mitarbeiter} bekommt einen Link und unterschreibt auf dem eigenen Telefon oder Computer — ohne Konto. Den Link
+            schicken Sie selbst; den Code zum Öffnen nennen Sie getrennt davon, am Telefon oder per SMS.
+          </p>
+          <ul className="space-y-1 text-ui-schiefer">
+            {!festgeschrieben && <li>— Mit dem Link werden die Unterlagen festgeschrieben; die Beratung ist dann gesperrt.</li>}
+            {ersetzt && <li>— Der neue Link ersetzt den bisherigen; der alte öffnet dann nichts mehr.</li>}
+            <li>— Der Link gilt {LINK_TAGE} Tage. Nach {LINK_VERSUCHE} falschen Codes ist er gesperrt.</li>
+          </ul>
+          {beraterFehlt && (
+            <p className="ui-innen p-3">
+              Unterschreiben Sie vorher selbst, dann trägt die Kopie des Mitarbeiters beide Unterschriften.
+            </p>
+          )}
+          {fehler && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-rose-900">{fehler}</p>}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
+            <button type="button" onClick={onSchliessen} disabled={laeuft} className={KNOPF_ZWEIT}>Abbrechen</button>
+            <button type="button" onClick={() => void erstellen()} disabled={laeuft} className={KNOPF}>
+              <Link2 className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird erstellt …' : 'Link erstellen'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 text-sm leading-relaxed text-ui-tinte">
+          <div>
+            <p className="font-medium">Link für {mitarbeiter} — gültig bis {datum(neu.gueltigBis)}:</p>
+            <div className="mt-2"><LinkFeld link={link} neu beschriftung={`Link für ${mitarbeiter}`} /></div>
+            <a href={mail()} className={`mt-2 ${KNOPF_KLEIN}`}>
+              <Mail className="h-3.5 w-3.5" aria-hidden /> Per E-Mail senden
+            </a>
+          </div>
+          <div className="ui-innen p-4">
+            <p className={ETIKETT}>Code zum Öffnen</p>
+            <p className="mt-1 font-mono text-3xl font-medium tracking-wider tabular-nums">{codeText(neu.code)}</p>
+            <p className="mt-2 text-ui-schiefer">
+              Nennen Sie den Code getrennt vom Link — am Telefon oder per SMS. Sie finden ihn auch später in der Karte.
+            </p>
+          </div>
+          <p className="text-xs text-ui-schiefer">
+            Den Link selbst sehen Sie nur jetzt. Geht er verloren, erstellen Sie einen neuen.
+          </p>
+          <div className="flex justify-end border-t border-ui-linie pt-4">
+            <button type="button" onClick={onSchliessen} className={KNOPF}>Fertig</button>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+/** Der Nachweis einer Unterschrift per Link — als Seite fuer den Druck. */
+function NachweisDruck({ u, axa }: { u: Unterschrift; axa: boolean }) {
+  return (
+    <article className="text-[10pt] leading-snug text-ui-tinte">
+      <h1 className="text-[14pt] font-medium">Nachweis der Unterschrift per Link</h1>
+      <p className="mt-1 text-ui-schiefer">
+        {u.name} · {dokumenteText(u.dokumente, axa)} · elektronisch per Link unterschrieben am {zeitpunktText(u.unterschriebenAm)}
+      </p>
+      <dl className="mt-4 grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)] gap-x-4 gap-y-1">
+        {u.nachweis && nachweisZeilen(u.nachweis, u.unterschriebenAm, axa).map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-ui-schiefer">{k}</dt>
+            <dd className="break-all">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-4 text-[8.5pt] text-ui-schiefer">
+        Einfache elektronische Signatur. Den Link hat der Berater an den Mitarbeiter geschickt, den Code getrennt davon
+        genannt. Die Zeitpunkte setzt die Datenbank; die Prüfsummen binden die Unterschrift an die festgeschriebene Fassung.
+      </p>
+    </article>
+  );
+}
+
+function NachweisDialog({ u, axa, onSchliessen }: { u: Unterschrift; axa: boolean; onSchliessen: () => void }) {
+  const drucken = useDrucken();
+  return (
+    <Dialog offen titel={`Nachweis · ${u.name}`} onSchliessen={onSchliessen}>
+      <div className="space-y-4 text-sm text-ui-tinte">
+        <p className="leading-relaxed">
+          Per Link unterschrieben am {zeitpunktText(u.unterschriebenAm)} — für {dokumenteText(u.dokumente, axa)}.
+        </p>
+        <dl className="space-y-2">
+          {u.nachweis && nachweisZeilen(u.nachweis, u.unterschriebenAm, axa).map(([k, v]) => (
+            <div key={k}>
+              <dt className={ETIKETT}>{k}</dt>
+              <dd className="break-all">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
+          <button type="button" onClick={() => drucken(<NachweisDruck u={u} axa={axa} />)} className={KNOPF_ZWEIT}>
+            <Printer className="h-4 w-4" aria-hidden /> Drucken
+          </button>
+          <button type="button" onClick={onSchliessen} className={KNOPF}>Fertig</button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/** Der Stand eines offenen Links — in der Zeile des Mitarbeiters. */
+function LinkZeile({ link }: { link: LinkStand }) {
+  const abgelaufen = new Date(link.gueltigBis).getTime() <= Date.now();
+  const gesperrt = link.fehlversuche >= LINK_VERSUCHE;
+  const stand = gesperrt
+    ? `gesperrt nach ${LINK_VERSUCHE} falschen Codes — bitte einen neuen Link erstellen`
+    : abgelaufen
+      ? 'abgelaufen — bitte einen neuen Link erstellen'
+      : [
+        link.geoeffnetAm ? `geöffnet am ${zeitpunktText(link.geoeffnetAm)}` : 'noch nicht geöffnet',
+        link.fehlversuche > 0 ? `${link.fehlversuche} falsche${link.fehlversuche === 1 ? 'r' : ''} Code${link.fehlversuche === 1 ? '' : 's'}` : '',
+      ].filter(Boolean).join(' · ');
+  return (
+    <p className={`mt-1 text-sm ${gesperrt || abgelaufen ? 'text-rose-700' : 'text-ui-schiefer'}`}>
+      <Link2 className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
+      Link gültig bis {datum(link.gueltigBis)} · Code <span className="font-mono text-ui-tinte">{codeText(link.code)}</span> · {stand}
+    </p>
+  );
+}
+
 /** Was vor der ersten Unterschrift noch fehlt — mit dem Schritt, in dem es nachzutragen ist. */
 export interface Luecke { text: string; schritt: number }
 
 /**
  * Die Karte in Schritt 7: Mitarbeiter und Berater unterschreiben, ihr Stand,
- * und das Aufheben. `onUnterschreiben` schreibt bei der ersten Unterschrift
- * die Unterlagen fest (Beratung.tsx kennt die Daten dafuer).
+ * der Link fuer den Mitarbeiter und das Aufheben. `onUnterschreiben` und
+ * `onLinkErstellen` schreiben die Unterlagen fest, wenn das noch nicht
+ * geschehen ist (schritte.tsx kennt die Daten dafuer).
  */
-export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken, bereit, geheZu, onUnterschreiben, onAufgehoben, beratungId, axa = false }: {
+export function UnterschriftenKarte({
+  status, unterlagen, unterzeichner, luecken, bereit, geheZu, onUnterschreiben, onLinkErstellen, onAufgehoben, beratungId, axa = false,
+}: {
   status: BeratungStatus;
   /** An Stelle der Vereinbarung steht der AXA-Antrag — der Berater unterschreibt dort mit. */
   axa?: boolean;
@@ -254,17 +304,39 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
   bereit: boolean;
   geheZu: (i: number) => void;
   onUnterschreiben: (person: UnterschriftPerson, name: string, zug: string) => Promise<true | string>;
+  onLinkErstellen: () => Promise<NeuerLink | string>;
+  /** Nach dem Aufheben — und zum Nachladen, ob per Link unterschrieben wurde */
   onAufgehoben: () => Promise<void>;
   beratungId: string;
 }) {
   const [dialog, setDialog] = useState<Unterzeichner | null>(null);
+  const [linkDialog, setLinkDialog] = useState(false);
+  const [nachweis, setNachweis] = useState<Unterschrift | null>(null);
   const [aufheben, setAufheben] = useState(false);
   const [meldung, setMeldung] = useState<string | null>(null);
+  const [link, setLink] = useState<LinkStand | null>(null);
+  const [laedt, setLaedt] = useState(false);
   const fest = unterlagen && typeof unterlagen === 'object' ? unterlagen : null;
+  const mitarbeiterFertig = fest?.unterschriften.some((u) => u.person === 'mitarbeiter') ?? false;
+
+  // Der offene Link — nur, solange der Mitarbeiter noch nicht unterschrieben hat.
+  const linkNachladen = useCallback(async () => {
+    if (!fest || mitarbeiterFertig) { setLink(null); return; }
+    const l = await linkLaden(beratungId);
+    setLink(l === 'fehler' ? null : l);
+  }, [beratungId, fest, mitarbeiterFertig]);
+  useEffect(() => { void linkNachladen(); }, [linkNachladen]);
+
+  const aktualisieren = async () => {
+    setLaedt(true);
+    await onAufgehoben();
+    await linkNachladen();
+    setLaedt(false);
+  };
 
   if (status === 'offen') {
     return (
-      <Karte titel="Unterschrift am Bildschirm">
+      <Karte titel="Unterschrift">
         <p className="text-sm leading-relaxed text-ui-schiefer">
           Unterschrieben wird nach der Entscheidung. Solange sie offen ist, gibt es die Gesprächsunterlagen zum Mitnehmen.
         </p>
@@ -273,36 +345,70 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
   }
 
   const offeneLuecken = fest ? [] : luecken;
+  const gesperrt = offeneLuecken.length > 0 || !bereit || unterlagen === 'fehler';
+  const mitarbeiter = unterzeichner.find((w) => w.person === 'mitarbeiter');
+  const berater = unterzeichner.find((w) => w.person === 'berater');
+  const beraterFertig = fest?.unterschriften.some((u) => u.person === 'berater') ?? false;
+  const hatUnterschriften = (fest?.unterschriften.length ?? 0) > 0;
+
   const zeile = (wer: Unterzeichner): ReactNode => {
     const u: Unterschrift | undefined = fest?.unterschriften.find((x) => x.person === wer.person);
+    const perLink = wer.person === 'mitarbeiter';
     return (
       <li key={wer.person} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <div className="min-w-0">
           <p className="text-base font-medium text-ui-tinte">{wer.rolle}{u ? ` · ${u.name}` : wer.name ? ` · ${wer.name}` : ''}</p>
           <p className={ETIKETT}>für {dokumenteText(dokumenteFuer(status, wer.person, axa), axa)}</p>
+          {perLink && !u && link && <LinkZeile link={link} />}
         </div>
         {u ? (
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <UnterschriftBild zug={u.zug} name={u.name} klasse="h-10 max-w-[10rem]" />
             <p className="flex items-center gap-1.5 text-sm text-ui-tinte">
-              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden /> unterschrieben am {zeitpunktText(u.unterschriebenAm)}
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              {u.kanal === 'link' ? 'per Link unterschrieben' : 'unterschrieben'} am {zeitpunktText(u.unterschriebenAm)}
             </p>
+            {u.kanal === 'link' && u.nachweis && (
+              <button type="button" onClick={() => setNachweis(u)} className={KNOPF_KLEIN}>
+                <FileCheck2 className="h-3.5 w-3.5" aria-hidden /> Nachweis
+              </button>
+            )}
           </div>
         ) : (
-          <button type="button" className={KNOPF} disabled={offeneLuecken.length > 0 || !bereit || unterlagen === 'fehler'}
-            onClick={() => { setMeldung(null); setDialog(wer); }}>
-            <PenLine className="h-4 w-4" aria-hidden /> Unterschreiben
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {perLink && link && (
+              <button type="button" onClick={() => void aktualisieren()} aria-label="Stand aktualisieren" className={SYMBOL_KNOPF}>
+                <RefreshCw className={`h-4 w-4 ${laedt ? 'animate-spin' : ''}`} aria-hidden />
+              </button>
+            )}
+            {perLink && link && (
+              <button type="button" className={KNOPF_ZWEIT}
+                onClick={() => { setMeldung(null); void linkZurueckziehen(beratungId).then((ok) => {
+                  if (!ok) setMeldung('Der Link konnte nicht zurückgezogen werden. Bitte versuchen Sie es noch einmal.');
+                  void linkNachladen();
+                }); }}>
+                Zurückziehen
+              </button>
+            )}
+            {perLink && (
+              <button type="button" className={KNOPF_ZWEIT} disabled={gesperrt} onClick={() => { setMeldung(null); setLinkDialog(true); }}>
+                <Link2 className="h-4 w-4" aria-hidden /> {link ? 'Neuer Link' : 'Per Link'}
+              </button>
+            )}
+            <button type="button" className={KNOPF} disabled={gesperrt} onClick={() => { setMeldung(null); setDialog(wer); }}>
+              <PenLine className="h-4 w-4" aria-hidden /> Unterschreiben
+            </button>
+          </div>
         )}
       </li>
     );
   };
 
   return (
-    <Karte titel="Unterschrift am Bildschirm">
+    <Karte titel="Unterschrift">
       <p className="text-sm leading-relaxed text-ui-schiefer">
-        Mitarbeiter und Berater unterschreiben hier mit Finger, Stift oder Maus. Die Unterschriften stehen dann in den
-        Unterlagen; der Arbeitgeber unterschreibt auf Papier.
+        Mitarbeiter und Berater unterschreiben hier mit Finger, Stift oder Maus — der Mitarbeiter auf Wunsch per Link auf
+        dem eigenen Gerät. Die Unterschriften stehen dann in den Unterlagen; der Arbeitgeber unterschreibt auf Papier.
       </p>
 
       {unterlagen === 'fehler' && (
@@ -333,28 +439,53 @@ export function UnterschriftenKarte({ status, unterlagen, unterzeichner, luecken
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               Die Unterlagen sind seit {zeitpunktText(fest.erstelltAm)} festgeschrieben, die Beratung ist gesperrt. Muss noch
-              etwas geändert werden, heben Sie die Unterschriften auf und lassen neu unterschreiben.
+              etwas geändert werden, {hatUnterschriften
+                ? 'heben Sie die Unterschriften auf und lassen neu unterschreiben'
+                : 'heben Sie die Festschreibung auf'}{link ? ' — der offene Link öffnet dann nichts mehr' : ''}.
             </span>
           </p>
-          <button type="button" onClick={() => setAufheben(true)} className={KNOPF_GEFAHR}>Unterschriften aufheben</button>
+          <button type="button" onClick={() => setAufheben(true)} className={KNOPF_GEFAHR}>
+            {hatUnterschriften ? 'Unterschriften aufheben' : 'Festschreibung aufheben'}
+          </button>
         </div>
       )}
       {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
 
       <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
-        Einfache elektronische Signatur: geeignet für Protokoll und Erklärungen ohne gesetzliche Schriftform. Ob Versicherer
-        oder Unterstützungskasse sie für die Vereinbarung annehmen, klären Sie bitte vorab.
+        Einfache elektronische Signatur, am Bildschirm wie per Link: geeignet für Protokoll und Erklärungen ohne gesetzliche
+        Schriftform. Ob Versicherer oder Unterstützungskasse sie für die Vereinbarung annehmen, klären Sie bitte vorab.
       </p>
 
       {dialog && (
         <UnterschriftDialog offen wer={dialog} status={status} axa={axa} onSchliessen={() => setDialog(null)}
-          onUnterschreiben={(name, zug) => onUnterschreiben(dialog.person, name, zug)} />
+          onUnterschreiben={async (name, zug) => {
+            const x = await onUnterschreiben(dialog.person, name, zug);
+            // Unterschreibt der Mitarbeiter doch am Bildschirm, braucht es den Link nicht mehr.
+            if (x === true && dialog.person === 'mitarbeiter' && link) {
+              await linkZurueckziehen(beratungId);
+              setLink(null);
+            }
+            return x;
+          }} />
       )}
 
-      <Dialog offen={aufheben} titel="Unterschriften aufheben?" onSchliessen={() => setAufheben(false)}>
+      {mitarbeiter && (
+        <LinkDialog offen={linkDialog} mitarbeiter={mitarbeiter.name} berater={berater?.name ?? ''} festgeschrieben={fest !== null}
+          ersetzt={link !== null} beraterFehlt={!beraterFertig}
+          onErstellen={onLinkErstellen}
+          onSchliessen={() => { setLinkDialog(false); void linkNachladen(); }} />
+      )}
+
+      {nachweis && <NachweisDialog u={nachweis} axa={axa} onSchliessen={() => setNachweis(null)} />}
+
+      <Dialog offen={aufheben} titel={hatUnterschriften ? 'Unterschriften aufheben?' : 'Festschreibung aufheben?'}
+        onSchliessen={() => setAufheben(false)}>
         <p className="text-sm leading-relaxed text-ui-tinte">
-          Die Unterschriften und die festgeschriebenen Unterlagen werden gelöscht. Ausgedruckte oder gespeicherte Exemplare
-          bleiben davon unberührt. Danach lässt sich die Beratung wieder ändern; unterschrieben wird neu.
+          {hatUnterschriften
+            ? 'Die Unterschriften und die festgeschriebenen Unterlagen werden gelöscht. Ausgedruckte oder gespeicherte Exemplare '
+              + 'bleiben davon unberührt. Danach lässt sich die Beratung wieder ändern; unterschrieben wird neu.'
+            : 'Die festgeschriebenen Unterlagen werden gelöscht. Danach lässt sich die Beratung wieder ändern.'}
+          {link ? ' Der offene Link öffnet dann nichts mehr.' : ''}
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setAufheben(false)} className={KNOPF_ZWEIT}>Abbrechen</button>

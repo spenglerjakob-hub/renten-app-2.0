@@ -67,6 +67,11 @@ DirectoryIndex index.html
   # Auffangmuster. Nie in Suchmaschinen (Kopfzeile unten, Meta-Tag im HTML).
   RewriteRule ^mitarbeiterberatung/?$ /mitarbeiterberatung.html [NC,L]
 
+  # --- Unterschrift per Link ----------------------------------------------
+  # Der Mitarbeiter unterschreibt ohne Konto, nur mit Link und Code. Eigene
+  # Seite, VOR dem Auffangmuster. Nie in Suchmaschinen (Kopfzeile unten).
+  RewriteRule ^unterschrift/?$ /unterschrift.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
@@ -96,6 +101,12 @@ DirectoryIndex index.html
   # Die Mitarbeiterberatung ist ein Arbeitsbereich hinter der Anmeldung —
   # dauerhaft nicht in Suchmaschinen.
   <FilesMatch "^mitarbeiterberatung\.html$">
+    Header set X-Robots-Tag "noindex, nofollow"
+  </FilesMatch>
+
+  # Die Seite der Unterschrift per Link zeigt persoenliche Unterlagen —
+  # dauerhaft nicht in Suchmaschinen.
+  <FilesMatch "^unterschrift\.html$">
     Header set X-Robots-Tag "noindex, nofollow"
   </FilesMatch>
 

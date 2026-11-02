@@ -1,5 +1,5 @@
 import type { BeratungStatus } from '@renten/schema';
-import type { UnterlagenArt, UnterschriftPerson } from '../lib/bav-beratung';
+import type { Nachweis, UnterlagenArt, UnterschriftKanal, UnterschriftPerson } from '../lib/bav-beratung';
 
 /**
  * Die Unterschrift am Bildschirm — was sich ohne Browser rechnen laesst: aus
@@ -148,8 +148,36 @@ export function zeitpunktText(iso: string): string {
 }
 
 /** Der Vermerk unter der Linie. */
-export function vermerkText(name: string, iso: string): string {
-  return `Elektronisch unterschrieben von ${name.trim()} am ${zeitpunktText(iso)}`;
+export function vermerkText(name: string, iso: string, kanal: UnterschriftKanal = 'bildschirm'): string {
+  return `Elektronisch ${kanal === 'link' ? 'per Link ' : ''}unterschrieben von ${name.trim()} am ${zeitpunktText(iso)}`;
+}
+
+/** „482 913“ — zum Vorlesen am Telefon in zwei Dreiergruppen. */
+export function codeText(code: string): string {
+  return code.length === 6 ? `${code.slice(0, 3)}\u00a0${code.slice(3)}` : code;
+}
+
+/**
+ * Der Nachweis einer Unterschrift per Link als Zeilen — fuer den Dialog und
+ * den Druck. Die Pruefsummen vollstaendig: Sie binden die Unterschrift an die
+ * festgeschriebene Fassung.
+ */
+export function nachweisZeilen(n: Nachweis, unterschriebenAm: string, axa = false): [string, string][] {
+  const zeit = (iso: string | undefined) => (iso ? zeitpunktText(iso) : 'nicht erfasst');
+  const zeilen: [string, string][] = [
+    ['Link erstellt', n.linkErstelltAm ? `${zeitpunktText(n.linkErstelltAm)}${n.linkErstelltVon ? ` von ${n.linkErstelltVon}` : ''}` : 'nicht erfasst'],
+    ['Mit Code geöffnet', zeit(n.geoeffnetAm)],
+    ['Unterschrieben, Code bestätigt', zeit(n.codeBestaetigtAm ?? unterschriebenAm)],
+    ['IP-Adresse', n.ip ?? 'nicht übermittelt'],
+  ];
+  if (n.weiterleitung && n.weiterleitung !== n.ip) zeilen.push(['Weiterleitungen', n.weiterleitung]);
+  zeilen.push(['Browser', n.browser ?? 'nicht übermittelt']);
+  for (const art of ['protokoll', 'vereinbarung', 'verzicht'] as const) {
+    const summe = n.pruefsummen[art];
+    if (summe) zeilen.push([`Prüfsumme ${dokumenteText([art], axa)}`, summe]);
+  }
+  if (n.adresse) zeilen.push(['Seite', n.adresse]);
+  return zeilen;
 }
 
 /** Die ersten 16 Zeichen der Pruefsumme in Vierergruppen — zum Abgleichen von Papier und Ablage. */

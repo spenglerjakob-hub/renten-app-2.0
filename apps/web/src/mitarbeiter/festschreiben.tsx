@@ -148,7 +148,7 @@ export function mitUnterschriften(html: string, unterschriften: readonly Untersc
       feld.replaceChildren(bild);
     }
     for (const vermerk of Array.from(doc.body.querySelectorAll(`[data-vermerk="${u.person}"]`))) {
-      vermerk.textContent = vermerkText(u.name, u.unterschriebenAm);
+      vermerk.textContent = vermerkText(u.name, u.unterschriebenAm, u.kanal);
     }
   }
   return doc.body.innerHTML;

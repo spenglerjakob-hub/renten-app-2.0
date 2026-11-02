@@ -238,11 +238,24 @@ function Datenschutz() {
         der EU.
       </P>
       <P>
-        Unterschreiben Mitarbeiter und Berater am Bildschirm, speichern wir die Unterlagen so, wie sie unterschrieben
-        wurden (Beratungsprotokoll und Vereinbarung oder Verzichtserklärung, mit den Zahlen darin), dazu je
-        Unterschrift den Linienzug, den Namen und den Zeitpunkt. Vom Linienzug speichern wir nur die Form — keine
+        Unterschreiben Mitarbeiter und Berater am Bildschirm oder per Link, speichern wir die Unterlagen so, wie sie
+        unterschrieben wurden (Beratungsprotokoll und Vereinbarung oder Verzichtserklärung, mit den Zahlen darin), dazu
+        je Unterschrift den Linienzug, den Namen und den Zeitpunkt. Vom Linienzug speichern wir nur die Form — keine
         Schreibdynamik wie Druck oder Tempo. Danach lässt sich die Beratung nicht mehr ändern, bis der Berater die
         Unterschriften aufhebt.
+      </P>
+      <P>
+        <strong>Unterschrift per Link.</strong> Der Mitarbeiter kann auch auf dem eigenen Gerät unterschreiben. Dafür
+        erstellt der Berater einen Link und einen sechsstelligen Code; schon damit werden die Unterlagen festgeschrieben.
+        Den Link schickt der Berater selbst, den Code nennt er getrennt davon — wir schicken dem Mitarbeiter nichts. Mit
+        Link und Code sieht der Mitarbeiter die festgeschriebenen Unterlagen, den Namen der Firma sowie Name, Telefon
+        und E-Mail des Beraters aus „Ihr Auftritt“, sonst nichts. Vom Link speichern wir nur eine Prüfsumme, dazu den
+        Code, wer den Link wann erstellt hat, wann er mit dem Code geöffnet wurde und wie oft der Code falsch war. Ein
+        Link gilt 14 Tage und ist nach fünf falschen Codes gesperrt; gelöscht wird er mit Ablauf, nach der
+        Unterschrift sofort. Unterschreibt der Mitarbeiter per Link, speichern wir als Nachweis zusätzlich die
+        IP-Adresse und die Kennung des Browsers (User-Agent) beim Unterschreiben, die Zeitpunkte von Erstellen,
+        Öffnen und Unterschreiben sowie die Prüfsummen der unterschriebenen Unterlagen. Der Nachweis gehört zur
+        Unterschrift und wird mit ihr gelöscht.
       </P>
       <P>
         Ist die Firma bei der AXA versichert, tritt der AXA-Antrag auf Entgeltumwandlung an die Stelle der
@@ -268,13 +281,14 @@ function Datenschutz() {
       <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
         Auftrag (Art. 28 DSGVO) — wie bei den Szenarien (Abschnitt 6), auch für die Kirchensteuerpflicht und die
-        Antworten zur Gesundheit im AXA-Antrag als Angaben besonderer Kategorie. Arbeitgeber und Mitarbeiter haben keinen Zugang zum JS-Rentenplaner; sie erhalten nur,
-        was der Berater ihnen zeigt, druckt oder als Datei gibt. Die Übersicht für den Arbeitgeber enthält Namen,
+        Antworten zur Gesundheit im AXA-Antrag als Angaben besonderer Kategorie. Arbeitgeber und Mitarbeiter haben kein
+        Konto beim JS-Rentenplaner; sie erhalten nur, was der Berater ihnen zeigt, druckt oder als Datei gibt — der
+        Mitarbeiter auch die Unterlagen, die der Berater ihm per Link zum Unterschreiben freigibt. Die Übersicht für den Arbeitgeber enthält Namen,
         Entscheidung, Beträge und Beginn, aber keine Gehälter und keine weiteren persönlichen Angaben.
       </P>
       <P>
-        Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen und
-        Unterschriften; diese auch dann, wenn er die Unterschriften aufhebt. Löschen kann eine Beratung, wer sie
+        Gelöscht wird eine Beratung, sobald der Berater sie löscht, mit ihren unterschriebenen Unterlagen,
+        Unterschriften, Nachweisen und Links; diese auch dann, wenn er die Unterschriften aufhebt. Löschen kann eine Beratung, wer sie
         angelegt hat, und der Berater, der die Firma angelegt hat. Mit einer Firma werden ihre Beratungen, auch die
         der Kollegen, und ihr Logo gelöscht, mit dem Konto alles, was ihm gehört — Beratungen in Firmen von Kollegen
         bleiben dort, freigegebene Firmen eines Büro-Mitglieds übernimmt, wer das Büro verwaltet.
@@ -307,8 +321,10 @@ function Datenschutz() {
       <H2>9. E-Mail-Benachrichtigung an Berater</H2>
       <P>
         Geht ein Vorsorge-Check ein, erhält der Berater eine E-Mail an seine Konto-Adresse. Sie enthält nur den
-        Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden.
-        Versandt wird über unser Postfach bei Hostinger.
+        Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden. Ebenso,
+        wenn ein Mitarbeiter per Link unterschrieben hat: Die E-Mail an den Berater, der den Link erstellt hat,
+        nennt Mitarbeiter und Firma, wie der Berater sie eingetragen hat, und den Zeitpunkt — keine Inhalte der
+        Unterlagen. Versandt wird über unser Postfach bei Hostinger.
       </P>
 
       <H2>10. Rückmeldungen und Anfragen als Early Adopter</H2>
@@ -412,6 +428,10 @@ function Datenschutz() {
           Vorsorge-Check: offene Links 30 Tage, eingereichte Angaben und hochgeladene Unterlagen höchstens
           90 Tage; Unterlagen eines nicht abgesendeten Checks bis zum Ablauf des Links.
         </li>
+        <li>
+          Unterschrift per Link: offene Links höchstens 14 Tage, nach der Unterschrift keinen Tag länger; der
+          Nachweis einer Unterschrift so lange wie die Unterschrift selbst.
+        </li>
         <li>Server-Logdateien: [Frist laut Hostinger].</li>
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
@@ -432,7 +452,8 @@ function Datenschutz() {
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
-        Angaben nicht mehr, sobald sie abgeschickt sind. Hochgeladene Unterlagen liegen in einem nicht
+        Angaben nicht mehr, sobald sie abgeschickt sind. Ein Link zur Unterschrift öffnet nur mit dem getrennt
+        genannten Code und nur die Unterlagen dieser einen Beratung; nach fünf falschen Codes ist er gesperrt. Hochgeladene Unterlagen liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
         Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann — ein Firmenlogo auch die
