@@ -35,6 +35,11 @@
     --ui-luecke: 214 211 209;      /* Stone Muted — Daten bleiben einfarbig */
     --ui-daten-2: 120 113 108;
     --ui-daten-3: 168 162 158;
+    /* Was die gewaehlten Loesungen neu dazubringen — die einzige Ausnahme von „Daten einfarbig“:
+       das Blau der Hervorhebung (#1d6aa8). Gegen Weiss 5,7:1, gegen Tinte 3,5:1, gegen das Grau
+       der Luecke 3,8:1 — der Teil bleibt auch ohne Farbsehen unterscheidbar. Sky Wash waere so
+       hell wie die Luecke. */
+    --ui-neu: 29 106 168;
     --ui-knopf: 59 166 241;        /* Cyan Signal — die einzige farbige Flaeche */
     --ui-knopf-rand: 51 152 225;
     --ui-knopf-schrift: 12 10 9;   /* dunkle Schrift: Weiss auf Cyan erreicht nur 2,8:1 */

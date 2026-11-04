@@ -22,6 +22,23 @@ function betraege(zeile: Jahreszeile, kaufkraftHeute: boolean) {
   return { f, g, luecke, deckung };
 }
 
+/**
+ * Was die gewaehlten Loesungen dazubringen (Etappe „Abschluss“): der
+ * Zuwachs im Netto, der Teil davon, der im Ring noch Platz hat — mehr als
+ * das Ziel zeigt der Ring nicht —, und die Prozentpunkte des Ziels. Die
+ * Prozente sind dieselben gerundeten wie beim Netto, damit Netto bisher,
+ * neu und Luecke zusammen 100 ergeben. Nominal; die Anzeige rechnet in ihr
+ * Geld um. `null`, wenn nichts dazukommt.
+ */
+export function neuerTeil(zeile: Jahreszeile, vorher: Jahreszeile): { betrag: number; imRing: number; prozent: number } | null {
+  const betrag = zeile.nettoMonat - vorher.nettoMonat;
+  if (!(betrag >= 0.5)) return null;
+  const ziel = zeile.zielNettoMonat;
+  const imRing = Math.max(0, Math.min(zeile.nettoMonat, ziel) - Math.min(vorher.nettoMonat, ziel));
+  const prozent = ziel > 0 ? Math.round((zeile.nettoMonat / ziel) * 100) - Math.round((vorher.nettoMonat / ziel) * 100) : 0;
+  return { betrag, imRing, prozent };
+}
+
 /** Titel und Einleitung der Etappe, mit dem Schalter „Nominal | Kaufkraft heute“. */
 export function ErgebnisKopf({ zeile, kaufkraftHeute, onKaufkraftHeute }: {
   zeile: Jahreszeile;
@@ -47,11 +64,26 @@ export function ErgebnisKopf({ zeile, kaufkraftHeute, onKaufkraftHeute }: {
   );
 }
 
-/** Der Ring mit Netto und Luecke, darunter der Kernsatz — das schwebende Stueck der Etappe. */
-export function ErgebnisRing({ zeile, kaufkraftHeute }: { zeile: Jahreszeile; kaufkraftHeute: boolean }) {
+/**
+ * Der Ring mit Netto und Luecke, darunter der Kernsatz — das schwebende Stueck der Etappe.
+ * Mit `vorher` (Etappe „Abschluss“) ist der Teil blau, den die gewaehlten Loesungen
+ * dazubringen, und unter dem Netto steht „davon … neu durch die Lösungen“.
+ */
+export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
+  zeile: Jahreszeile;
+  kaufkraftHeute: boolean;
+  /** Dieselbe Zeile ohne die gewaehlten Loesungen — im selben Jahr */
+  vorher?: Jahreszeile;
+}) {
   const { f, g, luecke, deckung } = betraege(zeile, kaufkraftHeute);
   const ziel = zeile.zielNettoMonat * f;
   const netto = zeile.nettoMonat * f;
+  const teil = vorher ? neuerTeil(zeile, vorher) : null;
+  // Im Ring hoechstens bis zum Ziel: Betrag und Anteil des blauen Bogens am Ganzen.
+  const deckungVorher = vorher && zeile.zielNettoMonat > 0 ? Math.round((vorher.nettoMonat / zeile.zielNettoMonat) * 100) : 0;
+  const neuImRing = teil && teil.imRing > 0
+    ? { wert: teil.imRing * f, prozent: Math.max(0, Math.min(100, deckung) - Math.min(100, deckungVorher)) }
+    : undefined;
   return (
     <section aria-label="Ziel, Netto und Lücke" className={`${SCHWEBEND} p-5 sm:p-7`}>
       {/* Der Ring oben, die Zahlen darunter nebeneinander: In der schmalen Spalte des
@@ -60,9 +92,21 @@ export function ErgebnisRing({ zeile, kaufkraftHeute }: { zeile: Jahreszeile; ka
         <LueckenRing
           ganz={ziel} gedeckt={Math.min(netto, ziel)} luecke={luecke * f}
           gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={ZIEL_RING}
+          neu={neuImRing}
         />
         <dl className="grid w-full gap-4 sm:grid-cols-2">
-          <Zahl etikett="Netto im Ruhestand" punkt="bg-ui-tinte" wert={euro(netto)} zusatz={`${deckung}\u00a0%`} />
+          <Zahl
+            etikett="Netto im Ruhestand" punkt="bg-ui-tinte" wert={euro(netto)} zusatz={`${deckung}\u00a0%`}
+            unter={teil && (
+              <span className="flex items-start gap-2">
+                <span aria-hidden className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-full bg-ui-neu" />
+                <span>
+                  davon <strong className="font-medium text-ui-tinte">{euro(teil.betrag * f)}</strong> neu durch die
+                  Lösungen{teil.prozent > 0 && <span className="whitespace-nowrap"> · {teil.prozent}{'\u00a0'}%</span>}
+                </span>
+              </span>
+            )}
+          />
           {luecke > 0 && (
             <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke * f)}
               zusatz={`${100 - deckung}\u00a0%`} />

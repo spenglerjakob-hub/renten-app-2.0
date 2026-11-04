@@ -14,7 +14,7 @@ export default {
         ui: Object.fromEntries([
           'tinte', 'flaeche', 'karte', 'innen', 'linie', 'schiefer', 'asche', 'dunkel', 'hover',
           'luecke', 'daten-2', 'daten-3', 'knopf', 'knopf-rand', 'knopf-schrift', 'knopf-hover', 'zweit-rand',
-          'regler', 'feld-rand',
+          'regler', 'feld-rand', 'neu',
         ].map((rolle) => [rolle, `rgb(var(--ui-${rolle}) / <alpha-value>)`])),
       },
       // Fliesstext Inter, Ueberschriften Inter Tight — beide selbst ausgeliefert (index.css).

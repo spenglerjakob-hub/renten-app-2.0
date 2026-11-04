@@ -97,7 +97,8 @@ export function Abschluss({
       {zeileMit && vorher && ergebnisMit ? (
         <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
           <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
-            <ErgebnisRing zeile={zeileMit} kaufkraftHeute={kaufkraftHeute} />
+            {/* Blau im Ring: was die gewaehlten Loesungen dazubringen — gegen das Ergebnis ohne sie. */}
+            <ErgebnisRing zeile={zeileMit} vorher={vorher} kaufkraftHeute={kaufkraftHeute} />
             <VorherNachher vorher={vorher} nachher={zeileMit} kaufkraftHeute={kaufkraftHeute} ergebnisMit={ergebnisMit} neu={mit.neu} />
           </div>
           {/* Rechts die Aufstellung und darunter, was gewaehlt ist — so stehen beide Spalten etwa gleich hoch. */}
