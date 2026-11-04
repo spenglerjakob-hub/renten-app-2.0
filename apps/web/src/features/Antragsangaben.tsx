@@ -260,11 +260,13 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
         Konto, nicht im Plan, und werden spätestens 90 Tage nach dem Anlegen gelöscht.
       </p>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-2">
-        <div className="space-y-5">
+      {/* grid-cols-1 statt der stillen Auto-Spalte und min-w-0 an Spalten und fieldsets: Sonst
+          wuchs die Spalte am Telefon auf die Breite der längsten Zeile, die Karte schnitt rechts ab. */}
+      <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="min-w-0 space-y-5">
           <TextFeld label="Kunde (nur für Ihre Liste)" wert={kunde} onChange={setKunde} maxLaenge={120} />
 
-          <fieldset className="space-y-3">
+          <fieldset className="min-w-0 space-y-3">
             <legend className="text-sm font-medium text-ui-tinte">Bezugsrecht im Todesfall</legend>
             {loesungen.map((l) => {
               const wert = angaben.bezugsrecht[l.id] ?? 1;
@@ -283,7 +285,7 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
           </fieldset>
 
           {bank ? (
-            <fieldset className="space-y-3">
+            <fieldset className="min-w-0 space-y-3">
               <legend className="text-sm font-medium text-ui-tinte">Bankverbindung</legend>
               <TextFeld label="Kontoinhaber" wert={angaben.bank?.inhaber ?? ''} onChange={(v) => setzeBank({ inhaber: v })} maxLaenge={120} />
               <div>
@@ -298,8 +300,9 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
           )}
         </div>
 
-        <div className="space-y-5">
-          <fieldset>
+        <div className="min-w-0 space-y-5">
+          {/* min-w-0: Ein fieldset ist von Haus aus so breit wie sein breitester Inhalt. */}
+          <fieldset className="min-w-0">
             <legend className="text-sm font-medium text-ui-tinte">Kopie des Personalausweises</legend>
             <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
               Vorder- und Rückseite, als Foto oder Datei. Jede Kopie wird im Browser verkleinert und mit dem
@@ -309,7 +312,7 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
               <ul className="mt-3 space-y-1.5">
                 {ausweise.map((k) => (
                   <li key={k.pfad} className="flex items-center gap-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate text-ui-tinte">
+                    <span className="min-w-0 flex-1 leading-snug text-ui-tinte">
                       {SEITE_TEXT[k.seite]}
                       <span className="text-ui-schiefer">{k.vomKunden ? ' · vom Kunden' : ''}{k.hochgeladenAm ? ` · ${datum(k.hochgeladenAm)}` : ''}</span>
                     </span>
