@@ -22,3 +22,8 @@ export {
   type FirmenModellDaten, type FirmenAngebot, type BeratungAngaben, type VersichererWerte,
   type Entscheidung, type AxaAngaben, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';
+export {
+  BEZUGSRECHTE, BEZUGSRECHT_VORGABE, ANTRAG_FELDER, bezugsrechtText, ibanBereinigt, ibanGueltig, ibanFormatiert,
+  antragAngabenSchema, antragEingangSchema, antragLoesungSchema, braucheBank, offeneAngaben, eingangUebernehmen,
+  type BezugsrechtWert, type AntragFeld, type AntragAngaben, type AntragEingang, type AntragLoesung,
+} from './antrag.js';

@@ -72,6 +72,11 @@ DirectoryIndex index.html
   # Seite, VOR dem Auffangmuster. Nie in Suchmaschinen (Kopfzeile unten).
   RewriteRule ^unterschrift/?$ /unterschrift.html [NC,L]
 
+  # --- Angaben fuer den Antrag ----------------------------------------------
+  # Der Kunde ergaenzt Angaben ohne Konto, nur mit Link (Code im Fragment).
+  # Eigene Seite, VOR dem Auffangmuster. Nie in Suchmaschinen (Kopfzeile unten).
+  RewriteRule ^antrag/?$ /antrag.html [NC,L]
+
   # Alles Uebrige an die Anwendung.
   RewriteRule . /index.html [L]
 </IfModule>
@@ -107,6 +112,12 @@ DirectoryIndex index.html
   # Die Seite der Unterschrift per Link zeigt persoenliche Unterlagen —
   # dauerhaft nicht in Suchmaschinen.
   <FilesMatch "^unterschrift\.html$">
+    Header set X-Robots-Tag "noindex, nofollow"
+  </FilesMatch>
+
+  # Die Seite fuer die Angaben zum Antrag nimmt Bankverbindung und
+  # Ausweiskopie entgegen — dauerhaft nicht in Suchmaschinen.
+  <FilesMatch "^antrag\.html$">
     Header set X-Robots-Tag "noindex, nofollow"
   </FilesMatch>
 

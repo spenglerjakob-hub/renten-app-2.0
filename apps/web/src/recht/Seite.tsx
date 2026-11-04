@@ -145,8 +145,9 @@ function Datenschutz() {
       <P>
         Der JS-Rentenplaner rechnet Altersvorsorge durch — Renten, Steuern, Sozialabgaben und Verträge. Die
         Berechnung läuft vollständig in Ihrem Browser. Auf unseren Server gelangen Daten nur, wenn Sie ein
-        Konto nutzen, ein Szenario oder eine Mitarbeiterberatung in Ihrem Konto speichern, einen
-        Vorsorge-Check an Ihren Berater senden, uns eine Rückmeldung schicken oder ein Abo buchen.
+        Konto nutzen, ein Szenario, eine Mitarbeiterberatung oder Angaben für einen Antrag in Ihrem Konto
+        speichern, einen Vorsorge-Check oder Angaben für einen Antrag an Ihren Berater senden, uns eine
+        Rückmeldung schicken oder ein Abo buchen.
         Wir setzen keine Analyse-, Tracking- oder Werbedienste ein und laden keine Inhalte von Drittanbietern
         (etwa Schriftarten) nach.
       </P>
@@ -269,7 +270,7 @@ function Datenschutz() {
         auch im unterschriebenen Antrag; wird der Zusatz abgewählt, löschen wir sie, sonst mit der Beratung.
       </P>
       <P>
-        <strong>Gemeinsam im Büro.</strong> Gehört ein Berater zu einem Büro (Abschnitt 11), kann er eine Firma für
+        <strong>Gemeinsam im Büro.</strong> Gehört ein Berater zu einem Büro (Abschnitt 12), kann er eine Firma für
         sein Büro freigeben. Dann sehen alle Mitglieder des Büros das Angebot der Firma (ändern kann es nur, wer die
         Firma angelegt hat) und sehen und bearbeiten alle ihre Beratungen, einschließlich Gehalt, Steuer- und
         Gesundheitsangaben und der unterschriebenen Unterlagen. Voneinander sehen sie Namen und Agentur aus „Ihr
@@ -318,7 +319,37 @@ function Datenschutz() {
         Sie nicht ab, mit Ablauf des Links.
       </P>
 
-      <H2>9. E-Mail-Benachrichtigung an Berater</H2>
+      <H2>9. Angaben für den Antrag</H2>
+      <P>
+        Nimmt ein Kunde im Rechner Lösungen an, kann der Berater die Angaben erfassen, die der Versicherer für den
+        Antrag braucht, und in seinem Konto speichern: den Namen des Kunden für seine Liste, die angenommenen
+        Lösungen (Art, Anbieter, Beiträge, Rente oder Kapital laut Angebot), je Lösung das Bezugsrecht im
+        Todesfall, die Bankverbindung (Kontoinhaber und IBAN) und eine Kopie des Personalausweises (Vorder- und
+        Rückseite). Diese Angaben stehen nur im Konto, nicht im gespeicherten Plan, und sind nur für das Konto
+        sichtbar, das den Antrag angelegt hat; das erzwingt die Datenbank selbst. Verantwortlich ist der
+        <strong> Berater</strong>; wir verarbeiten die Angaben in seinem Auftrag (Art. 28 DSGVO).
+      </P>
+      <P>
+        <strong>Ausweiskopie.</strong> Jedes Bild wird schon im Browser verkleinert, ohne eingebettete Metadaten
+        wie den Aufnahmeort neu gespeichert und mit dem Wasserzeichen „KOPIE“ versehen, damit es dauerhaft als
+        Kopie erkennbar ist (§ 20 Abs. 2 PAuswG). Die Bilder liegen in einem nicht öffentlichen Speicher bei
+        Supabase in der EU; abrufen kann sie nur der Berater, über kurz gültige, signierte Verweise.
+      </P>
+      <P>
+        <strong>Link an den Kunden.</strong> Was dem Berater fehlt, kann der Kunde über einen persönlichen Link
+        selbst ergänzen — ohne Konto, nach seiner ausdrücklichen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Mit dem
+        Link sieht der Kunde nur, wonach gefragt ist, und die Lösungen mit Art und Anbieter, keine Angaben des
+        Beraters und keine Beträge. Ein Link gilt 30 Tage und lässt sich einmal absenden; hochgeladene Bilder kann
+        der Kunde bis zum Absenden wieder entfernen, abrufen kann er sie nicht. Eine E-Mail schicken wir dafür
+        weder dem Kunden noch dem Berater.
+      </P>
+      <P>
+        Gelöscht wird ein Antrag samt Ausweiskopien, sobald der Berater ihn löscht, <strong>spätestens 90 Tage
+        nach dem Anlegen</strong>, und mit dem Konto des Beraters. Seine Einwilligung kann der Kunde jederzeit mit
+        Wirkung für die Zukunft bei seinem Berater widerrufen.
+      </P>
+
+      <H2>10. E-Mail-Benachrichtigung an Berater</H2>
       <P>
         Geht ein Vorsorge-Check ein, erhält der Berater eine E-Mail an seine Konto-Adresse. Sie enthält nur den
         Namen, den der Berater selbst beim Erstellen des Links eingetragen hat, keine Angaben des Kunden. Ebenso,
@@ -327,7 +358,7 @@ function Datenschutz() {
         Unterlagen. Versandt wird über unser Postfach bei Hostinger.
       </P>
 
-      <H2>10. Rückmeldungen und Anfragen als Early Adopter</H2>
+      <H2>11. Rückmeldungen und Anfragen als Early Adopter</H2>
       <P>
         Über „Feedback geben“ können Sie uns eine Rückmeldung schicken: eine Bewertung mit Sternen, einen Text
         oder beides. Gespeichert werden Bewertung, Text, die Seite, auf der Sie gerade waren, der Zeitpunkt und
@@ -347,7 +378,7 @@ function Datenschutz() {
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
 
-      <H2>11. Abo, Büro und Zahlung</H2>
+      <H2>12. Abo, Büro und Zahlung</H2>
       <P>
         <strong>Büro und Team.</strong> Buchen Sie ein Abo, legen wir für Ihr Konto ein Büro an. Dazu speichern wir
         den Namen des Büros, wer ihm angehört und seit wann, wer es verwaltet, die Einladungslinks (wer sie wann
@@ -383,7 +414,7 @@ function Datenschutz() {
         acht Jahre (§ 147 AO, § 257 HGB) [Fristen prüfen lassen].
       </P>
 
-      <H2>12. Weitere Seiten</H2>
+      <H2>13. Weitere Seiten</H2>
       <P>
         Die Seiten zum Altersvorsorgedepot, zum Zuschussmodell und zum Matching-Modell rechnen ausschließlich in
         Ihrem Browser und speichern nichts — es sei denn, Sie übernehmen ein Modell mit „Für die
@@ -391,7 +422,7 @@ function Datenschutz() {
         E-Mail-Programm; was Sie dort absenden, entscheiden Sie selbst.
       </P>
 
-      <H2>13. Empfänger und Auftragsverarbeiter</H2>
+      <H2>14. Empfänger und Auftragsverarbeiter</H2>
       <Liste>
         <li>
           <strong>Supabase Inc.</strong> (San Francisco, USA) — Datenbank, Anmeldung und Serverfunktionen.
@@ -406,11 +437,11 @@ function Datenschutz() {
         </li>
         <li>
           <strong>Stripe Payments Europe, Ltd.</strong> (Dublin, Irland) — Zahlungsabwicklung, Rechnungen und
-          Kundenportal für das Abo, siehe Abschnitt 11.
+          Kundenportal für das Abo, siehe Abschnitt 12.
         </li>
       </Liste>
 
-      <H2>14. Speicherdauer im Überblick</H2>
+      <H2>15. Speicherdauer im Überblick</H2>
       <Liste>
         <li>
           Konto, gespeicherte Szenarien, Firmen und Beratungen der Mitarbeiterberatung samt unterschriebener
@@ -432,11 +463,15 @@ function Datenschutz() {
           Unterschrift per Link: offene Links höchstens 14 Tage, nach der Unterschrift keinen Tag länger; der
           Nachweis einer Unterschrift so lange wie die Unterschrift selbst.
         </li>
+        <li>
+          Angaben für den Antrag samt Ausweiskopien: bis der Berater sie löscht, höchstens 90 Tage nach dem
+          Anlegen; Links an den Kunden höchstens 30 Tage.
+        </li>
         <li>Server-Logdateien: [Frist laut Hostinger].</li>
         <li>Browser-Speicher: bis Sie ihn löschen.</li>
       </Liste>
 
-      <H2>15. Ihre Rechte</H2>
+      <H2>16. Ihre Rechte</H2>
       <P>
         Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
         der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21 DSGVO). Eine
@@ -448,12 +483,14 @@ function Datenschutz() {
         [zuständige Behörde am Sitz des Verantwortlichen].
       </P>
 
-      <H2>16. Datensicherheit</H2>
+      <H2>17. Datensicherheit</H2>
       <P>
         Alle Verbindungen sind verschlüsselt (TLS). Gespeicherte Daten sind je Konto durch Zugriffsregeln der
         Datenbank getrennt; Kunden, die einen Vorsorge-Check senden, können nichts lesen — auch ihre eigenen
         Angaben nicht mehr, sobald sie abgeschickt sind. Ein Link zur Unterschrift öffnet nur mit dem getrennt
-        genannten Code und nur die Unterlagen dieser einen Beratung; nach fünf falschen Codes ist er gesperrt. Hochgeladene Unterlagen liegen in einem nicht
+        genannten Code und nur die Unterlagen dieser einen Beratung; nach fünf falschen Codes ist er gesperrt. Ein
+        Link für die Angaben zum Antrag zeigt nur die offenen Fragen, keine Angaben. Hochgeladene Unterlagen und
+        Ausweiskopien liegen in einem nicht
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
         Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann — ein Firmenlogo auch die

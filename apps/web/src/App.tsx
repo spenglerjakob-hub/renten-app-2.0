@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette, ClipboardCheck,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette, ClipboardCheck, ClipboardList,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -45,6 +45,11 @@ import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Loesungen } from './features/Loesungen';
 import { Abschluss } from './features/Abschluss';
+import { Antragsangaben } from './features/Antragsangaben';
+import { Antraege } from './features/Antraege';
+import { antragLoesungenAus } from './features/antrag-daten';
+import { useAntraege } from './store/antraege';
+import { antragStand } from './lib/antraege';
 import { angenommenePositionen, ansichtMitAngenommenen, mitAngenommenen } from './features/tuev-berechnung';
 import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
@@ -403,6 +408,8 @@ export default function App() {
   */
   const auftritt = useAuftritt((s) => s.auftritt);
   const auftrittStatus = useAuftritt((s) => s.status);
+  // Fuer den Kopf des Antragsbogens: Firma und Berater, soweit hinterlegt.
+  const beraterZeile = [auftritt?.firma.trim(), auftritt?.berater.trim()].filter(Boolean).join(' · ') || undefined;
   const auftrittLaden = useAuftritt((s) => s.laden);
   const auftrittLeeren = useAuftritt((s) => s.zuruecksetzen);
   const [auftrittOffen, setAuftrittOffen] = useState(false);
@@ -454,6 +461,19 @@ export default function App() {
     });
   }, [auftrittLokal, auftrittStatus, auftrittBand, auftrittUebernehmen]);
   const neueEingaenge = checkListe.filter((a) => a.eingang).length;
+  /*
+    ANTRAEGE nach „Lösungen annehmen“: geladen, sobald jemand angemeldet ist —
+    die Marke „n eingegangen“ steht in der Seitenleiste, auch wenn das
+    Fenster zu ist.
+  */
+  const antraegeListe = useAntraege((s) => s.liste);
+  const antraegeLaden = useAntraege((s) => s.laden);
+  useEffect(() => {
+    if (supabaseKonfiguriert && angemeldet) void antraegeLaden();
+  }, [angemeldet, antraegeLaden]);
+  const antraegeEingegangen = antraegeListe.filter((a) => antragStand(a) === 'eingegangen').length;
+  const [antraegeOffen, setAntraegeOffen] = useState(false);
+  const schliesseAntraege = useCallback(() => setAntraegeOffen(false), []);
   /*
     KONTO UND VORSORGE-CHECK als Fenster: Beide werden in jeder Etappe
     gebraucht — gespeichert wird oft erst nach den Angeboten am Ende, ein
@@ -527,6 +547,18 @@ export default function App() {
     sobald das Ergebnis einmal mit Zahlen zu sehen war.
   */
   const nameVon = useCallback((id: PersonId) => personNameAus(szenario.personen, id), [szenario.personen]);
+  /*
+    Das Abbild der angenommenen Loesungen fuer den Antrag — immer der ganze
+    Haushalt: Ein Antrag gehoert zum Plan, nicht zur Ansicht. Stabil per
+    useMemo, sonst setzte die Karte ihr Formular bei jedem Zeichnen zurueck.
+  */
+  const antragLoesungen = useMemo(() => antragLoesungenAus(mitHaushalt.loesungen, nameVon), [mitHaushalt, nameVon]);
+  const kundeVorschlag = useMemo(
+    () => szenario.personen
+      .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
+      .map((p) => p.name.trim()).filter(Boolean).join(' und '),
+    [szenario.personen, szenario.haushalt.verheiratet],
+  );
   const fallSchritte = useMemo(
     () => fallFortschritt(szenario, { konto: Boolean(angemeldet), nameVon }),
     [szenario, angemeldet, nameVon],
@@ -709,6 +741,13 @@ export default function App() {
       symbol: <Inbox className="h-4 w-4" aria-hidden />,
       marke: eingangMarke,
       onOeffnen: () => setCheckOffen(true),
+    }] : []),
+    ...(checkMoeglich ? [{
+      text: 'Anträge',
+      zusatz: 'Angaben für den Antrag, Links an Kunden',
+      symbol: <ClipboardList className="h-4 w-4" aria-hidden />,
+      marke: antraegeEingegangen > 0 ? `${antraegeEingegangen} eingegangen` : undefined,
+      onOeffnen: () => { void antraegeLaden(); setAntraegeOffen(true); },
     }] : []),
     ...(zugang && aboSichtbar(zugang) ? [{
       text: 'Abo & Team',
@@ -1421,6 +1460,17 @@ export default function App() {
               vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
               onZuLoesungen={() => { setTuevReiter('loesungen'); geheZu('loesungen'); }}
             />
+            {/* Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt. */}
+            {mitHaushalt.loesungen.length > 0 && (
+              <Antragsangaben
+                antragId={szenario.loesungen.antrag}
+                loesungen={antragLoesungen}
+                kundeVorschlag={kundeVorschlag}
+                angemeldet={checkMoeglich}
+                onKonto={() => setKontoOffen(true)}
+                berater={beraterZeile}
+              />
+            )}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
           </>
         )}
@@ -1451,6 +1501,17 @@ export default function App() {
           onSchliessen={schliesseAuftritt}
         >
           <AuftrittFenster anmeldeAdresse={angemeldet} />
+        </Dialog>
+      )}
+
+      {checkMoeglich && (
+        <Dialog
+          offen={antraegeOffen}
+          titel="Anträge"
+          beschreibung="Angaben für den Antrag, Links an Kunden und der Antragsbogen."
+          onSchliessen={schliesseAntraege}
+        >
+          <Antraege berater={beraterZeile} />
         </Dialog>
       )}
 

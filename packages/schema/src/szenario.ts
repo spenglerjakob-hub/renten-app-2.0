@@ -536,6 +536,13 @@ export const loesungenSchema = z.object({
    * Szenario — es liegt im Browser und geht in jeden Export.
    */
   angenommen: z.array(z.string().min(1).max(64)).max(12).default([]),
+  /**
+   * Der Antrag zu den angenommenen Lösungen — nur seine ID in der Tabelle
+   * `antraege`. Bankverbindung und Ausweiskopie stehen dort, hinter Row
+   * Level Security, nie hier. Ein unbrauchbarer Wert fällt weg, statt den
+   * ganzen Plan unlesbar zu machen.
+   */
+  antrag: z.string().uuid().optional().catch(undefined),
 });
 
 export const szenarioSchema = z.object({
