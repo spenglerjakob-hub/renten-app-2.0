@@ -24,7 +24,7 @@ const beitrag = (a: MitAngenommenen['loesungen'][number]['angebot']) => (a.loesu
   ? (a.beitragMonat > 0 ? `${euro(a.beitragMonat)} + AG ${euro(a.agZuschussMonat)}` : `AG ${euro(a.agZuschussMonat)}`)
   : euro(a.beitragMonat));
 
-export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, einzelperson, inhaberName }: {
+export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, einzelperson, inhaberName, mitRenteneinkuenften = true }: {
   vorher: Jahreszeile;
   nachher: Jahreszeile;
   ergebnisMit: ProjektionsErgebnis;
@@ -33,6 +33,8 @@ export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, ei
   einzelperson?: string;
   /** Bei Paaren im Haushalt: wem eine Loesung gehoert */
   inhaberName?: (id: 'A' | 'B') => string;
+  /** Steht „Ihre Renteneinkünfte“ im selben Ausdruck? Nur dann der Verweis darauf. */
+  mitRenteneinkuenften?: boolean;
 }) {
   const lueckeVorher = versorgungsluecke(vorher);
   const lueckeNachher = versorgungsluecke(nachher);
@@ -46,9 +48,10 @@ export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, ei
   return (
     <Seite titel="Ihr Ergebnis mit den gewählten Lösungen" nummer={`Im Jahr ${nachher.jahr} · Beträge des jeweiligen Jahres`}>
       <Text>
-        Dieselbe Rechnung wie auf der Seite „Ihre Renteneinkünfte“ — jetzt mit den Lösungen, für die
+        {mitRenteneinkuenften ? 'Dieselbe Rechnung wie auf der Seite „Ihre Renteneinkünfte“' : 'Dieselbe Rechnung wie für Ihre heutige Versorgung'} —
+        jetzt mit den Lösungen, für die
         {einzelperson ? ` ${einzelperson} sich` : ' Sie sich'} entschieden {einzelperson ? 'hat' : 'haben'}, gemeinsam
-        gerechnet. Zeilen mit der Marke „{NEU_TEXT}“ sind in den Seiten davor nicht enthalten.
+        gerechnet. Zeilen mit der Marke „{NEU_TEXT}“ sind {mitRenteneinkuenften ? 'in den Seiten davor' : 'in der heutigen Versorgung'} nicht enthalten.
       </Text>
 
       <div className="mt-3 grid grid-cols-3 gap-3">

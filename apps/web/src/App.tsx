@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
@@ -51,7 +51,9 @@ import { antragLoesungenAus } from './features/antrag-daten';
 import { useAntraege } from './store/antraege';
 import { antragStand } from './lib/antraege';
 import { angenommenePositionen, ansichtMitAngenommenen, mitAngenommenen } from './features/tuev-berechnung';
-import { Gutachten } from './druck/Gutachten';
+import { Gutachten, useGutachtenSeiten } from './druck/Gutachten';
+import { ALLES, gewaehlt, type DruckAuswahl } from './druck/druckauswahl';
+import { DruckAuswahlFenster } from './features/DruckAuswahl';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { KaufkraftSchalter } from './components/KaufkraftSchalter';
@@ -225,82 +227,37 @@ function KopfAuswahl({
 }
 
 /**
- * EIN Druckknopf mit Auswahl statt zweier roter Knoepfe — die waren das
- * Lauteste im ganzen Kopf. Mit Kontur, nicht gefuellt: Die Hauptaktion
- * jeder Etappe ist „Weiter“, nicht das Drucken.
+ * EIN Druckknopf — mit Kontur, nicht gefuellt: Die Hauptaktion jeder Etappe
+ * ist „Weiter“, nicht das Drucken. Er oeffnet das Druckfenster, in dem
+ * Thema fuer Thema angekreuzt wird, was ins Gutachten kommt.
  */
-function DruckMenue({ onDrucke, kompakt = false }: {
-  onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void;
+function DruckKnopf({ onOeffnen, kompakt = false }: {
+  onOeffnen: () => void;
   /** Nur das Symbol — fuer die eingeklappte Kopfleiste */
   kompakt?: boolean;
 }) {
-  const [offen, setOffen] = useState(false);
-  const huelle = useRef<HTMLDivElement>(null);
-  const menueId = useId();
-
-  useEffect(() => {
-    if (!offen) return;
-    const weg = (e: MouseEvent) => { if (!huelle.current?.contains(e.target as Node)) setOffen(false); };
-    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
-    document.addEventListener('mousedown', weg);
-    document.addEventListener('keydown', taste);
-    return () => {
-      document.removeEventListener('mousedown', weg);
-      document.removeEventListener('keydown', taste);
-    };
-  }, [offen]);
-
-  const wahl = (umfang: 'kurz' | 'ausfuehrlich') => { setOffen(false); onDrucke(umfang); };
-  const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-ui-innen focus-visible:bg-ui-innen';
-
-  return (
-    <div ref={huelle} className={`relative flex ${kompakt ? '' : 'flex-1 sm:flex-none'}`}>
-      {kompakt ? (
-        <button
-          type="button"
-          onClick={() => setOffen((v) => !v)}
-          aria-expanded={offen}
-          aria-controls={menueId}
-          aria-label="Gutachten drucken"
-          title="Gutachten drucken"
-          className={KOPF_KNOPF}
-        >
-          <Printer className="h-4 w-4" aria-hidden />
-        </button>
-      ) : (
+  return kompakt ? (
+    <button
+      type="button"
+      onClick={onOeffnen}
+      aria-haspopup="dialog"
+      aria-label="Gutachten drucken"
+      title="Gutachten drucken"
+      className={KOPF_KNOPF}
+    >
+      <Printer className="h-4 w-4" aria-hidden />
+    </button>
+  ) : (
+    <div className="flex flex-1 sm:flex-none">
       <button
         type="button"
-        onClick={() => setOffen((v) => !v)}
-        aria-expanded={offen}
-        aria-controls={menueId}
+        onClick={onOeffnen}
+        aria-haspopup="dialog"
         className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover sm:flex-none"
       >
         <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
-        <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
       </button>
-      )}
-      {offen && (
-        <div
-          id={menueId}
-          className="ui-karte absolute right-0 top-full z-50 mt-2 w-64 p-1 text-sm text-ui-tinte shadow-lg"
-        >
-          {/*
-            Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
-            Angaben, Renteneinkuenfte, Vorbehalt), die ausfuehrliche zum
-            Mitgeben. Ein Dokument mit Namen darauf fuehrt den Vorbehalt
-            in beiden Faellen mit.
-          */}
-          <button type="button" className={eintrag} onClick={() => wahl('kurz')}>
-            <span className="block font-medium">Kurzfassung</span>
-            <span className="block text-xs text-ui-schiefer">Für das Gespräch: Angaben und Renteneinkünfte</span>
-          </button>
-          <button type="button" className={eintrag} onClick={() => wahl('ausfuehrlich')}>
-            <span className="block font-medium">Ausführlich</span>
-            <span className="block text-xs text-ui-schiefer">Zum Mitgeben: alle Abschnitte des Gutachtens</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -642,11 +599,27 @@ export default function App() {
   const zeile = echteZeile ?? LEERE_ZEILE;
 
   /*
-    DER DRUCKUMFANG. Gedruckt wird erst, wenn React die neue Seitenfolge
-    gezeichnet hat — `window.print()` unmittelbar im Klick druckte noch die
-    alte. Deshalb der Umweg ueber einen Effekt.
+    DAS GUTACHTEN UND SEINE DRUCKAUSWAHL. Alle Seiten, die der Fall hergibt,
+    kommen aus EINER Liste (`useGutachtenSeiten`): Das Druckfenster zeigt sie
+    als Kaestchen, das Gutachten druckt die angekreuzten. Die Auswahl gilt, bis
+    die Seite neu geladen wird; im Browser gespeichert wird sie nicht.
+
+    Gedruckt wird erst, wenn React die neue Seitenfolge gezeichnet hat —
+    `window.print()` unmittelbar im Klick druckte noch die alte. Deshalb der
+    Umweg ueber einen Effekt.
   */
-  const [druckUmfang, setDruckUmfang] = useState<'kurz' | 'ausfuehrlich'>('ausfuehrlich');
+  const gutachtenSeiten = useGutachtenSeiten({
+    szenario: ansichtSzenario,
+    ergebnis: ergebnis ?? null,
+    zeile,
+    einzelperson: einzeln ? personNameAus(szenario.personen, wer) : undefined,
+    mit: mitAnsicht,
+    ergebnisMit,
+    positionenMit,
+  });
+  const [druckAuswahl, setDruckAuswahl] = useState<DruckAuswahl>(ALLES);
+  const [druckOffen, setDruckOffen] = useState(false);
+  const schliesseDruck = useCallback(() => setDruckOffen(false), []);
   const [druckAngefordert, setDruckAngefordert] = useState(false);
   useEffect(() => {
     if (!druckAngefordert) return;
@@ -661,24 +634,18 @@ export default function App() {
       Promise.all(bilder.map((b) => b.decode().catch(() => undefined))),
       new Promise((fertig) => window.setTimeout(fertig, 1500)),
     ]).then(() => window.print());
-  }, [druckAngefordert, druckUmfang]);
-  const druckeJetzt = (umfang: 'kurz' | 'ausfuehrlich') => {
-    setDruckUmfang(umfang);
+  }, [druckAngefordert]);
+  // Erst das Fenster schliessen, dann drucken: Der Effekt laeuft nach dem Zeichnen.
+  const druckeJetzt = () => {
+    setDruckOffen(false);
     setDruckAngefordert(true);
   };
   /*
-    NOCH BEISPIELWERTE IM FALL? Dann eine Rueckfrage vor dem Druck — ein
-    Gutachten geht an den Kunden, und danach ist es zu spaet. Beide Knoepfe
-    sind gleichwertig; gedruckt werden darf trotzdem, die Werte stehen im
-    Gutachten dann als Beispielwert gekennzeichnet.
+    NOCH BEISPIELWERTE IM FALL? Dann sagt es das Druckfenster — ein
+    Gutachten geht an den Kunden, und danach ist es zu spaet. Gedruckt werden
+    darf trotzdem, die Werte stehen im Gutachten als Beispielwert gekennzeichnet.
   */
-  const [druckFrage, setDruckFrage] = useState<'kurz' | 'ausfuehrlich' | null>(null);
   const offeneBeispielTexte = offeneBeispiele(ansichtSzenario, (id) => personNameAus(szenario.personen, id));
-  const drucke = (umfang: 'kurz' | 'ausfuehrlich') => {
-    if (offeneBeispielTexte.length > 0) setDruckFrage(umfang);
-    else druckeJetzt(umfang);
-  };
-  const schliesseDruckFrage = useCallback(() => setDruckFrage(null), []);
 
   /*
     Solange Beispielwerte im Fall stehen, sagt es jede rechnende Etappe —
@@ -971,7 +938,7 @@ export default function App() {
                 <Wallet className="h-4 w-4" aria-hidden />
                 {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-ui-tinte ring-2 ring-ui-flaeche" />}
               </button>
-              {kopfEingeklappt && <DruckMenue onDrucke={drucke} kompakt />}
+              {kopfEingeklappt && <DruckKnopf onOeffnen={() => setDruckOffen(true)} kompakt />}
               {!kopfEingeklappt && (
                 <button
                   type="button"
@@ -1037,7 +1004,7 @@ export default function App() {
                 <button type="button" onClick={exportieren} className={`${KOPF_TEXT} flex-1 sm:flex-none`}>
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
-                <DruckMenue onDrucke={drucke} />
+                <DruckKnopf onOeffnen={() => setDruckOffen(true)} />
                 <button
                   type="button"
                   onClick={zuruecksetzen}
@@ -1064,12 +1031,9 @@ export default function App() {
         szenario={ansichtSzenario}
         ergebnis={ergebnis ?? null}
         zeile={zeile}
-        umfang={druckUmfang}
         einzelperson={einzeln ? personNameAus(szenario.personen, wer) : undefined}
         auftritt={auftritt}
-        mit={mitAnsicht}
-        ergebnisMit={ergebnisMit}
-        positionenMit={positionenMit}
+        seiten={gutachtenSeiten.filter((s) => gewaehlt(s, druckAuswahl))}
       />
 
       {importMeldung && (
@@ -1515,28 +1479,20 @@ export default function App() {
         </Dialog>
       )}
 
-      <Dialog offen={druckFrage !== null} titel="Noch Beispielwerte im Fall" onSchliessen={schliesseDruckFrage}>
-        <p className="text-sm leading-relaxed text-ui-tinte/80">
-          Diese Angaben sind noch Beispielwerte: <strong className="font-medium text-ui-tinte">{offeneBeispielTexte.join(', ')}</strong>. Im
-          Gutachten stehen sie gekennzeichnet.
-        </p>
-        {/* Zwei gleichwertige Knoepfe: Drucken darf man trotzdem. */}
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => { setDruckFrage(null); setBasisOffen(true); geheZu('daten'); }}
-            className={KNOPF_ZWEIT}
-          >
-            Angaben prüfen
-          </button>
-          <button
-            type="button"
-            onClick={() => { const u = druckFrage; setDruckFrage(null); if (u) druckeJetzt(u); }}
-            className={KNOPF_ZWEIT}
-          >
-            Trotzdem drucken
-          </button>
-        </div>
+      <Dialog
+        offen={druckOffen}
+        titel="Gutachten drucken"
+        beschreibung="Kreuzen Sie an, was ins Gutachten kommt. Deckblatt und Vorbehalt sind immer dabei."
+        onSchliessen={schliesseDruck}
+      >
+        <DruckAuswahlFenster
+          seiten={gutachtenSeiten}
+          auswahl={druckAuswahl}
+          onAuswahl={setDruckAuswahl}
+          beispielwerte={offeneBeispielTexte}
+          onAngabenPruefen={() => { setDruckOffen(false); setBasisOffen(true); geheZu('daten'); }}
+          onDrucken={druckeJetzt}
+        />
       </Dialog>
 
       {checkMoeglich && (

@@ -215,8 +215,8 @@ export function Renteneinkuenfte({
 
       <Text>
         Alle Beträge sind Monatsbeträge des Jahres {zeile.jahr}, also das, was später auf dem
-        Kontoauszug steht. Was sie in heutigem Geld wert sind, zeigt die Seite „Dieselben Zahlen in
-        heutiger Kaufkraft“.
+        Kontoauszug steht. Was Netto, Ziel und Lücke in heutigem Geld wert sind, steht oben unter
+        „Ihr Versorgungsziel“.
       </Text>
     </Seite>
   );

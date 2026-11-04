@@ -46,7 +46,7 @@ const kopfVon = (titel: string) => titel
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;
 
-export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, nettoHeute = 0 }: {
+export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, nettoHeute = 0, mitRenteneinkuenften = true }: {
   loesungen: Loesung[];
   /** Wie am Bildschirm: Netto-Aufwand oder Beitrag vorgegeben */
   vorgabe: LoesungsVorgabe;
@@ -54,6 +54,8 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
   angebote: AngebotPosition[];
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
   nettoHeute?: number;
+  /** Steht „Ihre Renteneinkünfte“ im selben Ausdruck? Nur dann der Verweis darauf. */
+  mitRenteneinkuenften?: boolean;
 }) {
   const brutto = vorgabe === 'brutto';
   const sichtbar = loesungen.filter((l) => l.verfuegbar);
@@ -278,8 +280,8 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
           {besteAngebote.length > 0 && <Text>★ die höchste Nettorendite.</Text>}
           {gerechnet.some(ohneAufwand) && <Text>{OHNE_EIGENAUFWAND_TEXT}</Text>}
           <Text>
-            Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet, wie auf der Seite zu den
-            Renteneinkünften. Eine Kapitalabfindung ist im Jahr des Zuflusses voll zu versteuern (bAV) bzw.
+            Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet
+            {mitRenteneinkuenften ? ', wie auf der Seite zu den Renteneinkünften. ' : '. '}Eine Kapitalabfindung ist im Jahr des Zuflusses voll zu versteuern (bAV) bzw.
             mit ihrem Ertrag (private Rentenversicherung). Eine Modellrechnung, keine Empfehlung für ein
             Produkt oder einen Anbieter.
           </Text>
