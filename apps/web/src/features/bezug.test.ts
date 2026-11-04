@@ -3,7 +3,7 @@ import type { ProjektionsErgebnis } from '@renten/engine';
 import { szenarioSchema } from '@renten/schema';
 import { standardSzenario } from '../store/standard';
 import { anteilAmNetto, anteilAnLuecke, nettoHeuteMonat } from './bezug';
-import { angebotPositionen } from './tuev-berechnung';
+import { angebotPositionen, ohneEigenaufwand } from './tuev-berechnung';
 
 const mitZeile0 = (nettoGesamt: number, vollstaendigImRuhestand = false) =>
   ({ zeilen: [{ nettoGesamt, vollstaendigImRuhestand }] }) as unknown as ProjektionsErgebnis;
@@ -54,5 +54,43 @@ describe('Angebote: welchen Teil der Luecke sie schliessen', () => {
   it('ohne Luecke kein Anteil', () => {
     const [p] = angebotPositionen(mitAngebot(500));
     expect(p!.lueckeAnteil).toBeNull();
+  });
+});
+
+describe('Angebote ohne Eigenbeitrag: rein arbeitgeberfinanzierte bAV', () => {
+  const nurArbeitgeber = () => {
+    const s = standardSzenario();
+    return szenarioSchema.parse({
+      ...s,
+      haushalt: { ...s.haushalt, zielNettoHeute: 2000 },
+      loesungen: {
+        ...s.loesungen,
+        angebote: [{ id: 'g', loesung: 'bav', name: 'GGF', beitragMonat: 0, agZuschussMonat: 300, renteMonat: 400 }],
+      },
+    });
+  };
+
+  it('wird gerechnet: Rente netto, Anteil an der Luecke, kein eigener Aufwand', () => {
+    const [p] = angebotPositionen(nurArbeitgeber());
+    expect(p!.rente).not.toBeNull();
+    expect(p!.rente!.nettoRenteMonat).toBeGreaterThan(0);
+    expect(p!.rente!.echterAufwandMonat).toBe(0);
+    expect(p!.lueckeAnteil!.anteil).toBeGreaterThan(0);
+    // Ohne eigenen Aufwand gibt es keinen Hebel — die Anzeige setzt einen Strich statt „0,00“.
+    expect(ohneEigenaufwand(p!.rente!)).toBe(true);
+  });
+
+  it('mit eigener Umwandlung ist es ein gewoehnliches Angebot', () => {
+    const s = nurArbeitgeber();
+    const [p] = angebotPositionen({ ...s, loesungen: { ...s.loesungen, angebote: [{ ...s.loesungen.angebote[0]!, beitragMonat: 100 }] } });
+    expect(p!.rente!.echterAufwandMonat).toBeGreaterThan(0);
+    expect(ohneEigenaufwand(p!.rente!)).toBe(false);
+    expect(p!.rente!.nettoHebel).toBeGreaterThan(0);
+  });
+
+  it('ohne Arbeitgeber und ohne Umwandlung bleibt es leer', () => {
+    const s = nurArbeitgeber();
+    const [p] = angebotPositionen({ ...s, loesungen: { ...s.loesungen, angebote: [{ ...s.loesungen.angebote[0]!, agZuschussMonat: 0 }] } });
+    expect(p!.rente).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
-  versorgungsluecke, projiziere, kenntKapitalwahl, grenzsteuersatz, grenzLohnsteuersatz, SV_FREI_QUOTE, euroText,
+  versorgungsluecke, projiziere, kenntKapitalwahl, nurPerson, grenzsteuersatz, grenzLohnsteuersatz, SV_FREI_QUOTE, euroText,
   type Steuerklasse, type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung, type LoesungsOptionen,
@@ -849,6 +849,52 @@ const EINZAHL_TYP: Record<LoesungsArt, Vertrag['typ']> = {
 };
 const SCHICHT: Record<LoesungsArt, 1 | 2 | 3> = { bav: 2, avd: 2, basis: 1, privat: 3 };
 
+/** Kurzname einer Loesung — fuer Angebote ohne Anbieter, im Kassenbon und im Gutachten. */
+export const LOESUNG_KURZ: Record<LoesungsArt, string> = {
+  avd: 'Altersvorsorgedepot', bav: 'Betriebsrente', basis: 'Basisrente', privat: 'Private Rente',
+};
+
+/** Der Beginn eines Angebots: der naechste Monatserste — beim Altersvorsorgedepot fruehestens dessen Start. */
+function angebotBeginn(a: AngebotEintrag, avdAb: number, heute: Date) {
+  const jetzt = heute.getFullYear();
+  const naechsterMonat = heute.getMonth() + 2;
+  const beginn = naechsterMonat > 12
+    ? { jahr: jetzt + 1, monat: 1 }
+    : { jahr: jetzt, monat: naechsterMonat };
+  return a.loesung === 'avd' && beginn.jahr < avdAb ? { jahr: avdAb, monat: 1 } : beginn;
+}
+
+/**
+ * Ein Angebot als Vertrag fuer die Projektion. EINE Stelle fuer den
+ * Vergleich (`angebotPositionen`) und fuer das Ergebnis mit den angenommenen
+ * Loesungen (`mitAngenommenen`): Inhaber, Art, Beginn, Rente und Kapital sind
+ * in beiden dieselben.
+ */
+export function angebotAlsVertrag(a: AngebotEintrag, szenario: SzenarioParsed, avdAb: number, heute = new Date()) {
+  const inhaber: Vertrag['inhaber'] = a.inhaber === 'B' && szenario.haushalt.verheiratet ? 'B' : 'A';
+  const start = angebotBeginn(a, avdAb, heute);
+  const mitKapital = angebotKenntKapital(a.loesung) && a.kapital > 0;
+  const vertrag: Vertrag = {
+    id: `angebot-${a.id}`, inhaber, schicht: SCHICHT[a.loesung], typ: AUSZAHL_TYP[a.loesung],
+    // Ohne Anbieter stuende im Kassenbon sonst die Vertragsart als Kuerzel.
+    name: a.name || LOESUNG_KURZ[a.loesung],
+    brutto: a.renteMonat, strategie: 'rente', altvertrag: false,
+    /*
+      Fuer die Kapitalwahl einer privaten Rentenversicherung braucht die
+      Steuer den Ertrag: Kapital minus eingezahlte Beitraege, und die
+      12/62-Regel braucht den Vertragsbeginn.
+    */
+    kapitalAlternative: mitKapital ? a.kapital : undefined,
+    beginnJahr: start.jahr,
+    monatsbeitrag: a.beitragMonat,
+  };
+  return { vertrag, start, mitKapital };
+}
+
+/** Laesst sich das Angebot rechnen? Ein Beitrag (bei der bAV genuegt der Arbeitgeber) und Rente oder Kapital. */
+export const angebotRechenbar = (a: AngebotEintrag) =>
+  angebotGesamtMonat(a) > 0 && (a.renteMonat > 0 || (angebotKenntKapital(a.loesung) && a.kapital > 0));
+
 export interface AngebotPosition {
   angebot: AngebotEintrag;
   /** Der Weg als laufende Rente — null ohne Beitrag oder ohne Rente */
@@ -868,6 +914,27 @@ export interface AngebotPosition {
    */
   lueckeAnteil: { anteil: number; jahr: number } | null;
 }
+
+/** Was im Monat in den Vertrag fliesst: bei der bAV Umwandlung und Arbeitgeber, sonst der Beitrag. */
+export const angebotGesamtMonat = (a: { loesung: LoesungsArt; beitragMonat: number; agZuschussMonat: number }) =>
+  a.beitragMonat + (a.loesung === 'bav' ? a.agZuschussMonat : 0);
+
+/**
+ * OHNE EIGENEN AUFWAND — eine rein arbeitgeberfinanzierte Betriebsrente,
+ * etwa fuer den Geschaeftsfuehrer. Netto-Hebel, Rendite und Amortisation
+ * messen die Auszahlung am EIGENEN Aufwand; ohne ihn gibt es sie nicht.
+ * Der Rechenkern liefert dann 0 (`kennzahlen`), und „0,00 ×“ laese sich als
+ * „bringt nichts“ — das Gegenteil. Die Anzeige setzt einen Strich und sagt,
+ * warum.
+ */
+export const ohneEigenaufwand = (r: Pick<TuevErgebnis, 'summeEinzahlung'>) => r.summeEinzahlung < 0.005;
+
+/** Die Erklaerung dazu — am Bildschirm und im Gutachten derselbe Satz. */
+export const OHNE_EIGENAUFWAND_TEXT = 'Rein arbeitgeberfinanziert: Den Beitrag trägt allein der Arbeitgeber — Sie '
+  + 'zahlen nichts aus Ihrem Netto, die Rente kommt hinzu. Netto-Hebel, Rendite und Amortisation messen am '
+  + 'eigenen Aufwand und entfallen deshalb. In Direktversicherung, Pensionskasse und Pensionsfonds ist der '
+  + 'Arbeitgeberbeitrag bis 8 % der Beitragsbemessungsgrenze steuerfrei und bis 4 % beitragsfrei; was darüber '
+  + 'liegt, ist für Sie steuer- bzw. beitragspflichtiger Lohn — das ist hier nicht gerechnet.';
 
 /** Kennt diese Loesung eine volle Kapitalauszahlung? bAV und private Rentenversicherung ja. */
 export const angebotKenntKapital = (loesung: LoesungsArt) => kenntKapitalwahl(AUSZAHL_TYP[loesung]);
@@ -891,39 +958,22 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
   const basis = tuevBasis(szenario);
   const heute = new Date();
   const jetzt = heute.getFullYear();
-  // Beginn: der naechste Monatserste.
-  const naechsterMonat = heute.getMonth() + 2;
-  const beginn = naechsterMonat > 12
-    ? { jahr: jetzt + 1, monat: 1 }
-    : { jahr: jetzt, monat: naechsterMonat };
   const avdAb = basis.p.avd.abJahr;
   // Einmal OHNE Angebot — die Luecke und das Netto, an denen sich jedes Angebot misst.
   let ohne: ReturnType<typeof projiziere> | null = null;
   const ohneAngebot = () => (ohne ??= projiziere(szenario));
 
   return szenario.loesungen.angebote.map((a) => {
-    const inhaber = a.inhaber === 'B' && szenario.haushalt.verheiratet ? 'B' : 'A';
+    const { vertrag: auszahlung, start, mitKapital } = angebotAlsVertrag(a, szenario, avdAb, heute);
+    const { id, inhaber } = auszahlung;
     const person = szenario.personen.find((x) => x.id === inhaber) ?? szenario.personen[0]!;
     const rentenbeginnJahr = jahrAus(person.rentenbeginn, jetzt + 20);
     const mitRente = a.renteMonat > 0;
-    const mitKapital = angebotKenntKapital(a.loesung) && a.kapital > 0;
     const leer = { angebot: a, rente: null, kapital: null, breakEven: null, rentenbeginnJahr, lueckeAnteil: null };
-    if (a.beitragMonat <= 0 || (!mitRente && !mitKapital)) return leer;
+    // Bei der bAV kann der Arbeitgeber den ganzen Beitrag tragen (etwa fuer den Geschaeftsfuehrer):
+    // Gerechnet wird, sobald ueberhaupt etwas in den Vertrag fliesst.
+    if (!angebotRechenbar(a)) return leer;
 
-    const id = `angebot-${a.id}`;
-    const start = a.loesung === 'avd' && beginn.jahr < avdAb ? { jahr: avdAb, monat: 1 } : beginn;
-    const auszahlung: Vertrag = {
-      id, inhaber, schicht: SCHICHT[a.loesung], typ: AUSZAHL_TYP[a.loesung],
-      name: a.name, brutto: a.renteMonat, strategie: 'rente', altvertrag: false,
-      /*
-        Fuer die Kapitalwahl einer privaten Rentenversicherung braucht die
-        Steuer den Ertrag: Kapital minus eingezahlte Beitraege, und die
-        12/62-Regel braucht den Vertragsbeginn.
-      */
-      kapitalAlternative: mitKapital ? a.kapital : undefined,
-      beginnJahr: start.jahr,
-      monatsbeitrag: a.beitragMonat,
-    };
     const projektion = (strategie: Vertrag['strategie']) => {
       const v = { ...auszahlung, strategie };
       const klon: SzenarioParsed = { ...szenario, vertraege: [...szenario.vertraege, v] };
@@ -1003,4 +1053,72 @@ export function angebotPositionen(szenario: SzenarioParsed): AngebotPosition[] {
       : null;
     return { angebot: a, rente, kapital, breakEven, rentenbeginnJahr, lueckeAnteil };
   });
+}
+
+/* ======================================================================
+ * DAS ERGEBNIS MIT DEN ANGENOMMENEN LOESUNGEN
+ * ==================================================================== */
+
+export interface MitAngenommenen {
+  /** Das Szenario mit den angenommenen Angeboten als Vertraege */
+  szenario: SzenarioParsed;
+  /** Die Vertrags-IDs der dazugekommenen Loesungen — fuer die Marke „Neu“ */
+  neu: ReadonlySet<string>;
+  /** Je angenommenem, gerechnetem Angebot sein Vertrag — in der Reihenfolge der Angebote */
+  loesungen: { angebot: AngebotEintrag; vertrag: Vertrag }[];
+}
+
+/**
+ * Das Szenario MIT den angenommenen Loesungen.
+ *
+ * GEMEINSAM, nicht einzeln: Im Vergleich sind Angebote Alternativen
+ * (`angebotPositionen`). Angenommen sind sie Entscheidungen — alle zusammen
+ * kommen zu den bestehenden Vertraegen, und die Steuer im Alter faellt auf
+ * die Summe. Vorbild ist `leistungsRechnung` der Mitarbeiterberatung.
+ *
+ * Nur, was sich rechnen laesst (`angebotRechenbar`). Mit Rente laeuft das
+ * Angebot als Rente; nennt es nur ein Kapital, als Kapitalauszahlung.
+ *
+ * Immer im ganzen Haushalt: Erst dort ist klar, wem ein Angebot gehoert.
+ * Die Einzelbetrachtung schneidet danach zu (`ansichtMitAngenommenen`).
+ */
+export function mitAngenommenen(szenario: SzenarioParsed, heute = new Date()): MitAngenommenen {
+  const ids = new Set(szenario.loesungen.angenommen);
+  const angebote = szenario.loesungen.angebote.filter((a) => ids.has(a.id) && angebotRechenbar(a));
+  if (angebote.length === 0) return { szenario, neu: new Set(), loesungen: [] };
+
+  const avdAb = tuevBasis(szenario).p.avd.abJahr;
+  const loesungen = angebote.map((a) => {
+    const { vertrag } = angebotAlsVertrag(a, szenario, avdAb, heute);
+    return { angebot: a, vertrag: a.renteMonat > 0 ? vertrag : { ...vertrag, strategie: 'kapital' as const } };
+  });
+  return {
+    szenario: { ...szenario, vertraege: [...szenario.vertraege, ...loesungen.map((x) => x.vertrag)] },
+    neu: new Set(loesungen.map((x) => x.vertrag.id)),
+    loesungen,
+  };
+}
+
+/**
+ * Was davon die Ansicht zeigt: im Haushalt alles, in der Einzelbetrachtung
+ * nur die Loesungen der Person — mit `nurPerson` zugeschnitten wie das
+ * Ergebnis. Null, wenn dort nichts angenommen ist.
+ */
+export function ansichtMitAngenommenen(m: MitAngenommenen, wer: Vertrag['inhaber'] | null): MitAngenommenen | null {
+  if (m.loesungen.length === 0) return null;
+  if (wer === null) return m;
+  const loesungen = m.loesungen.filter((x) => x.vertrag.inhaber === wer);
+  if (loesungen.length === 0) return null;
+  return { szenario: nurPerson(m.szenario, wer), neu: new Set(loesungen.map((x) => x.vertrag.id)), loesungen };
+}
+
+/**
+ * Was jede angenommene Loesung netto kostet — aus dem Vergleich, je Angebot
+ * fuer sich gerechnet (`angebotPositionen`), im Szenario der Ansicht. Fuer
+ * die Etappe „Abschluss“ und das Gutachten aus EINER Rechnung.
+ */
+export function angenommenePositionen(ansicht: SzenarioParsed, mit: MitAngenommenen | null): AngebotPosition[] {
+  if (!mit) return [];
+  const angebote = mit.loesungen.map((x) => x.angebot);
+  return angebotPositionen({ ...ansicht, loesungen: { ...ansicht.loesungen, angebote } });
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette, ClipboardCheck,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -44,6 +44,8 @@ import { aboSichtbar, aboZusatz, rueckmeldungFaellig, useZugang, wirksam } from 
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Loesungen } from './features/Loesungen';
+import { Abschluss } from './features/Abschluss';
+import { angenommenePositionen, ansichtMitAngenommenen, mitAngenommenen } from './features/tuev-berechnung';
 import { Gutachten } from './druck/Gutachten';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
@@ -68,13 +70,14 @@ const REITER: { id: Reiter; text: string }[] = [
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
 
-/** Die vier Etappen der Beratung — siehe `JourneyLeiste`. */
-type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen';
+/** Die fuenf Etappen der Beratung — siehe `JourneyLeiste`. */
+type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen' | 'abschluss';
 const ETAPPEN: readonly Etappe<Schritt>[] = [
   { id: 'daten', text: 'Daten & Ziel', kurz: 'Daten & Ziel' },
   { id: 'ergebnis', text: 'Ergebnis', kurz: 'Ergebnis' },
   { id: 'sparen', text: 'Sparrechner', kurz: 'Sparen' },
   { id: 'loesungen', text: 'Vertrags-TÜV & Lösungen', kurz: 'TÜV & Lösungen' },
+  { id: 'abschluss', text: 'Abschluss', kurz: 'Abschluss' },
 ];
 
 /*
@@ -501,6 +504,23 @@ export default function App() {
   const { ergebnis, rechnet, fehler } = useProjektion(ansichtSzenario);
 
   /*
+    DAS ERGEBNIS MIT DEN ANGENOMMENEN LOESUNGEN — fuer die Etappe
+    „Abschluss“ und das Gutachten. Im ganzen Haushalt gerechnet und dann wie
+    das Ergebnis auf die Person zugeschnitten (`ansichtMitAngenommenen`).
+    Ein eigener Lauf im Worker, aber nur, wenn etwas angenommen ist.
+  */
+  const mitHaushalt = useMemo(() => mitAngenommenen(szenario), [szenario]);
+  const mitAnsicht = useMemo(
+    () => ansichtMitAngenommenen(mitHaushalt, einzeln ? wer : null),
+    [mitHaushalt, einzeln, wer],
+  );
+  const { ergebnis: ergebnisMit } = useProjektion(mitAnsicht?.szenario ?? null);
+  const positionenMit = useMemo(
+    () => angenommenePositionen(ansichtSzenario, mitAnsicht),
+    [ansichtSzenario, mitAnsicht],
+  );
+
+  /*
     DER FORTSCHRITT DES FALLS — aus echten Schritten (`features/fortschritt.ts`).
     Am ganzen Fall, nicht an der Einzelbetrachtung: Er beschreibt, was
     erfasst ist, nicht was gerade angezeigt wird. Ausgewertet ist der Fall,
@@ -516,7 +536,9 @@ export default function App() {
   }, [schritt, ergebnis, ausgewertet]);
   const etappeErledigt = (id: Schritt) => (id === 'daten'
     ? datenErledigt(fallSchritte)
-    : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
+    : id === 'abschluss'
+      ? mitHaushalt.loesungen.length > 0
+      : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
   /** Ein offener Schritt der Leiste fuehrt an die Stelle, an der etwas fehlt. */
   const springeZu = (id: FallSchrittId) => {
     if (id === 'auswertung') { geheZu('ergebnis'); return; }
@@ -645,6 +667,16 @@ export default function App() {
   );
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
+  /*
+    In der Etappe „Abschluss“ rechnet auch die Fussleiste mit den gewaehlten
+    Loesungen — sonst stuende dort eine andere Luecke als im Titel darueber.
+    Dasselbe Jahr, also derselbe Kaufkraftfaktor.
+  */
+  const leisteMit = schritt === 'abschluss' && mitAnsicht && ergebnisMit && echteZeile
+    ? ergebnisMit.zeilen.find((z) => z.jahr === zeile.jahr) ?? null
+    : null;
+  const leiste = leisteMit ?? zeile;
+  const leisteLuecke = versorgungsluecke(leiste);
   // Das heutige Haushaltsnetto — die Bezugsgroesse fuer Sparrate und Beitraege.
   const nettoHeute = nettoHeuteMonat(ergebnis);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
@@ -656,6 +688,7 @@ export default function App() {
     { id: 'journey', text: '2. Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('ergebnis') },
     { id: 'journey', text: '3. Sparrechner', symbol: <Target className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('sparen') },
     { id: 'journey', text: '4. Vertrags-TÜV & Lösungen', symbol: <SearchCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('loesungen') },
+    { id: 'journey', text: '5. Abschluss', symbol: <ClipboardCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('abschluss') },
   ];
   const werkzeuge: Werkzeug[] = [
     {
@@ -995,6 +1028,9 @@ export default function App() {
         umfang={druckUmfang}
         einzelperson={einzeln ? personNameAus(szenario.personen, wer) : undefined}
         auftritt={auftritt}
+        mit={mitAnsicht}
+        ergebnisMit={ergebnisMit}
+        positionenMit={positionenMit}
       />
 
       {importMeldung && (
@@ -1355,9 +1391,36 @@ export default function App() {
             />
             <div id="tuev-bereich" role="tabpanel" aria-labelledby={`tuev-reiter-${tuevReiter}`}>
               {tuevReiter === 'loesungen'
-                ? <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
+                ? (
+                  <Loesungen
+                    zeile={ergebnis ? zeile : null}
+                    szenario={ansichtSzenario}
+                    sparrate={sparrate}
+                    nettoHeute={nettoHeute}
+                    onAnnehmen={() => geheZu('abschluss')}
+                  />
+                )
                 : <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />}
             </div>
+            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
+          </>
+        )}
+
+        {/* ---------- 5. ABSCHLUSS ---------- */}
+        {schritt === 'abschluss' && (
+          <>
+            <Abschluss
+              mit={mitAnsicht}
+              positionen={positionenMit}
+              ergebnisMit={ergebnisMit}
+              vorher={ergebnis ? zeile : null}
+              kaufkraftHeute={kaufkraftHeute}
+              onKaufkraftHeute={setKaufkraftHeute}
+              person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+              inhaberName={paar && !einzeln ? nameVon : undefined}
+              vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
+              onZuLoesungen={() => { setTuevReiter('loesungen'); geheZu('loesungen'); }}
+            />
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
           </>
         )}
@@ -1460,18 +1523,18 @@ export default function App() {
           {/* Ab der kleinen Breite stehen die Zahlen dicht als Rechnung beieinander, der Schalter rechts. */}
           <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6 sm:py-3">
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
-              <LeistenZahl etikett="Zielbedarf" wert={euro(zeile.zielNettoMonat * faktor)} />
+              <LeistenZahl etikett="Zielbedarf" wert={euro(leiste.zielNettoMonat * faktor)} />
               <span aria-hidden className="hidden text-lg text-ui-asche sm:block">−</span>
               <LeistenZahl
                 // Bis zur mittleren Breite kurz, sonst bricht die Beschriftung um und die Leiste wird hoeher.
-                etikett={<><span className="md:hidden">Netto</span><span className="hidden md:inline">Gesamt-Netto</span></>}
-                wert={euro(zeile.nettoMonat * faktor)}
+                etikett={<><span className="md:hidden">Netto</span><span className="hidden md:inline">{leisteMit ? 'Netto mit Lösungen' : 'Gesamt-Netto'}</span></>}
+                wert={euro(leiste.nettoMonat * faktor)}
               />
               <span aria-hidden className="hidden text-lg text-ui-asche sm:block">=</span>
               <LeistenZahl
                 dunkel
                 etikett={<><span className="md:hidden">Lücke</span><span className="hidden md:inline">Versorgungslücke</span></>}
-                wert={luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
+                wert={leisteLuecke > 0 ? euro(leisteLuecke * faktor) : 'Gedeckt'}
               />
 
               {/* In derselben Zeile wie die Zahlen, damit die Leiste nicht

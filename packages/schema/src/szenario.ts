@@ -527,6 +527,15 @@ export const loesungenSchema = z.object({
   agZuschussFestMonat: z.number().min(0).max(10_000).default(0),
   lebenserwartung: z.number().int().min(60).max(120).default(85),
   angebote: z.array(angebotSchema).max(12).default([]),
+  /**
+   * Die angenommenen Angebote, als IDs aus `angebote`. Mit „Lösungen
+   * annehmen“ werden aus Alternativen Entscheidungen: Die Etappe „Abschluss“
+   * rechnet sie GEMEINSAM ins Ergebnis. Eine ID ohne Angebot zaehlt nicht.
+   *
+   * Antragsangaben wie Bankverbindung oder Ausweiskopie gehoeren NICHT ins
+   * Szenario — es liegt im Browser und geht in jeden Export.
+   */
+  angenommen: z.array(z.string().min(1).max(64)).max(12).default([]),
 });
 
 export const szenarioSchema = z.object({

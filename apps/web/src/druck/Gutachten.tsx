@@ -7,7 +7,9 @@ import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
-import { tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen } from '../features/tuev-berechnung';
+import {
+  tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen, type AngebotPosition, type MitAngenommenen,
+} from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -26,6 +28,7 @@ import { Foerderung } from './Foerderung';
 import { Merkblatt } from './Merkblatt';
 import { TuevBogen } from './TuevBogen';
 import { Loesungsvergleich } from './Loesungsvergleich';
+import { MitLoesungen } from './MitLoesungen';
 
 /**
  * Das gedruckte Gutachten.
@@ -47,6 +50,7 @@ import { Loesungsvergleich } from './Loesungsvergleich';
  */
 export function Gutachten({
   szenario, ergebnis, zeile, umfang = 'ausfuehrlich', einzelperson, auftritt = null,
+  mit = null, ergebnisMit = null, positionenMit = [],
 }: {
   szenario: SzenarioParsed;
   ergebnis: ProjektionsErgebnis | null;
@@ -74,6 +78,16 @@ export function Gutachten({
    * Ueberschriften. Ohne Auftritt bleibt der Ausdruck wie bisher.
    */
   auftritt?: Auftritt | null;
+  /**
+   * Die angenommenen Loesungen der Ansicht und das Ergebnis mit ihnen
+   * (Etappe „Abschluss“). Mit beidem kommt die Seite „Ihr Ergebnis mit den
+   * gewählten Lösungen“ dazu, in beiden Umfaengen. Das Deckblatt bleibt
+   * beim heutigen Stand.
+   */
+  mit?: MitAngenommenen | null;
+  ergebnisMit?: ProjektionsErgebnis | null;
+  /** Was jede angenommene Loesung netto kostet (`angenommenePositionen`) */
+  positionenMit?: AngebotPosition[];
 }) {
   const lang = umfang === 'ausfuehrlich';
   const jetzt = new Date().getFullYear();
@@ -149,6 +163,13 @@ export function Gutachten({
 
   // Nur bei Ehepaaren: sonst stuende auf der Seite alles bei einer Person.
   const beidePartner = h.verheiratet && szenario.personen.length > 1;
+
+  // Das Ergebnis mit den gewaehlten Loesungen — im selben Jahr wie die Renteneinkuenfte.
+  const zeileMit = ergebnisMit
+    ? ergebnisMit.zeilen.find((z) => z.jahr === zeile.jahr)
+      ?? ergebnisMit.zeilen.find((z) => z.jahr === ergebnisMit.ruhestandsjahr)
+      ?? null
+    : null;
 
   /* Entscheidet ueber EINE oder ZWEI Grundlagenseiten — siehe unten. */
   const hatVertraege = szenario.vertraege.length > 0;
@@ -249,6 +270,27 @@ export function Gutachten({
     ...(ergebnis && beidePartner ? [{
       titel: [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`],
       knoten: <JePersonSeite zeile={zeile} szenario={szenario} />,
+    }] : []),
+
+    /*
+      DIREKT NACH DEM HEUTIGEN STAND, in beiden Umfaengen: erst, wo der
+      Kunde steht — dann, wo er mit den gewaehlten Loesungen steht. Der
+      Vergleich der Angebote als Alternativen folgt in der Langfassung weiter
+      hinten.
+    */
+    ...(ergebnis && mit && ergebnisMit && zeileMit ? [{
+      titel: ['Ihr Ergebnis mit den gewählten Lösungen'],
+      knoten: (
+        <MitLoesungen
+          vorher={zeile}
+          nachher={zeileMit}
+          ergebnisMit={ergebnisMit}
+          mit={mit}
+          positionen={positionenMit}
+          einzelperson={einzelperson}
+          inhaberName={beidePartner ? (id) => personNameAus(szenario.personen, id) : undefined}
+        />
+      ),
     }] : []),
 
     /*

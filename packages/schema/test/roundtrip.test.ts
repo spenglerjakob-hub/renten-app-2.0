@@ -46,6 +46,15 @@ describe('Abwaertskompatibilitaet', () => {
     expect(zurueck.ok && zurueck.szenario.loesungen).toMatchObject({ agZuschussArt: 'festbetrag', agZuschussFestMonat: 40 });
   });
 
+  it('liest Dateien ohne angenommene Lösungen ein — und behält sie über Export und Import', () => {
+    const r = importiere(JSON.stringify({ ...vollstaendig, loesungen: { nettoMonat: 150 } }));
+    expect(r.ok && r.szenario.loesungen.angenommen).toEqual([]);
+    if (!r.ok) return;
+    const mit = { ...r.szenario, loesungen: { ...r.szenario.loesungen, angenommen: ['a1', 'a2'] } };
+    const zurueck = importiere(exportiere(mit));
+    expect(zurueck.ok && zurueck.szenario.loesungen.angenommen).toEqual(['a1', 'a2']);
+  });
+
   it('liest Dateien ohne die Liste der offenen Angaben ein — sie bleibt undefiniert', () => {
     // Undefiniert heisst "unbekannt": Die Anwendung leitet die Marken dann ab.
     // Eine leere Liste hiesse "alles geprueft" — das waere eine Behauptung.
