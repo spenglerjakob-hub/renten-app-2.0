@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mitName, namensTeile, vollerName } from './namen';
+import { fallName, mitName, namensTeile, vollerName } from './namen';
 
 describe('vollerName', () => {
   it('setzt Vor- und Nachname zusammen', () => {
@@ -39,5 +39,31 @@ describe('namensTeile', () => {
 describe('mitName', () => {
   it('speichert die Teile und den ganzen Namen', () => {
     expect(mitName({ vorname: 'Anna', nachname: 'Beispiel' })).toEqual({ vorname: 'Anna', nachname: 'Beispiel', name: 'Anna Beispiel' });
+  });
+});
+
+describe('fallName', () => {
+  const p = (name: string, vorname = '', nachname = '') => ({ name, vorname, nachname });
+
+  it('eine Person: der ganze Name', () => {
+    expect(fallName([p('Max Mustermann', 'Max', 'Mustermann')])).toBe('Max Mustermann');
+    // Aus der Zeit vor den getrennten Feldern: nur der ganze Name
+    expect(fallName([p('Max  Mustermann')])).toBe('Max Mustermann');
+  });
+
+  it('ein Paar mit gleichem Nachnamen: der Nachname einmal', () => {
+    expect(fallName([p('Max Mustermann', 'Max', 'Mustermann'), p('Erika Mustermann', 'Erika', 'Mustermann')]))
+      .toBe('Max und Erika Mustermann');
+  });
+
+  it('verschiedene Nachnamen oder nur ein Teil: beide ganz', () => {
+    expect(fallName([p('Max Mustermann', 'Max', 'Mustermann'), p('Erika Schmidt', 'Erika', 'Schmidt')]))
+      .toBe('Max Mustermann und Erika Schmidt');
+    expect(fallName([p('Max', 'Max', ''), p('Erika', 'Erika', '')])).toBe('Max und Erika');
+  });
+
+  it('ohne Namen leer — Platzhalter gehören nicht in den Plannamen', () => {
+    expect(fallName([p(''), p('  ')])).toBe('');
+    expect(fallName([p(''), p('Erika Mustermann', 'Erika', 'Mustermann')])).toBe('Erika Mustermann');
   });
 });

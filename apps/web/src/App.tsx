@@ -61,7 +61,7 @@ import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seiten
 import { Dialog } from './components/Dialog';
 import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
 import { RechtsLinks } from './components/RechtsLinks';
-import { personName, personNameAus } from './features/personen';
+import { fallNameAus, personName, personNameAus } from './features/personen';
 import { AkkordeonKarte, euro } from './components/Feld';
 import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
 
@@ -511,9 +511,7 @@ export default function App() {
   */
   const antragLoesungen = useMemo(() => antragLoesungenAus(mitHaushalt.loesungen, nameVon), [mitHaushalt, nameVon]);
   const kundeVorschlag = useMemo(
-    () => szenario.personen
-      .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
-      .map((p) => p.name.trim()).filter(Boolean).join(' und '),
+    () => fallNameAus(szenario.personen, szenario.haushalt.verheiratet),
     [szenario.personen, szenario.haushalt.verheiratet],
   );
   const fallSchritte = useMemo(

@@ -30,6 +30,25 @@ export function namensTeile(name: string, vorname = '', nachname = ''): NamensTe
   return { vorname: woerter.slice(0, -1).join(' '), nachname: woerter[woerter.length - 1] ?? '' };
 }
 
+/**
+ * Der Name eines Falls aus den Personen im Haushalt — vorgeschlagen beim
+ * Speichern des Plans und als Kunde im Antrag: „Max Mustermann“; ein Paar
+ * mit gleichem Nachnamen „Max und Erika Mustermann“, sonst beide ganz.
+ * Leer, solange niemand einen Namen hat.
+ */
+export function fallName(personen: readonly { name: string; vorname?: string; nachname?: string }[]): string {
+  const rein = (s: string) => s.trim().replace(/\s+/g, ' ');
+  const teile = personen
+    .map((p) => namensTeile(p.name, p.vorname ?? '', p.nachname ?? ''))
+    .map((t) => ({ vorname: rein(t.vorname), nachname: rein(t.nachname) }))
+    .filter((t) => t.vorname || t.nachname);
+  const [a, b] = teile;
+  if (teile.length === 2 && a && b && a.vorname && b.vorname && a.nachname && a.nachname === b.nachname) {
+    return `${a.vorname} und ${b.vorname} ${a.nachname}`;
+  }
+  return teile.map(vollerName).join(' und ');
+}
+
 /** Was eine Eingabe in die beiden Felder speichert: die Teile und den ganzen Namen dazu. */
 export function mitName(teile: NamensTeile): NamensTeile & { name: string } {
   return { ...teile, name: vollerName(teile) };
