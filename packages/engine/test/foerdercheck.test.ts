@@ -162,6 +162,18 @@ describe('Fördercheck — betriebliche Altersvorsorge', () => {
   });
 });
 
+describe('Fördercheck — Ansprache', () => {
+  it('ohne Angabe per Sie, im Rechner per Du — dieselben Zahlen', () => {
+    const sie = bav(angestellt)!;
+    const du = bav({ ...angestellt, ansprache: 'du' })!;
+    expect(sie.text).toMatch(/^Sie (wandeln|nutzen)/);
+    expect(du.text).toMatch(/^Du (wandelst|nutzt)/);
+    expect(du.hinweis!).toContain('Auf sie zahlst du volle Sozialabgaben');
+    expect(`${du.text} ${du.hinweis}`).not.toMatch(/\b(Sie|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres|Ihnen)\b/);
+    expect(du.rahmenMonat).toBe(sie.rahmenMonat);
+  });
+});
+
 describe('Fördercheck — Basisrente', () => {
   /*
     Selbststaendig, ohne Rentenversicherungspflicht — der klassische Fall.
@@ -183,6 +195,8 @@ describe('Fördercheck — Basisrente', () => {
     expect(b).not.toBeNull();
     expect(b!.rahmenMonat).toBeCloseTo(p.hoechstbetragAltersvorsorge / 12, 6);
     expect(b!.text).toContain('unverbraucht');
+    const du = basis({ ...selbst, ansprache: 'du' });
+    expect(du!.text).toMatch(/^Dein Höchstbetrag .* Du zahlst nicht in die gesetzliche Rentenversicherung ein/);
   });
 
   it('kürzt den Rahmen um den eigenen Beitrag', () => {

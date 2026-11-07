@@ -726,6 +726,16 @@ describe('Entgeltumwandlung bei privater Krankenversicherung', () => {
     expect(r.hinweise.join(' ')).not.toContain('§ 257 SGB V');
   });
 
+  it('spricht im Rechner per Du an — ohne Angabe per Sie', () => {
+    const basis = { jahresbrutto: 40_000, zveHeute: 30_000, privatVersichert: true, pkvPraemieMonat: 800 };
+    const sie = bav(kontext(basis)).hinweise.join(' ');
+    const du = bav(kontext({ ...basis, ansprache: 'du' })).hinweise.join(' ');
+    expect(sie).toContain('Sie sind privat krankenversichert: Ihre Prämie');
+    expect(du).toContain('Du bist privat krankenversichert: Deine Prämie');
+    expect(du).toContain('der Zuschuss deines Arbeitgebers');
+    expect(du).not.toMatch(/\b(Sie|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres|Ihnen)\b/);
+  });
+
   it('laesst einen Beamten bei null, ob privat versichert oder nicht', () => {
     for (const privatVersichert of [true, false]) {
       const r = bav(kontext({ beamter: true, privatVersichert, pkvPraemieMonat: 400 }));

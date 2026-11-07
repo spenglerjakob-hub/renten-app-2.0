@@ -212,8 +212,10 @@ function stammKontext(
   basis: ReturnType<typeof tuevBasis>,
   erwerb: ErwerbsPersonHeute | undefined,
 ): Pick<TuevKontext, 'jahresbrutto' | 'zveHeute' | 'beamter' | 'privatVersichert' | 'pkvPraemieMonat'
-  | 'selbststaendig' | 'grvBeitragJahr'> {
+  | 'selbststaendig' | 'grvBeitragJahr' | 'ansprache'> {
   return {
+    // Der Rechner spricht den Kunden per Du an — auch in den Hinweisen des Rechenkerns.
+    ansprache: 'du',
     /*
       DAS zvE KOMMT VOM HAUSHALT, BRUTTO UND ERWERBSART VOM INHABER.
       Die Einkommensteuer wird bei Verheirateten gemeinsam veranlagt —
@@ -574,6 +576,8 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
       kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
     },
     kontext: {
+      // Die Befunde per Du, wie der ganze Rechner
+      ansprache: 'du',
       jahresbrutto: basis.jahresbrutto,
       zveHeute: basis.zve,
       /*
