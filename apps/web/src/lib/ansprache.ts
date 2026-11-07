@@ -47,9 +47,21 @@ export interface AnspracheWoerter {
   w: (du: string, ihr?: string, sie?: string) => string;
   /** Der Satzanfang eines Kernsatzes: „Max, dir“ — ohne Namen (und beim Sie) „Dir“. */
   anrede: (anfang: string) => string;
+  /**
+   * Fuer Angaben, die nur eine Person betreffen (ihr Einkommen, ihre
+   * Krankenversicherung): auch beim Paar „du“.
+   */
+  einzeln: AnspracheWoerter;
 }
 
 export function woerter(a: Ansprache): AnspracheWoerter {
+  const w = grundwoerter(a) as AnspracheWoerter;
+  // Einmal tief: Die Einzelform einer Einzelform ist sie selbst.
+  w.einzeln = a.mehrere ? woerter({ ...a, mehrere: false, name: '' }) : w;
+  return w;
+}
+
+function grundwoerter(a: Ansprache): Omit<AnspracheWoerter, 'einzeln'> {
   const sie = a.form === 'sie';
   const m = a.mehrere;
   const du = sie ? 'Sie' : m ? 'ihr' : 'du';

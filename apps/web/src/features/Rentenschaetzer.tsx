@@ -6,6 +6,7 @@ import {
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, euro } from '../components/Feld';
 import { KNOPF_ZWEIT } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * KARRIERE-SCHAETZER
@@ -24,6 +25,8 @@ import { KNOPF_ZWEIT } from '../components/stil';
  */
 export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   const person = useSzenario((s) => s.szenario.personen.find((p) => p.id === personId));
+  // Die Angaben einer Person: auch beim Paar „du“
+  const t = useAnsprache().einzeln;
   const tarifIndex = useSzenario((s) => s.szenario.annahmen.tarifIndex);
   const einkommen = useSzenario((s) => s.szenario.einkommenHeute);
   const setzePerson = useSzenario((s) => s.setzePerson);
@@ -54,9 +57,9 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
     return (
       <div className="sm:col-span-2">
         <p className="ui-innen p-3 text-xs leading-relaxed text-ui-schiefer">
-          Sie zahlen nach Ihren Angaben nicht in die gesetzliche Rentenversicherung ein — es
+          {t.Du} {t.w('zahlst', 'zahlt', 'zahlen')} nach {t.dein('en')} Angaben nicht in die gesetzliche Rentenversicherung ein — es
           gibt hier also nichts zu schätzen. Ein Anspruch aus früheren Beitragsjahren steht in
-          Ihrer Renteninformation und gehört in das Feld darüber.
+          {' '}{t.dein('er')} Renteninformation und gehört in das Feld darüber.
         </p>
       </div>
     );
@@ -100,7 +103,7 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
             onChange={setGehalt}
             einheit="€"
             hilfe={selbststaendig
-              ? `Aus Ihrem Beitrag zurückgerechnet (${euro(einkommen.grvBeitragMonat)} im Monat geteilt durch den Beitragssatz).`
+              ? `Aus ${t.dein('em')} Beitrag zurückgerechnet (${euro(einkommen.grvBeitragMonat)} im Monat geteilt durch den Beitragssatz).`
               : undefined}
           />
 

@@ -20,6 +20,12 @@ describe('woerter', () => {
     expect(ihr.w('hast')).toBe('hast');
   });
 
+  it('Angaben einer Person: auch beim Paar „du“, beim Sie unveraendert', () => {
+    expect([ihr.einzeln.du, ihr.einzeln.dein('en'), ihr.einzeln.w('trägst', 'tragt')]).toEqual(['du', 'deinen', 'trägst']);
+    expect(du.einzeln).toBe(du);
+    expect([sie.einzeln.du, sie.einzeln.dein('en')]).toEqual(['Sie', 'Ihren']);
+  });
+
   it('der Kernsatz beginnt mit dem Vornamen — ohne Namen und beim Sie gross', () => {
     expect(du.anrede('dir')).toBe('Max, dir');
     expect(ihr.anrede('euch')).toBe('Max und Erika, euch');

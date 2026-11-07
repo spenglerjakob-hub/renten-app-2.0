@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { projiziere, versorgungsluecke, type Szenario } from '@renten/engine';
 import { euro } from '../components/Feld';
+import { useAnsprache } from '../components/Ansprache';
 import type { SzenarioParsed } from '../store/szenario';
 
 /**
@@ -17,6 +18,7 @@ import type { SzenarioParsed } from '../store/szenario';
  * sich auf einem Klon ein zweites Mal aufrufen.
  */
 export function KvdrHinweis({ szenario }: { szenario: SzenarioParsed }) {
+  const t = useAnsprache();
   const unterschied = useMemo(() => {
     const rechne = (kvStatus: 'kvdr' | 'freiwillig') => {
       /*
@@ -57,13 +59,13 @@ export function KvdrHinweis({ szenario }: { szenario: SzenarioParsed }) {
         <strong>Die KVdR ist eine Annahme, keine Selbstverständlichkeit.</strong> In sie kommt
         nur, wer in der zweiten Hälfte seines Erwerbslebens zu neun Zehnteln gesetzlich versichert
         war — eine freiwillige Mitgliedschaft zählt dabei mit. Wird die Zeit nicht erreicht,
-        bleiben Sie im Alter freiwillig versichert, und dann sind{' '}
-        <strong>alle</strong> Ihre Einkünfte beitragspflichtig, auch eine Rürup- oder Privatrente.
+        {t.w('bleibst du', 'bleibt ihr')} im Alter freiwillig versichert, und dann sind{' '}
+        <strong>alle</strong> {t.dein('e')} Einkünfte beitragspflichtig, auch eine Rürup- oder Privatrente.
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-ui-tinte/80">
-        In Ihrem Fall wären das{' '}
+        In {t.dein('em')} Fall wären das{' '}
         <strong>{euro(unterschied.kvPvOhne)} statt {euro(unterschied.kvPvMit)}</strong> im Monat —
-        ein Unterschied von <strong>{euro(unterschied.mehr)}</strong>, um den Ihre
+        ein Unterschied von <strong>{euro(unterschied.mehr)}</strong>, um den {t.dein('e')}
         Versorgungslücke wachsen würde.
       </p>
     </div>

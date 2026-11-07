@@ -5,6 +5,7 @@ import {
 import type { SzenarioParsed } from '../store/szenario';
 import { ZahlFeld, AuswahlFeld, Schalter, euro, type Vorbelegt } from '../components/Feld';
 import { Hinweis } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 const laenderOptionen = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
 
@@ -39,6 +40,8 @@ export function EinkommenFelder({
   marke?: (feld: 'modus' | 'betrag' | 'auszahlungen') => Vorbelegt | undefined;
 }) {
   const belegt = besoldungstabelle(wert.besoldungsland, new Date().getFullYear()).belegt;
+  // Das Einkommen einer Person: auch beim Paar „du“. Ohne Ansprache (Vorsorge-Check) wie bisher per Sie.
+  const t = useAnsprache().einzeln;
 
   return (
     <>
@@ -82,7 +85,7 @@ export function EinkommenFelder({
               onChange={(n) => onChange({ betrag: n })} einheit="€"
               vorbelegt={marke?.('betrag')}
               hilfe={wert.modus === 'netto'
-                ? 'Das Netto der Gehaltsabrechnung hängt von der Steuerklasse ab. Bei III/V oder Faktorverfahren tragen Sie besser das Brutto ein.'
+                ? `Das Netto der Gehaltsabrechnung hängt von der Steuerklasse ab. Bei III/V oder Faktorverfahren ${t.w('besser das Brutto eintragen', undefined, 'tragen Sie besser das Brutto ein')}.`
                 : undefined} />
             <AuswahlFeld
               label="Auszahlungen pro Jahr"
@@ -140,7 +143,7 @@ export function EinkommenFelder({
                 wert={wert.grvBeitragMonat}
                 onChange={(n) => onChange({ grvBeitragMonat: n })}
                 einheit="€"
-                hilfe={`Sie tragen ihn allein — es gibt keinen Arbeitgeberanteil. Voller Satz auf Ihren Gewinn wären ${euro(vorschlagBeitragMonat(wert.betrag))}.`}
+                hilfe={`${t.w('Du trägst', undefined, 'Sie tragen')} ihn allein — es gibt keinen Arbeitgeberanteil. Voller Satz auf ${t.dein('en')} Gewinn wären ${euro(vorschlagBeitragMonat(wert.betrag))}.`}
               />
             </div>
           ) : (

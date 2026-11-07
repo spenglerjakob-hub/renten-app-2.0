@@ -4,6 +4,7 @@ import type { ProjektionsErgebnis, Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
 import { useSzenario } from '../store/szenario';
 import { personNameAus } from './personen';
+import { useAnsprache } from '../components/Ansprache';
 
 /** Eine Kennzahl der Engine: leises Etikett, die Zahl, darunter was sie bedeutet — einfarbig. */
 function Kachel({ titel, wert, erklaerung }: { titel: string; wert: string; erklaerung: string }) {
@@ -29,6 +30,7 @@ export function SteuerEngine({
   faktor: number;
 }) {
   const [offen, setOffen] = useState(false);
+  const t = useAnsprache();
   // Der Selektor darf NICHTS erzeugen: `personen` ist eine stabile Referenz,
   // ein neues Array bei jedem Aufruf hielte zustand fuer eine Aenderung und
   // rendert endlos (React-Fehler #185, siehe Vertraege.tsx).
@@ -78,7 +80,7 @@ export function SteuerEngine({
             <Kachel
               titel="Durchschnittssteuer"
               wert={prozent(zeile.durchschnittssatz)}
-              erklaerung="Ihre reale prozentuale Belastung"
+              erklaerung={`${t.Dein('e')} reale prozentuale Belastung`}
             />
             <Kachel
               titel="Grenzsteuersatz"

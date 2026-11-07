@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import {
-  auszeichnungen, ohneEigenaufwand, LOESUNG_KURZ, OHNE_EIGENAUFWAND_TEXT, type AngebotPosition,
+  auszeichnungen, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText, type AngebotPosition,
 } from '../features/tuev-berechnung';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
@@ -278,7 +278,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
             </Fragment>
           ))}
           {besteAngebote.length > 0 && <Text>★ die höchste Nettorendite.</Text>}
-          {gerechnet.some(ohneAufwand) && <Text>{OHNE_EIGENAUFWAND_TEXT}</Text>}
+          {gerechnet.some(ohneAufwand) && <Text>{ohneEigenaufwandText()}</Text>}
           <Text>
             Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet
             {mitRenteneinkuenften ? ', wie auf der Seite zu den Renteneinkünften. ' : '. '}Eine Kapitalabfindung ist im Jahr des Zuflusses voll zu versteuern (bAV) bzw.
