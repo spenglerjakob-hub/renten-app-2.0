@@ -84,6 +84,11 @@ export function ibanGueltig(iban: string): boolean {
  * so von Anfang an bis 22. Geschützte Leerzeichen halten die Zahl bei ihrem
  * Wort — am Telefon stand sonst „18.“ allein in der nächsten Zeile. Die Sätze
  * passen auf die Kundenseite („Sie“) wie zum Berater.
+ *
+ * Der Prüfziffer-Satz sagt, was die Prüfziffer ist: Eine ausgedachte IBAN mit
+ * richtiger Länge fällt hier fast immer durch (sie passt nur etwa 1 zu 97), und
+ * „Prüfziffer stimmt nicht“ allein ließ ratlos, wenn die Länge doch stimmte.
+ * Ohne Klammern — der Antragsbogen setzt die Meldung schon in welche.
  */
 export function ibanFehler(iban: string): string | null {
   const v = ibanBereinigt(iban);
@@ -101,7 +106,12 @@ export function ibanFehler(iban: string): string | null {
   } else if (v.length < 15 || v.length > 34) {
     return `Eine IBAN hat 15 bis 34\u00a0Stellen — ${hier}.`;
   }
-  return ibanGueltig(v) ? null : 'Die Prüfziffer stimmt nicht — bitte die IBAN Stelle für Stelle vergleichen.';
+  if (ibanGueltig(v)) return null;
+  return v.startsWith('DE')
+    ? 'Die Prüfziffer stimmt nicht: Die zwei Ziffern nach „DE“ passen nicht zu Bankleitzahl und Kontonummer. '
+      + 'Bitte Stelle für Stelle vergleichen.'
+    : 'Die Prüfziffer stimmt nicht: Die zwei Ziffern nach dem Länderkürzel passen nicht zum Rest der IBAN. '
+      + 'Bitte Stelle für Stelle vergleichen.';
 }
 
 /** In Vierergruppen, wie auf der Bankkarte: „DE89 3704 0044 0532 0130 00“. */

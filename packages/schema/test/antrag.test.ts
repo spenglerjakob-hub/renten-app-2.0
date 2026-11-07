@@ -30,6 +30,11 @@ describe('IBAN', () => {
     expect(ibanFormatiert('de89370400440532013000')).toBe('DE89 3704 0044 0532 0130 00');
   });
 
+  const PRUEFZIFFER_DE = 'Die Prüfziffer stimmt nicht: Die zwei Ziffern nach „DE“ passen nicht zu Bankleitzahl und Kontonummer. '
+    + 'Bitte Stelle für Stelle vergleichen.';
+  const PRUEFZIFFER_ANDERE = 'Die Prüfziffer stimmt nicht: Die zwei Ziffern nach dem Länderkürzel passen nicht zum Rest der IBAN. '
+    + 'Bitte Stelle für Stelle vergleichen.';
+
   it('die Meldung nennt die Ursache — zu kurz ist nicht „Prüfziffer“', () => {
     // Der Fall vom Bildschirmfoto: 18 statt 22 Stellen
     expect(ibanFehler('DE23 6605 5555 5555 54')).toBe('Eine deutsche IBAN hat 22\u00a0Stellen — hier sind es\u00a018.');
@@ -37,13 +42,15 @@ describe('IBAN', () => {
     // Beim Tippen zählt sie mit, schon ab dem „D“
     expect(ibanFehler('d')).toBe('Eine deutsche IBAN hat 22\u00a0Stellen — hier ist es eine.');
     expect(ibanFehler('DE89 37')).toBe('Eine deutsche IBAN hat 22\u00a0Stellen — hier sind es\u00a06.');
-    expect(ibanFehler('DE89 3704 0044 0532 0130 01')).toBe('Die Prüfziffer stimmt nicht — bitte die IBAN Stelle für Stelle vergleichen.');
+    expect(ibanFehler('DE89 3704 0044 0532 0130 01')).toBe(PRUEFZIFFER_DE);
+    // Ausgedacht, aber 22 Stellen: Die Prüfziffer passt nur zufällig
+    expect(ibanFehler('DE23 6605 5555 5555 5555 54')).toBe(PRUEFZIFFER_DE);
     expect(ibanFehler('DE89 37O4 0044 0532 0130 00')).toBe('Nach „DE“ folgen nur Ziffern — steht irgendwo ein O statt einer 0?');
     expect(ibanFehler('DE89-3704-0044-0532-0130-00')).toBe('Eine IBAN besteht nur aus Buchstaben und Ziffern.');
     expect(ibanFehler('3704 0044 0532 0130 00')).toBe('Eine IBAN beginnt mit dem Länderkürzel und zwei Ziffern, etwa „DE12“.');
     expect(ibanFehler('DEX9')).toBe('Eine IBAN beginnt mit dem Länderkürzel und zwei Ziffern, etwa „DE12“.');
     expect(ibanFehler('AT61 1904 3002')).toBe('Eine IBAN hat 15 bis 34\u00a0Stellen — hier sind es\u00a012.');
-    expect(ibanFehler('AT61 1904 3002 3457 3202')).toBe('Die Prüfziffer stimmt nicht — bitte die IBAN Stelle für Stelle vergleichen.');
+    expect(ibanFehler('AT61 1904 3002 3457 3202')).toBe(PRUEFZIFFER_ANDERE);
     // Gültig oder leer: keine Meldung
     expect(ibanFehler('de89 3704 0044 0532 0130 00')).toBeNull();
     expect(ibanFehler('GB82 WEST 1234 5698 7654 32')).toBeNull();

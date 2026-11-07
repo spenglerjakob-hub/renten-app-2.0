@@ -76,7 +76,8 @@ describe('Antragsbogen', () => {
     const mit = (iban: string) => antragsbogenHtml({ ...daten, angaben: { ...daten.angaben, bank: { inhaber: 'Max', iban } } });
     expect(mit('DE23 6605 5555 5555 54')).toContain(
       'DE23 6605 5555 5555 54 <span class="leer">(Eine deutsche IBAN hat 22\u00a0Stellen — hier sind es\u00a018.)</span>');
-    expect(mit('DE89 3704 0044 0532 0130 01')).toContain('(Die Prüfziffer stimmt nicht');
+    expect(mit('DE89 3704 0044 0532 0130 01')).toContain('(Die Prüfziffer stimmt nicht: Die zwei Ziffern nach „DE“');
+    expect(mit('DE89 3704 0044 0532 0130 01')).not.toMatch(/\(\(|\)\)|\([^()]*\(/);
     expect(mit('')).toContain('<td class="wert"><span class="leer">noch offen</span></td>');
     expect(antragsbogenHtml(daten)).not.toMatch(/Prüfziffer|Stellen —/);
   });
