@@ -2,9 +2,10 @@ import { euro, prozent } from '../components/Feld';
 import type { SparzielErgebnis, SparzielEingaben } from '../features/sparziel-berechnung';
 import { Seite, Untertitel, Tabelle, Zeile, GrosseZahl, Text } from './Bausteine';
 import { anteilAmNetto } from '../features/bezug';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
- * "Was Sie jetzt tun koennen" — die Luecke als Monatsbetrag.
+ * Was jetzt zu tun ist — die Luecke als Monatsbetrag.
  *
  * Das Gutachten stellte bisher nur fest, DASS eine Luecke besteht. Diese
  * Seite beantwortet die Frage, die der Leser danach hat: was muss ich
@@ -21,12 +22,13 @@ export function Sparziel({
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Startbeitrag */
   nettoHeute?: number;
 }) {
+  const an = useAnsprache();
   const r = ergebnis;
   const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
 
   return (
     <Seite
-      titel="Was Sie jetzt tun können"
+      titel={`Was ${an.du} jetzt tun ${an.w('kannst', 'könnt', 'können')}`}
       nummer={`Bei ${prozent(eingaben.rendite)} Rendite nach Kosten`}
     >
       <div className="grid grid-cols-3 gap-3">
@@ -41,7 +43,7 @@ export function Sparziel({
           hinweis={`bei Rentenbeginn, für ${eingaben.auszahldauer} Jahre`}
         />
         <GrosseZahl
-          titel="Ihr Startbeitrag"
+          titel={`${an.Dein()} Startbeitrag`}
           wert={euro(r.gewaehlt.startbeitrag)}
           ton="gut"
           hinweis={`im Monat, ${r.jahreBisRente} Jahre lang`}
@@ -49,7 +51,7 @@ export function Sparziel({
       </div>
       {anteil && (
         <Text>
-          Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind <strong>{anteil}</strong> Ihres heutigen
+          Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind <strong>{anteil}</strong> {an.dein('es')} heutigen
           Haushaltsnettos von {euro(nettoHeute)} im Monat.
         </Text>
       )}
@@ -62,7 +64,7 @@ export function Sparziel({
       <Untertitel>Mit oder ohne Beitragsdynamik</Untertitel>
       <Tabelle
         kopf={[
-          'Ihr Beitrag steigt jährlich um',
+          `${an.Dein()} Beitrag steigt jährlich um`,
           'Start heute',
           'Im letzten Sparjahr',
           'Summe aller Beiträge',
@@ -104,7 +106,7 @@ export function Sparziel({
           <Untertitel>Was es kostet, damit zu warten</Untertitel>
           <Tabelle
             kopf={[
-              'Wenn Sie beginnen',
+              `Wenn ${an.du} ${an.w('beginnst', 'beginnt', 'beginnen')}`,
               'Sparjahre',
               'Startbeitrag',
               'Summe aller Beiträge',
@@ -181,7 +183,7 @@ export function Sparziel({
       <Text>
         Diese Seite nennt eine <strong>Größenordnung</strong>, keine Produktempfehlung. Welcher
         Weg dorthin der richtige ist — geförderte Vorsorge, betriebliche Lösung oder freies
-        Sparen — hängt an Ihrer Steuerlast, Ihrem Arbeitgeber und Ihrer Lebensplanung und gehört
+        Sparen — hängt an {an.dein('er')} Steuerlast, {an.dein('em')} Arbeitgeber und {an.dein('er')} Lebensplanung und gehört
         ins persönliche Gespräch.
       </Text>
     </Seite>

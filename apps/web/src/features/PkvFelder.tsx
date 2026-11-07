@@ -8,6 +8,7 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
  */
 export type PkvFelderWert = SzenarioParsed['haushalt']['pkv'];
 import { ZahlFeld, ProzentFeld, Schalter, type Vorbelegt } from '../components/Feld';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * Die Eingaben zur privaten Krankenversicherung.
@@ -53,13 +54,15 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
     (onChange ? onChange(p) : setzeHaushalt({ pkv: p }));
 
   const setze = (teil: Partial<typeof pkv>) => schreibe({ ...pkv, ...teil });
+  // Die Versicherung einer Person: auch beim Paar „du“. Ohne Ansprache (Vorsorge-Check) wie bisher per Sie.
+  const t = useAnsprache().einzeln;
   const setzeBet = (teil: Partial<typeof pkv.bet>) =>
     schreibe({ ...pkv, bet: { ...pkv.bet, ...teil } });
 
   return (
     <div className="ui-innen mt-4 p-3 sm:p-4">
       <p className="mb-3 text-xs font-medium text-ui-tinte">
-        {titel ?? 'Ihre private Krankenversicherung'}
+        {titel ?? `${t.Dein('e')} private Krankenversicherung`}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -76,8 +79,8 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
           einheit="€"
           vorbelegt={vorbelegt}
           hilfe={pkv.bet.aktiv
-            ? 'Alles zusammen, wie auf Ihrer Rechnung — Kranken-, Pflege- und Entlastungstarif.'
-            : 'Kranken- und Pflegeversicherung zusammen, wie Sie ihn heute zahlen.'}
+            ? `Alles zusammen, wie auf ${t.dein('er')} Rechnung — Kranken-, Pflege- und Entlastungstarif.`
+            : `Kranken- und Pflegeversicherung zusammen, wie ${t.w('du ihn heute zahlst', undefined, 'Sie ihn heute zahlen')}.`}
         />
         {!einfach && (
           <>
@@ -113,7 +116,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
           onChange={(b) => setze({ zuschlagEnthalten: b })}
         />
         <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-          Er wird bis zum Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}. Geburtstags erhoben und entfällt
+          Er wird bis zum Kalenderjahr {t.dein('es')} {ZUSCHLAG_BIS_ALTER}. Geburtstags erhoben und entfällt
           danach (§ 149 VAG) — der Beitrag sinkt dann einmalig um gut 9 %. Wer die Grenze schon
           überschritten hat, lässt den Haken weg.
         </p>
@@ -187,9 +190,19 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
             {pkv.bet.beitragMonat > pkv.praemieMonat && (
               /* Ein Eingabefehler, kein Hinweis — deshalb rot. */
               <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-900">
-                Der Entlastungstarif ist größer als der Gesamtbeitrag oben. Tragen Sie oben den
-                <strong className="font-medium"> vollen </strong> Beitrag ein — Kranken-, Pflege- und Entlastungstarif
-                zusammen.
+                {t.form === 'sie' ? (
+                  <>
+                    Der Entlastungstarif ist größer als der Gesamtbeitrag oben. Tragen Sie oben den
+                    <strong className="font-medium"> vollen </strong> Beitrag ein — Kranken-, Pflege- und Entlastungstarif
+                    zusammen.
+                  </>
+                ) : (
+                  <>
+                    Der Entlastungstarif ist größer als der Gesamtbeitrag oben. Oben den
+                    <strong className="font-medium"> vollen </strong> Beitrag eintragen — Kranken-, Pflege- und Entlastungstarif
+                    zusammen.
+                  </>
+                )}
               </p>
             )}
           </>

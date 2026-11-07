@@ -1,7 +1,8 @@
 import { versorgungsluecke, type Jahreszeile } from '@renten/engine';
 import { euro } from '../components/Feld';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
-import { LueckenRing, ZIEL_RING } from '../components/LueckenRing';
+import { useAnsprache } from '../components/Ansprache';
+import { LueckenRing } from '../components/LueckenRing';
 import { EINLEITUNG, Hervor, Kernsatz, SCHWEBEND, Titel, Zahl } from '../components/stil';
 
 /*
@@ -46,17 +47,19 @@ export function ErgebnisKopf({ zeile, kaufkraftHeute, onKaufkraftHeute }: {
   onKaufkraftHeute: (b: boolean) => void;
 }) {
   const { f, luecke } = betraege(zeile, kaufkraftHeute);
+  const t = useAnsprache();
   return (
     <div>
+      {/* Der Kernsatz mit dem Vornamen vorn: „Max, dir fehlen …“ — ohne Namen „Dir fehlen …“. */}
       <Titel gross als="h2">
         {luecke > 0
-          ? <>Im Ruhestand fehlen <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(luecke * f)}</Hervor></span> im Monat</>
-          : <>Ihr Ziel ist <Hervor>gedeckt</Hervor></>}
+          ? <>{t.anrede(t.dir)} fehlen im Ruhestand <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(luecke * f)}</Hervor></span> im Monat</>
+          : <>{t.anrede(t.dein())} Ziel ist <Hervor>gedeckt</Hervor></>}
       </Titel>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <p className={`${EINLEITUNG} min-w-0 flex-1 basis-72`}>
-          Was Ihnen im Jahr {zeile.jahr} netto bleibt — nach Steuern und Kranken- und Pflegeversicherung —
-          und wie groß die Lücke zu Ihrem Ziel ist{kaufkraftHeute ? ', in heutiger Kaufkraft.' : `, nominal im Geld des Jahres ${zeile.jahr}.`}
+          Was {t.dir} im Jahr {zeile.jahr} netto bleibt — nach Steuern und Kranken- und Pflegeversicherung —
+          und wie groß die Lücke zu {t.dein('em')} Ziel ist{kaufkraftHeute ? ', in heutiger Kaufkraft.' : `, nominal im Geld des Jahres ${zeile.jahr}.`}
         </p>
         <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} />
       </div>
@@ -79,6 +82,7 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
   const ziel = zeile.zielNettoMonat * f;
   const netto = zeile.nettoMonat * f;
   const teil = vorher ? neuerTeil(zeile, vorher) : null;
+  const t = useAnsprache();
   // Im Ring hoechstens bis zum Ziel: Betrag und Anteil des blauen Bogens am Ganzen.
   const deckungVorher = vorher && zeile.zielNettoMonat > 0 ? Math.round((vorher.nettoMonat / zeile.zielNettoMonat) * 100) : 0;
   const neuImRing = teil && teil.imRing > 0
@@ -91,7 +95,7 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
       <div className="flex flex-col items-center gap-6">
         <LueckenRing
           ganz={ziel} gedeckt={Math.min(netto, ziel)} luecke={luecke * f}
-          gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={ZIEL_RING}
+          gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={{ ganz: 'Ziel', mitte: `${t.Dein()} Ziel`, gedeckt: 'Netto im Ruhestand' }}
           neu={neuImRing}
         />
         <dl className="grid w-full gap-4 sm:grid-cols-2">
@@ -115,8 +119,8 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
       </div>
       <Kernsatz klasse="mt-6">
         {deckung < 100
-          ? <>Das Netto deckt <Hervor>{deckung} %</Hervor> des Ziels.</>
-          : <>Das Netto erreicht <Hervor>{deckung} %</Hervor> des Ziels.</>}
+          ? <>{t.Dein()} Netto deckt <Hervor>{deckung} %</Hervor> {t.dein('es')} Ziels.</>
+          : <>{t.Dein()} Netto erreicht <Hervor>{deckung} %</Hervor> {t.dein('es')} Ziels.</>}
       </Kernsatz>
       <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
         {kaufkraftHeute ? `Im Geld des Jahres ${zeile.jahr}` : 'In heutiger Kaufkraft'}: Netto {euro(zeile.nettoMonat * g)} und

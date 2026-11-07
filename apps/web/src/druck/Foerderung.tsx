@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import { Seite, Text } from './Bausteine';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * „Förderung, die Sie nicht nutzen" — der Fördercheck als eigene Seite.
@@ -29,16 +30,17 @@ export function Foerderung({
   /** Rendite nach Kosten fuer die Hochrechnung — dieselbe wie beim Sparziel */
   rendite: number;
   ohneBeitrag: number;
-  /** Steht die Seite „Was Sie jetzt tun können“ im selben Ausdruck? Nur dann der Verweis darauf. */
+  /** Steht die Seite „Was du jetzt tun kannst“ im selben Ausdruck? Nur dann der Verweis darauf. */
   mitSparziel?: boolean;
 }) {
+  const an = useAnsprache();
   const jahreBisRente = Math.max(0, zeile.jahr - kontext.jahr);
 
   return (
-    <Seite titel="Förderung, die Sie nicht nutzen" nummer="Geld vom Staat und vom Arbeitgeber">
+    <Seite titel={`Förderung, die ${an.du} nicht ${an.w('nutzt', 'nutzt', 'nutzen')}`} nummer="Geld vom Staat und vom Arbeitgeber">
       <Text>
-        Welche Förderung Ihnen heute entgeht — je Weg ein Rechenbeispiel für einen Monat und eine
-        Hochrechnung bis zu Ihrem Rentenbeginn {zeile.jahr}. Die Beispielbeträge sind keine
+        Welche Förderung {an.dir} heute entgeht — je Weg ein Rechenbeispiel für einen Monat und eine
+        Hochrechnung bis zu {an.dein('em')} Rentenbeginn {zeile.jahr}. Die Beispielbeträge sind keine
         Empfehlung über die Höhe.
       </Text>
 
@@ -55,13 +57,13 @@ export function Foerderung({
       ))}
 
       <Text>
-        Hochgerechnet mit Ihren heutigen Steuer- und Beitragssätzen, ohne Beitragsdynamik und
+        Hochgerechnet mit {an.dein('en')} heutigen Steuer- und Beitragssätzen, ohne Beitragsdynamik und
         nominal — ein Euro in {jahreBisRente} Jahren ist weniger wert als heute. Das
         Vertragsguthaben ist mit {prozent(rendite)} Rendite nach Kosten gerechnet
-        {mitSparziel ? ', derselben Annahme wie auf der Seite „Was Sie jetzt tun können“.' : '.'}
+        {mitSparziel ? `, derselben Annahme wie auf der Seite „Was ${an.du} jetzt tun ${an.w('kannst', 'könnt', 'können')}“.` : '.'}
         {ohneBeitrag > 0 && (
           <>
-            {' '}Zu {ohneBeitrag === 1 ? 'einem Ihrer geförderten Verträge' : `${ohneBeitrag} Ihrer geförderten Verträge`}{' '}
+            {' '}Zu {ohneBeitrag === 1 ? `einem ${an.dein('er')} geförderten Verträge` : `${ohneBeitrag} ${an.dein('er')} geförderten Verträge`}{' '}
             ist kein laufender Beitrag erfasst; der freie Rahmen ist insoweit zu groß ausgewiesen.
           </>
         )}
@@ -88,6 +90,8 @@ function Befund({
   jahreBisRente: number;
   rendite: number;
 }) {
+  // Das Rechenbeispiel gehoert einer Person: auch beim Paar „du“
+  const e = useAnsprache().einzeln;
   const ag = b.agZuschussMonat ?? 0;
   const mitAg = ag >= 0.5;
   const zufluss = b.zuflussMonat ?? b.probeMonat;
@@ -96,25 +100,25 @@ function Befund({
   /* --- Das Rechenbeispiel fuer EINEN Monat --- */
   const monat: [string, ReactNode, boolean?][] = [];
   if (b.foerderArt === 'zulage') {
-    monat.push(['Ihr Beitrag', euro(b.probeMonat)]);
+    monat.push([`${e.Dein()} Beitrag`, euro(b.probeMonat)]);
     monat.push(['+ Zulage vom Staat', euro(b.ersparnisJahr / 12)]);
     monat.push(['= fließt ins Depot', euro(zufluss), true]);
     if (steuerUeberZulage >= 0.5) {
       monat.push(['Steuervorteil über die Zulage hinaus', `− ${euro(steuerUeberZulage)}`]);
     }
-    monat.push(['Kostet Sie netto', euro(b.nettoAufwandMonat), true]);
+    monat.push([`Kostet ${e.dich} netto`, euro(b.nettoAufwandMonat), true]);
   } else if (b.id === 'bav') {
-    monat.push(['Ihr Beitrag (Entgeltumwandlung)', euro(b.probeMonat)]);
+    monat.push([`${e.Dein()} Beitrag (Entgeltumwandlung)`, euro(b.probeMonat)]);
     if (mitAg) {
       monat.push(['+ Arbeitgeberzuschuss (§ 1a Abs. 1a BetrAVG)', euroGenau(ag)]);
       monat.push(['= fließt in den Vertrag', euroGenau(zufluss), true]);
     }
     monat.push(['− Steuer und Sozialabgaben gespart', euro(b.ersparnisJahr / 12)]);
-    monat.push(['Kostet Sie netto', euro(b.nettoAufwandMonat), true]);
+    monat.push([`Kostet ${e.dich} netto`, euro(b.nettoAufwandMonat), true]);
   } else {
-    monat.push(['Ihr Beitrag', euro(b.probeMonat)]);
+    monat.push([`${e.Dein()} Beitrag`, euro(b.probeMonat)]);
     monat.push(['− Steuer gespart', euro(b.ersparnisJahr / 12)]);
-    monat.push(['Kostet Sie netto', euro(b.nettoAufwandMonat), true]);
+    monat.push([`Kostet ${e.dich} netto`, euro(b.nettoAufwandMonat), true]);
   }
 
   /* --- Die Hochrechnung bis zum Rentenbeginn --- */
@@ -138,12 +142,12 @@ function Befund({
     );
     const voll = lauf(p.avd.hoechstbetragEigenbeitrag / 12);
     const heute = lauf(kontext.avdEigenbeitragJahr / 12);
-    rente.push(['Ihre Beiträge', euro(voll.eigenbeitraege - heute.eigenbeitraege)]);
+    rente.push([`${e.Dein('e')} Beiträge`, euro(voll.eigenbeitraege - heute.eigenbeitraege)]);
     rente.push(['Zulagen vom Staat', euro(voll.zulagenGesamt - heute.zulagenGesamt), true]);
     rente.push([`Depot bei Rentenbeginn (${prozent(rendite)})`, euro(voll.endkapital - heute.endkapital)]);
   } else {
     const jahr = (monatsbetrag: number) => euro(monatsbetrag * 12 * jahre);
-    rente.push(['Ihre Beiträge', jahr(b.probeMonat)]);
+    rente.push([`${e.Dein('e')} Beiträge`, jahr(b.probeMonat)]);
     if (mitAg) rente.push(['Vom Arbeitgeber', jahr(ag), true]);
     rente.push([
       b.id === 'bav' ? 'Steuer und Sozialabgaben gespart' : 'Steuer gespart',

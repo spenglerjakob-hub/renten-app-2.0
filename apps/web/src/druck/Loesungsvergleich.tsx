@@ -2,10 +2,11 @@ import { Fragment } from 'react';
 import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import {
-  auszeichnungen, ohneEigenaufwand, LOESUNG_KURZ, OHNE_EIGENAUFWAND_TEXT, type AngebotPosition,
+  auszeichnungen, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText, type AngebotPosition,
 } from '../features/tuev-berechnung';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * „Lösungen im Vergleich" — die vierte Etappe der Beratung auf Papier.
@@ -54,9 +55,10 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
   angebote: AngebotPosition[];
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
   nettoHeute?: number;
-  /** Steht „Ihre Renteneinkünfte“ im selben Ausdruck? Nur dann der Verweis darauf. */
+  /** Steht die Seite zu den Renteneinkünften im selben Ausdruck? Nur dann der Verweis darauf. */
   mitRenteneinkuenften?: boolean;
 }) {
+  const an = useAnsprache();
   const brutto = vorgabe === 'brutto';
   const sichtbar = loesungen.filter((l) => l.verfuegbar);
   const auszeichnung = auszeichnungen(loesungen, brutto);
@@ -94,17 +96,17 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
       >
         <Text>
           {brutto
-            ? <>Je Lösung derselbe Beitrag von {euro(betragMonat)} im Monat, was er Sie nach Steuer- und
+            ? <>Je Lösung derselbe Beitrag von {euro(betragMonat)} im Monat, was er {an.dich} nach Steuer- und
               Abgabenersparnis wirklich kostet und was damit im Vertrag landet</>
-            : <>Je Lösung der Beitrag, der Sie nach Steuer- und Abgabenersparnis {euro(betragMonat)} im Monat
+            : <>Je Lösung der Beitrag, der {an.dich} nach Steuer- und Abgabenersparnis {euro(betragMonat)} im Monat
               kostet, und was damit im Vertrag landet</>}
-          {' '}— mit Ihrem persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss. Gerechnet zusätzlich
-          zu dem, was Sie heute schon einzahlen.
+          {' '}— mit {an.dein('em')} persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss. Gerechnet zusätzlich
+          zu dem, was {an.du} heute schon {an.w('einzahlst', 'einzahlt', 'einzahlen')}.
         </Text>
 
         {!brutto && meiste[0] && (
           <Ergebnis>
-            Am meisten aus Ihrem Netto-Aufwand {meiste.length > 1 ? 'machen' : 'macht'} <strong>{namen(meiste)}</strong>:
+            Am meisten aus {an.dein('em')} Netto-Aufwand {meiste.length > 1 ? 'machen' : 'macht'} <strong>{namen(meiste)}</strong>:
             {' '}aus {cent(meiste[0].nettoMonat)} netto im Monat werden <strong>{cent(meiste[0].vertragMonat)}</strong> im
             Vertrag — <strong>{zahl(meiste[0].hebel)}-mal</strong> so viel.
           </Ergebnis>
@@ -114,15 +116,15 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
             {guenstigste[0] && (
               <>
                 Am günstigsten {guenstigste.length > 1 ? 'sind' : 'ist'} <strong>{namen(guenstigste)}</strong>:
-                {' '}{euro(betragMonat)} Beitrag kosten Sie netto nur <strong>{cent(guenstigste[0].nettoMonat)}</strong> im Monat.
+                {' '}{euro(betragMonat)} Beitrag kosten {an.dich} netto nur <strong>{cent(guenstigste[0].nettoMonat)}</strong> im Monat.
               </>
             )}
             {meiste[0] && (guenstigste[0] && dieselben
-              ? <> Dort landet auch je Netto-Euro am meisten im Vertrag: <strong>{zahl(meiste[0].hebel)}-mal</strong> Ihr Netto-Aufwand.</>
+              ? <> Dort landet auch je Netto-Euro am meisten im Vertrag: <strong>{zahl(meiste[0].hebel)}-mal</strong> {an.dein()} Netto-Aufwand.</>
               : <>
                   {guenstigste[0] ? ' ' : ''}Am meisten je Netto-Euro {meiste.length > 1 ? 'bringen' : 'bringt'}{' '}
                   <strong>{namen(meiste)}</strong>: {cent(meiste[0].vertragMonat)} im Vertrag,{' '}
-                  <strong>{zahl(meiste[0].hebel)}-mal</strong> Ihr Netto-Aufwand.
+                  <strong>{zahl(meiste[0].hebel)}-mal</strong> {an.dein()} Netto-Aufwand.
                 </>)}
           </Ergebnis>
         )}
@@ -141,19 +143,19 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
           >
             {brutto ? (
               <>
-                <Zeile fett zellen={['Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+                <Zeile fett zellen={[`${an.Dein()} Beitrag (bAV: Bruttoumwandlung)`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
                 <Zeile zellen={['− Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
                 <Zeile zellen={['− Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
-                <Zeile fett zellen={['= Kostet Sie netto', ...sichtbar.map((l) => cent(l.nettoMonat))]} />
+                <Zeile fett zellen={[`= Kostet ${an.dich} netto`, ...sichtbar.map((l) => cent(l.nettoMonat))]} />
                 <Gruppenzeile text="Im Vertrag" spalten={sichtbar.length + 1} />
-                <Zeile zellen={['Ihr Beitrag', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+                <Zeile zellen={[`${an.Dein()} Beitrag`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
               </>
             ) : (
               <>
-                <Zeile zellen={['Ihr Netto-Aufwand', ...sichtbar.map((l) => cent(l.nettoMonat))]} />
+                <Zeile zellen={[`${an.Dein()} Netto-Aufwand`, ...sichtbar.map((l) => cent(l.nettoMonat))]} />
                 <Zeile zellen={['+ Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
                 <Zeile zellen={['+ Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
-                <Zeile fett zellen={['= Ihr Beitrag (bAV: Bruttoumwandlung)', ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
+                <Zeile fett zellen={[`= ${an.Dein()} Beitrag (bAV: Bruttoumwandlung)`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
               </>
             )}
             <Zeile zellen={['+ Zulagen', ...sichtbar.map((l) => posten(l.zulageMonat))]} />
@@ -189,7 +191,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
         Seite schon bei vier Angeboten ueber.
       */}
       {gruppen.length > 0 && (
-        <Seite titel="Ihre Angebote im Vergleich" nummer="Rente und Kapital netto">
+        <Seite titel={`${an.Dein('e')} Angebote im Vergleich`} nummer="Rente und Kapital netto">
           <Text>
             Die Rente laut Angebot, nach Steuer und Kranken- und Pflegeversicherung im ersten
             Rentenjahr, gegen den Netto-Aufwand in der Ansparphase — und, wo das Angebot sie nennt, die
@@ -233,9 +235,9 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
                     const spalten = g.length + 1;
                     return (
                       <>
-                        <Zeile zellen={['Kostet Sie netto im Monat', ...g.map((a) => euro(e(a).echterAufwandMonat))]} />
+                        <Zeile zellen={[`Kostet ${an.dich} netto im Monat`, ...g.map((a) => euro(e(a).echterAufwandMonat))]} />
                         {nettoHeute > 0 && (
-                          <Zeile zellen={['In % Ihres heutigen Nettos', ...g.map((a) => anteilAmNetto(e(a).echterAufwandMonat, nettoHeute) ?? '—')]} />
+                          <Zeile zellen={[`In % ${an.dein('es')} heutigen Nettos`, ...g.map((a) => anteilAmNetto(e(a).echterAufwandMonat, nettoHeute) ?? '—')]} />
                         )}
                         <Zeile zellen={['Fließt in den Vertrag', ...g.map((a) => euro(e(a).beitragMonat + e(a).zulageMonat))]} />
                         {mitRente && (
@@ -278,7 +280,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
             </Fragment>
           ))}
           {besteAngebote.length > 0 && <Text>★ die höchste Nettorendite.</Text>}
-          {gerechnet.some(ohneAufwand) && <Text>{OHNE_EIGENAUFWAND_TEXT}</Text>}
+          {gerechnet.some(ohneAufwand) && <Text>{ohneEigenaufwandText(an)}</Text>}
           <Text>
             Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet
             {mitRenteneinkuenften ? ', wie auf der Seite zu den Renteneinkünften. ' : '. '}Eine Kapitalabfindung ist im Jahr des Zuflusses voll zu versteuern (bAV) bzw.

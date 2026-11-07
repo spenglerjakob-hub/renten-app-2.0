@@ -3,6 +3,7 @@ import type { Jahreszeile } from '@renten/engine';
 import { standardSzenario } from '../store/standard';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 import { gespraechssatz, kaufkraft } from './kaufkraft';
+import { woerter } from '../lib/ansprache';
 
 /** Eine Jahreszeile mit den Feldern, auf die es hier ankommt. */
 const zeile = (x: Partial<Jahreszeile>): Jahreszeile => ({
@@ -52,5 +53,14 @@ describe('Kaufkraft bis zum Rentenbeginn', () => {
     const satz = gespraechssatz(kaufkraft(zeile({ nettoMonat: 3600 }))!, 0.02);
     expect(satz).toMatch(/^Ihr Ziel ist voraussichtlich gedeckt\./);
     expect(satz).not.toContain('fehlen');
+  });
+  it('im Rechner per Du — fuer ein Paar per ihr; ohne Ansprache bleibt es beim Sie', () => {
+    const k = kaufkraft(zeile({}))!;
+    const du = gespraechssatz(k, 0.02, woerter({ form: 'du', mehrere: false, name: 'Max' })).replace(/\s/g, ' ');
+    expect(du).toMatch(/^Dir fehlen im Ruhestand voraussichtlich 1.103 €/);
+    expect(du).toContain('Dein Netto von 1.500 €');
+    const ihr = gespraechssatz(kaufkraft(zeile({ nettoMonat: 3600 }))!, 0.02, woerter({ form: 'du', mehrere: true, name: '' }));
+    expect(ihr).toMatch(/^Euer Ziel ist voraussichtlich gedeckt\. Euer Netto von/);
+    expect(gespraechssatz(k, 0.02)).toMatch(/^Ihnen fehlen/);
   });
 });

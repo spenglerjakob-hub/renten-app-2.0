@@ -4,6 +4,7 @@ import { useFernSzenarien, supabaseKonfiguriert } from '../store/szenarien-fern'
 import { useSzenario } from '../store/szenario';
 import { useAuth } from '../store/auth';
 import { KontoLoeschen } from './KontoLoeschen';
+import { fallNameAus } from './personen';
 import { FEHLER, FELD, KNOPF, KNOPF_KLEIN } from '../components/stil';
 
 /** Knoepfe nur mit Symbol, wie das Loeschen in der Liste der Beratungen; Loeschen faerbt sich erst beim Darueberfahren rot. */
@@ -30,7 +31,8 @@ export function Konto() {
   const szenario = useSzenario((s) => s.szenario);
   const setze = useSzenario((s) => s.setze);
 
-  const [name, setName] = useState('Mein Plan');
+  // Vorgeschlagen wird der Name aus dem Rechner — „Mein Plan“ nur, solange dort keiner steht.
+  const [name, setName] = useState(() => fallNameAus(szenario.personen, szenario.haushalt.verheiratet) || 'Mein Plan');
 
   useEffect(() => { void initialisieren(); }, [initialisieren]);
 

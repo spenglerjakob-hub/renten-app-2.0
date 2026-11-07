@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { ClipboardCopy, Check } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
+import { useAnsprache } from '../components/Ansprache';
 import { euro, prozent } from '../components/Feld';
 import { Posten } from '../components/stil';
 import { gespraechssatz, kaufkraft } from './kaufkraft';
@@ -29,6 +30,8 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
   // Eigene Kennung je Einbindung: Die Karte steht zweimal im Dokument (Telefon und PC).
   const titelId = useId();
   const [kopiert, setKopiert] = useState(false);
+  // Im Rechner per Du, in der Schnellrechnung wie bisher per Sie
+  const a = useAnsprache();
   useEffect(() => {
     if (!kopiert) return;
     const t = window.setTimeout(() => setKopiert(false), 2000);
@@ -37,7 +40,7 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
 
   const k = kaufkraft(zeile);
   if (!k) return null;
-  const satz = gespraechssatz(k, inflation);
+  const satz = gespraechssatz(k, inflation, a);
   const kopieren = async () => {
     try { await navigator.clipboard.writeText(satz); setKopiert(true); } catch { /* ohne Zwischenablage bleibt der Satz lesbar */ }
   };
@@ -50,7 +53,7 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
 
       {/* Werte bleiben beisammen; umbrechen darf nur die Luecke mit ihren zwei Teilen. */}
       <dl className="mt-4 text-sm">
-        <Posten text={`Ihr Ziel von ${euro(k.bedarfHeute)} entspricht ${k.jahr}`} wert={nowrap(`${euro(k.bedarfNominal)} im Monat`)} />
+        <Posten text={`${a.Dein()} Ziel von ${euro(k.bedarfHeute)} entspricht ${k.jahr}`} wert={nowrap(`${euro(k.bedarfNominal)} im Monat`)} />
         <Posten text={`Gesamt-Netto ${k.jahr}`} wert={nowrap(euro(k.nettoNominal))} />
         <Posten text="… in heutiger Kaufkraft" wert={nowrap(euro(k.nettoHeute))} />
         <Posten text={`Kaufkraftverlust bis ${k.jahr}`} wert={nowrap(`${euro(k.verlustMonat)} im Monat (${prozent(k.verlustQuote, 0)})`)} />
@@ -62,7 +65,7 @@ export function KaufkraftKarte({ zeile, inflation, standard = false, klasse = ''
         )}
       </dl>
       <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-        Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : 'Ihre Annahme'}, {wo}).
+        Bei {prozent(inflation)} Inflation pro Jahr ({standard ? 'Standardwert' : `${a.Dein('e')} Annahme`}, {wo}).
         Modellrechnung, keine Zusage.
       </p>
 

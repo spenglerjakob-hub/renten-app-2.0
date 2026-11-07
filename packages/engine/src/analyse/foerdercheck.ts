@@ -3,6 +3,7 @@ import { zusatzsteuer } from '../tax/haushalt.js';
 import { euroText } from '../util/text.js';
 import { svWirkung, SV_FREI_QUOTE, STEUER_FREI_QUOTE, type SvKontext } from './vertrags-tuev.js';
 import { avdZulagen, avdSteuervorteil, type AvdKind } from '../products/altersvorsorgedepot.js';
+import { anrede, type Ansprache } from './ansprache.js';
 
 /**
  * FOERDERCHECK — was an Foerderung LIEGEN BLEIBT.
@@ -70,6 +71,8 @@ export const BAV_AG_PFLICHTZUSCHUSS = 0.15;
 const DECKUNG_SCHWACH = 0.5;
 
 export interface FoerderKontext extends SvKontext {
+  /** Die Ansprache der Befunde — ohne Angabe per Sie, im Rechner per Du */
+  ansprache?: Ansprache;
   /** Zu versteuerndes Einkommen heute — Basis fuer die Steuerwirkung */
   zveHeute: number;
   /** Eigener Jahresbeitrag zur gesetzlichen Rentenversicherung */
@@ -392,7 +395,7 @@ function avdBefund(
     zuflussMonat: (mehrEigen + liegenGelassen) / 12,
     foerderquote: mehrEigen > 0 ? liegenGelassen / mehrEigen : 0,
     text: (k.avdEigenbeitragJahr > 0
-      ? `Sie zahlen ${euroText(k.avdEigenbeitragJahr / 12)} im Monat ein. `
+      ? `${anrede(k.ansprache).Sie} ${anrede(k.ansprache).w('zahlst', 'zahlen')} ${euroText(k.avdEigenbeitragJahr / 12)} im Monat ein. `
       : 'Ein Altersvorsorgedepot ist nicht erfasst. ')
       + `Mit ${euroText(mehrEigen / 12)} mehr im Monat — dem Höchstbetrag von `
       + `${euroText(hoechst / 12)} — kämen ${euroText(liegenGelassen)} Zulage im Jahr dazu, `
@@ -429,6 +432,7 @@ function bavBefund(
   steuerOpt: SteuerOptionen,
   p: LegalParameters,
 ): FoerderBefund | null {
+  const a = anrede(k.ansprache);
   if (k.beamter || k.selbststaendig) return null;
 
   const eigen = Math.max(0, k.bavEigenanteilJahr);
@@ -470,20 +474,20 @@ function bavBefund(
     dastuende.
   */
   const belegt = vomArbeitgeber > 0.5
-    ? ` Davon sind ${euroText(vomArbeitgeber / 12)} bereits durch Ihren Arbeitgeber belegt — `
+    ? ` Davon sind ${euroText(vomArbeitgeber / 12)} bereits durch ${a.ihr('en')} Arbeitgeber belegt — `
       + 'seine Beiträge gehen vor.'
     : '';
 
   const text = genutzt > 0.5
-    ? `Sie wandeln heute ${euroText(eigen / 12)} im Monat selbst um. Steuer- UND `
+    ? `${a.Sie} ${a.w('wandelst', 'wandeln')} heute ${euroText(eigen / 12)} im Monat selbst um. Steuer- UND `
       + `sozialversicherungsfrei sind ${euroText(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat `
       + `(4 % der Beitragsbemessungsgrenze).${belegt} Frei sind noch `
       + `${euroText(rahmenMonat)}.`
-    : 'Sie nutzen die Entgeltumwandlung bisher gar nicht. Steuer- UND sozialversicherungsfrei '
+    : `${a.Sie} ${a.w('nutzt', 'nutzen')} die Entgeltumwandlung bisher gar nicht. Steuer- UND sozialversicherungsfrei `
       + `sind ${euroText(rahmenMonat)} im Monat, das sind 4 % der Beitragsbemessungsgrenze.`;
 
   const hinweis = `Darüber hinaus wären weitere ${euroText(nurSteuerfrei / 12)} nur noch `
-    + 'steuerfrei: Auf sie zahlen Sie volle Sozialabgaben, der Vorteil beschränkt sich dann '
+    + `steuerfrei: Auf sie ${a.w('zahlst du', 'zahlen Sie')} volle Sozialabgaben, der Vorteil beschränkt sich dann `
     + 'auf die Steuer. Diese zweite Stufe lohnt sich nicht mehr in jedem Fall — die erste '
     + 'fast immer.';
 
@@ -523,6 +527,7 @@ function basisBefund(
   steuerOpt: SteuerOptionen,
   p: LegalParameters,
 ): FoerderBefund | null {
+  const a = anrede(k.ansprache);
   const { rahmen, verbraucht, hoechstbetrag } = basisrahmenJahr(k, steuerOpt.verheiratet, p);
   const rahmenMonat = rahmen / 12;
   if (rahmenMonat < BAGATELLE_BASIS) return null;
@@ -543,14 +548,14 @@ function basisBefund(
   if (!anlassEinkommen && !anlassRente) return null;
 
   const rahmenSatz = verbraucht <= 0.5
-    ? `Ihr Höchstbetrag von ${euroText(hoechstbetrag / 12)} im Monat ist unverbraucht — `
-      + 'Sie zahlen nicht in die gesetzliche Rentenversicherung ein.'
-    : `Von Ihrem Höchstbetrag (${euroText(hoechstbetrag / 12)} im Monat) sind `
+    ? `${a.Ihr()} Höchstbetrag von ${euroText(hoechstbetrag / 12)} im Monat ist unverbraucht — `
+      + `${a.Sie} ${a.w('zahlst', 'zahlen')} nicht in die gesetzliche Rentenversicherung ein.`
+    : `Von ${a.ihr('em')} Höchstbetrag (${euroText(hoechstbetrag / 12)} im Monat) sind `
       + `${euroText(verbraucht / 12)} durch Beiträge zur gesetzlichen Rentenversicherung `
       + `belegt; ${euroText(rahmenMonat)} sind noch frei.`;
 
   const anlassSatz = anlassRente
-    ? ` Ihre gesetzliche Rente deckt nur ${Math.round(k.grvDeckung * 100)} % Ihres Bedarfs, `
+    ? ` ${a.Ihr('e')} gesetzliche Rente deckt nur ${Math.round(k.grvDeckung * 100)} % ${a.ihr('es')} Bedarfs, `
       + `und es fehlen ${euroText(k.lueckeMonat)} im Monat in heutiger Kaufkraft — `
       + 'eine lebenslange Rente aus '
       + 'geförderten Beiträgen schließt genau diese Lücke.'

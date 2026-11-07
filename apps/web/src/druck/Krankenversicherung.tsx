@@ -3,6 +3,7 @@ import { euro, prozent } from '../components/Feld';
 import type { PkvErgebnis } from '../features/pkv-berechnung';
 import { LEBENSERWARTUNG } from '../features/pkv-berechnung';
 import { Seite, Untertitel, Tabelle, Zeile, GrosseZahl, Text } from './Bausteine';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * "Ihre Krankenversicherung im Alter" — nur bei privat Versicherten.
@@ -21,6 +22,9 @@ export function Krankenversicherung({
   inflation: number;
   zielNettoMonat: number;
 }) {
+  // Der Vertrag gehoert einer Person (`e`), das Ziel dem Haushalt (`an`)
+  const an = useAnsprache();
+  const e = an.einzeln;
   const r = ergebnis;
   const jetzt = new Date().getFullYear();
   // Abgezinst wird mit der INFLATION, nicht mit der Beitragssteigerung: die
@@ -68,11 +72,11 @@ export function Krankenversicherung({
       </div>
 
       <Text>
-        <strong>Warum diese Seite überhaupt steht.</strong> Ihr Beitrag wächst, Ihre Rente wächst,
+        <strong>Warum diese Seite überhaupt steht.</strong> {e.Dein()} Beitrag wächst, {e.dein('e')} Rente wächst,
         und beide tun es nicht im gleichen Tempo. Ein Beitrag von{' '}
         {euro(r.heute.gesamtMonat)} heute ist bei {prozent(steigerung)} Steigerung im Jahr{' '}
         {r.rentenjahr} bei {euro(r.beiRente.praemieMonat)} — das sind{' '}
-        <strong>{prozent(r.anteilAmZiel, 0)}</strong> Ihres dann gewünschten Nettos von{' '}
+        <strong>{prozent(r.anteilAmZiel, 0)}</strong> {an.dein('es')} dann gewünschten Nettos von{' '}
         {euro(zielNettoMonat)}. Diese Zahl steckt bereits in der Versorgungslücke dieses
         Gutachtens.
       </Text>
@@ -99,7 +103,7 @@ export function Krankenversicherung({
       <Untertitel>Was das Gesetz vorgibt und was angenommen ist</Untertitel>
       <Text>
         <strong>Der Zuschlag entfällt mit {ZUSCHLAG_BIS_ALTER + 1}, nicht mit 65.</strong> Der
-        gesetzliche Zuschlag von 10 % wird bis zum Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}.
+        gesetzliche Zuschlag von 10 % wird bis zum Kalenderjahr {e.dein('es')} {ZUSCHLAG_BIS_ALTER}.
         Geburtstags erhoben (§ 149 VAG); danach fällt er weg, der Beitrag sinkt einmalig um gut
         9 %. Der verbreitete Satz „mit 65 fallen 10 % weg" verwechselt zwei Vorschriften.
       </Text>
@@ -113,7 +117,7 @@ export function Krankenversicherung({
       </Text>
       <Text>
         <strong>Die beiden Steigerungssätze sind Annahmen</strong>, keine Rechtsgrößen — sie
-        stehen in Ihren Angaben und lassen sich ändern. Historisch lagen die Beiträge der privaten
+        stehen in {an.dein('en')} Angaben und lassen sich ändern. Historisch lagen die Beiträge der privaten
         Krankenversicherung über der allgemeinen Inflation, mit starken Sprüngen statt gleichmäßiger
         Schritte.
       </Text>
@@ -125,7 +129,7 @@ export function Krankenversicherung({
           x !== null ? `${x.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren` : 'nie';
         return (
           <>
-            <Untertitel>Ihr Beitragsentlastungstarif</Untertitel>
+            <Untertitel>{e.Dein()} Beitragsentlastungstarif</Untertitel>
             {/* Brutto aus dem Vertrag, netto nach Arbeitgeberzuschuss und
                 Steuer — dieselbe Rechnung wie am Bildschirm. */}
             <Tabelle kopf={['', 'Brutto', 'Netto']} spalten={[52, 24, 24]}>
@@ -152,7 +156,7 @@ export function Krankenversicherung({
       })()}
 
       <Text>
-        In der privaten Krankenversicherung fallen auf <strong>keine</strong> Ihrer übrigen
+        In der privaten Krankenversicherung fallen auf <strong>keine</strong> {e.dein('er')} übrigen
         Alterseinkünfte Kranken- und Pflegebeiträge an — nicht auf eine Basisrente, nicht auf eine
         private Rente, nicht auf Entnahmen aus einem Depot. Das ist der Gegenposten zu diesem
         Beitrag und in den Zahlen dieses Gutachtens bereits berücksichtigt.

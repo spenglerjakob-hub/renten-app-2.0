@@ -8,9 +8,10 @@ import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt,
 } from '../components/Feld';
 import { AKZENT, EINLEITUNG, Hervor, KNOPF, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 import {
   foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, ohneEigenaufwand,
-  OHNE_EIGENAUFWAND_TEXT, type AngebotPosition,
+  ohneEigenaufwandText, type AngebotPosition,
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
@@ -52,6 +53,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehme
   /** „Lösungen annehmen“ — weiter zur Etappe „Abschluss“ */
   onAnnehmen?: () => void;
 }) {
+  const t = useAnsprache();
   const l = szenario.loesungen;
   const setzeLoesungen = useSzenario((x) => x.setzeLoesungen);
   const angebotHinzufuegen = useSzenario((x) => x.angebotHinzufuegen);
@@ -106,11 +108,11 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehme
           </Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
             {brutto
-              ? 'Derselbe Beitrag in jeder Schicht — und was er Sie nach Steuer- und Abgabenersparnis wirklich '
-                + 'kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
+              ? `Derselbe Beitrag in jeder Schicht — und was er ${t.dich} nach Steuer- und Abgabenersparnis wirklich `
+                + `kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
                 + 'Steuersatz, nicht mit einem Durchschnitt.'
-              : 'Je Schicht der Beitrag, der Sie nach Steuer- und Abgabenersparnis genau diesen Betrag kostet — '
-                + 'und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und Ihrem persönlichen '
+              : `Je Schicht der Beitrag, der ${t.dich} nach Steuer- und Abgabenersparnis genau diesen Betrag kostet — `
+                + `und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
                 + 'Steuersatz, nicht mit einem Durchschnitt.'}
           </p>
         </div>
@@ -228,7 +230,8 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
   nettoHeute: number;
 }) {
   const anteil = anteilAmNetto(x.nettoMonat, nettoHeute);
-  const beitragText = x.id === 'bav' ? 'Bruttoumwandlung' : 'Ihr Beitrag';
+  const t = useAnsprache();
+  const beitragText = x.id === 'bav' ? 'Bruttoumwandlung' : `${t.Dein()} Beitrag`;
   const ersparnis: [string, number][] = [
     ...(x.steuerErsparnisMonat >= 0.5 ? [['Steuerersparnis', x.steuerErsparnisMonat] as [string, number]] : []),
     ...(x.svErsparnisMonat >= 0.5 ? [['Sozialabgaben gespart', x.svErsparnisMonat] as [string, number]] : []),
@@ -249,12 +252,12 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
         ...ersparnis.map(([t, w]) => [`− ${t}`, w] as [string, number]),
       ]
     : [
-        ['Ihr Netto-Aufwand', x.nettoMonat],
+        [`${t.Dein()} Netto-Aufwand`, x.nettoMonat],
         ...ersparnis.map(([t, w]) => [`+ ${t}`, w] as [string, number]),
       ];
   const summe: [string, number] = brutto
-    ? ['= Kostet Sie netto', x.nettoMonat]
-    : [x.id === 'bav' ? '= Bruttoumwandlung' : '= Ihr Beitrag', x.eigenbeitragMonat];
+    ? [`= Kostet ${t.dich} netto`, x.nettoMonat]
+    : [x.id === 'bav' ? '= Bruttoumwandlung' : `= ${t.Dein()} Beitrag`, x.eigenbeitragMonat];
   const geld = (n: number) => euroGenau(Math.round(n * 100) / 100);
   /*
     Die ausgezeichnete Loesung („Meiste“, „Günstigste“) ist die Akzentkarte:
@@ -291,7 +294,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
         <div className="flex flex-1 flex-col p-5 pt-4">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-xs text-ui-schiefer">
-              {brutto ? 'Kostet Sie netto' : 'Im Vertrag'}
+              {brutto ? `Kostet ${t.dich} netto` : 'Im Vertrag'}
             </span>
             <span className="ui-titel text-[28px] font-normal leading-none tabular-nums text-ui-tinte">
               {ausgezeichnet
@@ -301,7 +304,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
           </div>
           <p className="mt-1.5 text-right text-xs text-ui-schiefer">
             {brutto && <>Im Vertrag {geld(x.vertragMonat)} · </>}
-            <span className="font-medium text-ui-tinte">{zahl(x.hebel)} ×</span> {brutto ? 'je Netto-Euro' : 'Ihr Netto-Aufwand'}
+            <span className="font-medium text-ui-tinte">{zahl(x.hebel)} ×</span> {brutto ? 'je Netto-Euro' : `${t.Dein()} Netto-Aufwand`}
           </p>
 
           {/* Die Rechnung als Posten mit Summenlinie in Tinte — wie die Aufstellungen der Beratung. */}
@@ -336,7 +339,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
           */}
           {anteil && (
             <p className="mt-3 text-xs text-ui-schiefer">
-              Netto-Aufwand {geld(x.nettoMonat)} = <strong className="font-medium text-ui-tinte">{anteil}</strong> Ihres heutigen Nettos
+              Netto-Aufwand {geld(x.nettoMonat)} = <strong className="font-medium text-ui-tinte">{anteil}</strong> {t.dein('es')} heutigen Nettos
             </p>
           )}
           <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
@@ -367,6 +370,7 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
   szenario: SzenarioParsed; nettoHeute: number; onAnnehmen?: () => void;
 }) {
   const angebote = szenario.loesungen.angebote;
+  const t = useAnsprache();
   const angebotAendern = useSzenario((x) => x.angebotAendern);
   const angebotEntfernen = useSzenario((x) => x.angebotEntfernen);
   const angebotHinzufuegen = useSzenario((x) => x.angebotHinzufuegen);
@@ -389,9 +393,9 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
         <div>
           <Titel als="h2" id="angebote-titel">Angebote vergleichen</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            Holen Sie mit den Beiträgen oben Angebote ein und tragen Sie die Rente ein, die der Anbieter
+            Mit den Beiträgen oben Angebote einholen und die Rente eintragen, die der Anbieter
             zum Rentenbeginn nennt — und, wo es sie gibt, die Kapitalabfindung. Gerechnet wird wie im
-            Vertrags-TÜV: was das Angebot Sie netto kostet, gegen das, was im Alter nach Steuer und
+            Vertrags-TÜV: was das Angebot {t.dich} netto kostet, gegen das, was im Alter nach Steuer und
             Krankenversicherung ankommt.
           </p>
         </div>
@@ -411,8 +415,8 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
 
       {angebote.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          Noch kein Angebot erfasst. Über „Angebot mit diesem Beitrag erfassen“ oben übernehmen Sie den
-          Beitrag einer Lösung als Ausgangspunkt.
+          Noch kein Angebot erfasst. Über „Angebot mit diesem Beitrag erfassen“ oben lässt sich der
+          Beitrag einer Lösung als Ausgangspunkt übernehmen.
         </p>
       ) : (
         <>
@@ -557,8 +561,8 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
           <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
             <p className="text-sm leading-relaxed text-ui-schiefer">
               {anzahl > 0
-                ? <>{anzahl === 1 ? 'Ein Angebot ist' : `${anzahl} Angebote sind`} angenommen — im Abschluss steht Ihr Ergebnis mit {anzahl === 1 ? 'dieser Lösung' : 'diesen Lösungen'}.</>
-                : 'Setzen Sie bei den Angeboten, für die sich der Kunde entscheidet, das Häkchen „Annehmen“.'}
+                ? <>{anzahl === 1 ? 'Ein Angebot ist' : `${anzahl} Angebote sind`} angenommen — im Abschluss steht {t.dein()} Ergebnis mit {anzahl === 1 ? 'dieser Lösung' : 'diesen Lösungen'}.</>
+                : `Bei den Angeboten, für die ${t.du} ${t.w('dich entscheidest', 'euch entscheidet')}, das Häkchen „Annehmen“ setzen.`}
             </p>
             <button type="button" onClick={onAnnehmen} disabled={anzahl === 0 || !onAnnehmen} className={`shrink-0 ${KNOPF}`}>
               <ClipboardCheck className="h-4 w-4" aria-hidden /> Lösungen annehmen{anzahl > 0 ? ` (${anzahl})` : ''}
@@ -594,6 +598,7 @@ const besteRenditeVon = (p: Position) => (ohneAufwand(p)
 function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; nettoHeute: number }) {
   const mitRente = positionen.some((p) => p.rente);
   const mitKapital = positionen.some((p) => p.kapital);
+  const t = useAnsprache();
   const mitVergleich = positionen.some((p) => p.breakEven);
   // Um die beste Rendite konkurrieren nur Angebote mit eigenem Aufwand.
   const inWertung = positionen.filter((p) => (p.rente || p.kapital) && !ohneAufwand(p));
@@ -602,9 +607,9 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
   const mitAufwand = (p: Position, w: string) => (ohneAufwand(p) ? null : w);
 
   const zeilen: Zeile[] = [
-    { text: 'Kostet Sie netto im Monat', wert: (p) => { const e = einzahlung(p); return e ? euro(e.echterAufwandMonat) : null; } },
+    { text: `Kostet ${t.dich} netto im Monat`, wert: (p) => { const e = einzahlung(p); return e ? euro(e.echterAufwandMonat) : null; } },
     ...(nettoHeute > 0 ? [{
-      text: 'In % Ihres heutigen Nettos',
+      text: `In % ${t.dein('es')} heutigen Nettos`,
       info: `Der Netto-Aufwand im Verhältnis zum heutigen Haushaltsnetto von ${euro(nettoHeute)} im Monat.`,
       wert: (p: Position) => { const e = einzahlung(p); return e ? anteilAmNetto(e.echterAufwandMonat, nettoHeute) : null; },
     }] : []),
@@ -729,11 +734,11 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
       </div>
       {(positionen.some(ohneAufwand) || positionen.some((p) => !p.rente && !p.kapital)) && (
         <div className="space-y-1.5 border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte">
-          {positionen.some(ohneAufwand) && <p>{OHNE_EIGENAUFWAND_TEXT}</p>}
+          {positionen.some(ohneAufwand) && <p>{ohneEigenaufwandText(t)}</p>}
           {positionen.some((p) => !p.rente && !p.kapital) && (
             <p>
-              Angebote ohne Beitrag oder ohne Rente bzw. Kapital rechnet der Vergleich nicht — tragen Sie
-              beides ein. Bei der Betriebsrente genügt der Beitrag des Arbeitgebers.
+              Angebote ohne Beitrag oder ohne Rente bzw. Kapital rechnet der Vergleich nicht — dazu
+              beides eintragen. Bei der Betriebsrente genügt der Beitrag des Arbeitgebers.
             </p>
           )}
         </div>

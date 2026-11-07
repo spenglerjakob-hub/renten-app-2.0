@@ -6,6 +6,7 @@ import { riesterZulagen, riesterZulagenkuerzung } from '../products/bav.js';
 import { avdZulagen, avdSteuervorteil } from '../products/altersvorsorgedepot.js';
 import { kennzahlen } from './kennzahlen.js';
 import { euroText } from '../util/text.js';
+import { anrede, type Ansprache } from './ansprache.js';
 
 /**
  * VERTRAGS-TUEV
@@ -121,6 +122,8 @@ export interface TuevZulageDetail {
 }
 
 export interface TuevKontext {
+  /** Die Ansprache der Hinweise — ohne Angabe per Sie, im Rechner per Du */
+  ansprache?: Ansprache;
   /**
    * Beamter oder Besoldungsempfaenger.
    *
@@ -452,6 +455,7 @@ export function vertragsTuev(
   p: LegalParameters,
 ): TuevErgebnis {
   const hinweise: string[] = [];
+  const an = anrede(k.ansprache);
   const steuerOpt = {
     verheiratet: s.haushalt.verheiratet,
     bundesland: s.haushalt.bundesland,
@@ -490,20 +494,20 @@ export function vertragsTuev(
   if (v.typ === 'avd' && k.selbststaendig) {
     hinweise.push(
       'Selbstständige sind beim Altersvorsorgedepot ab 2027 ausdrücklich förderberechtigt — '
-      + 'die Reform weitet den Kreis darauf aus. Für Sie ist es damit der geförderte Weg, '
+      + `die Reform weitet den Kreis darauf aus. Für ${an.dich} ist es damit der geförderte Weg, `
       + 'den Riester nie geboten hat.',
     );
   }
   if (v.typ.startsWith('bav')) {
     if (k.selbststaendig) {
       hinweise.push(
-        'Als Selbstständiger können Sie kein Entgelt umwandeln — dafür bräuchte es einen '
+        `Als Selbstständiger ${an.w('kannst du', 'können Sie')} kein Entgelt umwandeln — dafür bräuchte es einen `
         + 'Arbeitgeber. Ein bestehender Vertrag aus früherer Anstellung lässt sich hier '
         + 'trotzdem bewerten; ausgewiesen wird dann nur die Steuerwirkung.',
       );
     } else if (k.beamter) {
       hinweise.push(
-        'Als Beamter zahlen Sie keine Sozialabgaben. Eine Entgeltumwandlung spart hier '
+        `Als Beamter ${an.w('zahlst du', 'zahlen Sie')} keine Sozialabgaben. Eine Entgeltumwandlung spart hier `
         + 'nur Steuern, keine Beiträge.',
       );
     } else if (k.privatVersichert) {
@@ -515,18 +519,18 @@ export function vertragsTuev(
         und Arbeitslosenversicherung nahezu auf.
       */
       hinweise.push(
-        'Sie sind privat krankenversichert: Ihre Prämie hängt am Vertrag, nicht am Gehalt. '
+        `${an.Sie} ${an.w('bist', 'sind')} privat krankenversichert: ${an.Ihr('e')} Prämie hängt am Vertrag, nicht am Gehalt. `
         + 'Eine Entgeltumwandlung spart deshalb keine Kranken- und Pflegebeiträge, sondern '
         + 'nur Renten- und Arbeitslosenversicherung.',
       );
       if (probe.verlorenerZuschuss > 0.5) {
         hinweise.push(
-          'Ihre Prämie ist im Verhältnis zum Gehalt so hoch, dass sich der Zuschuss Ihres '
+          `${an.Ihr('e')} Prämie ist im Verhältnis zum Gehalt so hoch, dass sich der Zuschuss ${an.ihr('es')} `
           + 'Arbeitgebers nach dem beitragspflichtigen Entgelt bemisst (§ 257 SGB V) — und '
-          + 'mit der Umwandlung sinkt. Das kostet Sie '
+          + `mit der Umwandlung sinkt. Das kostet ${an.dich} `
           + `${euroText(probe.verlorenerZuschuss / 12)} im Monat und hebt die Ersparnis bei `
           + 'Renten- und Arbeitslosenversicherung nahezu auf. Die Umwandlung lohnt sich für '
-          + 'Sie über die Steuer, nicht über die Sozialabgaben.',
+          + `${an.dich} über die Steuer, nicht über die Sozialabgaben.`,
         );
       }
     } else if (probe.ersparnis <= 0.01) {
@@ -744,18 +748,18 @@ export function vertragsTuev(
               ? `Beitragsfrei sind höchstens ${monat(svGrenze)} im Monat (4 % der `
                 + 'Beitragsbemessungsgrenze) — für Arbeitgeber- und Arbeitnehmeranteil zusammen, und '
                 + `der Arbeitgeberanteil wird zuerst angerechnet. Er belegt davon ${monat(agBelegt)}. `
-                + `Auf ${monat(eigenanteil - svFrei)} Ihrer Entgeltumwandlung zahlen Sie deshalb `
+                + `Auf ${monat(eigenanteil - svFrei)} ${an.ihr('er')} Entgeltumwandlung ${an.w('zahlst du', 'zahlen Sie')} deshalb `
                 + 'volle Sozialabgaben; gespart wird dort nur Steuer.'
               : `Nur ${monat(svGrenze)} im Monat sind beitragsfrei `
-                + `(4 % der Beitragsbemessungsgrenze${svRahmen < svGrenze - 0.5 ? ', zum Teil schon durch Ihre anderen Verträge belegt' : ''}). `
-                + `Auf die darüber liegenden ${monat(eigenanteil - svFrei)} zahlen Sie volle Sozialabgaben.`,
+                + `(4 % der Beitragsbemessungsgrenze${svRahmen < svGrenze - 0.5 ? `, zum Teil schon durch ${an.ihr('e')} anderen Verträge belegt` : ''}). `
+                + `Auf die darüber liegenden ${monat(eigenanteil - svFrei)} ${an.w('zahlst du', 'zahlen Sie')} volle Sozialabgaben.`,
           );
         }
         if (eigenanteil > steuerFrei + 0.5) {
           hinweise.push(
             `Steuerfrei sind höchstens ${monat(steuerGrenze)} im Monat (8 % der `
             + 'Beitragsbemessungsgrenze) — Arbeitgeberanteil und andere Verträge eingerechnet. Die '
-            + `darüber liegenden ${monat(eigenanteil - steuerFrei)} zahlen Sie aus versteuertem `
+            + `darüber liegenden ${monat(eigenanteil - steuerFrei)} ${an.w('zahlst du', 'zahlen Sie')} aus versteuertem `
             + 'Gehalt — der Vertrag lohnt sich insoweit nur noch wegen der Rendite.',
           );
         }
@@ -774,7 +778,7 @@ export function vertragsTuev(
             hinweise.push(
               `Der Arbeitgeberanteil liegt selbst um ${monat(agUeberSv)} im Monat über dem beitragsfreien `
               + `Rahmen${agUeberSteuer > 0.5 ? ` (um ${monat(agUeberSteuer)} auch über dem steuerfreien)` : ''}. `
-              + 'Dieser Teil ist für Sie Arbeitslohn: Sie zahlen darauf Sozialabgaben'
+              + `Dieser Teil ist für ${an.dich} Arbeitslohn: ${an.Sie} ${an.w('zahlst', 'zahlen')} darauf Sozialabgaben`
               + `${agUeberSteuer > 0.5 ? ' und Steuer' : ''}. In der Rechnung oben ist das nicht enthalten.`,
             );
           }
@@ -799,11 +803,11 @@ export function vertragsTuev(
             const gewinn = (wirkungAlt.ersparnis + steuerAlt) - (svJahr + steuerJahr);
             if (gewinn / 12 >= 5) {
               hinweise.push(
-                `Tipp: Ihr Arbeitgeber zahlt ${monat(freiwillig)} im Monat freiwillig in die `
-                + 'Direktversicherung und belegt damit den Freirahmen, den Ihre Entgeltumwandlung '
+                `Tipp: ${an.Ihr()} Arbeitgeber zahlt ${monat(freiwillig)} im Monat freiwillig in die `
+                + `Direktversicherung und belegt damit den Freirahmen, den ${an.ihr('e')} Entgeltumwandlung `
                 + 'bräuchte. Zahlt er diesen Anteil stattdessen in eine Unterstützungskasse, bleibt '
-                + 'er für beide Seiten unbegrenzt steuer- und sozialabgabenfrei, und Ihnen stünde '
-                + 'der Rahmen der Direktversicherung zur Verfügung. Das brächte Ihnen rund '
+                + `er für beide Seiten unbegrenzt steuer- und sozialabgabenfrei, und ${an.ihnen} stünde `
+                + `der Rahmen der Direktversicherung zur Verfügung. Das brächte ${an.ihnen} rund `
                 + `${monat(gewinn)} im Monat mehr Ersparnis. Der 15-%-Pflichtzuschuss bleibt in der `
                 + 'Direktversicherung (§ 1a Abs. 1a BetrAVG).',
               );
@@ -836,7 +840,7 @@ export function vertragsTuev(
 
       if (moment && k.selbststaendig && verbraucht <= 0.5) {
         hinweise.push(
-          `Als Selbstständiger ohne Rentenversicherungspflicht steht Ihnen der Höchstbetrag `
+          `Als Selbstständiger ohne Rentenversicherungspflicht steht ${an.ihnen} der Höchstbetrag `
           + `nach § 10 Abs. 3 EStG in voller Höhe zur Verfügung: `
           + `${euroText(rahmen / 12)} im Monat sind absetzbar. Bei einem Angestellten ist er `
           + 'bereits durch die Beiträge zur gesetzlichen Rentenversicherung weitgehend belegt.',

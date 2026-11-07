@@ -15,6 +15,7 @@ import {
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { EINLEITUNG, FELD, Hervor, Kernsatz, Titel } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 /** Ein Block in der Innenflaeche mit leisem Titel — Belastung, Ertrag, Laufzeit, Kennzahlen. */
 const BLOCK = 'ui-innen p-4';
@@ -172,6 +173,9 @@ export function VertragsTuev({
 }) {
   const tuev = useSzenario((x) => x.szenario.tuev);
   const vertraege = useSzenario((x) => x.szenario.vertraege);
+  // `a` fuer den Haushalt (ein Paar: ihr), `e` fuer die Person des Vertrags — `t` ist hier der TUEV-Eintrag
+  const a = useAnsprache();
+  const e = a.einzeln;
   const tuevHinzufuegen = useSzenario((x) => x.tuevHinzufuegen);
   const tuevAendern = useSzenario((x) => x.tuevAendern);
   const tuevEntfernen = useSzenario((x) => x.tuevEntfernen);
@@ -216,7 +220,7 @@ export function VertragsTuev({
         <div>
           <Titel als="h2">Vertrags-TÜV</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            Stellen Sie Ihre Verträge nebeneinander. Gerechnet wird mit Ihrem tatsächlichen
+            Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
             Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
             Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
           </p>
@@ -265,8 +269,8 @@ export function VertragsTuev({
       <div className="print:hidden">
         <AkkordeonKarte
           titel={szenario.einkommenGetrennt
-            ? `Ihr Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
-            : 'Ihr Einkommen (Ausgangsbasis)'}
+            ? `Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
+            : `${a.Dein()} Einkommen (Ausgangsbasis)`}
           offen={einkommenOffen}
           onUmschalten={() => setEinkommenOffen((x) => !x)}
         >
@@ -296,7 +300,7 @@ export function VertragsTuev({
               info={(
                 <>
                   Das Jahresbrutto durch zwölf. Bei 13 oder 14 Gehältern ist das <strong>mehr
-                  als Ihr Monatsgehalt</strong> — Sonderzahlungen sind darin verteilt. Beiträge
+                  als {e.dein()} Monatsgehalt</strong> — Sonderzahlungen sind darin verteilt. Beiträge
                   und Steuer hängen am Jahresbetrag, deshalb wird so gerechnet.
                 </>
               )}
@@ -307,10 +311,10 @@ export function VertragsTuev({
               info={(
                 <>
                   {szenario.einkommenHeute.modus === 'netto'
-                    ? 'Aus Ihrem eingegebenen Netto zurückgerechnet: Gesucht wird das Brutto, '
+                    ? `Aus ${e.dein('em')} eingegebenen Netto zurückgerechnet: Gesucht wird das Brutto, `
                       + 'das nach Sozialabgaben und Steuer genau dieses Netto ergibt.'
                     : szenario.einkommenHeute.modus === 'besoldung'
-                      ? 'Aus der Besoldungstabelle Ihres Dienstherrn — Gruppe und Erfahrungsstufe '
+                      ? `Aus der Besoldungstabelle ${e.dein('es')} Dienstherrn — Gruppe und Erfahrungsstufe `
                         + 'bestimmen den Betrag.'
                       : 'Betrag × Auszahlungen pro Jahr.'}
                   {' '}Hierauf rechnen Beitragsbemessungsgrenzen, Höchstbeträge und Steuertarif.
@@ -324,7 +328,7 @@ export function VertragsTuev({
               info={(
                 <>
                   Brutto abzüglich Sozialabgaben, Einkommensteuer, Soli und — falls
-                  angegeben — Kirchensteuer, nach dem Rechtsstand {basis.p.jahr}. Ihr zu
+                  angegeben — Kirchensteuer, nach dem Rechtsstand {basis.p.jahr}. {a.Dein()} zu
                   versteuerndes Einkommen beträgt dabei {euro(basis.zve)} im Jahr; daran hängt
                   die Steuerersparnis jedes geförderten Beitrags.
                 </>
@@ -336,8 +340,8 @@ export function VertragsTuev({
 
       {tuev.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          Noch kein Vertrag zur Prüfung ausgewählt. Wählen Sie oben einen aus, um zu sehen,
-          was er Sie wirklich kostet und was er wirklich bringt.
+          Noch kein Vertrag zur Prüfung ausgewählt. Oben einen auswählen — dann steht hier,
+          was er {a.dich} wirklich kostet und was er wirklich bringt.
         </p>
       ) : (
         <div className="space-y-5 sm:space-y-6">
@@ -371,7 +375,7 @@ export function VertragsTuev({
               selbststaendig: erwerb?.selbststaendig ?? false,
               privatVersichert: szenario.haushalt.kvErwerb === 'pkv'
                 || szenario.haushalt.kvStatus === 'pkv',
-            });
+            }, e);
 
             return (
               <article key={t.id} className="ui-karte overflow-hidden druckbereich">
@@ -391,10 +395,10 @@ export function VertragsTuev({
                 </header>
 
                 <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-3 lg:gap-6">
-                  {/* 1) ANNAHMEN — in der Innenflaeche: hier tragen Sie ein, daneben steht die Auswertung. */}
+                  {/* 1) ANNAHMEN — in der Innenflaeche: hier wird eingetragen, daneben steht die Auswertung. */}
                   <div className="ui-innen space-y-3 p-4">
                     <h4 className="text-sm font-medium text-ui-tinte">
-                      1. Ihre Annahmen
+                      1. {e.Dein('e')} Annahmen
                     </h4>
                     <ZahlFeld
                       label="Beitrag monatlich"
@@ -402,7 +406,7 @@ export function VertragsTuev({
                       onChange={(n) => tuevAendern(t.id, { beitragMonat: n })}
                       einheit="€"
                       hilfe={v.typ.startsWith('bav')
-                        ? 'Gesamtbeitrag: Ihr Anteil und der des Arbeitgebers zusammen.'
+                        ? `Gesamtbeitrag: ${e.dein()} Anteil und der des Arbeitgebers zusammen.`
                         : undefined}
                     />
                     <ProzentFeld
@@ -418,7 +422,7 @@ export function VertragsTuev({
                           wert={t.agZuschussMonat}
                           onChange={(n) => tuevAendern(t.id, { agZuschussMonat: n })}
                           einheit="€"
-                          hilfe={`Mindert Ihren eigenen Aufwand. Ihr Anteil: ${
+                          hilfe={`Mindert ${e.dein('en')} eigenen Aufwand. ${e.Dein()} Anteil: ${
                             euroGenau(Math.max(0, t.beitragMonat - t.agZuschussMonat))}.`}
                         />
                         <FruehereBeitraege
@@ -511,7 +515,7 @@ export function VertragsTuev({
                       /* Weiss auf der Innenflaeche der Annahmen, wie die Kinder bei Riester. */
                       <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-3">
                         <span className="text-xs font-medium text-ui-tinte">
-                          Kinder (Zulage) — aus Ihren Basisdaten
+                          Kinder (Zulage) — aus {a.dein('en')} Basisdaten
                         </span>
                         <div className="mt-1.5">
                           <ZahlFeld
@@ -559,7 +563,7 @@ export function VertragsTuev({
 
                     <div className={BLOCK}>
                       <div className={BLOCK_TITEL}>
-                        Ihre Belastung (Ansparphase)
+                        {e.Dein('e')} Belastung (Ansparphase)
                       </div>
                       {/*
                         Oben steht, was der Vertrag monatlich BEKOMMT, nicht
@@ -584,7 +588,7 @@ export function VertragsTuev({
                           )
                         ))}
                         <div className={SUMME}>
-                          <span className="text-xs font-medium text-ui-tinte">Kostet Sie wirklich</span>
+                          <span className="text-xs font-medium text-ui-tinte">Kostet {e.dich} wirklich</span>
                           <span className="text-base font-medium tabular-nums text-ui-tinte">
                             {euro(treppe.aufwand)}
                           </span>
@@ -603,7 +607,7 @@ export function VertragsTuev({
                       der Treppe heben sie die oberste Zeile an und gehen in der
                       naechsten wieder ab — unten steht unveraendert derselbe
                       Betrag. Als blosser Minusposten gebucht zaehlten sie
-                      doppelt, und "Kostet Sie wirklich" ginge nicht mehr auf.
+                      doppelt, und "Kostet dich wirklich" ginge nicht mehr auf.
                     */}
                     {r.zulageMonat > 0 && (
                       <div className={BLOCK}>
@@ -654,9 +658,9 @@ export function VertragsTuev({
                         </div>
                         <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
                           Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
-                          fließen zusätzlich in den Vertrag und senken Ihren eigenen Beitrag
+                          fließen zusätzlich in den Vertrag und senken {e.dein('en')} eigenen Beitrag
                           nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als
-                          Abzug von Ihren Kosten.
+                          Abzug von {e.dein('en')} Kosten.
                         </p>
                       </div>
                     )}
@@ -669,7 +673,7 @@ export function VertragsTuev({
                     */}
                     <div className={BLOCK}>
                       <div className={BLOCK_TITEL}>
-                        Ihr Ertrag (Auszahlungsphase)
+                        {e.Dein()} Ertrag (Auszahlungsphase)
                       </div>
                       <div className="space-y-1.5">
                         <GegenueberZeile
@@ -743,7 +747,7 @@ export function VertragsTuev({
                     <Kernsatz>
                       {ohne ? (
                         <>
-                          Rein arbeitgeberfinanziert: Sie zahlen nichts selbst, netto kommen{' '}
+                          Rein arbeitgeberfinanziert: {e.Du} {e.w('zahlst', undefined, 'zahlen')} nichts selbst, netto kommen{' '}
                           <Hervor>{istKapital ? euro(r.nettoKapital) : `${euro(r.nettoRenteMonat)} im Monat`}</Hervor> dazu.
                         </>
                       ) : (
@@ -778,7 +782,7 @@ export function VertragsTuev({
                           fussnote={ohne ? 'ohne eigenen Aufwand' : 'p. a. nach allen Abzügen'}
                           info={ohne ? undefined : (
                             <>
-                              Der interne Zinsfuß Ihrer Zahlungsreihe: der Zinssatz, bei dem
+                              Der interne Zinsfuß {e.dein('er')} Zahlungsreihe: der Zinssatz, bei dem
                               {' '}{laufzeitText(r.monateEinzahlung)} Einzahlung und{' '}
                               {istKapital ? 'die Kapitalauszahlung' : `${r.jahreAuszahlung} Jahre Rente`}
                               {' '}genau aufgehen. Anders als der Hebel <strong>berücksichtigt
@@ -856,11 +860,11 @@ export function VertragsTuev({
                             `renteOderKapital` rechnet ab dem Alter bei
                             Rentenbeginn. "Ab 12 Jahren" waere schlicht falsch.
                           */}
-                          <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn Sie{' '}
+                          <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn {e.du}{' '}
                           <strong>
                             {wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                           </strong>{' '}
-                          alt werden — ohne Verzinsung.
+                          alt {e.w('wirst', undefined, 'werden')} — ohne Verzinsung.
                           {wege.breakEven.kapitalTraegtSichSelbst
                             ? ' Mit 2 % Verzinsung nie: der Kapitalertrag allein trägt die Rente.'
                             : ` Mit 2 % Verzinsung erst mit ${wege.breakEven.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren.`}
@@ -873,7 +877,7 @@ export function VertragsTuev({
 
                     {r.zulagenGekuerzt && (
                       <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
-                        <strong className="font-medium text-ui-tinte">Zulagen werden gekürzt.</strong> Ihr Eigenbeitrag liegt unter dem
+                        <strong className="font-medium text-ui-tinte">Zulagen werden gekürzt.</strong> {e.Dein()} Eigenbeitrag liegt unter dem
                         Mindesteigenbeitrag nach § 86 EStG (4 % des Vorjahresbruttos abzüglich
                         Zulagen). Die Zulagen fallen dadurch anteilig geringer aus.
                       </p>
@@ -888,7 +892,7 @@ export function VertragsTuev({
                     {!wege && kenntKapitalwahl(v.typ) && (
                       <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
                         Für den Vergleich fehlt {v.brutto > 0 ? 'die Kapitalauszahlung' : 'die monatliche Rente'}.
-                        Tragen Sie beide Beträge am Vertrag ein — dann rechnet der TÜV beide Wege
+                        Sind beide Beträge am Vertrag eingetragen, rechnet der TÜV beide Wege
                         und nennt den Break-even. Geschätzt wird nichts.
                       </p>
                     )}
@@ -905,7 +909,7 @@ export function VertragsTuev({
                         <div className="ui-innen flex items-start gap-2.5 p-3">
                           <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
                           <p className="text-xs leading-relaxed text-ui-tinte/80 [&_strong]:font-medium [&_strong]:text-ui-tinte">
-                            <strong>Ohne Verzinsung:</strong> Sie müssten{' '}
+                            <strong>Ohne Verzinsung:</strong> {e.Du} {e.w('müsstest', undefined, 'müssten')}{' '}
                             <strong>
                               {vergleich.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                             </strong>{' '}
@@ -920,7 +924,7 @@ export function VertragsTuev({
                               ? 'Der Kapitalertrag allein trägt die Rente — die Verrentung rechnet sich finanziell nie.'
                               : (
                                 <>
-                                  Sie müssten{' '}
+                                  {e.Du} {e.w('müsstest', undefined, 'müssten')}{' '}
                                   <strong>
                                     {vergleich.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                                   </strong>{' '}

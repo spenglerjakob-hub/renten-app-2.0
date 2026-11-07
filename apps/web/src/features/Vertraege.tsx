@@ -13,6 +13,7 @@ import {
 } from './vertragsarten';
 import { personNameAus } from './personen';
 import { KNOPF_ZWEIT } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 /** Ein Ergebnis im Vertrag: leises Etikett, darunter der Betrag in Tinte. */
 function Wert({ etikett, children }: { etikett: string; children: ReactNode }) {
@@ -50,6 +51,9 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
   const haushaltsKinder = useSzenario((x) => x.szenario.haushalt.kinder);
   const personen = useSzenario((x) => x.szenario.personen);
+  // Die Kinder gehoeren dem Haushalt, der Steuersatz der Person des Vertrags
+  const t = useAnsprache();
+  const e = t.einzeln;
   const tarifIndex = useSzenario((x) => x.szenario.annahmen.tarifIndex);
   const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
   const setzeKind = useSzenario((x) => x.setzeKind);
@@ -219,7 +223,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 <span className="text-xs font-medium text-ui-tinte">
                   Kinder — für die Kinderzulage
                 </span>
-                <span className="text-xs text-ui-schiefer">Aus Ihren Basisdaten</span>
+                <span className="text-xs text-ui-schiefer">Aus {t.dein('en')} Basisdaten</span>
               </div>
               <ZahlFeld
                 label="Kinder mit Kindergeldanspruch"
@@ -373,7 +377,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
             Eigenbeitrag {euro(avd.eigenbeitraege)} über die Laufzeit, dazu {euro(avd.zulagenGesamt)} Zulagen
-            vom Staat. Die Auszahlung ist voll mit Ihrem persönlichen Steuersatz zu versteuern —
+            vom Staat. Die Auszahlung ist voll mit {e.dein('em')} persönlichen Steuersatz zu versteuern —
             nicht mit der Abgeltungsteuer.
           </p>
           {/* Die Hinweise des Rechenkerns als Liste mit Gedankenstrich — lesen, nicht erschrecken. */}
@@ -400,10 +404,10 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           {v.typ === 'prvRente' ? (
             <>
               Steuerpflichtig ist nicht die Auszahlung, sondern nur der <strong>Ertrag</strong> —
-              die Auszahlung abzüglich Ihrer eingezahlten Beiträge (§ 20 Abs. 1 Nr. 6 EStG).
+              die Auszahlung abzüglich {e.dein('er')} eingezahlten Beiträge (§ 20 Abs. 1 Nr. 6 EStG).
               Läuft der Vertrag mindestens <strong>12 Jahre</strong> und wird nach dem{' '}
               <strong>62. Lebensjahr</strong> ausgezahlt (bei Abschluss bis 2011: nach dem 60.),
-              zählt davon nur die <strong>Hälfte</strong>, versteuert mit Ihrem persönlichen Satz.
+              zählt davon nur die <strong>Hälfte</strong>, versteuert mit {e.dein('em')} persönlichen Satz.
               Wird eine der beiden Bedingungen verfehlt, ist der ganze Ertrag steuerpflichtig.
               Kranken- und Pflegeversicherungsbeiträge fallen <strong>nicht</strong> an — anders
               als bei einer Betriebsrente.

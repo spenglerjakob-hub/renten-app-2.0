@@ -6,6 +6,8 @@ import { useSzenario } from '../store/szenario';
 import { eintragVon, offenePfade, relevant } from './vorbelegung';
 import type { FallSchrittId } from './fortschritt';
 import { Etappen, KNOPF, KNOPF_ZWEIT } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
+import type { AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * DER ASSISTENT fuer die erste Etappe: dieselben Angaben wie im Formular,
@@ -19,40 +21,42 @@ import { Etappen, KNOPF, KNOPF_ZWEIT } from '../components/stil';
  */
 
 interface AssistentSchritt {
-  titel: string;
-  unterlage: ReactNode;
+  /** Titel und Unterlage sprechen den Kunden an — per Du, ein Paar per ihr */
+  titel: (t: AnspracheWoerter) => string;
+  unterlage: (t: AnspracheWoerter) => ReactNode;
   /** Ein Teil der Basisdaten — oder die Vertraege, die der Aufrufer mitgibt */
   teil: BasisTeil | 'vertraege';
 }
 
 const SCHRITTE: AssistentSchritt[] = [
   {
-    titel: 'Haushalt & Krankenversicherung',
+    titel: () => 'Haushalt & Krankenversicherung',
     teil: 'haushalt',
-    unterlage: (
+    unterlage: (t) => (
       <>
-        Gesetzlich versichert: der <strong>Name Ihrer Krankenkasse</strong> — den Zusatzbeitrag kennt
-        der Rechner. Privat versichert: Ihre <strong>Beitragsrechnung</strong>. Bei Kindern genügt das
+        Gesetzlich versichert: der <strong>Name {t.dein('er')} Krankenkasse</strong> — den Zusatzbeitrag kennt
+        der Rechner. Privat versichert: {t.dein('e')} <strong>Beitragsrechnung</strong>. Bei Kindern genügt das
         Geburtsjahr; es entscheidet über Pflegeversicherung, Kinderfreibetrag und Zulagen.
       </>
     ),
   },
   {
-    titel: 'Sie & Ihre gesetzliche Rente',
+    titel: (t) => t.w('Du & deine gesetzliche Rente', 'Ihr beide & eure gesetzliche Rente'),
     teil: 'personen',
-    unterlage: (
+    // Das Zitat aus der Renteninformation bleibt woertlich — so steht es im Brief.
+    unterlage: (t) => (
       <>
         Die <strong>Renteninformation</strong> der Deutschen Rentenversicherung: der Betrag unter{' '}
         <em>„Höhe Ihrer künftigen Regelaltersrente“</em>. Beamte: die <strong>Versorgungsauskunft</strong>{' '}
         mit dem Ruhegehaltssatz. Keine Renteninformation zur Hand? Der Rentenschätzer rechnet aus
-        Ihrem Einkommen.
+        {' '}{t.dein('em')} Einkommen.
       </>
     ),
   },
   {
-    titel: 'Einkommen',
+    titel: () => 'Einkommen',
     teil: 'einkommen',
-    unterlage: (
+    unterlage: () => (
       <>
         Die letzte <strong>Gehaltsabrechnung</strong>: das Gesamtbrutto eines normalen Monats —
         Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter. Beamte: die{' '}
@@ -62,9 +66,9 @@ const SCHRITTE: AssistentSchritt[] = [
     ),
   },
   {
-    titel: 'Bestehende Vorsorge',
+    titel: () => 'Bestehende Vorsorge',
     teil: 'vertraege',
-    unterlage: (
+    unterlage: () => (
       <>
         Die jährliche <strong>Standmitteilung</strong> jedes Vertrags: garantierte bzw. prognostizierte
         Monatsrente, Beitrag und Beginn. Bei Betriebsrenten den Anteil des Arbeitgebers
@@ -74,11 +78,11 @@ const SCHRITTE: AssistentSchritt[] = [
     ),
   },
   {
-    titel: 'Ihr Ziel',
+    titel: (t) => `${t.Dein()} Ziel`,
     teil: 'ziel',
-    unterlage: (
+    unterlage: (t) => (
       <>
-        Keine Unterlage — nur eine Überlegung: Wie viel Geld im Monat brauchen Sie im Ruhestand,
+        Keine Unterlage — nur eine Überlegung: Wie viel Geld im Monat {t.w('brauchst du', 'braucht ihr')} im Ruhestand,
         gerechnet in <strong>heutigem Geld</strong>? Die Preissteigerung bis dahin rechnet der
         Planer selbst hinzu.
       </>
@@ -146,6 +150,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
 }) {
   const szenario = useSzenario((x) => x.szenario);
   const pruefen = useSzenario((x) => x.pruefen);
+  const t = useAnsprache();
   const offen = offenePfade(szenario).filter((p) => relevant(szenario, p));
   const vertraegeOffen = offen.includes('vertraege');
   /*
@@ -170,7 +175,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
   return (
     <section aria-labelledby="assistent-titel" className="ui-karte p-5 sm:p-7">
       <Etappen
-        schritte={SCHRITTE.map((x) => x.titel)}
+        schritte={SCHRITTE.map((x) => x.titel(t))}
         aktiv={i}
         onWechsel={geheZu}
         beschriftung="Schritte des Assistenten"
@@ -180,11 +185,11 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
       />
 
       <div className="mt-6 sm:mt-8">
-        <h3 id="assistent-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{s.titel}</h3>
+        <h3 id="assistent-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{s.titel(t)}</h3>
         {/* Die Unterlage als leiser Satz unter dem Titel — wie die Hilfetexte der Beratung, kein gelber Kasten. */}
         <p className="mt-2 flex max-w-3xl gap-2.5 text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span><span className="font-medium text-ui-tinte">Das brauchen Sie: </span>{s.unterlage}</span>
+          <span><span className="font-medium text-ui-tinte">Das {t.w('brauchst du', 'braucht ihr')}: </span>{s.unterlage(t)}</span>
         </p>
 
         <div className="mt-6">
@@ -220,7 +225,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
             </button>
           ) : <span />}
           <button type="button" onClick={() => (letzter ? onFertig() : geheZu(i + 1))} className={`ml-auto ${KNOPF}`}>
-            {letzter ? 'Fertig — zum Ergebnis' : `Weiter: ${SCHRITTE[i + 1]!.titel}`}
+            {letzter ? 'Fertig — zum Ergebnis' : `Weiter: ${SCHRITTE[i + 1]!.titel(t)}`}
             <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
           </button>
         </div>

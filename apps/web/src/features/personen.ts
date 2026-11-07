@@ -9,6 +9,8 @@
  * (dort erschien nur "A" oder "B"). Solche Regeln laufen auseinander.
  */
 
+import { fallName } from '../lib/namen';
+
 interface Benannt {
   id: string;
   name: string;
@@ -25,4 +27,15 @@ export function personName(p: Benannt): string {
 export function personNameAus(personen: readonly Benannt[], id: string): string {
   const p = personen.find((x) => x.id === id);
   return p ? personName(p) : `Person ${id}`;
+}
+
+/**
+ * Der Name des Falls aus dem Plan: Person A, mit Ehepartner auch Person B —
+ * Vorschlag beim Speichern des Plans und für den Kunden im Antrag. Leer ohne
+ * Namen; Platzhalter wie „Person A“ gehören nicht in einen Plannamen.
+ */
+export function fallNameAus(
+  personen: readonly (Benannt & { vorname?: string; nachname?: string })[], verheiratet: boolean,
+): string {
+  return fallName(personen.filter((p) => p.id === 'A' || verheiratet));
 }

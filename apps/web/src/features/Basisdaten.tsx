@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import { ArrowRight, RotateCcw, Target } from 'lucide-react';
 import { Posten } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
 import { Rentenschaetzer } from './Rentenschaetzer';
 import { PkvFelder } from './PkvFelder';
@@ -54,6 +55,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
   const zeige = (t: BasisTeil) => teil === undefined || teil === t;
   const einklappbar = teil === undefined;
   const s = useSzenario((x) => x.szenario);
+  const t = useAnsprache();
   const { setzeHaushalt, setzeEinkommen, setzePerson, partnerHinzufuegen } = useSzenario();
   const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
   const setzeEinkommenGetrennt = useSzenario((x) => x.setzeEinkommenGetrennt);
@@ -106,7 +108,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         >
           <span>
             <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Assistent fragt alle Angaben
-            einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
+            einzeln ab und sagt, welche Unterlage {t.du} dafür {t.w('brauchst', 'braucht')}.
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Assistenten <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
         </button>
@@ -117,7 +119,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         >
           <span>
             <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
-            einzeln ab und sagt, welche Unterlage Sie dafür brauchen.
+            einzeln ab und sagt, welche Unterlage {t.du} dafür {t.w('brauchst', 'braucht')}.
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Check <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
         </a>
@@ -137,7 +139,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
       {zeige('ziel') && <section className={einklappbar ? 'ui-innen p-4 sm:p-5' : ''}>
         {einklappbar && (
           <h3 className="mb-3 flex items-center gap-2 text-base font-medium text-ui-tinte">
-            <Target className="h-4 w-4 text-ui-schiefer" aria-hidden /> Ihr Ziel
+            <Target className="h-4 w-4 text-ui-schiefer" aria-hidden /> {t.Dein()} Ziel
           </h3>
         )}
         {/*
@@ -183,7 +185,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         )}
         {zielAnteil !== null && (
           <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> Ihres
+            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}{' '}
             heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
           </p>
         )}
@@ -259,7 +261,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
               label="Krankenversicherung in der Erwerbsphase"
               wert={s.haushalt.kvErwerb}
               onChange={(v) => setzeHaushalt({ kvErwerb: v })}
-              hilfe="Als Selbstständiger tragen Sie den gesetzlichen Beitrag allein — einen Arbeitgeberanteil gibt es nicht."
+              hilfe={`Als Selbstständiger ${t.w('trägst du', 'tragt ihr')} den gesetzlichen Beitrag allein — einen Arbeitgeberanteil gibt es nicht.`}
               optionen={[
                 { wert: 'gesetzlich', text: 'Gesetzlich freiwillig versichert' },
                 { wert: 'pkv', text: 'Privat versichert' },
@@ -283,7 +285,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
                   ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
                   : { krankenkasse: undefined });
               }}
-              hilfe={`${KASSEN_STAND}. Findet sich Ihre Kasse nicht, tragen Sie den Satz unten von Hand ein.`}
+              hilfe={`${KASSEN_STAND}. Findet sich ${t.dein('e')} Kasse nicht, den Satz unten von Hand eintragen.`}
               optionen={[
                 { wert: '', text: 'Keine Angabe — Satz selbst eintragen' },
                 ...KRANKENKASSEN.map((k) => ({
@@ -304,7 +306,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
             gibt.
           */}
           <ProzentFeld
-            label="Zusatzbeitrag Ihrer Krankenkasse"
+            label={`Zusatzbeitrag ${t.dein('er')} Krankenkasse`}
             wert={s.haushalt.zusatzbeitrag ?? durchschnittlicherZusatzbeitrag(jetzt)}
             /*
               Von Hand geaendert heisst: Es ist nicht mehr der Satz der
@@ -320,7 +322,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
             max={10}
             stellen={2}
             hilfe={s.haushalt.zusatzbeitrag === undefined
-              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}. Ihre Kasse weicht davon ab.`
+              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}. ${t.Dein('e')} Kasse weicht davon ab.`
               : `Zum Vergleich: Der Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}.`}
             vorbelegt={marke('haushalt.zusatzbeitrag')}
           />
@@ -383,7 +385,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
           jedem anderen Rechner kennen, steht hier, warum sie fehlt.
         */}
         <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-          Eine Steuerklasse brauchen Sie nicht: Gerechnet wird die Jahressteuer, bei Verheirateten
+          Eine Steuerklasse {t.w('brauchst du', 'braucht ihr')} nicht: Gerechnet wird die Jahressteuer, bei Verheirateten
           mit Splitting. Die Steuerklasse regelt nur, wie viel Lohnsteuer monatlich einbehalten wird.
         </p>
       </Abschnitt>}

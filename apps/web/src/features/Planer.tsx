@@ -87,14 +87,14 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
           {!ergebnis.imNettoEnthalten && (
             <p className="mt-3 border-t border-ui-linie pt-3 text-xs leading-relaxed text-ui-tinte">
               Diese Entnahme ist derzeit <strong className="font-medium">nicht</strong> im Haushaltsnetto enthalten.
-              Setzen Sie den Schalter oben, um sie einzurechnen.
+              Mit dem Schalter oben lässt sie sich einrechnen.
             </p>
           )}
         </div>
       ) : (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
-          Noch kein Kapital erfasst. Tragen Sie ein Startkapital ein oder stellen Sie einen
-          Vertrag auf „Kapital in den Entnahmeplaner“ um.
+          Noch kein Kapital erfasst. Ein Startkapital eintragen oder einen Vertrag auf
+          „Kapital in den Entnahmeplaner“ umstellen.
         </p>
       )}
     </div>

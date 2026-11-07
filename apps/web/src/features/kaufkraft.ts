@@ -1,5 +1,6 @@
 import { versorgungsluecke, type Jahreszeile } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
+import { SIE, woerter, type AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * KAUFKRAFT BIS ZUM RENTENBEGINN — in Euro, fuer das Gespraech.
@@ -50,12 +51,13 @@ export function kaufkraft(zeile: Jahreszeile): Kaufkraft | null {
 /**
  * Der Satz fuer das Gespraech — und zum Kopieren ins Beratungsprotokoll.
  * Mit der Annahme darin: Eine Zahl ohne ihre Inflationsannahme waere im
- * Protokoll nicht nachvollziehbar.
+ * Protokoll nicht nachvollziehbar. Im Rechner per Du, in der Schnellrechnung
+ * (ohne Ansprache) wie bisher per Sie.
  */
-export function gespraechssatz(k: Kaufkraft, inflation: number): string {
-  const netto = `Ihr Netto von ${euro(k.nettoNominal)} im Jahr ${k.jahr} entspricht in heutigen Preisen `
+export function gespraechssatz(k: Kaufkraft, inflation: number, t: AnspracheWoerter = woerter(SIE)): string {
+  const netto = `${t.Dein()} Netto von ${euro(k.nettoNominal)} im Jahr ${k.jahr} entspricht in heutigen Preisen `
     + `${euro(k.nettoHeute)} (bei ${prozent(inflation)} Inflation pro Jahr).`;
-  if (k.lueckeNominal <= 0) return `Ihr Ziel ist voraussichtlich gedeckt. ${netto}`;
-  return `Ihnen fehlen im Ruhestand voraussichtlich ${euro(k.lueckeHeute)} im Monat in heutiger Kaufkraft `
+  if (k.lueckeNominal <= 0) return `${t.Dein()} Ziel ist voraussichtlich gedeckt. ${netto}`;
+  return `${t.Dir} fehlen im Ruhestand voraussichtlich ${euro(k.lueckeHeute)} im Monat in heutiger Kaufkraft `
     + `— im Jahr ${k.jahr} sind das ${euro(k.lueckeNominal)}. ${netto}`;
 }

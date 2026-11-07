@@ -5,6 +5,7 @@ import { euro, euroGenau, prozent } from '../components/Feld';
 import { typText, vertragsBezeichnung } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
+import { useAnsprache } from '../components/Ansprache';
 import {
   Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text, KASTEN, KASTEN_TITEL, Summe,
 } from './Bausteine';
@@ -26,8 +27,10 @@ export function TuevBogen({
   szenario: SzenarioParsed;
 }) {
   const { vertrag: v, ergebnis: r, vergleich, istKapital, wege } = position;
+  // Ein Vertrag gehoert einer Person — auch beim Paar „du“, wie am Bildschirm
+  const e = useAnsprache().einzeln;
   const t = szenario.tuev.find((x) => x.vertragId === v.id);
-  const treppe = belastungsTreppe(r);
+  const treppe = belastungsTreppe(r, undefined, e);
   const gut = r.nettoHebel >= 1;
   // Rein arbeitgeberfinanziert: Hebel und Rendite messen am eigenen Aufwand — ohne ihn gibt es sie nicht.
   const ohne = ohneEigenaufwand(r);
@@ -41,7 +44,7 @@ export function TuevBogen({
     >
       <div className="grid grid-cols-3 gap-3">
         <GrosseZahl
-          titel="Kostet Sie im Monat"
+          titel={`Kostet ${e.dich} im Monat`}
           wert={euro(r.echterAufwandMonat)}
           hinweis={`Beitrag ${euro(r.beitragMonat)}`}
         />
@@ -88,7 +91,7 @@ export function TuevBogen({
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div className={KASTEN}>
           <div className={KASTEN_TITEL}>
-            Was Sie einzahlen (laufender Beitrag, monatlich)
+            Was {e.du} {e.w('einzahlst', undefined, 'einzahlen')} (laufender Beitrag, monatlich)
           </div>
           {/* Dieselbe Treppe wie am Bildschirm, aus derselben Funktion: oben
               was der Vertrag bekommt, unten was es kostet. */}
@@ -98,7 +101,7 @@ export function TuevBogen({
               <Angabe feld={z.text} wert={euro(z.betrag)} />
             </div>
           ))}
-          <Summe text="Kostet Sie wirklich" wert={euro(treppe.aufwand)} />
+          <Summe text={`Kostet ${e.dich} wirklich`} wert={euro(treppe.aufwand)} />
         </div>
 
         <div className={KASTEN}>
@@ -122,7 +125,7 @@ export function TuevBogen({
           {istKapital && r.kvPvKapital > 0 && (
             <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(r.kvPvKapital)} />
           )}
-          <Summe text="Bleibt Ihnen" wert={euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)} />
+          <Summe text={`Bleibt ${e.dir}`} wert={euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)} />
         </div>
       </div>
 
@@ -157,7 +160,7 @@ export function TuevBogen({
           )}
           <p className="mt-1 text-[11px] leading-relaxed text-ui-tinte">
             Die Zulagen sind der Anteil des Staates am Gesamtbeitrag — sie fließen zusätzlich in
-            den Vertrag und senken Ihren eigenen Beitrag nicht. Über das Jahr sind das{' '}
+            den Vertrag und senken {e.dein('en')} eigenen Beitrag nicht. Über das Jahr sind das{' '}
             <strong>{euro(laufendeZulageJahr(r))}</strong>.
           </p>
         </div>
@@ -165,10 +168,10 @@ export function TuevBogen({
 
       <Untertitel>Über die gesamte Laufzeit</Untertitel>
       <Zweispaltig>
-        <Angabe feld="Summe Ihres Aufwands" wert={euro(r.summeEinzahlung)} />
+        <Angabe feld={`Summe ${e.dein('es')} Aufwands`} wert={euro(r.summeEinzahlung)} />
         <Angabe feld="Summe der Auszahlung (netto)" wert={euro(r.summeAuszahlung)} />
         <Angabe feld="Überschuss" wert={euro(r.echterGewinn)} />
-        <Angabe feld="Rendite auf Ihren Aufwand" wert={ohne ? '—' : prozent(r.rendite)} />
+        <Angabe feld={`Rendite auf ${e.dein('en')} Aufwand`} wert={ohne ? '—' : prozent(r.rendite)} />
         <Angabe
           feld="Eingesetztes Geld zurück nach"
           wert={ohne ? 'kein eigener Aufwand' : r.amortisationsJahre > 0
@@ -212,13 +215,13 @@ export function TuevBogen({
               hebel(wege.kapital.nettoHebel),
             ]} />
             <Zeile zellen={[
-              'Rendite auf Ihren Aufwand',
+              `Rendite auf ${e.dein('en')} Aufwand`,
               ohne ? '—' : prozent(wege.rente.rendite),
               ohne ? '—' : prozent(wege.kapital.rendite),
             ]} />
           </Tabelle>
           <Text>
-            <strong>Break-even:</strong> Ohne Verzinsung des Kapitals müssten Sie{' '}
+            <strong>Break-even:</strong> Ohne Verzinsung des Kapitals {e.w('müsstest', undefined, 'müssten')} {e.du}{' '}
             <strong>{wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>{' '}
             alt werden, damit die laufende Rente die Einmalzahlung einholt.{' '}
             {wege.breakEven.kapitalTraegtSichSelbst ? (
@@ -238,7 +241,7 @@ export function TuevBogen({
         <>
           <Untertitel>Rente oder Kapital</Untertitel>
           <Text>
-            <strong>Ohne Verzinsung des Kapitals</strong> müssten Sie{' '}
+            <strong>Ohne Verzinsung des Kapitals</strong> {e.w('müsstest', undefined, 'müssten')} {e.du}{' '}
             <strong>{vergleich.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>{' '}
             alt werden, damit die laufende Rente die Einmalzahlung einholt.{' '}
             {vergleich.kapitalTraegtSichSelbst ? (

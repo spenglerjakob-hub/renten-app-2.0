@@ -5,6 +5,7 @@ import { useSzenario } from '../store/szenario';
 import { euro, euroGenau, InfoPunkt } from '../components/Feld';
 import { foerderBasis } from './tuev-berechnung';
 import { EINLEITUNG } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * FÖRDERCHECK — was an Förderung liegen bleibt.
@@ -25,6 +26,9 @@ import { EINLEITUNG } from '../components/stil';
  */
 export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
   const szenario = useSzenario((s) => s.szenario);
+  // `t` fuer den Haushalt (Steuer, Rahmen), `e` fuer die Person des Beitrags (Arbeitgeber, Depot)
+  const t = useAnsprache();
+  const e = t.einzeln;
 
   const { befunde, ohneBeitrag } = useMemo(() => {
     const b = foerderBasis(szenario, zeile);
@@ -47,8 +51,8 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
             Fördercheck
           </h3>
           <p className={`mt-1 ${EINLEITUNG}`}>
-            Oben steht, was Ihre Verträge leisten. Hier steht, welche Förderung Sie heute nicht
-            ausschöpfen — und was ein geförderter Beitrag Sie nach Steuern und Abgaben
+            Oben steht, was {t.dein('e')} Verträge leisten. Hier steht, welche Förderung {t.du} heute nicht
+            {' '}{t.w('ausschöpfst', 'ausschöpft')} — und was ein geförderter Beitrag {t.dich} nach Steuern und Abgaben
             tatsächlich kostet.
           </p>
         </div>
@@ -142,18 +146,18 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                     Aus <strong>{euro(b.probeMonat)}</strong> Eigenbeitrag werden{' '}
                     <strong>{euro(b.zuflussMonat ?? b.probeMonat + b.ersparnisJahr / 12)}</strong>{' '}
                     im Depot: Der Staat legt <strong>{euro(b.ersparnisJahr / 12)}</strong> im
-                    Monat obendrauf — {Math.round(b.foerderquote * 100)} % auf Ihren Beitrag.
+                    Monat obendrauf — {Math.round(b.foerderquote * 100)} % auf {e.dein('en')} Beitrag.
                     {b.probeMonat - b.nettoAufwandMonat >= 0.5 && (
                       <>
                         {' '}Über die Zulage hinaus spart der Sonderausgabenabzug{' '}
                         {euro(b.probeMonat - b.nettoAufwandMonat)} Steuer im Monat; netto kostet
-                        Sie der Beitrag dann <strong>{euro(b.nettoAufwandMonat)}</strong>.
+                        {' '}{e.dich} der Beitrag dann <strong>{euro(b.nettoAufwandMonat)}</strong>.
                       </>
                     )}
                   </>
                 ) : (
                   <>
-                    <strong>{euro(b.probeMonat)}</strong> im Monat kosten Sie nach Förderung nur{' '}
+                    <strong>{euro(b.probeMonat)}</strong> im Monat kosten {e.dich} nach Förderung nur{' '}
                     <strong>{euro(b.nettoAufwandMonat)}</strong> — der Staat trägt{' '}
                     {Math.round(b.foerderquote * 100)} % ({euro(b.ersparnisJahr / 12)} im Monat).
                     {/*
@@ -163,7 +167,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                     */}
                     {(b.agZuschussMonat ?? 0) >= 0.5 && (
                       <>
-                        {' '}Dazu legt Ihr Arbeitgeber <strong>{euroGenau(b.agZuschussMonat!)}</strong>{' '}
+                        {' '}Dazu legt {e.dein()} Arbeitgeber <strong>{euroGenau(b.agZuschussMonat!)}</strong>{' '}
                         obendrauf (§ 1a Abs. 1a BetrAVG) — im Vertrag landen{' '}
                         <strong>{euroGenau(b.zuflussMonat ?? b.probeMonat)}</strong>.
                       </>
@@ -175,18 +179,18 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                     <>
                       Auf {euro(b.probeMonat)} im Monat ({euro(b.probeMonat * 12)} im Jahr) gibt
                       es {euro(b.ersparnisJahr)} Zulage. Das ist <strong>Geld vom Staat</strong>,
-                      keine Steuerersparnis — es fließt unabhängig von Ihrem Steuersatz und wird
-                      dem Vertrag <strong>zusätzlich</strong> gutgeschrieben. Ihr eigener Beitrag
-                      wird dadurch nicht kleiner, Ihr Depot aber um{' '}
-                      {Math.round(b.foerderquote * 100)} % größer als das, was Sie einzahlen.
+                      keine Steuerersparnis — es fließt unabhängig von {e.dein('em')} Steuersatz und wird
+                      dem Vertrag <strong>zusätzlich</strong> gutgeschrieben. {e.Dein()} eigener Beitrag
+                      wird dadurch nicht kleiner, {e.dein()} Depot aber um{' '}
+                      {Math.round(b.foerderquote * 100)} % größer als das, was {e.du} {e.w('einzahlst', undefined, 'einzahlen')}.
                     </>
                   ) : (
                     <>
-                      Der Beitrag von {euro(b.probeMonat * 12)} im Jahr mindert Ihr zu
-                      versteuerndes Einkommen. Gerechnet wird die <strong>Differenz</strong> Ihrer
+                      Der Beitrag von {euro(b.probeMonat * 12)} im Jahr mindert {t.dein()} zu
+                      versteuerndes Einkommen. Gerechnet wird die <strong>Differenz</strong> {t.dein('er')}{' '}
                       Jahressteuer mit und ohne Beitrag — nicht ein Durchschnittssatz. Das ergibt{' '}
                       {euro(b.ersparnisJahr)} im Jahr, also{' '}
-                      {Math.round(b.foerderquote * 100)} % des Einsatzes. Ihr persönlicher
+                      {Math.round(b.foerderquote * 100)} % des Einsatzes. {t.Dein()} persönlicher
                       Steuersatz bestimmt diese Quote; sie ist keine feste Zusage.
                       {(b.agZuschussMonat ?? 0) >= 0.5 && (
                         <>
@@ -214,8 +218,8 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
         */
         <p className="ui-innen mt-5 px-4 py-3 text-xs leading-relaxed text-ui-schiefer">
           Zu {ohneBeitrag === 1 ? 'einem geförderten Vertrag' : `${ohneBeitrag} geförderten Verträgen`}{' '}
-          ist kein laufender Beitrag erfasst. Tragen Sie ihn oben in der Prüfung ein — sonst
-          erscheint hier mehr freier Rahmen, als Sie tatsächlich haben.
+          ist kein laufender Beitrag erfasst. Er gehört oben in die Prüfung — sonst
+          erscheint hier mehr freier Rahmen, als {t.du} tatsächlich {t.w('hast', 'habt')}.
         </p>
       )}
     </section>

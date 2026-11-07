@@ -7,6 +7,7 @@ import {
   type Loesung, type LoesungId,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
+import { SIE, woerter, type AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * Die Vertrags-TUEV-Rechnung, herausgeloest aus der Oberflaeche.
@@ -211,8 +212,10 @@ function stammKontext(
   basis: ReturnType<typeof tuevBasis>,
   erwerb: ErwerbsPersonHeute | undefined,
 ): Pick<TuevKontext, 'jahresbrutto' | 'zveHeute' | 'beamter' | 'privatVersichert' | 'pkvPraemieMonat'
-  | 'selbststaendig' | 'grvBeitragJahr'> {
+  | 'selbststaendig' | 'grvBeitragJahr' | 'ansprache'> {
   return {
+    // Der Rechner spricht den Kunden per Du an — auch in den Hinweisen des Rechenkerns.
+    ansprache: 'du',
     /*
       DAS zvE KOMMT VOM HAUSHALT, BRUTTO UND ERWERBSART VOM INHABER.
       Die Einkommensteuer wird bei Verheirateten gemeinsam veranlagt —
@@ -573,6 +576,8 @@ export function foerderBasis(szenario: SzenarioParsed, zeile: Jahreszeile | null
       kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
     },
     kontext: {
+      // Die Befunde per Du, wie der ganze Rechner
+      ansprache: 'du',
       jahresbrutto: basis.jahresbrutto,
       zveHeute: basis.zve,
       /*
@@ -681,6 +686,11 @@ export function belastungsTreppe(
     /** Mitarbeiterberatung: Die Ersparnis ist Lohnsteuer dieser Klasse, nicht Jahressteuer */
     steuerklasse?: Steuerklasse;
   },
+  /**
+   * Die Ansprache: im Rechner und im Gutachten per Du. Ohne Angabe per Sie —
+   * so rechnet die Mitarbeiterberatung, deren Unterlagen unveraendert bleiben.
+   */
+  t: AnspracheWoerter = woerter(SIE),
 ): {
   zufluss: number;
   zeilen: TreppenZeile[];
@@ -697,7 +707,7 @@ export function belastungsTreppe(
       betrag: zulagen,
       art: 'abzug',
       erklaerung: `${euroText(zulagen * 12)} im Jahr, die der Staat dem Vertrag gutschreibt — `
-        + 'unabhängig von Ihrem Steuersatz. Sie erhöhen das Kapital und senken Ihren eigenen '
+        + `unabhängig von ${t.dein('em')} Steuersatz. Sie erhöhen das Kapital und senken ${t.dein('en')} eigenen `
         + 'Beitrag nicht; deshalb stehen sie oben im Zufluss und gehen hier wieder ab.',
     });
   }
@@ -706,7 +716,7 @@ export function belastungsTreppe(
       text: '− Arbeitgeberzuschuss',
       betrag: agZuschuss,
       art: 'abzug',
-      erklaerung: 'Was Ihr Arbeitgeber zum Vertrag beisteuert. Bei Entgeltumwandlung sind '
+      erklaerung: `Was ${t.dein()} Arbeitgeber zum Vertrag beisteuert. Bei Entgeltumwandlung sind `
         + 'mindestens 15 % Pflicht (§ 1a Abs. 1a BetrAVG), weil er Sozialabgaben spart; '
         + 'viele zahlen mehr.',
     });
@@ -724,7 +734,7 @@ export function belastungsTreppe(
       text: '− SV-Ersparnis',
       betrag: sv,
       art: 'abzug',
-      erklaerung: fuerErklaerung && svErklaerung(sv, fuerErklaerung),
+      erklaerung: fuerErklaerung && svErklaerung(sv, fuerErklaerung, t),
     });
   }
   if (r.steuerersparnisMonat > 0) {
@@ -734,7 +744,7 @@ export function belastungsTreppe(
       art: 'abzug',
       // Das zu versteuernde Einkommen mindert der eigene Beitrag — nicht der Zuschuss des Arbeitgebers
       erklaerung: fuerErklaerung
-        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat - agZuschuss, fuerErklaerung),
+        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat - agZuschuss, fuerErklaerung, t),
     });
   }
 
@@ -748,7 +758,7 @@ export function belastungsTreppe(
       // "Entgeltumwandlung" trifft es nur dort, wo ein Zuschuss fliesst: Den
       // gibt es nach § 1a Abs. 1a BetrAVG gerade deshalb, weil der
       // Beschaeftigte Entgelt umwandelt.
-      text: agZuschuss > 0 ? '= Ihre Entgeltumwandlung' : '= Ihr Eigenbeitrag',
+      text: agZuschuss > 0 ? `= ${t.Dein('e')} Entgeltumwandlung` : `= ${t.Dein()} Eigenbeitrag`,
       betrag: zufluss - zulagen - agZuschuss,
       art: 'summe',
     });
@@ -762,15 +772,16 @@ export function belastungsTreppe(
 function svErklaerung(
   svMonat: number,
   k: { p: LegalParameters; beamter: boolean; selbststaendig: boolean; privatVersichert: boolean },
+  t: AnspracheWoerter,
 ): string {
   const frei = SV_FREI_QUOTE * k.p.bbgRvJahr / 12;
   const teil = k.privatVersichert
-    ? 'Renten- und Arbeitslosenversicherung — Ihre private Krankenversicherung richtet sich '
+    ? `Renten- und Arbeitslosenversicherung — ${t.dein('e')} private Krankenversicherung richtet sich `
       + 'nach dem Vertrag, nicht nach dem Gehalt, und spart deshalb nichts'
     : 'Renten-, Arbeitslosen-, Kranken- und Pflegeversicherung';
   return `Umgewandeltes Entgelt ist bis ${euroText(frei)} im Monat beitragsfrei — 4 % der `
     + 'Beitragsbemessungsgrenze (§ 1 Abs. 1 Nr. 9 SvEV), für Arbeitgeber- und Arbeitnehmeranteil '
-    + 'zusammen; der Arbeitgeberanteil wird zuerst angerechnet. Gespart wird Ihr ARBEITNEHMERanteil '
+    + `zusammen; der Arbeitgeberanteil wird zuerst angerechnet. Gespart wird ${t.dein()} ARBEITNEHMERanteil `
     + `zur ${teil}: ${euroText(svMonat)} im Monat. Was über die 4 % hinausgeht, trägt volle `
     + 'Sozialabgaben.';
 }
@@ -782,14 +793,15 @@ function steuerErklaerung(
   steuerMonat: number,
   beitragMonat: number,
   k: { zve: number; p: LegalParameters; splitting?: boolean; steuerklasse?: Steuerklasse },
+  t: AnspracheWoerter,
 ): string {
   const grenz = k.steuerklasse
     ? grenzLohnsteuersatz(k.zve, k.steuerklasse, k.p)
     : grenzsteuersatz(k.zve, k.splitting ?? false, k.p);
   const steuer = k.steuerklasse ? `Lohnsteuer in Steuerklasse ${ROEMISCH[k.steuerklasse]}` : 'Jahressteuer';
-  return `Der Beitrag mindert Ihr zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
-    + `wird die DIFFERENZ Ihrer ${steuer} mit und ohne Beitrag — nicht ein `
-    + `Durchschnittssatz: Der letzte Euro Ihres Einkommens kostet rund `
+  return `Der Beitrag mindert ${t.dein()} zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
+    + `wird die DIFFERENZ ${t.dein('er')} ${steuer} mit und ohne Beitrag — nicht ein `
+    + `Durchschnittssatz: Der letzte Euro ${t.dein('es')} Einkommens kostet rund `
     + `${(grenz * 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} % Steuer, und `
     + `genau dort setzt der Beitrag an. Von ${euroText(beitragMonat)} bleiben so `
     + `${euroText(steuerMonat)} im Monat beim Finanzamt liegen.`;
@@ -929,12 +941,13 @@ export const angebotGesamtMonat = (a: { loesung: LoesungsArt; beitragMonat: numb
  */
 export const ohneEigenaufwand = (r: Pick<TuevErgebnis, 'summeEinzahlung'>) => r.summeEinzahlung < 0.005;
 
-/** Die Erklaerung dazu — am Bildschirm und im Gutachten derselbe Satz. */
-export const OHNE_EIGENAUFWAND_TEXT = 'Rein arbeitgeberfinanziert: Den Beitrag trägt allein der Arbeitgeber — Sie '
-  + 'zahlen nichts aus Ihrem Netto, die Rente kommt hinzu. Netto-Hebel, Rendite und Amortisation messen am '
+/** Die Erklaerung dazu — am Bildschirm und im Gutachten derselbe Satz; im Rechner per Du. */
+export const ohneEigenaufwandText = (t: AnspracheWoerter = woerter(SIE)) =>
+  `Rein arbeitgeberfinanziert: Den Beitrag trägt allein der Arbeitgeber — ${t.du} `
+  + `${t.w('zahlst', 'zahlt', 'zahlen')} nichts aus ${t.dein('em')} Netto, die Rente kommt hinzu. Netto-Hebel, Rendite und Amortisation messen am `
   + 'eigenen Aufwand und entfallen deshalb. In Direktversicherung, Pensionskasse und Pensionsfonds ist der '
   + 'Arbeitgeberbeitrag bis 8 % der Beitragsbemessungsgrenze steuerfrei und bis 4 % beitragsfrei; was darüber '
-  + 'liegt, ist für Sie steuer- bzw. beitragspflichtiger Lohn — das ist hier nicht gerechnet.';
+  + `liegt, ist für ${t.dich} steuer- bzw. beitragspflichtiger Lohn — das ist hier nicht gerechnet.`;
 
 /** Kennt diese Loesung eine volle Kapitalauszahlung? bAV und private Rentenversicherung ja. */
 export const angebotKenntKapital = (loesung: LoesungsArt) => kenntKapitalwahl(AUSZAHL_TYP[loesung]);

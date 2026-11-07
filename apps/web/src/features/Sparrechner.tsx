@@ -5,6 +5,7 @@ import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
 import { anteilAmNetto } from './bezug';
 import { Hervor, Karte, Kernsatz, SCHWEBEND } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 import {
   sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
@@ -26,6 +27,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
   onStartbeitrag?: (n: number | null) => void;
 }) {
   const szenario = useSzenario((x) => x.szenario);
+  const t = useAnsprache();
   const schmal = useSchmal();
   const [eingaben, setEingaben] = useState<SparzielEingaben>(SPARZIEL_VORGABE);
 
@@ -85,8 +87,8 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
         </div>
         <p className="mt-6 border-t border-ui-linie pt-5 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
-          <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik beginnen Sie mit{' '}
-          <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und zahlen im letzten Sparjahr{' '}
+          <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik {t.w('beginnst du', 'beginnt ihr')} mit{' '}
+          <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und {t.w('zahlst', 'zahlt')} im letzten Sparjahr{' '}
           <strong>{euro(r.gewaehlt.endbeitrag)}</strong>. Die Rechnung unterstellt, dass die
           Entnahme später mit {prozent(szenario.annahmen.inflation)} Inflation mitwächst, und
           zieht die Abgeltungsteuer auf den Ertragsanteil bereits ab. Sie nennt eine
@@ -108,7 +110,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
               hinweis={`bei Rentenbeginn, für ${eingaben.auszahldauer} Jahre`}
             />
             <Kachel
-              titel="Ihr Startbeitrag"
+              titel={`${t.Dein()} Startbeitrag`}
               wert={euro(r.gewaehlt.startbeitrag)}
               hinweis={`im Monat, ${r.jahreBisRente} Jahre lang`}
             />
@@ -117,7 +119,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
           {anteil && (
             <p className="mt-5 border-t border-ui-linie pt-4 text-sm leading-relaxed text-ui-schiefer">
               Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind{' '}
-              <strong className="font-medium text-ui-tinte">{anteil}</strong> Ihres
+              <strong className="font-medium text-ui-tinte">{anteil}</strong> {t.dein('es')}{' '}
               heutigen Haushaltsnettos von {euro(nettoHeute)} im Monat.
             </p>
           )}

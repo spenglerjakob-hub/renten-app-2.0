@@ -6,6 +6,7 @@ import { euro, prozent, InfoPunkt } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
 import { pkvRechnen, LEBENSERWARTUNG, SCHWELLE_ANTEIL, type PkvErgebnis } from './pkv-berechnung';
 import { KNOPF_ZWEIT } from '../components/stil';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * Was die private Krankenversicherung im Ruhestand kostet.
@@ -17,6 +18,9 @@ import { KNOPF_ZWEIT } from '../components/stil';
 export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
   const szenario = useSzenario((x) => x.szenario);
   const schmal = useSchmal();
+  // Der Vertrag gehoert einer Person — sie per „du“; das Ziel dem Haushalt
+  const t = useAnsprache();
+  const e = t.einzeln;
   const [offen, setOffen] = useState(false);
 
   const r = useMemo(
@@ -58,7 +62,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           </span>
           <span>
             <span className="block text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
-              Ihre private Krankenversicherung
+              {e.Dein('e')} private Krankenversicherung
             </span>
             <span className="mt-0.5 block text-sm text-ui-schiefer">
               Heute {euro(r.heute.gesamtMonat)} — im Jahr {r.rentenjahr} {euro(r.beiRente.praemieMonat)}
@@ -98,7 +102,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
 
         <p className="mt-3 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           Die Stufe nach unten liegt bei <strong>{ZUSCHLAG_BIS_ALTER + 1}</strong>: bis zum
-          Kalenderjahr Ihres {ZUSCHLAG_BIS_ALTER}. Geburtstags wird der gesetzliche Zuschlag von
+          Kalenderjahr {e.dein('es')} {ZUSCHLAG_BIS_ALTER}. Geburtstags wird der gesetzliche Zuschlag von
           10 % erhoben, danach entfällt er (§ 149 VAG). Ab 65 senken die daraus angesparten Mittel
           den Beitrag <em>nicht</em> — sie finanzieren Erhöhungen (§ 150 Abs. 3 VAG), die Kurve
           steigt dort also flacher. Ab 80 mindern nicht verbrauchte Mittel den Beitrag; das ist
@@ -118,13 +122,13 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           <div className="ui-innen mt-5 p-4">
             <p className="text-xs leading-relaxed text-ui-tinte/80">
               <strong className="font-medium text-ui-tinte">
-                Ihr Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} Ihres
+                {e.Dein()} Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} {t.dein('es')}{' '}
                 Zielnettos
               </strong>{' '}
               — {euro(r.beiRente.gesamtMonat)} von {euro(zeile.zielNettoMonat)}. Ein
-              Beitragsentlastungstarif senkt genau diesen Betrag: Sie zahlen heute mehr, um im
+              Beitragsentlastungstarif senkt genau diesen Betrag: {e.Du} {e.w('zahlst', undefined, 'zahlen')} heute mehr, um im
               Ruhestand dauerhaft weniger zu zahlen. Ob sich das rechnet, hängt an Beitrag,
-              Entlastung und Ihrer Lebenserwartung — tragen Sie ihn oben ein, dann steht die
+              Entlastung und {e.dein('er')} Lebenserwartung — oben eingetragen, steht die
               Gegenüberstellung hier.
             </p>
             <a href={mailto} className={`mt-3 ${KNOPF_ZWEIT}`}>
@@ -210,6 +214,7 @@ function BetKarte({ bet, n, abAlter }: {
   n: NonNullable<PkvErgebnis['betNetto']>;
   abAlter: number;
 }) {
+  const e = useAnsprache().einzeln;
   const alter = (x: number | null) =>
     x !== null ? `${x.toLocaleString('de-DE', { maximumFractionDigits: 0 })} Jahren` : 'nie';
   const zeilen: [string, string, string][] = [
@@ -222,7 +227,7 @@ function BetKarte({ bet, n, abAlter }: {
   return (
     <div className="mt-5">
       <div className="mb-2 text-sm font-medium text-ui-tinte">
-        Ihr Beitragsentlastungstarif
+        {e.Dein()} Beitragsentlastungstarif
       </div>
       <table className="w-full overflow-hidden rounded-[8px] border border-ui-linie text-xs tabular-nums">
         <thead className="bg-ui-innen text-xs text-ui-schiefer">
@@ -234,16 +239,16 @@ function BetKarte({ bet, n, abAlter }: {
               <InfoPunkt titel="Wie aus brutto netto wird">
                 <strong>Heute:</strong>{' '}
                 {n.agMonat >= 0.5
-                  ? <>Von {euro(n.beitragMonat)} Beitrag trägt Ihr Arbeitgeber {euro(n.agMonat)}.</>
+                  ? <>Von {euro(n.beitragMonat)} Beitrag trägt {e.dein()} Arbeitgeber {euro(n.agMonat)}.</>
                   : <>Einen Arbeitgeberzuschuss auf die {euro(n.beitragMonat)} gibt es nicht —
                       Selbstständige und Beamte bekommen keinen, Angestellte nicht mehr, wenn die
                       Prämie den Höchstzuschuss schon ausschöpft.</>}{' '}
-                Ihr eigener Anteil zählt zu {prozent(PKV_BASISANTEIL, 0)} als Sonderausgabe und spart
-                bei Ihrem heutigen Steuersatz {euro(n.steuerMonat)} — so kostet der Tarif Sie{' '}
+                {e.Dein()} eigener Anteil zählt zu {prozent(PKV_BASISANTEIL, 0)} als Sonderausgabe und spart
+                bei {e.dein('em')} heutigen Steuersatz {euro(n.steuerMonat)} — so kostet der Tarif {e.dich}{' '}
                 {euro(n.aufwandMonat)}.{' '}
                 <strong>Ab {abAlter}:</strong> {euro(n.entlastungMonat)} Entlastung, abzüglich{' '}
                 {euro(n.restbeitragMonat)} Restbeitrag, der weiterläuft. Die niedrigere Prämie
-                mindert aber auch Ihren Sonderausgabenabzug; das kostet zum Steuersatz im Ruhestand{' '}
+                mindert aber auch {e.dein('en')} Sonderausgabenabzug; das kostet zum Steuersatz im Ruhestand{' '}
                 {euro(n.steuerRuhestandMonat)}. Es bleiben {euro(n.ersparnisMonat)}. Gerechnet mit{' '}
                 {prozent(n.steuersatzHeute, 0)} heute und {prozent(n.steuersatzRuhestand, 0)} im
                 Ruhestand, jeweils je Euro Sonderausgabe samt Soli und Kirchensteuer.
@@ -264,10 +269,10 @@ function BetKarte({ bet, n, abAlter }: {
       <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
         Brutto sind die Beträge aus dem Vertrag, die Ersparnis schon nach dem Restbeitrag.{' '}
         <strong className="font-medium text-ui-tinte">Netto</strong> nach Arbeitgeberzuschuss und Steuer — darauf kommt es an: Den
-        Beitrag mindert heute Ihr höherer Steuersatz, die Entlastung kostet im Ruhestand Abzug zu
+        Beitrag mindert heute {e.dein()} höherer Steuersatz, die Entlastung kostet im Ruhestand Abzug zu
         einem meist niedrigeren. Nominal addiert, ohne Abzinsung; die Entlastung ist ein fester
         Betrag und verliert über die Jahre an Kaufkraft. Den genauen abziehbaren Anteil nennt die
-        Beitragsbescheinigung Ihres Versicherers.
+        Beitragsbescheinigung {e.dein('es')} Versicherers.
       </p>
     </div>
   );

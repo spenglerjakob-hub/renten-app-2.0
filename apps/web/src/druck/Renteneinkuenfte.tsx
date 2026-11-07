@@ -7,9 +7,10 @@ import {
   Seite, Untertitel, Angabe, Zweispaltig, Tabelle, Zeile, Gruppenzeile,
   GrosseZahl, Text, KASTEN, Abzeichen,
 } from './Bausteine';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
- * "Ihre Renteneinkuenfte" — woraus sich das Netto zusammensetzt.
+ * Die Renteneinkuenfte — woraus sich das Netto zusammensetzt.
  *
  * WARUM EIGENS GEBAUT: An dieser Stelle stand der Kassenbon des Bildschirms.
  * Der besteht aus Klappknoepfen, Schatten, runden Karten und Schichtfarben —
@@ -40,6 +41,7 @@ export function Renteneinkuenfte({
    */
   einzelperson?: string;
 }) {
+  const an = useAnsprache();
   const geteilt = geteilterFreibetrag(szenario, zeile.jahr);
   const luecke = zeile.zielNettoMonat - zeile.nettoMonat;
   const gedeckt = zeile.zielNettoMonat > 0
@@ -54,7 +56,7 @@ export function Renteneinkuenfte({
 
   return (
     <Seite
-      titel={`Ihre Renteneinkünfte im Jahr ${zeile.jahr}`}
+      titel={`${an.Dein('e')} Renteneinkünfte im Jahr ${zeile.jahr}`}
       nummer={`Alter ${zeile.alterA} · Beträge des jeweiligen Jahres`}
     >
       <div className="grid grid-cols-3 gap-3">
@@ -81,7 +83,7 @@ export function Renteneinkuenfte({
         Kaufkraft — auf dem Papier stand bisher nur der hochgerechnete Betrag,
         und der wirkt ohne den Bezugspunkt willkuerlich hoch.
       */}
-      <Untertitel>Ihr Versorgungsziel — monatlich, in zwei Maßstäben</Untertitel>
+      <Untertitel>{an.Dein()} Versorgungsziel — monatlich, in zwei Maßstäben</Untertitel>
       <div className={KASTEN}>
         <div className="mb-1 grid grid-cols-2 gap-x-8 text-[11px] font-medium text-ui-schiefer">
           <span>In heutiger Kaufkraft</span>
@@ -93,11 +95,11 @@ export function Renteneinkuenfte({
           <Angabe feld="Erwartetes Netto" wert={euro(heute(zeile.nettoMonat))} />
           <Angabe feld="Erwartetes Netto" wert={euro(zeile.nettoMonat)} />
           <Angabe
-            feld={luecke > 0 ? 'Es fehlen' : 'Darüber hinaus'}
+            feld={luecke > 0 ? `${an.Dir} fehlen` : 'Darüber hinaus'}
             wert={euro(Math.abs(heute(luecke)))}
           />
           <Angabe
-            feld={luecke > 0 ? 'Es fehlen' : 'Darüber hinaus'}
+            feld={luecke > 0 ? `${an.Dir} fehlen` : 'Darüber hinaus'}
             wert={euro(Math.abs(luecke))}
           />
         </Zweispaltig>
@@ -162,7 +164,7 @@ export function Renteneinkuenfte({
                   {a.kvPvGesamt > 0 && (
                     <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(a.kvPvGesamt)} />
                   )}
-                  <Angabe feld="Bleibt Ihnen" wert={euro(a.nettoKapital)} />
+                  <Angabe feld={`Bleibt ${an.dir}`} wert={euro(a.nettoKapital)} />
                   {/* Bei vorgezogenem Ablauf: was zum Rentenbeginn daraus wird. */}
                   {a.wachstumJahre > 0 && (
                     <Angabe
@@ -216,7 +218,7 @@ export function Renteneinkuenfte({
       <Text>
         Alle Beträge sind Monatsbeträge des Jahres {zeile.jahr}, also das, was später auf dem
         Kontoauszug steht. Was Netto, Ziel und Lücke in heutigem Geld wert sind, steht oben unter
-        „Ihr Versorgungsziel“.
+        „{an.Dein()} Versorgungsziel“.
       </Text>
     </Seite>
   );

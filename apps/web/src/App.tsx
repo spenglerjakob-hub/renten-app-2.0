@@ -61,7 +61,9 @@ import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seiten
 import { Dialog } from './components/Dialog';
 import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
 import { RechtsLinks } from './components/RechtsLinks';
-import { personName, personNameAus } from './features/personen';
+import { fallNameAus, personName, personNameAus } from './features/personen';
+import { AnspracheGeben } from './components/Ansprache';
+import { vornamen, woerter, type Ansprache } from './lib/ansprache';
 import { AkkordeonKarte, euro } from './components/Feld';
 import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
 
@@ -511,11 +513,20 @@ export default function App() {
   */
   const antragLoesungen = useMemo(() => antragLoesungenAus(mitHaushalt.loesungen, nameVon), [mitHaushalt, nameVon]);
   const kundeVorschlag = useMemo(
-    () => szenario.personen
-      .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
-      .map((p) => p.name.trim()).filter(Boolean).join(' und '),
+    () => fallNameAus(szenario.personen, szenario.haushalt.verheiratet),
     [szenario.personen, szenario.haushalt.verheiratet],
   );
+  /*
+    Die Ansprache des Kunden fuer Rechner und Gutachten: Du, ein Paar im
+    ganzen Haushalt im Plural, in der Einzelbetrachtung die gewaehlte Person.
+  */
+  const ansprache = useMemo<Ansprache>(() => ({
+    form: 'du',
+    mehrere: paar && !einzeln,
+    name: vornamen(szenario.personen.filter((p) => (einzeln ? p.id === wer : p.id === 'A' || paar))),
+  }), [szenario.personen, paar, einzeln, wer]);
+  // App liegt selbst ueber dem Kontext — ihre Etappenkoepfe nehmen die Woerter direkt.
+  const t = useMemo(() => woerter(ansprache), [ansprache]);
   const fallSchritte = useMemo(
     () => fallFortschritt(szenario, { konto: Boolean(angemeldet), nameVon }),
     [szenario, angemeldet, nameVon],
@@ -616,6 +627,7 @@ export default function App() {
     mit: mitAnsicht,
     ergebnisMit,
     positionenMit,
+    ansprache: t,
   });
   const [druckAuswahl, setDruckAuswahl] = useState<DruckAuswahl>(ALLES);
   const [druckOffen, setDruckOffen] = useState(false);
@@ -871,6 +883,7 @@ export default function App() {
       Haarlinie. Eingaben und Ergebnisse trennt nicht mehr ein Farbton,
       sondern die Etappe — wie in der Mitarbeiterberatung.
     */
+    <AnspracheGeben wert={ansprache}>
     <div className="min-h-screen bg-ui-flaeche pb-28 text-ui-tinte sm:pb-32 print:pb-0">
       {/*
         KOPFZEILE — hell wie der Kopf der anderen Seiten (`SeitenKopf`), aber
@@ -1133,8 +1146,8 @@ export default function App() {
         {schritt === 'daten' && (
           <>
             <EtappenKopf
-              titel={<>Ihre Daten und <Hervor>Ihr Ziel</Hervor></>}
-              text="Wer Sie sind, was Sie verdienen, was schon an Vorsorge da ist — und mit wie viel Geld im Monat Sie im Ruhestand leben möchten."
+              titel={<>{t.Dein('e')} Daten und <Hervor>{t.dein()} Ziel</Hervor></>}
+              text={`Wer ${t.du} ${t.w('bist', 'seid')}, was ${t.du} ${t.w('verdienst', 'verdient')}, was schon an Vorsorge da ist — und mit wie viel Geld im Monat ${t.du} im Ruhestand leben ${t.w('möchtest', 'möchtet')}.`}
             />
             {/*
               LINKS die Angaben zur Person, RECHTS die Vertraege — auf weissen
@@ -1243,8 +1256,8 @@ export default function App() {
               ? <ErgebnisKopf zeile={zeile} kaufkraftHeute={kaufkraftHeute} onKaufkraftHeute={setKaufkraftHeute} />
               : (
                 <EtappenKopf
-                  titel="Ihr Ergebnis"
-                  text="Was Ihnen im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu Ihrem Ziel ist."
+                  titel={`${t.Dein()} Ergebnis`}
+                  text={`Was ${t.dir} im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu ${t.dein('em')} Ziel ist.`}
                 />
               )}
             {/* Was die Zahlen darunter bestimmt — wessen Fall, welches Jahr — steht vor ihnen. */}
@@ -1352,9 +1365,9 @@ export default function App() {
             */}
             <EtappenKopf
               titel={ergebnis && luecke > 0 && sparrate !== null
-                ? <>Mit <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(sparrate)}</Hervor></span> im Monat schließen Sie die Lücke</>
+                ? <>{t.anrede('mit')} <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(sparrate)}</Hervor></span> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke</>
                 : 'Die Lücke schließen'}
-              text="Wie viel Sie ab heute monatlich zurücklegen müssten, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten."
+              text={`Wie viel ${t.du} ab heute monatlich zurücklegen ${t.w('müsstest', 'müsstet')}, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten.`}
             />
             {paarUmschalter}
             {beispielHinweis}
@@ -1370,7 +1383,7 @@ export default function App() {
           <>
             <EtappenKopf
               titel="Vertrags-TÜV & Lösungen"
-              text="Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den Sie neu in die Altersvorsorge stecken."
+              text={`Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den ${t.du} neu in die Altersvorsorge ${t.w('steckst', 'steckt')}.`}
             />
             {paarUmschalter}
             {beispielHinweis}
@@ -1563,5 +1576,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </AnspracheGeben>
   );
 }

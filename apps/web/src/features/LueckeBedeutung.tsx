@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { ArrowRight, Hourglass } from 'lucide-react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
+import { useAnsprache } from '../components/Ansprache';
 import { euro, prozent } from '../components/Feld';
 import { KNOPF_ZWEIT, Posten } from '../components/stil';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 import { anteilAmNetto } from './bezug';
 
 /**
- * "Was die Luecke fuer Sie bedeutet" — die Bruecke vom Ergebnis zum Sparrechner.
+ * "Was die Luecke fuer dich bedeutet" — die Bruecke vom Ergebnis zum Sparrechner.
  *
  * Eine Luecke von 3.000 EUR im Jahr 2070 sagt fuer sich wenig: Sie ist
  * nominal, also um Jahrzehnte Inflation aufgeblaeht, und sie nennt nicht, was
@@ -30,6 +31,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
   klasse?: string;
 }) {
   const szenario = useSzenario((x) => x.szenario);
+  const t = useAnsprache();
   const r = useMemo(() => sparzielRechnen(szenario, zeile, SPARZIEL_VORGABE), [szenario, zeile]);
   if (!r) return null;
   const anteil = anteilAmNetto(r.gewaehlt.startbeitrag, nettoHeute);
@@ -37,7 +39,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
   return (
     <section className={`ui-karte p-5 sm:p-7 ${klasse}`}>
       <h3 className="flex items-center gap-2.5 text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
-        <Hourglass className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> Was die Lücke für Sie bedeutet
+        <Hourglass className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> Was die Lücke für {t.dich} bedeutet
       </h3>
 
       {/* Zwei kleine Aufstellungen wie in der Beratung — die zweite fuehrt zur Sparrate. */}
@@ -57,7 +59,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
           wert={(
             <>
               <span className="font-medium">{euro(r.gewaehlt.startbeitrag)} im Monat</span>
-              {anteil && <span className="block text-xs text-ui-schiefer">= {anteil} Ihres heutigen Nettos von {euro(nettoHeute)}</span>}
+              {anteil && <span className="block text-xs text-ui-schiefer">= {anteil} {t.dein('es')} heutigen Nettos von {euro(nettoHeute)}</span>}
             </>
           )}
         />
@@ -71,7 +73,7 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
 
       <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
         Bei {prozent(SPARZIEL_VORGABE.rendite)} Rendite nach Kosten, gleichbleibendem Beitrag und{' '}
-        {SPARZIEL_VORGABE.auszahldauer} Jahren Auszahlung. Anpassen können Sie das im Sparrechner.
+        {SPARZIEL_VORGABE.auszahldauer} Jahren Auszahlung. Anpassen lässt sich das im Sparrechner.
       </p>
 
       {/* Der zweite Knopf: Die Hauptaktion der Etappe ist „Weiter“ am Ende — sie fuehrt ebenfalls dorthin. */}
