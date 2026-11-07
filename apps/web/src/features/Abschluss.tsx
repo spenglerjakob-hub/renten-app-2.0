@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { versorgungsluecke, type Jahreszeile, type ProjektionsErgebnis } from '@renten/engine';
+import { useAnsprache } from '../components/Ansprache';
 import { euro } from '../components/Feld';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { EINLEITUNG, Hervor, KNOPF_ZWEIT, LINK, Posten, Titel } from '../components/stil';
@@ -50,21 +51,23 @@ export function Abschluss({
   const zeileMit = ergebnisMit && vorher ? zeileIm(ergebnisMit, vorher.jahr) : null;
   const f = zeileMit && kaufkraftHeute ? 1 / zeileMit.kaufkraftfaktor : 1;
   const lueckeMit = zeileMit ? versorgungsluecke(zeileMit) : 0;
+  const t = useAnsprache();
+  const angenommen = `die ${t.du} angenommen ${t.w('hast', 'habt')}`;
 
   if (!mit) {
     return (
       <>
         <div>
-          <Titel gross als="h2">Ihr Ergebnis mit den gewählten Lösungen</Titel>
+          <Titel gross als="h2">{t.Dein()} Ergebnis mit den gewählten Lösungen</Titel>
           <p className={`mt-3 ${EINLEITUNG}`}>
-            Hier steht Ihr Ergebnis noch einmal — mit den Lösungen, die Sie angenommen haben.
+            Hier steht {t.dein()} Ergebnis noch einmal — mit den Lösungen, {angenommen}.
           </p>
         </div>
         {vorspann}
         <div className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
           <p>
             {person ? `Für ${person} ist noch keine Lösung angenommen.` : 'Noch ist keine Lösung angenommen.'}{' '}
-            Setzen Sie in „Vertrags-TÜV & Lösungen“ bei den Angeboten das Häkchen „Annehmen“.
+            Dazu in „Vertrags-TÜV & Lösungen“ bei den Angeboten das Häkchen „Annehmen“ setzen.
           </p>
           <button type="button" onClick={onZuLoesungen} className={`mt-4 ${KNOPF_ZWEIT}`}>
             Zu den Angeboten <ArrowRight className="h-4 w-4" aria-hidden />
@@ -78,15 +81,16 @@ export function Abschluss({
     <>
       <div>
         <Titel gross als="h2">
+          {/* Der Kernsatz mit dem Vornamen vorn: „Max, mit den gewählten Lösungen fehlen dir noch …“ */}
           {!zeileMit
-            ? 'Ihr Ergebnis mit den gewählten Lösungen'
+            ? `${t.Dein()} Ergebnis mit den gewählten Lösungen`
             : lueckeMit > 0
-              ? <>Mit den gewählten Lösungen fehlen noch <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeMit * f)}</Hervor></span> im Monat</>
-              : <>Mit den gewählten Lösungen ist Ihr Ziel <Hervor>gedeckt</Hervor></>}
+              ? <>{t.anrede('mit')} den gewählten Lösungen fehlen {t.dir} noch <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeMit * f)}</Hervor></span> im Monat</>
+              : <>{t.anrede('mit')} den gewählten Lösungen ist {t.dein()} Ziel <Hervor>gedeckt</Hervor></>}
         </Titel>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <p className={`${EINLEITUNG} min-w-0 flex-1 basis-72`}>
-            Ihr Ergebnis noch einmal, jetzt mit den Lösungen, die Sie angenommen haben — gemeinsam
+            {t.Dein()} Ergebnis noch einmal, jetzt mit den Lösungen, {angenommen} — gemeinsam
             gerechnet, mit der Steuer auf alle Renten zusammen. Was dazugekommen ist, trägt die Marke
             „{NEU_TEXT}“.
           </p>
@@ -200,11 +204,12 @@ function GewaehlteLoesungen({ mit, positionen, inhaberName, onZuLoesungen }: {
     return p?.rente ?? p?.kapital ?? null;
   };
   const summe = mit.loesungen.reduce((s, x) => s + (aufwand(x.angebot.id)?.echterAufwandMonat ?? 0), 0);
+  const t = useAnsprache();
 
   return (
     <section aria-labelledby="gewaehlte-loesungen" className="ui-karte p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="gewaehlte-loesungen" className="text-base font-medium text-ui-tinte">Ihre gewählten Lösungen</h3>
+        <h3 id="gewaehlte-loesungen" className="text-base font-medium text-ui-tinte">{t.Dein('e')} gewählten Lösungen</h3>
         <button type="button" onClick={onZuLoesungen} className={`${LINK} text-xs`}>Ändern</button>
       </div>
       <ul className="mt-2 divide-y divide-ui-linie">
@@ -228,8 +233,8 @@ function GewaehlteLoesungen({ mit, positionen, inhaberName, onZuLoesungen }: {
               </div>
               <p className="mt-1 text-xs text-ui-schiefer">
                 {!e ? 'Kostet netto: —'
-                  : ohneEigenaufwand(e) ? 'Kostet Sie netto nichts — rein arbeitgeberfinanziert.'
-                    : <>Kostet Sie netto <strong className="font-medium text-ui-tinte">{euro(e.echterAufwandMonat)}</strong> im Monat.</>}
+                  : ohneEigenaufwand(e) ? `Kostet ${t.dich} netto nichts — rein arbeitgeberfinanziert.`
+                    : <>Kostet {t.dich} netto <strong className="font-medium text-ui-tinte">{euro(e.echterAufwandMonat)}</strong> im Monat.</>}
               </p>
             </li>
           );

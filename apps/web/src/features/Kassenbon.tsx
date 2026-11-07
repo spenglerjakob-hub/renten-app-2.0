@@ -4,6 +4,7 @@ import {
   type ProjektionsErgebnis, type Jahreszeile, type Szenario,
 } from '@renten/engine';
 import { euro, prozent, Schalter } from '../components/Feld';
+import { useAnsprache } from '../components/Ansprache';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { geteilterFreibetrag, freibetragText } from './bav-freibetrag';
 import { personNameAus } from './personen';
@@ -116,7 +117,7 @@ export function Kassenbon({
    *
    * Das Szenario selbst weiss davon nichts — es ist zusammengestrichen und
    * sieht aus wie das eines Alleinstehenden. Ohne diese Angabe stuende ueber
-   * einer Einzelrechnung weiter "Ihr Haushalts-Netto".
+   * einer Einzelrechnung weiter "Euer Haushalts-Netto".
    */
   person?: string;
   /**
@@ -182,11 +183,12 @@ export function Kassenbon({
       + ergebnis.kapitalauszahlungen.filter((a) => neu.has(a.vertragId)).length
     : 0;
 
+  const t = useAnsprache();
   return (
     <div className="ui-karte p-5 druckbereich sm:p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
-          {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `Ihr Haushalts-Netto im Jahr ${zeile.jahr}`}
+          {person ? `Netto von ${person} im Jahr ${zeile.jahr}` : `${t.Dein()} ${t.mehrere ? 'Haushalts-Netto' : 'Netto'} im Jahr ${zeile.jahr}`}
         </h2>
         {onKaufkraftHeute ? (
           <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} klasse="print:hidden" />
@@ -205,11 +207,11 @@ export function Kassenbon({
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-ui-tinte/80">
           <span>
             {luecke > 0
-              ? <>Das Netto deckt <strong className="font-medium tabular-nums text-ui-tinte">{deckung} %</strong> des Ziels</>
+              ? <>{t.Dein()} Netto deckt <strong className="font-medium tabular-nums text-ui-tinte">{deckung} %</strong> {t.dein('es')} Ziels</>
               : <strong className="font-medium text-ui-tinte">Ziel erreicht</strong>}
           </span>
           {luecke > 0 && (
-            <span className="text-ui-schiefer">es fehlen <strong className="font-medium tabular-nums text-ui-tinte">{100 - deckung} %</strong></span>
+            <span className="text-ui-schiefer">{t.dir} fehlen <strong className="font-medium tabular-nums text-ui-tinte">{100 - deckung} %</strong></span>
           )}
         </div>
         {/* Die Luecke als Stein hinter den Schichten — wie im Ring. */}
@@ -255,7 +257,7 @@ export function Kassenbon({
           <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
             {jePersonAnsicht
               ? 'Dieselben Zahlen, nach Inhaber sortiert statt nach Schicht.'
-              : 'Zeigt getrennt, womit jeder von Ihnen beiden dasteht.'}
+              : `Zeigt getrennt, womit jeder von ${t.dir} beiden dasteht.`}
           </p>
         </div>
       )}
