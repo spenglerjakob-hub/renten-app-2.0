@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { KNOPF, KNOPF_ZWEIT, Etappen } from './stil';
 
 /**
- * Die Etappen der Hauptseite: Angaben, Ergebnis, Sparrechner, Loesungen.
+ * Die Etappen der Hauptseite: Angaben, Ergebnis, Sparrechner, Loesungen, Abschluss.
  *
  * WARUM EIN SCHRITT JE ANSICHT und nicht eine lange Seite: Im Gespraech
  * fuehrt der Berater den Kunden durch eine Geschichte — erst wer er ist und

@@ -74,6 +74,10 @@ export default defineConfig({
         schnellrechnung: resolve(hier, 'schnellrechnung.html'),
         // Die bAV-Mitarbeiterberatung — mit Anmeldung, Paket Arbeitgeber-Vorsorgemodelle.
         mitarbeiterberatung: resolve(hier, 'mitarbeiterberatung.html'),
+        // Unterschrift per Link — fuer den Mitarbeiter, ohne Konto, nur mit Link und Code.
+        unterschrift: resolve(hier, 'unterschrift.html'),
+        // Angaben fuer den Antrag — fuer den Kunden, ohne Konto, nur mit Link.
+        antrag: resolve(hier, 'antrag.html'),
       },
       output: {
         manualChunks: { engine: ['@renten/engine'] },

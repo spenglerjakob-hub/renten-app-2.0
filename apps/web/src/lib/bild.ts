@@ -142,3 +142,83 @@ export function dataUrlZuBlob(dataUrl: string): Blob | null {
     return null;
   }
 }
+
+/**
+ * Eine Kopie des Personalausweises vorbereiten: verkleinert, neu kodiert
+ * (ohne Metadaten) und mit dem Wasserzeichen „KOPIE“ quer über dem ganzen
+ * Bild — damit die Kopie dauerhaft als Kopie erkennbar ist (§ 20 Abs. 2
+ * PAuswG) und sich nicht als Original weiterverwenden lässt.
+ *
+ * ANDERS ALS `bildVorbereiten`: Was der Browser nicht lesen kann (HEIC
+ * außerhalb von Safari), geht NICHT unverändert hinaus. Eine Ausweiskopie
+ * ohne Wasserzeichen soll es nicht geben — dann 'unlesbar', und die Seite
+ * bittet um ein Foto als JPEG oder PNG.
+ */
+export const AUSWEIS_MAX_KANTE = 2000;
+export const WASSERZEICHEN = 'KOPIE';
+
+export async function ausweisVorbereiten(datei: Blob): Promise<Blob | 'unlesbar'> {
+  let bild: ImageBitmap;
+  try {
+    bild = await createImageBitmap(datei, { imageOrientation: 'from-image' });
+  } catch {
+    return 'unlesbar';
+  }
+  try {
+    const faktor = Math.min(1, AUSWEIS_MAX_KANTE / Math.max(bild.width, bild.height));
+    const breite = Math.max(1, Math.round(bild.width * faktor));
+    const hoehe = Math.max(1, Math.round(bild.height * faktor));
+    const leinwand = document.createElement('canvas');
+    leinwand.width = breite;
+    leinwand.height = hoehe;
+    const ctx = leinwand.getContext('2d');
+    if (!ctx) return 'unlesbar';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, breite, hoehe);
+    ctx.drawImage(bild, 0, 0, breite, hoehe);
+
+    // Das Wasserzeichen: dunkel mit hellem Rand — lesbar auf hellem wie auf dunklem Grund.
+    const { schrift, winkel, punkte } = wasserzeichenRaster(breite, hoehe);
+    ctx.font = `700 ${schrift}px system-ui, -apple-system, 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1, schrift / 16);
+    for (const p of punkte) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(winkel);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.strokeText(WASSERZEICHEN, 0, 0);
+      ctx.fillStyle = 'rgba(30, 30, 30, 0.30)';
+      ctx.fillText(WASSERZEICHEN, 0, 0);
+      ctx.restore();
+    }
+
+    const blob = await new Promise<Blob | null>((fertig) => leinwand.toBlob(fertig, 'image/jpeg', QUALITAET));
+    return blob ?? 'unlesbar';
+  } finally {
+    bild.close();
+  }
+}
+
+/**
+ * Wo das Wasserzeichen steht: ein versetztes Raster über das ganze Bild,
+ * schräg um 30 Grad, die Schrift ein Fünftel der kurzen Kante hoch. Rein
+ * rechnerisch — damit es sich ohne Browser prüfen lässt.
+ */
+export function wasserzeichenRaster(breite: number, hoehe: number): {
+  schrift: number; winkel: number; punkte: { x: number; y: number }[];
+} {
+  const schrift = Math.max(20, Math.round(Math.min(breite, hoehe) / 5));
+  // „KOPIE“ ist in fetter Schrift etwa 3,3 Schrifthöhen breit.
+  const abstandX = schrift * 4;
+  const abstandY = schrift * 2.2;
+  const punkte: { x: number; y: number }[] = [];
+  let zeile = 0;
+  for (let y = abstandY / 2; y < hoehe + abstandY / 2; y += abstandY, zeile += 1) {
+    const versatz = zeile % 2 === 1 ? abstandX / 2 : 0;
+    for (let x = versatz; x < breite + abstandX / 2; x += abstandX) punkte.push({ x, y });
+  }
+  return { schrift, winkel: -Math.PI / 6, punkte };
+}

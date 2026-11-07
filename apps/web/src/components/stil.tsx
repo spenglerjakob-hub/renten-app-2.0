@@ -190,12 +190,14 @@ export function Posten({ text, wert, summe = false }: { text: ReactNode; wert: R
 }
 
 /** Eine Kennzahl in einer Liste (dl): leises Etikett, wenn noetig mit dem Punkt der Legende, darunter die Zahl gross. */
-export function Zahl({ etikett, wert, zusatz, punkt }: {
+export function Zahl({ etikett, wert, zusatz, punkt, unter }: {
   etikett: ReactNode; wert: ReactNode;
   /** Klein hinter der Zahl, etwa der Anteil („· 48 %“) */
   zusatz?: ReactNode;
   /** Farbe des Punkts vor dem Etikett — wie im Ring oder Balken daneben */
   punkt?: string;
+  /** Eine Zeile unter der Zahl, etwa „davon … neu durch die Lösungen“ */
+  unter?: ReactNode;
 }) {
   return (
     <div>
@@ -205,6 +207,7 @@ export function Zahl({ etikett, wert, zusatz, punkt }: {
       <dd className="mt-0.5 text-[28px] font-medium leading-tight tabular-nums text-ui-tinte">
         {wert}{zusatz !== undefined && <> <span className="whitespace-nowrap text-base text-ui-schiefer">· {zusatz}</span></>}
       </dd>
+      {unter && <dd className="mt-1.5 text-sm leading-snug tabular-nums text-ui-schiefer">{unter}</dd>}
     </div>
   );
 }

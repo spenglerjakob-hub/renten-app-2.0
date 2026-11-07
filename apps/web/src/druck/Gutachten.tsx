@@ -7,7 +7,9 @@ import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
-import { tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen } from '../features/tuev-berechnung';
+import {
+  tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen, type AngebotPosition, type MitAngenommenen,
+} from '../features/tuev-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -26,56 +28,55 @@ import { Foerderung } from './Foerderung';
 import { Merkblatt } from './Merkblatt';
 import { TuevBogen } from './TuevBogen';
 import { Loesungsvergleich } from './Loesungsvergleich';
+import { MitLoesungen } from './MitLoesungen';
+import type { ThemaId } from './druckauswahl';
 
 /**
- * Das gedruckte Gutachten.
- *
- * WARUM EIN EIGENES DOKUMENT UND KEIN DRUCK-CSS: Der Ausdruck war ein Abzug
- * der Bedienoberflaeche. Die besteht aus Formularfeldern, Reitern und
- * Scrollbereichen — auf Papier ergibt das leere Eingabekaesten, fehlende
- * Vertraege (immer nur EIN Reiter ist im Dokument) und abgeschnittene
- * Tabellen (Scrollbereiche werden nicht umbrochen, sondern gekappt).
- *
- * Gerechnet wird hier NICHTS neu. Alle Zahlen stammen aus demselben
- * `ProjektionsErgebnis` und derselben TUEV-Funktion, die auch der Bildschirm
- * benutzt.
- *
- * Eingehaengt wird es in App.tsx als `hidden print:block`; der Bildschirmpfad
- * ist im Gegenzug durchgehend `print:hidden`. So gibt es genau eine Quelle
- * fuer das Papier, und eine Aenderung an der Oberflaeche kann den Ausdruck
- * nicht mehr versehentlich zerlegen.
+ * Eine Seite des Gutachtens (oder mehrere zu einem Thema) — mit dem Thema,
+ * nach dem das Druckfenster waehlt (druckauswahl.ts).
  */
-export function Gutachten({
-  szenario, ergebnis, zeile, umfang = 'ausfuehrlich', einzelperson, auftritt = null,
-}: {
+export interface GutachtenSeite {
+  thema: ThemaId;
+  /** Bei den Vertrags-Pruefungen: welcher Vertrag */
+  vertragId?: string;
+  /** Kurz fuers Druckfenster, etwa der Name des Vertrags — sonst der erste Titel */
+  name?: string;
+  /** Die Eintraege im Inhaltsverzeichnis */
+  titel: string[];
+  /**
+   * Die Seite selbst. Als Funktion: Sie erfaehrt, was sonst noch gedruckt
+   * wird — ein Verweis auf eine abgewaehlte Seite liefe ins Leere.
+   */
+  knoten: (gedruckt: (t: ThemaId) => boolean) => ReactNode;
+}
+
+export interface GutachtenDaten {
   szenario: SzenarioParsed;
   ergebnis: ProjektionsErgebnis | null;
   zeile: Jahreszeile;
-  /**
-   * Wie viel gedruckt wird.
-   *
-   * `kurz` ist die Fassung fuers Gespraech: Deckblatt, Angaben,
-   * Renteneinkuenfte — und der Vorbehalt. Den fuehrt auch die Kurzfassung
-   * mit: Ein Dokument mit dem Namen des Kunden darauf, das Zahlen bis in die
-   * 2070er zeigt, gibt man nicht ohne Rechtsstand aus der Hand.
-   */
-  umfang?: 'kurz' | 'ausfuehrlich';
-  /**
-   * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.
-   *
-   * Das Szenario ist dann zusammengestrichen und sieht aus wie das eines
-   * Alleinstehenden — ohne diese Angabe gaebe das Deckblatt ein Gutachten
-   * ueber einen Haushalt aus, den es so nicht gibt.
-   */
+  /** Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht */
   einzelperson?: string;
   /**
-   * „Ihr Auftritt im Gutachten“: Logo, Firma und Kontakt auf dem Deckblatt,
-   * eine Fusszeile auf jeder Seite, die Akzentfarbe an Linien und
-   * Ueberschriften. Ohne Auftritt bleibt der Ausdruck wie bisher.
+   * Die angenommenen Loesungen der Ansicht und das Ergebnis mit ihnen
+   * (Etappe „Abschluss“). Mit beidem kommt die Seite „Ihr Ergebnis mit den
+   * gewählten Lösungen“ dazu. Das Deckblatt bleibt beim heutigen Stand.
    */
-  auftritt?: Auftritt | null;
-}) {
-  const lang = umfang === 'ausfuehrlich';
+  mit?: MitAngenommenen | null;
+  ergebnisMit?: ProjektionsErgebnis | null;
+  /** Was jede angenommene Loesung netto kostet (`angenommenePositionen`) */
+  positionenMit?: AngebotPosition[];
+}
+
+/**
+ * ALLE SEITEN, DIE DER FALL HERGIBT — in der Reihenfolge des Gutachtens.
+ * Daraus entstehen das Druckfenster (welche Themen es gibt) und, gefiltert
+ * nach der Auswahl, die gedruckten Seiten samt Inhaltsverzeichnis. Eine
+ * Liste fuer alles: Was hier keinen Eintrag hat, gibt es weder im Fenster
+ * noch auf dem Papier.
+ */
+export function useGutachtenSeiten({
+  szenario, ergebnis, zeile, einzelperson, mit = null, ergebnisMit = null, positionenMit = [],
+}: GutachtenDaten): GutachtenSeite[] {
   const jetzt = new Date().getFullYear();
   const avd = useMemo(
     () => parameterFuer(Math.max(jetzt, 2027), { indexRate: szenario.annahmen.tarifIndex }).avd,
@@ -88,9 +89,6 @@ export function Gutachten({
   );
 
   const h = szenario.haushalt;
-  const name = h.verheiratet
-    ? `${personNameAus(szenario.personen, 'A')} und ${personNameAus(szenario.personen, 'B')}`
-    : personNameAus(szenario.personen, 'A');
 
   const luecke = versorgungsluecke(zeile);
 
@@ -117,12 +115,12 @@ export function Gutachten({
   }, [szenario, ergebnis, zeile]);
 
   /*
-    Der Loesungsvergleich der letzten Etappe — nur im ausfuehrlichen Umfang,
-    und nur, wenn es eine Luecke gibt oder Angebote erfasst sind. Sonst
-    stuende eine Seite ueber Loesungen fuer ein Problem, das es nicht gibt.
+    Der Loesungsvergleich der letzten Etappe — nur, wenn es eine Luecke gibt
+    oder Angebote erfasst sind. Sonst stuende eine Seite ueber Loesungen fuer
+    ein Problem, das es nicht gibt.
   */
   const loesungen = useMemo(() => {
-    if (!lang || (luecke <= 0 && szenario.loesungen.angebote.length === 0)) return null;
+    if (luecke <= 0 && szenario.loesungen.angebote.length === 0) return null;
     const l = szenario.loesungen;
     const betrag = l.vorgabe === 'brutto' ? l.bruttoMonat : l.nettoMonat;
     return {
@@ -130,25 +128,20 @@ export function Gutachten({
       betrag,
       angebote: angebotPositionen(szenario),
     };
-  }, [lang, luecke, szenario, foerderung]);
+  }, [luecke, szenario, foerderung]);
 
-  const gedeckt = zeile.zielNettoMonat > 0
-    ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
-    : 100;
-
-  // Dieselben drei Groessen in heutiger Kaufkraft. Der Kaufkraftfaktor der
-  // Zeile rechnet einen Betrag des Rentenjahres auf das heutige Preisniveau
-  // zurueck; gerechnet wird also nichts Neues.
-  const heute = (n: number) => n / zeile.kaufkraftfaktor;
-  // Dieselbe Umrechnung als Kaufkraftverlust in Euro — wie die Karte am Bildschirm.
-  const kk = ergebnis ? kaufkraft(zeile) : null;
   // Das heutige Haushaltsnetto — Bezugsgroesse fuer Startbeitrag und Aufwand (nicht das Netto im Alter).
   const haushaltsNetto = nettoHeuteMonat(ergebnis);
-  const bedarfHeute = h.zielNettoHeute;
-  const nettoHeute = heute(zeile.nettoMonat);
 
   // Nur bei Ehepaaren: sonst stuende auf der Seite alles bei einer Person.
   const beidePartner = h.verheiratet && szenario.personen.length > 1;
+
+  // Das Ergebnis mit den gewaehlten Loesungen — im selben Jahr wie die Renteneinkuenfte.
+  const zeileMit = ergebnisMit
+    ? ergebnisMit.zeilen.find((z) => z.jahr === zeile.jahr)
+      ?? ergebnisMit.zeilen.find((z) => z.jahr === ergebnisMit.ruhestandsjahr)
+      ?? null
+    : null;
 
   /* Entscheidet ueber EINE oder ZWEI Grundlagenseiten — siehe unten. */
   const hatVertraege = szenario.vertraege.length > 0;
@@ -179,10 +172,12 @@ export function Gutachten({
    * namenlosen Vertraegen hiessen alle Pruefungen gleich. Gezaehlt wird
    * deshalb der Index.
    */
-  const seiten: { titel: string[]; knoten: ReactNode }[] = [
+
+  return [
     {
+      thema: 'angaben',
       titel: [hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'],
-      knoten: (
+      knoten: () => (
         <Seite
           titel={hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'}
           nummer="Grundlage der Berechnung"
@@ -214,8 +209,9 @@ export function Gutachten({
       lohnt kein Blatt.
     */
     ...(hatVertraege ? [{
+      thema: 'vertraege' as const,
       titel: ['Ihre Verträge'],
-      knoten: (
+      knoten: () => (
         <Seite titel="Ihre Verträge" nummer="Grundlage der Berechnung">
           <Vertragsliste
             szenario={szenario}
@@ -227,8 +223,9 @@ export function Gutachten({
     }] : []),
 
     ...(ergebnis ? [{
+      thema: 'renteneinkuenfte' as const,
       titel: [`Ihre Renteneinkünfte im Jahr ${zeile.jahr}`],
-      knoten: (
+      knoten: () => (
         <Renteneinkuenfte
           ergebnis={ergebnis}
           zeile={zeile}
@@ -247,8 +244,32 @@ export function Gutachten({
       alles bei einer Person steht.
     */
     ...(ergebnis && beidePartner ? [{
+      thema: 'partner' as const,
       titel: [`Die Versorgung beider Partner im Jahr ${zeile.jahr}`],
-      knoten: <JePersonSeite zeile={zeile} szenario={szenario} />,
+      knoten: () => <JePersonSeite zeile={zeile} szenario={szenario} />,
+    }] : []),
+
+    /*
+      DIREKT NACH DEM HEUTIGEN STAND, in beiden Umfaengen: erst, wo der
+      Kunde steht — dann, wo er mit den gewaehlten Loesungen steht. Der
+      Vergleich der Angebote als Alternativen folgt in der Langfassung weiter
+      hinten.
+    */
+    ...(ergebnis && mit && ergebnisMit && zeileMit ? [{
+      thema: 'mitLoesungen' as const,
+      titel: ['Ihr Ergebnis mit den gewählten Lösungen'],
+      knoten: (gedruckt: (t: ThemaId) => boolean) => (
+        <MitLoesungen
+          mitRenteneinkuenften={gedruckt('renteneinkuenfte')}
+          vorher={zeile}
+          nachher={zeileMit}
+          ergebnisMit={ergebnisMit}
+          mit={mit}
+          positionen={positionenMit}
+          einzelperson={einzelperson}
+          inhaberName={beidePartner ? (id) => personNameAus(szenario.personen, id) : undefined}
+        />
+      ),
     }] : []),
 
     /*
@@ -257,10 +278,10 @@ export function Gutachten({
       und was davon zaehlt — Bedarf, Netto, Luecke, heute und im Rentenjahr —
       steht schon auf dem Deckblatt und bei den Renteneinkuenften.
     */
-    ...(lang ? [
-      ...(pkv ? [{
+    ...(pkv ? [{
+        thema: 'krankenversicherung' as const,
         titel: [`Die Krankenversicherung von ${pkv.person} im Alter`],
-        knoten: (
+        knoten: () => (
           <Krankenversicherung
             ergebnis={pkv}
             steigerung={pkv.steigerung}
@@ -270,8 +291,9 @@ export function Gutachten({
         ),
       }] : []),
       ...(sparziel ? [{
+        thema: 'sparziel' as const,
         titel: ['Was Sie jetzt tun können'],
-        knoten: (
+        knoten: () => (
           <Sparziel
             ergebnis={sparziel}
             eingaben={SPARZIEL_VORGABE}
@@ -287,9 +309,11 @@ export function Gutachten({
         Rechenbeispiel und Hochrechnung bis zur Rente.
       */
       ...(foerderung.befunde.length > 0 ? [{
+        thema: 'foerderung' as const,
         titel: ['Förderung, die Sie nicht nutzen'],
-        knoten: (
+        knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Foerderung
+            mitSparziel={gedruckt('sparziel')}
             befunde={foerderung.befunde}
             kontext={foerderung.kontext}
             p={foerderung.p}
@@ -300,11 +324,13 @@ export function Gutachten({
         ),
       }] : []),
       ...(loesungen ? [{
+        thema: 'loesungen' as const,
         // Die Angebote stehen auf eigenem Blatt — und deshalb auch im Verzeichnis.
         titel: ['Lösungen im Vergleich',
           ...(loesungen.angebote.some((a) => a.rente || a.kapital) ? ['Ihre Angebote im Vergleich'] : [])],
-        knoten: (
+        knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Loesungsvergleich
+            mitRenteneinkuenften={gedruckt('renteneinkuenfte')}
             loesungen={loesungen.liste}
             vorgabe={szenario.loesungen.vorgabe}
             betragMonat={loesungen.betrag}
@@ -314,14 +340,17 @@ export function Gutachten({
         ),
       }] : []),
       ...positionen.map((p) => ({
+        thema: 'pruefung' as const,
+        vertragId: p.vertrag.id,
+        name: vertragsBezeichnung(p.vertrag),
         titel: [`Vertrags-Prüfung: ${vertragsBezeichnung(p.vertrag)}`],
-        knoten: <TuevBogen position={p} szenario={szenario} />,
+        knoten: () => <TuevBogen position={p} szenario={szenario} />,
       })),
       {
+        thema: 'merkblatt' as const,
         titel: ['Zum Mitnehmen'],
-        knoten: <Merkblatt />,
+        knoten: () => <Merkblatt />,
       },
-    ] : []),
 
     /*
       Rechtsstand und Methodik stehen ans ENDE. Der vorhandene Abschnitt
@@ -329,8 +358,9 @@ export function Gutachten({
       statt sie ein zweites Mal zu schreiben.
     */
     ...(ergebnis ? [{
+      thema: 'rechtsstand' as const,
       titel: ['Rechtsstand, Methodik und Vorbehalt'],
-      knoten: (
+      knoten: () => (
         <Seite titel="Rechtsstand, Methodik und Vorbehalt" nummer="Wie die Zahlen zustande kommen">
           <Rechtsstand
             ergebnis={ergebnis}
@@ -343,6 +373,71 @@ export function Gutachten({
       ),
     }] : []),
   ];
+}
+
+/**
+ * Das gedruckte Gutachten.
+ *
+ * WARUM EIN EIGENES DOKUMENT UND KEIN DRUCK-CSS: Der Ausdruck war ein Abzug
+ * der Bedienoberflaeche. Die besteht aus Formularfeldern, Reitern und
+ * Scrollbereichen — auf Papier ergibt das leere Eingabekaesten, fehlende
+ * Vertraege (immer nur EIN Reiter ist im Dokument) und abgeschnittene
+ * Tabellen (Scrollbereiche werden nicht umbrochen, sondern gekappt).
+ *
+ * Gerechnet wird hier NICHTS neu. Alle Zahlen stammen aus demselben
+ * `ProjektionsErgebnis` und derselben TUEV-Funktion, die auch der Bildschirm
+ * benutzt.
+ *
+ * Gedruckt werden das Deckblatt mit dem Inhalt und die Seiten, die das
+ * Druckfenster gewaehlt hat — in der Reihenfolge von `useGutachtenSeiten`,
+ * schon gefiltert (`gewaehlt` in druckauswahl.ts).
+ *
+ * Eingehaengt wird es in App.tsx als `hidden print:block`; der Bildschirmpfad
+ * ist im Gegenzug durchgehend `print:hidden`. So gibt es genau eine Quelle
+ * fuer das Papier, und eine Aenderung an der Oberflaeche kann den Ausdruck
+ * nicht mehr versehentlich zerlegen.
+ */
+export function Gutachten({ szenario, ergebnis, zeile, einzelperson, auftritt = null, seiten }: {
+  szenario: SzenarioParsed;
+  ergebnis: ProjektionsErgebnis | null;
+  zeile: Jahreszeile;
+  /**
+   * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.
+   *
+   * Das Szenario ist dann zusammengestrichen und sieht aus wie das eines
+   * Alleinstehenden — ohne diese Angabe gaebe das Deckblatt ein Gutachten
+   * ueber einen Haushalt aus, den es so nicht gibt.
+   */
+  einzelperson?: string;
+  /**
+   * „Ihr Auftritt im Gutachten“: Logo, Firma und Kontakt auf dem Deckblatt,
+   * eine Fusszeile auf jeder Seite, die Akzentfarbe an Linien und
+   * Ueberschriften. Ohne Auftritt bleibt der Ausdruck wie bisher.
+   */
+  auftritt?: Auftritt | null;
+  /** Die Seiten, die gedruckt werden */
+  seiten: GutachtenSeite[];
+}) {
+  const h = szenario.haushalt;
+  const name = h.verheiratet
+    ? `${personNameAus(szenario.personen, 'A')} und ${personNameAus(szenario.personen, 'B')}`
+    : personNameAus(szenario.personen, 'A');
+  const luecke = versorgungsluecke(zeile);
+  const gedeckt = zeile.zielNettoMonat > 0
+    ? Math.min(100, (zeile.nettoMonat / zeile.zielNettoMonat) * 100)
+    : 100;
+
+  // Dieselben drei Groessen in heutiger Kaufkraft. Der Kaufkraftfaktor der
+  // Zeile rechnet einen Betrag des Rentenjahres auf das heutige Preisniveau
+  // zurueck; gerechnet wird also nichts Neues.
+  const heute = (n: number) => n / zeile.kaufkraftfaktor;
+  // Dieselbe Umrechnung als Kaufkraftverlust in Euro — wie die Karte am Bildschirm.
+  const kk = ergebnis ? kaufkraft(zeile) : null;
+  const bedarfHeute = h.zielNettoHeute;
+  const nettoHeute = heute(zeile.nettoMonat);
+
+  /** Was sonst noch gedruckt wird — fuer Verweise von Seite zu Seite. */
+  const gedruckt = (t: ThemaId) => seiten.some((s) => s.thema === t);
 
   const abschnitte = seiten.flatMap((s) => s.titel);
   // Die Fusszeile jeder Seite (`@page`-Randfelder) — nur mit Auftritt.
@@ -377,8 +472,8 @@ export function Gutachten({
           Bis zu Ihrem Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}
           <strong>{prozent(szenario.annahmen.inflation)}</strong> Inflation im Jahr. Deshalb stehen
           in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
-          Rentenjahres statt im Geld von heute. Die Seite „Ihre Renteneinkünfte“ nennt beide
-          Maßstäbe nebeneinander.
+          Rentenjahres statt im Geld von heute.
+          {gedruckt('renteneinkuenfte') && ' Die Seite „Ihre Renteneinkünfte“ nennt beide Maßstäbe nebeneinander.'}
           {/* Der Kaufkraftverlust in Euro — dieselbe Umrechnung wie die Kacheln. */}
           {kk && kk.verlustMonat > 0 && (
             <>
@@ -433,7 +528,8 @@ export function Gutachten({
         <div className="mt-4 rounded-[10px] border border-ui-linie bg-ui-innen p-3">
           <Text>
             <strong>Was dieses Dokument ist.</strong> Eine Modellrechnung auf Grundlage der von
-            Ihnen gemachten Angaben und der auf Seite „Ihre Angaben“ genannten Annahmen. Es ist
+            Ihnen gemachten Angaben und der {gedruckt('angaben') ? 'auf Seite „Ihre Angaben“' : 'am Ende des Dokuments'} genannten
+            Annahmen. Es ist
             keine Steuer-, Renten- oder Anlageberatung und keine Zusage über künftige Leistungen.
             Rechtslage und Rechenwege sind am Ende des Dokuments beschrieben.
           </Text>
@@ -446,7 +542,7 @@ export function Gutachten({
         war es einmal, und bei gleichnamigen Vertrags-Pruefungen ist er nicht
         eindeutig.
       */}
-      {seiten.map((s, i) => <Fragment key={i}>{s.knoten}</Fragment>)}
+      {seiten.map((s, i) => <Fragment key={i}>{s.knoten(gedruckt)}</Fragment>)}
     </div>
   );
 }

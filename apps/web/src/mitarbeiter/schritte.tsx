@@ -6,8 +6,10 @@ import {
   type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
 } from '@renten/schema';
 import {
-  speicherungenAbwarten, unterschreiben, type Firma, type UnterlagenArt, type Unterlagen, type UnterlagenHtml, type UnterschriftPerson,
+  linkErstellen, speicherungenAbwarten, unterschreiben, type Firma, type NeuerLink, type UnterlagenArt, type Unterlagen,
+  type UnterlagenHtml, type UnterschriftPerson,
 } from '../lib/bav-beratung';
+import { linkSeite } from '../lib/unterschrift-link';
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
@@ -1109,8 +1111,8 @@ const KANAL_TEXT: Record<(typeof AXA_KANAELE)[number], string> = {
  * Berufsunfaehigkeit eingeschlossen ist und dann die drei Fragen zur
  * Gesundheit mit der Belehrung davor, wie die Beratung erfolgte und was
  * erlaeutert wurde. Bei Verzicht nur, was ins Protokoll gehoert. Fuer die
- * Unterschrift am Bildschirm muss alles beantwortet sein; auf Papier kreuzt
- * man von Hand an.
+ * Unterschrift am Bildschirm oder per Link muss alles beantwortet sein; auf
+ * Papier kreuzt man von Hand an.
  */
 function AxaKarte({ x, setze, antrag, auftritt, angebot }: {
   x: AxaAngaben; setze: (p: Partial<AxaAngaben>) => void; antrag: boolean; auftritt: Auftritt | null; angebot: FirmenAngebot;
@@ -1130,9 +1132,9 @@ function AxaKarte({ x, setze, antrag, auftritt, angebot }: {
       <p className="text-sm leading-relaxed text-ui-schiefer">
         {antrag
           ? 'Bei dieser Firma tritt der AXA-Antrag an die Stelle der Mustervereinbarung. Diese Angaben stehen darin und im '
-            + 'AXA-Gesprächsprotokoll; vor der Unterschrift am Bildschirm braucht es alle.'
+            + 'AXA-Gesprächsprotokoll; vor der Unterschrift braucht es alle.'
           : 'Bei dieser Firma kommt zur Verzichtserklärung das AXA-Gesprächsprotokoll mit „Nein“. Diese Angaben stehen '
-            + 'darin; vor der Unterschrift am Bildschirm braucht es alle.'}
+            + 'darin; vor der Unterschrift braucht es alle.'}
       </p>
 
       <h3 className="mt-5 text-sm font-medium text-ui-tinte">Beratung durch</h3>
@@ -1250,32 +1252,48 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
     ...(status !== 'offen' && axa ? axaFehlt(daten, beraterName).map((text) => ({ text: `${axaZiel} ${text}`, schritt: 5 })) : []),
   ];
 
-  // Die erste Unterschrift schreibt die Unterlagen fest: erst speichern, dann genau das, was gedruckt wuerde.
+  // Die erste Unterschrift — oder der erste Link — schreibt die Unterlagen fest: erst speichern, dann genau das, was
+  // gedruckt wuerde. Sind sie schon festgeschrieben: null.
+  const festzuschreiben = async (): Promise<UnterlagenHtml | null | 'fehler'> => {
+    if (fest) return null;
+    await speicherungenAbwarten();
+    if (!(await sichern(daten))) return 'fehler';
+    const protokoll = await unterlageErfassen(<Protokoll {...dok} />);
+    return status === 'teilnahme'
+      ? { protokoll, vereinbarung: await unterlageErfassen(<Zweites {...dok} />) }
+      : { protokoll, verzicht: await unterlageErfassen(<VerzichtDokument {...dok} />) };
+  };
+  const NICHT_GESPEICHERT = 'Die Beratung konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.';
+
   const unterschreibenUndFestschreiben = async (person: UnterschriftPerson, n: string, zug: string): Promise<true | string> => {
-    let html: UnterlagenHtml | null = null;
-    if (!fest) {
-      await speicherungenAbwarten();
-      if (!(await sichern(daten))) return 'Die Beratung konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.';
-      const protokoll = await unterlageErfassen(<Protokoll {...dok} />);
-      html = status === 'teilnahme'
-        ? { protokoll, vereinbarung: await unterlageErfassen(<Zweites {...dok} />) }
-        : { protokoll, verzicht: await unterlageErfassen(<VerzichtDokument {...dok} />) };
-    }
+    const html = await festzuschreiben();
+    if (html === 'fehler') return NICHT_GESPEICHERT;
     const u = await unterschreiben(beratungId, person, n, zug, html);
     await aktualisieren();
     return u === 'fehler' ? 'Die Unterschrift konnte nicht gespeichert werden. Bitte versuchen Sie es noch einmal.' : true;
   };
 
+  const linkErstellenUndFestschreiben = async (): Promise<NeuerLink | string> => {
+    const html = await festzuschreiben();
+    if (html === 'fehler') return NICHT_GESPEICHERT;
+    const l = await linkErstellen(beratungId, linkSeite(window.location.origin), html);
+    await aktualisieren();
+    if (l === 'ohne_name') return 'Es fehlt der Name des Mitarbeiters (Schritt 2).';
+    if (l === 'unterschrieben') return `${name || 'Der Mitarbeiter'} hat schon unterschrieben.`;
+    return l === 'fehler' ? 'Der Link konnte nicht erstellt werden. Bitte versuchen Sie es noch einmal.' : l;
+  };
+
   return (
     <div className="space-y-6">
       <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
-        bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben} onAufgehoben={aktualisieren}
+        bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben}
+        onLinkErstellen={linkErstellenUndFestschreiben} onAufgehoben={aktualisieren}
         beratungId={beratungId} axa={axa} />
 
       <Karte titel="Unterlagen">
         <p className="text-sm leading-relaxed text-ui-schiefer">
           {fest
-            ? 'Die Unterlagen tragen die Unterschriften vom Bildschirm. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
+            ? 'Die Unterlagen tragen die elektronischen Unterschriften. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
               + `Arbeitgeber unterschreibt auf Papier. Dann gehen sie an die Personalabteilung, eine Kopie bekommt ${name || 'der Mitarbeiter'}.`
             : 'Drucken Sie die Unterlagen aus oder speichern Sie sie als PDF. Unterschrieben gehen sie an die Personalabteilung, '
               + `eine Kopie bekommt ${name || 'der Mitarbeiter'}.`}

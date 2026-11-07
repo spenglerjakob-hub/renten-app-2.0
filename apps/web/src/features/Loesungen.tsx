@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BadgeEuro, FilePlus2, Scale, Trash2, Trophy } from 'lucide-react';
+import { BadgeEuro, ClipboardCheck, FilePlus2, Scale, Trash2, Trophy } from 'lucide-react';
 import {
   loesungsvergleich, type Jahreszeile, type Loesung, type LoesungId, type LoesungsVorgabe,
 } from '@renten/engine';
@@ -7,15 +7,17 @@ import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, euro, euroGenau, prozent, InfoPunkt,
 } from '../components/Feld';
-import { AKZENT, EINLEITUNG, Hervor, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
+import { AKZENT, EINLEITUNG, Hervor, KNOPF, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
 import {
-  foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, type AngebotPosition,
+  foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, ohneEigenaufwand,
+  OHNE_EIGENAUFWAND_TEXT, type AngebotPosition,
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
 
 /**
- * LOESUNGEN — die letzte Etappe der Beratung.
+ * LOESUNGEN — die vierte Etappe der Beratung; die angenommenen Angebote
+ * rechnet danach die Etappe „Abschluss“ ins Ergebnis.
  *
  * Oben: Was wird aus einem Netto-Betrag in jeder Schicht? Je Loesung der
  * Beitrag, der nach Steuer- und Abgabenersparnis genau diesen Betrag kostet,
@@ -39,7 +41,7 @@ const LOESUNG_TEXT: Record<LoesungId, string> = {
 const zahl = (n: number, stellen = 2) =>
   n.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
 
-export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
+export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehmen }: {
   zeile: Jahreszeile | null;
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
   nettoHeute?: number;
@@ -47,6 +49,8 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
   szenario: SzenarioParsed;
   /** Der Startbeitrag aus dem Sparrechner, falls es eine Luecke gibt */
   sparrate: number | null;
+  /** „Lösungen annehmen“ — weiter zur Etappe „Abschluss“ */
+  onAnnehmen?: () => void;
 }) {
   const l = szenario.loesungen;
   const setzeLoesungen = useSzenario((x) => x.setzeLoesungen);
@@ -186,7 +190,7 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0 }: {
         </p>
       </section>
 
-      <Angebote szenario={szenario} nettoHeute={nettoHeute} />
+      <Angebote szenario={szenario} nettoHeute={nettoHeute} onAnnehmen={onAnnehmen} />
     </div>
   );
 }
@@ -359,14 +363,25 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
 
 /* ---------------------------------------------------------------------- */
 
-function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeute: number }) {
+function Angebote({ szenario, nettoHeute, onAnnehmen }: {
+  szenario: SzenarioParsed; nettoHeute: number; onAnnehmen?: () => void;
+}) {
   const angebote = szenario.loesungen.angebote;
   const angebotAendern = useSzenario((x) => x.angebotAendern);
   const angebotEntfernen = useSzenario((x) => x.angebotEntfernen);
   const angebotHinzufuegen = useSzenario((x) => x.angebotHinzufuegen);
+  const angebotAnnehmen = useSzenario((x) => x.angebotAnnehmen);
   const paar = szenario.haushalt.verheiratet && szenario.personen.length > 1;
 
   const positionen = useMemo(() => angebotPositionen(szenario), [szenario]);
+  /*
+    ANGENOMMEN werden nur Angebote, die gerechnet sind — nur sie haben eine
+    Rente oder ein Kapital, das ins Ergebnis kann. Eine Annahme, deren
+    Angebot nicht mehr rechenbar ist, laesst sich weiter zuruecknehmen.
+  */
+  const angenommen = new Set(szenario.loesungen.angenommen);
+  const gerechnet = (p: AngebotPosition) => Boolean(p.rente || p.kapital);
+  const anzahl = positionen.filter((p) => angenommen.has(p.angebot.id) && gerechnet(p)).length;
 
   return (
     <section aria-labelledby="angebote-titel">
@@ -402,8 +417,11 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
       ) : (
         <>
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
-            {positionen.map(({ angebot: a }, i) => {
+            {positionen.map((p, i) => {
+              const a = p.angebot;
               const kapitalMoeglich = angebotKenntKapital(a.loesung);
+              const an = angenommen.has(a.id);
+              const rechenbar = gerechnet(p);
               return (
                 <article key={a.id} className="ui-karte p-5">
                   <div className="mb-3 flex items-center justify-between gap-2">
@@ -463,6 +481,11 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
                         />
                       )}
                     </div>
+                    {a.loesung === 'bav' && a.beitragMonat <= 0 && a.agZuschussMonat > 0 && (
+                      <p className="text-xs leading-relaxed text-ui-schiefer">
+                        Rein arbeitgeberfinanziert, etwa für den Geschäftsführer: gerechnet ohne eigenen Aufwand.
+                      </p>
+                    )}
                     {a.loesung === 'bav' && (
                       <ProzentFeld
                         label="Dynamik p. a."
@@ -496,12 +519,51 @@ function Angebote({ szenario, nettoHeute }: { szenario: SzenarioParsed; nettoHeu
                       </p>
                     )}
                   </div>
+                  {/* Das Haekchen fuer „Lösungen annehmen“ — die Entscheidung des Kunden fuer dieses Angebot. */}
+                  <label
+                    className={`mt-4 flex items-start gap-2 rounded-[8px] border px-3 py-2.5 text-sm print:hidden ${
+                      an ? 'border-ui-tinte bg-ui-innen' : 'border-ui-linie'
+                    } ${rechenbar || an ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={an}
+                      disabled={!rechenbar && !an}
+                      onChange={(e) => angebotAnnehmen(a.id, e.target.checked)}
+                      aria-label={`Angebot ${i + 1} annehmen`}
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                    />
+                    <span className="min-w-0">
+                      <span className={`font-medium ${rechenbar || an ? 'text-ui-tinte' : 'text-ui-schiefer'}`}>Annehmen</span>
+                      {!rechenbar && (
+                        <span className="block text-xs leading-relaxed text-ui-schiefer">
+                          Erst mit Beitrag und Rente bzw. Kapital{an ? ' — so zählt es im Abschluss nicht' : ''}.
+                        </span>
+                      )}
+                    </span>
+                  </label>
                 </article>
               );
             })}
           </div>
 
           <AngebotsTabelle positionen={positionen} nettoHeute={nettoHeute} />
+
+          {/*
+            LOESUNGEN ANNEHMEN: Aus Alternativen werden Entscheidungen. Die
+            Etappe „Abschluss“ rechnet die angenommenen Angebote gemeinsam ins
+            Ergebnis und kennzeichnet sie dort als neu.
+          */}
+          <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+            <p className="text-sm leading-relaxed text-ui-schiefer">
+              {anzahl > 0
+                ? <>{anzahl === 1 ? 'Ein Angebot ist' : `${anzahl} Angebote sind`} angenommen — im Abschluss steht Ihr Ergebnis mit {anzahl === 1 ? 'dieser Lösung' : 'diesen Lösungen'}.</>
+                : 'Setzen Sie bei den Angeboten, für die sich der Kunde entscheidet, das Häkchen „Annehmen“.'}
+            </p>
+            <button type="button" onClick={onAnnehmen} disabled={anzahl === 0 || !onAnnehmen} className={`shrink-0 ${KNOPF}`}>
+              <ClipboardCheck className="h-4 w-4" aria-hidden /> Lösungen annehmen{anzahl > 0 ? ` (${anzahl})` : ''}
+            </button>
+          </div>
         </>
       )}
     </section>
@@ -518,15 +580,26 @@ const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 
 /** Die Einzahlseite ist bei beiden Wegen dieselbe — sie kommt aus dem, der gerechnet ist. */
 const einzahlung = (p: Position) => p.rente ?? p.kapital;
 
-/** Die hoechste Nettorendite eines Angebots ueber beide Wege. */
-const besteRenditeVon = (p: Position) => Math.max(p.rente?.rendite ?? -Infinity, p.kapital?.rendite ?? -Infinity);
+/** Rein arbeitgeberfinanziert: gerechnet, aber ohne eigenen Aufwand (`ohneEigenaufwand`). */
+const ohneAufwand = (p: Position) => { const e = einzahlung(p); return e !== null && ohneEigenaufwand(e); };
+
+/**
+ * Die hoechste Nettorendite eines Angebots ueber beide Wege. Ohne eigenen
+ * Aufwand gibt es keine — ein solches Angebot steht ausser Wertung.
+ */
+const besteRenditeVon = (p: Position) => (ohneAufwand(p)
+  ? -Infinity
+  : Math.max(p.rente?.rendite ?? -Infinity, p.kapital?.rendite ?? -Infinity));
 
 function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; nettoHeute: number }) {
   const mitRente = positionen.some((p) => p.rente);
   const mitKapital = positionen.some((p) => p.kapital);
   const mitVergleich = positionen.some((p) => p.breakEven);
-  const gerechnet = positionen.filter((p) => p.rente || p.kapital);
-  const beste = gerechnet.reduce((m, p) => Math.max(m, besteRenditeVon(p)), -Infinity);
+  // Um die beste Rendite konkurrieren nur Angebote mit eigenem Aufwand.
+  const inWertung = positionen.filter((p) => (p.rente || p.kapital) && !ohneAufwand(p));
+  const beste = inWertung.reduce((m, p) => Math.max(m, besteRenditeVon(p)), -Infinity);
+  /** Hebel, Rendite und Amortisation: ohne eigenen Aufwand ein Strich, kein „0,00“. */
+  const mitAufwand = (p: Position, w: string) => (ohneAufwand(p) ? null : w);
 
   const zeilen: Zeile[] = [
     { text: 'Kostet Sie netto im Monat', wert: (p) => { const e = einzahlung(p); return e ? euro(e.echterAufwandMonat) : null; } },
@@ -556,16 +629,16 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
       },
       {
         text: 'Netto-Hebel', info: 'Netto-Auszahlung über die Laufzeit je Euro Netto-Aufwand, ohne Verzinsung.',
-        wert: (p: Position) => (p.rente ? `${zahl(p.rente.nettoHebel)} ×` : null),
+        wert: (p: Position) => (p.rente ? mitAufwand(p, `${zahl(p.rente.nettoHebel)} ×`) : null),
       },
       {
         text: 'Nettorendite p. a.', stark: true,
         info: 'Der interne Zinsfuß aller Netto-Zahlungen: Aufwand in der Ansparphase gegen Netto-Rente bis zur Lebenserwartung.',
-        wert: (p: Position) => (p.rente ? prozent(p.rente.rendite, 2) : null),
+        wert: (p: Position) => (p.rente ? mitAufwand(p, prozent(p.rente.rendite, 2)) : null),
       },
       {
         text: 'Amortisation ab Rentenbeginn',
-        wert: (p: Position) => (p.rente ? `${jahre(p.rente.amortisationsJahre)} J.` : null),
+        wert: (p: Position) => (p.rente ? mitAufwand(p, `${jahre(p.rente.amortisationsJahre)} J.`) : null),
       },
     ] : []),
     ...(mitKapital ? [
@@ -582,8 +655,11 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
         wert: (p: Position) => (p.kapital ? euro(p.kapital.kvPvKapital) : null),
       },
       { text: 'Kapital netto', stark: true, wert: (p: Position) => (p.kapital ? euro(p.kapital.nettoKapital) : null) },
-      { text: 'Netto-Hebel', wert: (p: Position) => (p.kapital ? `${zahl(p.kapital.nettoHebel)} ×` : null) },
-      { text: 'Nettorendite p. a.', stark: true, wert: (p: Position) => (p.kapital ? prozent(p.kapital.rendite, 2) : null) },
+      { text: 'Netto-Hebel', wert: (p: Position) => (p.kapital ? mitAufwand(p, `${zahl(p.kapital.nettoHebel)} ×`) : null) },
+      {
+        text: 'Nettorendite p. a.', stark: true,
+        wert: (p: Position) => (p.kapital ? mitAufwand(p, prozent(p.kapital.rendite, 2)) : null),
+      },
     ] : []),
     ...(mitVergleich ? [
       { gruppe: 'Rente oder Kapital?' },
@@ -613,7 +689,10 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
                 <th key={p.angebot.id} className="px-4 py-2.5 text-right align-bottom">
                   <span className="block text-xs font-normal text-ui-schiefer">Angebot {i + 1}</span>
                   <span className="block font-medium leading-tight text-ui-tinte">{p.angebot.name || LOESUNG_TEXT[p.angebot.loesung]}</span>
-                  {gerechnet.length > 1 && (p.rente || p.kapital) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
+                  {ohneAufwand(p) && (
+                    <span className="mt-0.5 block text-xs font-normal leading-tight text-ui-schiefer">rein arbeitgeberfinanziert</span>
+                  )}
+                  {inWertung.length > 1 && inWertung.includes(p) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
                     <span className="ui-marke mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
@@ -648,10 +727,16 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
           </tbody>
         </table>
       </div>
-      {positionen.some((p) => !p.rente && !p.kapital) && (
-        <p className="border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs text-ui-tinte">
-          Bei Angeboten ohne Beitrag oder ohne Rente bzw. Kapital fehlt die Rechnung — tragen Sie beides ein.
-        </p>
+      {(positionen.some(ohneAufwand) || positionen.some((p) => !p.rente && !p.kapital)) && (
+        <div className="space-y-1.5 border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte">
+          {positionen.some(ohneAufwand) && <p>{OHNE_EIGENAUFWAND_TEXT}</p>}
+          {positionen.some((p) => !p.rente && !p.kapital) && (
+            <p>
+              Angebote ohne Beitrag oder ohne Rente bzw. Kapital rechnet der Vergleich nicht — tragen Sie
+              beides ein. Bei der Betriebsrente genügt der Beitrag des Arbeitgebers.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

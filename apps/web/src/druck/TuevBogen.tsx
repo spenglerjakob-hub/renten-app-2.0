@@ -1,5 +1,5 @@
 import {
-  belastungsTreppe, laufendeZulageJahr, laufzeitText, type TuevPosition,
+  belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand, type TuevPosition,
 } from '../features/tuev-berechnung';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import { typText, vertragsBezeichnung } from '../features/vertragsarten';
@@ -29,6 +29,10 @@ export function TuevBogen({
   const t = szenario.tuev.find((x) => x.vertragId === v.id);
   const treppe = belastungsTreppe(r);
   const gut = r.nettoHebel >= 1;
+  // Rein arbeitgeberfinanziert: Hebel und Rendite messen am eigenen Aufwand — ohne ihn gibt es sie nicht.
+  const ohne = ohneEigenaufwand(r);
+  const hebel = (x: number) => (ohne ? '—'
+    : `${x.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
 
   return (
     <Seite
@@ -48,9 +52,9 @@ export function TuevBogen({
         />
         <GrosseZahl
           titel="Aus einem Euro Aufwand werden"
-          wert={`${r.nettoHebel.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`}
-          ton={gut ? 'gut' : 'schlecht'}
-          hinweis={gut ? 'Der Vertrag trägt sich' : 'Unter dem Einsatz'}
+          wert={hebel(r.nettoHebel)}
+          ton={ohne ? 'neutral' : gut ? 'gut' : 'schlecht'}
+          hinweis={ohne ? 'Rein arbeitgeberfinanziert' : gut ? 'Der Vertrag trägt sich' : 'Unter dem Einsatz'}
         />
       </div>
 
@@ -164,10 +168,10 @@ export function TuevBogen({
         <Angabe feld="Summe Ihres Aufwands" wert={euro(r.summeEinzahlung)} />
         <Angabe feld="Summe der Auszahlung (netto)" wert={euro(r.summeAuszahlung)} />
         <Angabe feld="Überschuss" wert={euro(r.echterGewinn)} />
-        <Angabe feld="Rendite auf Ihren Aufwand" wert={prozent(r.rendite)} />
+        <Angabe feld="Rendite auf Ihren Aufwand" wert={ohne ? '—' : prozent(r.rendite)} />
         <Angabe
           feld="Eingesetztes Geld zurück nach"
-          wert={r.amortisationsJahre > 0
+          wert={ohne ? 'kein eigener Aufwand' : r.amortisationsJahre > 0
             ? `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren`
             : 'nicht erreicht'}
         />
@@ -204,13 +208,13 @@ export function TuevBogen({
             ]} />
             <Zeile zellen={[
               'Aus einem Euro Aufwand werden',
-              `${wege.rente.nettoHebel.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
-              `${wege.kapital.nettoHebel.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
+              hebel(wege.rente.nettoHebel),
+              hebel(wege.kapital.nettoHebel),
             ]} />
             <Zeile zellen={[
               'Rendite auf Ihren Aufwand',
-              prozent(wege.rente.rendite),
-              prozent(wege.kapital.rendite),
+              ohne ? '—' : prozent(wege.rente.rendite),
+              ohne ? '—' : prozent(wege.kapital.rendite),
             ]} />
           </Tabelle>
           <Text>

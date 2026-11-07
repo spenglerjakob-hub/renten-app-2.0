@@ -1,10 +1,11 @@
 import type { ProjektionsErgebnis, Jahreszeile, Szenario } from '@renten/engine';
 import { euro, prozent } from '../components/Feld';
+import { NEU_TEXT } from '../features/Kassenbon';
 import { SCHICHT_TITEL } from '../features/vertragsarten';
 import { geteilterFreibetrag, freibetragText } from '../features/bav-freibetrag';
 import {
   Seite, Untertitel, Angabe, Zweispaltig, Tabelle, Zeile, Gruppenzeile,
-  GrosseZahl, Text, KASTEN,
+  GrosseZahl, Text, KASTEN, Abzeichen,
 } from './Bausteine';
 
 /**
@@ -48,16 +49,6 @@ export function Renteneinkuenfte({
   // Der Kaufkraftfaktor der Zeile rechnet einen Betrag des Jahres auf heutiges
   // Preisniveau zurueck. Beide Richtungen stehen damit bereits fest.
   const heute = (n: number) => n / zeile.kaufkraftfaktor;
-
-  const nachSchicht = ([1, 2, 3] as const)
-    .map((schicht) => ({
-      schicht,
-      posten: zeile.posten.filter((x) => x.schicht === schicht && (x.bruttoJahr !== 0 || x.kvPvJahr !== 0)),
-    }))
-    .filter((x) => x.posten.length > 0);
-
-  const summe = (posten: Jahreszeile['posten'], feld: keyof Jahreszeile['posten'][number]) =>
-    posten.reduce((s, x) => s + (x[feld] as number), 0);
 
   const monat = (n: number) => euro(n / 12);
 
@@ -132,51 +123,7 @@ export function Renteneinkuenfte({
       </div>
 
       <Untertitel>Woraus sich das Netto zusammensetzt</Untertitel>
-      <Tabelle
-        kopf={['Einkunft', 'Brutto', 'KV/PV', 'Steuer', 'Netto']}
-        spalten={[40, 15, 15, 15, 15]}
-      >
-        {nachSchicht.flatMap(({ schicht, posten }) => [
-          <Gruppenzeile key={`s${schicht}`} text={SCHICHT_TITEL[schicht]} spalten={5} />,
-          ...posten.map((x) => (
-            <Zeile
-              key={x.id}
-              zellen={[
-                x.bezeichnung,
-                monat(x.bruttoJahr),
-                x.kvPvJahr > 0 ? `− ${monat(x.kvPvJahr)}` : '—',
-                x.steuerJahr > 0 ? `− ${monat(x.steuerJahr)}` : '—',
-                monat(x.nettoJahr),
-              ]}
-            />
-          )),
-          ...(posten.length > 1
-            ? [
-                <Zeile
-                  key={`sum${schicht}`}
-                  fett
-                  zellen={[
-                    `Summe Schicht ${schicht}`,
-                    monat(summe(posten, 'bruttoJahr')),
-                    `− ${monat(summe(posten, 'kvPvJahr'))}`,
-                    `− ${monat(summe(posten, 'steuerJahr'))}`,
-                    monat(summe(posten, 'nettoJahr')),
-                  ]}
-                />,
-              ]
-            : []),
-        ])}
-        <Zeile
-          fett
-          zellen={[
-            einzelperson ? `${einzelperson} gesamt` : 'Haushalt gesamt',
-            monat(zeile.bruttoGesamt),
-            `− ${monat(zeile.kvPvGesamt)}`,
-            `− ${monat(zeile.steuerGesamt)}`,
-            euro(zeile.nettoMonat),
-          ]}
-        />
-      </Tabelle>
+      <Zusammensetzung zeile={zeile} einzelperson={einzelperson} />
 
       {/*
         Wer mehrere Betriebsrenten hat, findet in der Tabelle Beitraege, die
@@ -268,9 +215,81 @@ export function Renteneinkuenfte({
 
       <Text>
         Alle Beträge sind Monatsbeträge des Jahres {zeile.jahr}, also das, was später auf dem
-        Kontoauszug steht. Was sie in heutigem Geld wert sind, zeigt die Seite „Dieselben Zahlen in
-        heutiger Kaufkraft“.
+        Kontoauszug steht. Was Netto, Ziel und Lücke in heutigem Geld wert sind, steht oben unter
+        „Ihr Versorgungsziel“.
       </Text>
     </Seite>
+  );
+}
+
+/**
+ * „Woraus sich das Netto zusammensetzt“ — je Schicht die Posten mit Brutto,
+ * KV/PV, Steuer und Netto. Auch fuer das Ergebnis mit den gewaehlten
+ * Loesungen: Dort tragen die neuen Zeilen die Marke „Neu“.
+ */
+export function Zusammensetzung({ zeile, einzelperson, neu }: {
+  zeile: Jahreszeile;
+  einzelperson?: string;
+  /** Die Vertrags-IDs der angenommenen Loesungen */
+  neu?: ReadonlySet<string>;
+}) {
+  const nachSchicht = ([1, 2, 3] as const)
+    .map((schicht) => ({
+      schicht,
+      posten: zeile.posten.filter((x) => x.schicht === schicht && (x.bruttoJahr !== 0 || x.kvPvJahr !== 0)),
+    }))
+    .filter((x) => x.posten.length > 0);
+
+  const summe = (posten: Jahreszeile['posten'], feld: keyof Jahreszeile['posten'][number]) =>
+    posten.reduce((s, x) => s + (x[feld] as number), 0);
+
+  const monat = (n: number) => euro(n / 12);
+
+  return (
+    <Tabelle
+      kopf={['Einkunft', 'Brutto', 'KV/PV', 'Steuer', 'Netto']}
+      spalten={[40, 15, 15, 15, 15]}
+    >
+      {nachSchicht.flatMap(({ schicht, posten }) => [
+        <Gruppenzeile key={`s${schicht}`} text={SCHICHT_TITEL[schicht]} spalten={5} />,
+        ...posten.map((x) => (
+          <Zeile
+            key={x.id}
+            zellen={[
+              neu?.has(x.id) ? <>{x.bezeichnung}<Abzeichen>{NEU_TEXT}</Abzeichen></> : x.bezeichnung,
+              monat(x.bruttoJahr),
+              x.kvPvJahr > 0 ? `− ${monat(x.kvPvJahr)}` : '—',
+              x.steuerJahr > 0 ? `− ${monat(x.steuerJahr)}` : '—',
+              monat(x.nettoJahr),
+            ]}
+          />
+        )),
+        ...(posten.length > 1
+          ? [
+              <Zeile
+                key={`sum${schicht}`}
+                fett
+                zellen={[
+                  `Summe Schicht ${schicht}`,
+                  monat(summe(posten, 'bruttoJahr')),
+                  `− ${monat(summe(posten, 'kvPvJahr'))}`,
+                  `− ${monat(summe(posten, 'steuerJahr'))}`,
+                  monat(summe(posten, 'nettoJahr')),
+                ]}
+              />,
+            ]
+          : []),
+      ])}
+      <Zeile
+        fett
+        zellen={[
+          einzelperson ? `${einzelperson} gesamt` : 'Haushalt gesamt',
+          monat(zeile.bruttoGesamt),
+          `− ${monat(zeile.kvPvGesamt)}`,
+          `− ${monat(zeile.steuerGesamt)}`,
+          euro(zeile.nettoMonat),
+        ]}
+      />
+    </Tabelle>
   );
 }

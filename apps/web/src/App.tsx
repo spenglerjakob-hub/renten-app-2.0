@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
-  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette,
+  PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette, ClipboardCheck, ClipboardList,
 } from 'lucide-react';
 import {
   versorgungsluecke, parseDatum, nurPerson,
@@ -44,7 +44,16 @@ import { aboSichtbar, aboZusatz, rueckmeldungFaellig, useZugang, wirksam } from 
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
 import { Loesungen } from './features/Loesungen';
-import { Gutachten } from './druck/Gutachten';
+import { Abschluss } from './features/Abschluss';
+import { Antragsangaben } from './features/Antragsangaben';
+import { Antraege } from './features/Antraege';
+import { antragLoesungenAus } from './features/antrag-daten';
+import { useAntraege } from './store/antraege';
+import { antragStand } from './lib/antraege';
+import { angenommenePositionen, ansichtMitAngenommenen, mitAngenommenen } from './features/tuev-berechnung';
+import { Gutachten, useGutachtenSeiten } from './druck/Gutachten';
+import { ALLES, gewaehlt, type DruckAuswahl } from './druck/druckauswahl';
+import { DruckAuswahlFenster } from './features/DruckAuswahl';
 import { EhepartnerDialog } from './features/EhepartnerDialog';
 import { Logo } from './components/Logo';
 import { KaufkraftSchalter } from './components/KaufkraftSchalter';
@@ -68,13 +77,14 @@ const REITER: { id: Reiter; text: string }[] = [
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
 
-/** Die vier Etappen der Beratung — siehe `JourneyLeiste`. */
-type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen';
+/** Die fuenf Etappen der Beratung — siehe `JourneyLeiste`. */
+type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen' | 'abschluss';
 const ETAPPEN: readonly Etappe<Schritt>[] = [
   { id: 'daten', text: 'Daten & Ziel', kurz: 'Daten & Ziel' },
   { id: 'ergebnis', text: 'Ergebnis', kurz: 'Ergebnis' },
   { id: 'sparen', text: 'Sparrechner', kurz: 'Sparen' },
   { id: 'loesungen', text: 'Vertrags-TÜV & Lösungen', kurz: 'TÜV & Lösungen' },
+  { id: 'abschluss', text: 'Abschluss', kurz: 'Abschluss' },
 ];
 
 /*
@@ -217,82 +227,37 @@ function KopfAuswahl({
 }
 
 /**
- * EIN Druckknopf mit Auswahl statt zweier roter Knoepfe — die waren das
- * Lauteste im ganzen Kopf. Mit Kontur, nicht gefuellt: Die Hauptaktion
- * jeder Etappe ist „Weiter“, nicht das Drucken.
+ * EIN Druckknopf — mit Kontur, nicht gefuellt: Die Hauptaktion jeder Etappe
+ * ist „Weiter“, nicht das Drucken. Er oeffnet das Druckfenster, in dem
+ * Thema fuer Thema angekreuzt wird, was ins Gutachten kommt.
  */
-function DruckMenue({ onDrucke, kompakt = false }: {
-  onDrucke: (umfang: 'kurz' | 'ausfuehrlich') => void;
+function DruckKnopf({ onOeffnen, kompakt = false }: {
+  onOeffnen: () => void;
   /** Nur das Symbol — fuer die eingeklappte Kopfleiste */
   kompakt?: boolean;
 }) {
-  const [offen, setOffen] = useState(false);
-  const huelle = useRef<HTMLDivElement>(null);
-  const menueId = useId();
-
-  useEffect(() => {
-    if (!offen) return;
-    const weg = (e: MouseEvent) => { if (!huelle.current?.contains(e.target as Node)) setOffen(false); };
-    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
-    document.addEventListener('mousedown', weg);
-    document.addEventListener('keydown', taste);
-    return () => {
-      document.removeEventListener('mousedown', weg);
-      document.removeEventListener('keydown', taste);
-    };
-  }, [offen]);
-
-  const wahl = (umfang: 'kurz' | 'ausfuehrlich') => { setOffen(false); onDrucke(umfang); };
-  const eintrag = 'block w-full rounded-md px-3 py-2 text-left hover:bg-ui-innen focus-visible:bg-ui-innen';
-
-  return (
-    <div ref={huelle} className={`relative flex ${kompakt ? '' : 'flex-1 sm:flex-none'}`}>
-      {kompakt ? (
-        <button
-          type="button"
-          onClick={() => setOffen((v) => !v)}
-          aria-expanded={offen}
-          aria-controls={menueId}
-          aria-label="Gutachten drucken"
-          title="Gutachten drucken"
-          className={KOPF_KNOPF}
-        >
-          <Printer className="h-4 w-4" aria-hidden />
-        </button>
-      ) : (
+  return kompakt ? (
+    <button
+      type="button"
+      onClick={onOeffnen}
+      aria-haspopup="dialog"
+      aria-label="Gutachten drucken"
+      title="Gutachten drucken"
+      className={KOPF_KNOPF}
+    >
+      <Printer className="h-4 w-4" aria-hidden />
+    </button>
+  ) : (
+    <div className="flex flex-1 sm:flex-none">
       <button
         type="button"
-        onClick={() => setOffen((v) => !v)}
-        aria-expanded={offen}
-        aria-controls={menueId}
+        onClick={onOeffnen}
+        aria-haspopup="dialog"
         className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover sm:flex-none"
       >
         <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="sm:hidden">Drucken</span><span className="hidden sm:inline">Gutachten drucken</span>
-        <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
       </button>
-      )}
-      {offen && (
-        <div
-          id={menueId}
-          className="ui-karte absolute right-0 top-full z-50 mt-2 w-64 p-1 text-sm text-ui-tinte shadow-lg"
-        >
-          {/*
-            Zwei Umfaenge: die Kurzfassung fuer das Gespraech (Deckblatt,
-            Angaben, Renteneinkuenfte, Vorbehalt), die ausfuehrliche zum
-            Mitgeben. Ein Dokument mit Namen darauf fuehrt den Vorbehalt
-            in beiden Faellen mit.
-          */}
-          <button type="button" className={eintrag} onClick={() => wahl('kurz')}>
-            <span className="block font-medium">Kurzfassung</span>
-            <span className="block text-xs text-ui-schiefer">Für das Gespräch: Angaben und Renteneinkünfte</span>
-          </button>
-          <button type="button" className={eintrag} onClick={() => wahl('ausfuehrlich')}>
-            <span className="block font-medium">Ausführlich</span>
-            <span className="block text-xs text-ui-schiefer">Zum Mitgeben: alle Abschnitte des Gutachtens</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -400,6 +365,8 @@ export default function App() {
   */
   const auftritt = useAuftritt((s) => s.auftritt);
   const auftrittStatus = useAuftritt((s) => s.status);
+  // Fuer den Kopf des Antragsbogens: Firma und Berater, soweit hinterlegt.
+  const beraterZeile = [auftritt?.firma.trim(), auftritt?.berater.trim()].filter(Boolean).join(' · ') || undefined;
   const auftrittLaden = useAuftritt((s) => s.laden);
   const auftrittLeeren = useAuftritt((s) => s.zuruecksetzen);
   const [auftrittOffen, setAuftrittOffen] = useState(false);
@@ -452,6 +419,19 @@ export default function App() {
   }, [auftrittLokal, auftrittStatus, auftrittBand, auftrittUebernehmen]);
   const neueEingaenge = checkListe.filter((a) => a.eingang).length;
   /*
+    ANTRAEGE nach „Lösungen annehmen“: geladen, sobald jemand angemeldet ist —
+    die Marke „n eingegangen“ steht in der Seitenleiste, auch wenn das
+    Fenster zu ist.
+  */
+  const antraegeListe = useAntraege((s) => s.liste);
+  const antraegeLaden = useAntraege((s) => s.laden);
+  useEffect(() => {
+    if (supabaseKonfiguriert && angemeldet) void antraegeLaden();
+  }, [angemeldet, antraegeLaden]);
+  const antraegeEingegangen = antraegeListe.filter((a) => antragStand(a) === 'eingegangen').length;
+  const [antraegeOffen, setAntraegeOffen] = useState(false);
+  const schliesseAntraege = useCallback(() => setAntraegeOffen(false), []);
+  /*
     KONTO UND VORSORGE-CHECK als Fenster: Beide werden in jeder Etappe
     gebraucht — gespeichert wird oft erst nach den Angeboten am Ende, ein
     Kunden-Link geht jederzeit raus. Erreichbar aus der ersten Etappe und aus
@@ -501,12 +481,41 @@ export default function App() {
   const { ergebnis, rechnet, fehler } = useProjektion(ansichtSzenario);
 
   /*
+    DAS ERGEBNIS MIT DEN ANGENOMMENEN LOESUNGEN — fuer die Etappe
+    „Abschluss“ und das Gutachten. Im ganzen Haushalt gerechnet und dann wie
+    das Ergebnis auf die Person zugeschnitten (`ansichtMitAngenommenen`).
+    Ein eigener Lauf im Worker, aber nur, wenn etwas angenommen ist.
+  */
+  const mitHaushalt = useMemo(() => mitAngenommenen(szenario), [szenario]);
+  const mitAnsicht = useMemo(
+    () => ansichtMitAngenommenen(mitHaushalt, einzeln ? wer : null),
+    [mitHaushalt, einzeln, wer],
+  );
+  const { ergebnis: ergebnisMit } = useProjektion(mitAnsicht?.szenario ?? null);
+  const positionenMit = useMemo(
+    () => angenommenePositionen(ansichtSzenario, mitAnsicht),
+    [ansichtSzenario, mitAnsicht],
+  );
+
+  /*
     DER FORTSCHRITT DES FALLS — aus echten Schritten (`features/fortschritt.ts`).
     Am ganzen Fall, nicht an der Einzelbetrachtung: Er beschreibt, was
     erfasst ist, nicht was gerade angezeigt wird. Ausgewertet ist der Fall,
     sobald das Ergebnis einmal mit Zahlen zu sehen war.
   */
   const nameVon = useCallback((id: PersonId) => personNameAus(szenario.personen, id), [szenario.personen]);
+  /*
+    Das Abbild der angenommenen Loesungen fuer den Antrag — immer der ganze
+    Haushalt: Ein Antrag gehoert zum Plan, nicht zur Ansicht. Stabil per
+    useMemo, sonst setzte die Karte ihr Formular bei jedem Zeichnen zurueck.
+  */
+  const antragLoesungen = useMemo(() => antragLoesungenAus(mitHaushalt.loesungen, nameVon), [mitHaushalt, nameVon]);
+  const kundeVorschlag = useMemo(
+    () => szenario.personen
+      .filter((p) => p.id === 'A' || szenario.haushalt.verheiratet)
+      .map((p) => p.name.trim()).filter(Boolean).join(' und '),
+    [szenario.personen, szenario.haushalt.verheiratet],
+  );
   const fallSchritte = useMemo(
     () => fallFortschritt(szenario, { konto: Boolean(angemeldet), nameVon }),
     [szenario, angemeldet, nameVon],
@@ -516,7 +525,9 @@ export default function App() {
   }, [schritt, ergebnis, ausgewertet]);
   const etappeErledigt = (id: Schritt) => (id === 'daten'
     ? datenErledigt(fallSchritte)
-    : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
+    : id === 'abschluss'
+      ? mitHaushalt.loesungen.length > 0
+      : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
   /** Ein offener Schritt der Leiste fuehrt an die Stelle, an der etwas fehlt. */
   const springeZu = (id: FallSchrittId) => {
     if (id === 'auswertung') { geheZu('ergebnis'); return; }
@@ -588,11 +599,27 @@ export default function App() {
   const zeile = echteZeile ?? LEERE_ZEILE;
 
   /*
-    DER DRUCKUMFANG. Gedruckt wird erst, wenn React die neue Seitenfolge
-    gezeichnet hat — `window.print()` unmittelbar im Klick druckte noch die
-    alte. Deshalb der Umweg ueber einen Effekt.
+    DAS GUTACHTEN UND SEINE DRUCKAUSWAHL. Alle Seiten, die der Fall hergibt,
+    kommen aus EINER Liste (`useGutachtenSeiten`): Das Druckfenster zeigt sie
+    als Kaestchen, das Gutachten druckt die angekreuzten. Die Auswahl gilt, bis
+    die Seite neu geladen wird; im Browser gespeichert wird sie nicht.
+
+    Gedruckt wird erst, wenn React die neue Seitenfolge gezeichnet hat —
+    `window.print()` unmittelbar im Klick druckte noch die alte. Deshalb der
+    Umweg ueber einen Effekt.
   */
-  const [druckUmfang, setDruckUmfang] = useState<'kurz' | 'ausfuehrlich'>('ausfuehrlich');
+  const gutachtenSeiten = useGutachtenSeiten({
+    szenario: ansichtSzenario,
+    ergebnis: ergebnis ?? null,
+    zeile,
+    einzelperson: einzeln ? personNameAus(szenario.personen, wer) : undefined,
+    mit: mitAnsicht,
+    ergebnisMit,
+    positionenMit,
+  });
+  const [druckAuswahl, setDruckAuswahl] = useState<DruckAuswahl>(ALLES);
+  const [druckOffen, setDruckOffen] = useState(false);
+  const schliesseDruck = useCallback(() => setDruckOffen(false), []);
   const [druckAngefordert, setDruckAngefordert] = useState(false);
   useEffect(() => {
     if (!druckAngefordert) return;
@@ -607,24 +634,18 @@ export default function App() {
       Promise.all(bilder.map((b) => b.decode().catch(() => undefined))),
       new Promise((fertig) => window.setTimeout(fertig, 1500)),
     ]).then(() => window.print());
-  }, [druckAngefordert, druckUmfang]);
-  const druckeJetzt = (umfang: 'kurz' | 'ausfuehrlich') => {
-    setDruckUmfang(umfang);
+  }, [druckAngefordert]);
+  // Erst das Fenster schliessen, dann drucken: Der Effekt laeuft nach dem Zeichnen.
+  const druckeJetzt = () => {
+    setDruckOffen(false);
     setDruckAngefordert(true);
   };
   /*
-    NOCH BEISPIELWERTE IM FALL? Dann eine Rueckfrage vor dem Druck — ein
-    Gutachten geht an den Kunden, und danach ist es zu spaet. Beide Knoepfe
-    sind gleichwertig; gedruckt werden darf trotzdem, die Werte stehen im
-    Gutachten dann als Beispielwert gekennzeichnet.
+    NOCH BEISPIELWERTE IM FALL? Dann sagt es das Druckfenster — ein
+    Gutachten geht an den Kunden, und danach ist es zu spaet. Gedruckt werden
+    darf trotzdem, die Werte stehen im Gutachten als Beispielwert gekennzeichnet.
   */
-  const [druckFrage, setDruckFrage] = useState<'kurz' | 'ausfuehrlich' | null>(null);
   const offeneBeispielTexte = offeneBeispiele(ansichtSzenario, (id) => personNameAus(szenario.personen, id));
-  const drucke = (umfang: 'kurz' | 'ausfuehrlich') => {
-    if (offeneBeispielTexte.length > 0) setDruckFrage(umfang);
-    else druckeJetzt(umfang);
-  };
-  const schliesseDruckFrage = useCallback(() => setDruckFrage(null), []);
 
   /*
     Solange Beispielwerte im Fall stehen, sagt es jede rechnende Etappe —
@@ -645,6 +666,16 @@ export default function App() {
   );
   const faktor = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const luecke = versorgungsluecke(zeile);
+  /*
+    In der Etappe „Abschluss“ rechnet auch die Fussleiste mit den gewaehlten
+    Loesungen — sonst stuende dort eine andere Luecke als im Titel darueber.
+    Dasselbe Jahr, also derselbe Kaufkraftfaktor.
+  */
+  const leisteMit = schritt === 'abschluss' && mitAnsicht && ergebnisMit && echteZeile
+    ? ergebnisMit.zeilen.find((z) => z.jahr === zeile.jahr) ?? null
+    : null;
+  const leiste = leisteMit ?? zeile;
+  const leisteLuecke = versorgungsluecke(leiste);
   // Das heutige Haushaltsnetto — die Bezugsgroesse fuer Sparrate und Beitraege.
   const nettoHeute = nettoHeuteMonat(ergebnis);
   // Hinweise des Rechenkerns lagen bisher ungenutzt im Ergebnis.
@@ -656,6 +687,7 @@ export default function App() {
     { id: 'journey', text: '2. Ergebnis', symbol: <BarChart3 className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('ergebnis') },
     { id: 'journey', text: '3. Sparrechner', symbol: <Target className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('sparen') },
     { id: 'journey', text: '4. Vertrags-TÜV & Lösungen', symbol: <SearchCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('loesungen') },
+    { id: 'journey', text: '5. Abschluss', symbol: <ClipboardCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('abschluss') },
   ];
   const werkzeuge: Werkzeug[] = [
     {
@@ -676,6 +708,13 @@ export default function App() {
       symbol: <Inbox className="h-4 w-4" aria-hidden />,
       marke: eingangMarke,
       onOeffnen: () => setCheckOffen(true),
+    }] : []),
+    ...(checkMoeglich ? [{
+      text: 'Anträge',
+      zusatz: 'Angaben für den Antrag, Links an Kunden',
+      symbol: <ClipboardList className="h-4 w-4" aria-hidden />,
+      marke: antraegeEingegangen > 0 ? `${antraegeEingegangen} eingegangen` : undefined,
+      onOeffnen: () => { void antraegeLaden(); setAntraegeOffen(true); },
     }] : []),
     ...(zugang && aboSichtbar(zugang) ? [{
       text: 'Abo & Team',
@@ -899,7 +938,7 @@ export default function App() {
                 <Wallet className="h-4 w-4" aria-hidden />
                 {angemeldet && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-ui-tinte ring-2 ring-ui-flaeche" />}
               </button>
-              {kopfEingeklappt && <DruckMenue onDrucke={drucke} kompakt />}
+              {kopfEingeklappt && <DruckKnopf onOeffnen={() => setDruckOffen(true)} kompakt />}
               {!kopfEingeklappt && (
                 <button
                   type="button"
@@ -965,7 +1004,7 @@ export default function App() {
                 <button type="button" onClick={exportieren} className={`${KOPF_TEXT} flex-1 sm:flex-none`}>
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
-                <DruckMenue onDrucke={drucke} />
+                <DruckKnopf onOeffnen={() => setDruckOffen(true)} />
                 <button
                   type="button"
                   onClick={zuruecksetzen}
@@ -992,9 +1031,9 @@ export default function App() {
         szenario={ansichtSzenario}
         ergebnis={ergebnis ?? null}
         zeile={zeile}
-        umfang={druckUmfang}
         einzelperson={einzeln ? personNameAus(szenario.personen, wer) : undefined}
         auftritt={auftritt}
+        seiten={gutachtenSeiten.filter((s) => gewaehlt(s, druckAuswahl))}
       />
 
       {importMeldung && (
@@ -1355,9 +1394,47 @@ export default function App() {
             />
             <div id="tuev-bereich" role="tabpanel" aria-labelledby={`tuev-reiter-${tuevReiter}`}>
               {tuevReiter === 'loesungen'
-                ? <Loesungen zeile={ergebnis ? zeile : null} szenario={ansichtSzenario} sparrate={sparrate} nettoHeute={nettoHeute} />
+                ? (
+                  <Loesungen
+                    zeile={ergebnis ? zeile : null}
+                    szenario={ansichtSzenario}
+                    sparrate={sparrate}
+                    nettoHeute={nettoHeute}
+                    onAnnehmen={() => geheZu('abschluss')}
+                  />
+                )
                 : <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />}
             </div>
+            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
+          </>
+        )}
+
+        {/* ---------- 5. ABSCHLUSS ---------- */}
+        {schritt === 'abschluss' && (
+          <>
+            <Abschluss
+              mit={mitAnsicht}
+              positionen={positionenMit}
+              ergebnisMit={ergebnisMit}
+              vorher={ergebnis ? zeile : null}
+              kaufkraftHeute={kaufkraftHeute}
+              onKaufkraftHeute={setKaufkraftHeute}
+              person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+              inhaberName={paar && !einzeln ? nameVon : undefined}
+              vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
+              onZuLoesungen={() => { setTuevReiter('loesungen'); geheZu('loesungen'); }}
+            />
+            {/* Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt. */}
+            {mitHaushalt.loesungen.length > 0 && (
+              <Antragsangaben
+                antragId={szenario.loesungen.antrag}
+                loesungen={antragLoesungen}
+                kundeVorschlag={kundeVorschlag}
+                angemeldet={checkMoeglich}
+                onKonto={() => setKontoOffen(true)}
+                berater={beraterZeile}
+              />
+            )}
             <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
           </>
         )}
@@ -1391,28 +1468,31 @@ export default function App() {
         </Dialog>
       )}
 
-      <Dialog offen={druckFrage !== null} titel="Noch Beispielwerte im Fall" onSchliessen={schliesseDruckFrage}>
-        <p className="text-sm leading-relaxed text-ui-tinte/80">
-          Diese Angaben sind noch Beispielwerte: <strong className="font-medium text-ui-tinte">{offeneBeispielTexte.join(', ')}</strong>. Im
-          Gutachten stehen sie gekennzeichnet.
-        </p>
-        {/* Zwei gleichwertige Knoepfe: Drucken darf man trotzdem. */}
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => { setDruckFrage(null); setBasisOffen(true); geheZu('daten'); }}
-            className={KNOPF_ZWEIT}
-          >
-            Angaben prüfen
-          </button>
-          <button
-            type="button"
-            onClick={() => { const u = druckFrage; setDruckFrage(null); if (u) druckeJetzt(u); }}
-            className={KNOPF_ZWEIT}
-          >
-            Trotzdem drucken
-          </button>
-        </div>
+      {checkMoeglich && (
+        <Dialog
+          offen={antraegeOffen}
+          titel="Anträge"
+          beschreibung="Angaben für den Antrag, Links an Kunden und der Antragsbogen."
+          onSchliessen={schliesseAntraege}
+        >
+          <Antraege berater={beraterZeile} />
+        </Dialog>
+      )}
+
+      <Dialog
+        offen={druckOffen}
+        titel="Gutachten drucken"
+        beschreibung="Kreuzen Sie an, was ins Gutachten kommt. Deckblatt und Vorbehalt sind immer dabei."
+        onSchliessen={schliesseDruck}
+      >
+        <DruckAuswahlFenster
+          seiten={gutachtenSeiten}
+          auswahl={druckAuswahl}
+          onAuswahl={setDruckAuswahl}
+          beispielwerte={offeneBeispielTexte}
+          onAngabenPruefen={() => { setDruckOffen(false); setBasisOffen(true); geheZu('daten'); }}
+          onDrucken={druckeJetzt}
+        />
       </Dialog>
 
       {checkMoeglich && (
@@ -1460,18 +1540,18 @@ export default function App() {
           {/* Ab der kleinen Breite stehen die Zahlen dicht als Rechnung beieinander, der Schalter rechts. */}
           <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6 sm:py-3">
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
-              <LeistenZahl etikett="Zielbedarf" wert={euro(zeile.zielNettoMonat * faktor)} />
+              <LeistenZahl etikett="Zielbedarf" wert={euro(leiste.zielNettoMonat * faktor)} />
               <span aria-hidden className="hidden text-lg text-ui-asche sm:block">−</span>
               <LeistenZahl
                 // Bis zur mittleren Breite kurz, sonst bricht die Beschriftung um und die Leiste wird hoeher.
-                etikett={<><span className="md:hidden">Netto</span><span className="hidden md:inline">Gesamt-Netto</span></>}
-                wert={euro(zeile.nettoMonat * faktor)}
+                etikett={<><span className="md:hidden">Netto</span><span className="hidden md:inline">{leisteMit ? 'Netto mit Lösungen' : 'Gesamt-Netto'}</span></>}
+                wert={euro(leiste.nettoMonat * faktor)}
               />
               <span aria-hidden className="hidden text-lg text-ui-asche sm:block">=</span>
               <LeistenZahl
                 dunkel
                 etikett={<><span className="md:hidden">Lücke</span><span className="hidden md:inline">Versorgungslücke</span></>}
-                wert={luecke > 0 ? euro(luecke * faktor) : 'Gedeckt'}
+                wert={leisteLuecke > 0 ? euro(leisteLuecke * faktor) : 'Gedeckt'}
               />
 
               {/* In derselben Zeile wie die Zahlen, damit die Leiste nicht

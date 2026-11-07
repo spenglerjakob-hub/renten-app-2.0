@@ -74,10 +74,12 @@ export interface SzenarioStore {
   tuevKindAendern: (id: string, kindId: string, geburtsjahr: number) => void;
   tuevKindEntfernen: (id: string, kindId: string) => void;
 
-  setzeLoesungen: (p: Partial<Omit<SzenarioParsed['loesungen'], 'angebote'>>) => void;
+  setzeLoesungen: (p: Partial<Omit<SzenarioParsed['loesungen'], 'angebote' | 'angenommen'>>) => void;
   angebotHinzufuegen: (a: Omit<Angebot, 'id'>) => void;
   angebotAendern: (id: string, p: Partial<Angebot>) => void;
   angebotEntfernen: (id: string) => void;
+  /** Ein Angebot annehmen oder die Annahme zuruecknehmen — „Lösungen annehmen“. */
+  angebotAnnehmen: (id: string, an: boolean) => void;
 
   vertragHinzufuegen: (schicht: 1 | 2 | 3) => void;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
@@ -330,8 +332,22 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
 
   angebotEntfernen: (id) => get().setze((s) => ({
     ...s,
-    loesungen: { ...s.loesungen, angebote: s.loesungen.angebote.filter((x) => x.id !== id) },
+    loesungen: {
+      ...s.loesungen,
+      angebote: s.loesungen.angebote.filter((x) => x.id !== id),
+      // Sonst bliebe eine Annahme ohne Angebot zurueck — wie beim TUEV eines entfernten Vertrags.
+      angenommen: s.loesungen.angenommen.filter((x) => x !== id),
+    },
   })),
+
+  angebotAnnehmen: (id, an) => get().setze((s) => {
+    const liste = s.loesungen.angenommen;
+    // Nur ein Angebot, das es gibt — und jedes hoechstens einmal, an seinem Platz.
+    const neu = an
+      ? (liste.includes(id) || !s.loesungen.angebote.some((x) => x.id === id) ? liste : [...liste, id])
+      : liste.filter((x) => x !== id);
+    return { ...s, loesungen: { ...s.loesungen, angenommen: neu } };
+  }),
 
   vertragHinzufuegen: (schicht) => get().setze((s) => {
     const typ = schicht === 1 ? 'basis' : schicht === 2 ? 'bav' : 'prvRente';

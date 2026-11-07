@@ -25,13 +25,24 @@ const PERSON_PUNKT = ['bg-ui-tinte', 'bg-ui-daten-2', 'bg-ui-daten-3'] as const;
 /** Spalten, die am Telefon in die Zeile unter dem Namen wandern. */
 const NEBEN = 'hidden px-2 text-right sm:table-cell';
 
+/** Die Marke einer angenommenen Loesung — dieselbe am Bildschirm und im Gutachten. */
+export const NEU_TEXT = 'Neu – bisher nicht enthalten';
+
+function NeuMarke() {
+  return (
+    <span className="ui-marke ml-1.5 inline-block whitespace-nowrap px-1.5 py-px align-[1px] text-[11px] font-medium">
+      {NEU_TEXT}
+    </span>
+  );
+}
+
 /**
  * Eine Gruppe von Postenzeilen — je Schicht oder je Person. Kopfzeile mit
  * Farbpunkt und Zwischensumme, darunter die Posten. Keine Karten in Karten:
  * Brutto, Abzuege und Netto stehen in Spalten, damit man sie vergleichen kann.
  */
 function Gruppe({
-  titel, zusatz, punkt, netto, posten, w, leerText,
+  titel, zusatz, punkt, netto, posten, w, leerText, neu,
 }: {
   titel: string;
   zusatz?: string;
@@ -41,6 +52,7 @@ function Gruppe({
   w: (n: number) => string;
   /** Was dastehen soll, wenn die Gruppe keine Zeile ueber null enthaelt. */
   leerText?: string;
+  neu?: ReadonlySet<string>;
 }) {
   return (
     <tbody className="break-inside-avoid">
@@ -69,6 +81,7 @@ function Gruppe({
         <tr key={p.id} className="align-top text-ui-tinte/80">
           <td className="py-1 pl-[1.125rem] pr-2">
             {p.bezeichnung}
+            {neu?.has(p.id) && <NeuMarke />}
             {/* Am Telefon fehlen die Spalten — die Zahlen stehen dann hier. */}
             <span className="block text-xs tabular-nums text-ui-schiefer sm:hidden">
               Brutto {w(p.bruttoJahr)} · KV/PV {w(p.kvPvJahr)} · Steuer {w(p.steuerJahr)}
@@ -90,7 +103,7 @@ function Gruppe({
  * Nullzeile greift, statt dass hier eine abweichende Ersatzkarte erscheint.
  */
 export function Kassenbon({
-  ergebnis, zeile, szenario, kaufkraftHeute, onKaufkraftHeute, person,
+  ergebnis, zeile, szenario, kaufkraftHeute, onKaufkraftHeute, person, neu,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
@@ -106,6 +119,11 @@ export function Kassenbon({
    * einer Einzelrechnung weiter "Ihr Haushalts-Netto".
    */
   person?: string;
+  /**
+   * Die Vertrags-IDs der angenommenen Loesungen (Etappe „Abschluss“): Ihre
+   * Zeilen tragen die Marke „Neu“ — im Ergebnis von Etappe 2 fehlen sie.
+   */
+  neu?: ReadonlySet<string>;
 }) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
   const w = (n: number) => euro((n / 12) * f);
@@ -158,6 +176,11 @@ export function Kassenbon({
   const anteil = (n: number) => `${Math.max(0, (n / 12 / skala) * 100)}%`;
 
   const deckung = Math.round(Math.min(1, zeile.nettoMonat / Math.max(1, zeile.zielNettoMonat)) * 100);
+  // Die Erklaerung der Marke steht nur, wenn eine markierte Zeile auch zu sehen ist.
+  const neuZeilen = neu && neu.size > 0
+    ? zeile.posten.filter((p) => neu.has(p.id) && p.nettoJahr !== 0).length
+      + ergebnis.kapitalauszahlungen.filter((a) => neu.has(a.vertragId)).length
+    : 0;
 
   return (
     <div className="ui-karte p-5 druckbereich sm:p-7">
@@ -264,6 +287,7 @@ export function Kassenbon({
               posten={b.sichtbar}
               w={w}
               leerText="Keine eigenen Einkünfte in diesem Jahr."
+              neu={neu}
             />
           ))
           : nachSchicht.map(({ schicht, posten, netto }) =>
@@ -276,6 +300,7 @@ export function Kassenbon({
                 netto={netto}
                 posten={posten}
                 w={w}
+                neu={neu}
               />
             ),
           )}
@@ -292,6 +317,13 @@ export function Kassenbon({
       </table>
 
       <div className="mt-5 space-y-2 empty:hidden [&_strong]:font-medium [&_strong]:text-ui-tinte">
+        {neuZeilen > 0 && (
+          <p className="ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte/80">
+            <strong>{NEU_TEXT}:</strong> mit „Lösungen annehmen“ dazugekommen — im Ergebnis von
+            Etappe 2 {neuZeilen === 1 ? 'ist diese Zeile' : 'sind diese Zeilen'} nicht enthalten.
+          </p>
+        )}
+
         {/*
           Der Satz, ohne den die Aufteilung mehr verspricht, als sie haelt.
           Er steht nur in der getrennten Ansicht — dort, wo die Zahl steht,
@@ -356,8 +388,12 @@ export function Kassenbon({
             {ergebnis.kapitalauszahlungen.map((a) => (
               <div key={a.vertragId} className="rounded-[8px] border border-ui-linie bg-ui-karte px-3 py-2.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-xs font-medium text-ui-tinte sm:text-sm">
-                    {a.bezeichnung} <span className="font-normal text-ui-schiefer">({a.jahr})</span>
+                  {/* Die Marke neben dem gekuerzten Namen, nicht darin — sonst schnitte sie die Kuerzung ab. */}
+                  <span className="flex min-w-0 items-baseline">
+                    <span className="truncate text-xs font-medium text-ui-tinte sm:text-sm">
+                      {a.bezeichnung} <span className="font-normal text-ui-schiefer">({a.jahr})</span>
+                    </span>
+                    {neu?.has(a.vertragId) && <NeuMarke />}
                   </span>
                   <span className="whitespace-nowrap text-xs font-medium tabular-nums text-ui-tinte sm:text-base">
                     {euro(a.nettoKapital * kaufkraft(a.jahr))}

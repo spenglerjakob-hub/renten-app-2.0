@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, parseDatum, toDe, type ProjektionsErgebnis } from '@renten/engine';
 import {
-  tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText,
+  tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand,
 } from './tuev-berechnung';
 import { kenntKapitalwahl } from './vertragsarten';
 import { EinkommenFelder } from './EinkommenFelder';
@@ -355,6 +355,8 @@ export function VertragsTuev({
             const { ergebnis: r, vergleich, istKapital, wege } = pos;
 
             const gut = r.nettoHebel >= 1;
+            // Rein arbeitgeberfinanziert: Hebel, Rendite und Amortisation messen am eigenen Aufwand.
+            const ohne = ohneEigenaufwand(r);
             /*
               Die Erklaerungen brauchen das zvE und die Erwerbsart DIESES
               Inhabers — das zvE ist eine Haushaltsgroesse, die Erwerbsart
@@ -739,17 +741,26 @@ export function VertragsTuev({
                       ausgesprochen. Er ist die Aussage dieser Karte.
                     */}
                     <Kernsatz>
-                      Je eingezahltem Euro kommen netto{gut ? '' : ' nur'}{' '}
-                      <Hervor>{euroGenau(Math.round(r.nettoHebel * 100) / 100)}</Hervor> zurück.
+                      {ohne ? (
+                        <>
+                          Rein arbeitgeberfinanziert: Sie zahlen nichts selbst, netto kommen{' '}
+                          <Hervor>{istKapital ? euro(r.nettoKapital) : `${euro(r.nettoRenteMonat)} im Monat`}</Hervor> dazu.
+                        </>
+                      ) : (
+                        <>
+                          Je eingezahltem Euro kommen netto{gut ? '' : ' nur'}{' '}
+                          <Hervor>{euroGenau(Math.round(r.nettoHebel * 100) / 100)}</Hervor> zurück.
+                        </>
+                      )}
                     </Kernsatz>
 
                     <div className={BLOCK}>
                       <div className="grid grid-cols-2 gap-3">
                         <Kennzahl
                           titel="Netto-Hebel"
-                          wert={`${r.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ×`}
-                          fussnote="Auszahlung je Euro Einzahlung"
-                          info={(
+                          wert={ohne ? '—' : `${r.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ×`}
+                          fussnote={ohne ? 'ohne eigenen Aufwand' : 'Auszahlung je Euro Einzahlung'}
+                          info={ohne ? undefined : (
                             <>
                               {euro(r.summeAuszahlung)} Auszahlung geteilt durch{' '}
                               {euro(r.summeEinzahlung)} eigenen Aufwand über{' '}
@@ -763,9 +774,9 @@ export function VertragsTuev({
                         />
                         <Kennzahl
                           titel="Nettorendite"
-                          wert={prozent(r.rendite, 2)}
-                          fussnote="p. a. nach allen Abzügen"
-                          info={(
+                          wert={ohne ? '—' : prozent(r.rendite, 2)}
+                          fussnote={ohne ? 'ohne eigenen Aufwand' : 'p. a. nach allen Abzügen'}
+                          info={ohne ? undefined : (
                             <>
                               Der interne Zinsfuß Ihrer Zahlungsreihe: der Zinssatz, bei dem
                               {' '}{laufzeitText(r.monateEinzahlung)} Einzahlung und{' '}
@@ -784,8 +795,8 @@ export function VertragsTuev({
                         {!istKapital && (
                           <Kennzahl
                             titel="Amortisation"
-                            wert={`${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} J.`}
-                            fussnote="ab Rentenbeginn"
+                            wert={ohne ? '—' : `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} J.`}
+                            fussnote={ohne ? 'ohne eigenen Aufwand' : 'ab Rentenbeginn'}
                           />
                         )}
                       </div>
@@ -829,13 +840,13 @@ export function VertragsTuev({
                             />
                             <WegZeile
                               text="Netto-Hebel"
-                              rente={`${wege.rente.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
-                              kapital={`${wege.kapital.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
+                              rente={ohne ? '—' : `${wege.rente.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
+                              kapital={ohne ? '—' : `${wege.kapital.nettoHebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ×`}
                             />
                             <WegZeile
                               text="Nettorendite"
-                              rente={prozent(wege.rente.rendite, 2)}
-                              kapital={prozent(wege.kapital.rendite, 2)}
+                              rente={ohne ? '—' : prozent(wege.rente.rendite, 2)}
+                              kapital={ohne ? '—' : prozent(wege.kapital.rendite, 2)}
                             />
                           </tbody>
                         </table>

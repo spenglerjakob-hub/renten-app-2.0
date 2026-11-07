@@ -20,7 +20,7 @@ import { Seite, Text } from './Bausteine';
  * eine Multiplikation zu viel versprechen wuerde.
  */
 export function Foerderung({
-  befunde, kontext, p, zeile, rendite, ohneBeitrag,
+  befunde, kontext, p, zeile, rendite, ohneBeitrag, mitSparziel = true,
 }: {
   befunde: FoerderBefund[];
   kontext: FoerderKontext;
@@ -29,6 +29,8 @@ export function Foerderung({
   /** Rendite nach Kosten fuer die Hochrechnung — dieselbe wie beim Sparziel */
   rendite: number;
   ohneBeitrag: number;
+  /** Steht die Seite „Was Sie jetzt tun können“ im selben Ausdruck? Nur dann der Verweis darauf. */
+  mitSparziel?: boolean;
 }) {
   const jahreBisRente = Math.max(0, zeile.jahr - kontext.jahr);
 
@@ -55,8 +57,8 @@ export function Foerderung({
       <Text>
         Hochgerechnet mit Ihren heutigen Steuer- und Beitragssätzen, ohne Beitragsdynamik und
         nominal — ein Euro in {jahreBisRente} Jahren ist weniger wert als heute. Das
-        Vertragsguthaben ist mit {prozent(rendite)} Rendite nach Kosten gerechnet, derselben
-        Annahme wie auf der Seite „Was Sie jetzt tun können“.
+        Vertragsguthaben ist mit {prozent(rendite)} Rendite nach Kosten gerechnet
+        {mitSparziel ? ', derselben Annahme wie auf der Seite „Was Sie jetzt tun können“.' : '.'}
         {ohneBeitrag > 0 && (
           <>
             {' '}Zu {ohneBeitrag === 1 ? 'einem Ihrer geförderten Verträge' : `${ohneBeitrag} Ihrer geförderten Verträge`}{' '}

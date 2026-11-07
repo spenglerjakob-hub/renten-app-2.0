@@ -3,6 +3,7 @@ import {
 } from '@renten/schema';
 import { supabase } from './supabase';
 import { zufallsname } from './check';
+import { nachweisAus } from './unterschrift-link';
 
 /**
  * bAV-Mitarbeiterberatung im Konto: Firmen (`bav_firmen`), Beratungen
@@ -21,7 +22,9 @@ import { zufallsname } from './check';
  * Die Unterschrift am Bildschirm (Migration 20261023120000): Bei der ersten
  * Unterschrift werden die Unterlagen festgeschrieben (`bav_unterlagen`), die
  * Unterschriften stehen in `bav_unterschriften`. Geaendert wird dort nichts,
- * nur als Ganzes geloescht.
+ * nur als Ganzes geloescht. Per Link (Migration 20261102120000) schreibt
+ * schon das Erstellen des Links die Unterlagen fest; unterschreibt der
+ * Mitarbeiter, traegt die Datenbank seine Unterschrift mit Nachweis ein.
  */
 export const FIRMENLOGO_BUCKET = 'bav-firmenlogos';
 
@@ -60,6 +63,26 @@ export type Stand = Record<BeratungStatus, number>;
 
 export type UnterschriftPerson = 'mitarbeiter' | 'berater';
 export type UnterlagenArt = 'protokoll' | 'vereinbarung' | 'verzicht';
+/** Am Bildschirm des Beraters oder per Link auf dem Geraet des Mitarbeiters */
+export type UnterschriftKanal = 'bildschirm' | 'link';
+
+/** Was die Datenbank zur Unterschrift per Link festhaelt — alle Zeitpunkte von ihr. */
+export interface Nachweis {
+  linkErstelltAm?: string;
+  /** Name aus „Ihr Auftritt“, sonst die E-Mail des Beraters */
+  linkErstelltVon?: string;
+  /** Wann der Code zum ersten Mal stimmte */
+  geoeffnetAm?: string;
+  /** Beim Unterschreiben erneut bestaetigt */
+  codeBestaetigtAm?: string;
+  ip?: string;
+  /** Die ganze Kette x-forwarded-for */
+  weiterleitung?: string;
+  browser?: string;
+  /** Die Seite, auf der der Link erstellt wurde */
+  adresse?: string;
+  pruefsummen: Partial<Record<UnterlagenArt, string>>;
+}
 
 export interface Unterschrift {
   person: UnterschriftPerson;
@@ -70,6 +93,9 @@ export interface Unterschrift {
   dokumente: UnterlagenArt[];
   /** Zeitpunkt der Datenbank */
   unterschriebenAm: string;
+  kanal: UnterschriftKanal;
+  /** Nur per Link */
+  nachweis: Nachweis | null;
 }
 
 /** Die festgeschriebenen Unterlagen einer Beratung — ohne das HTML, das kommt erst zum Drucken. */
@@ -361,13 +387,17 @@ const ARTEN: readonly UnterlagenArt[] = ['protokoll', 'vereinbarung', 'verzicht'
 const istPerson = (x: unknown): x is UnterschriftPerson => (PERSONEN as readonly unknown[]).includes(x);
 const istArt = (x: unknown): x is UnterlagenArt => (ARTEN as readonly unknown[]).includes(x);
 
-interface UnterschriftZeile { person: unknown; name: string; zug: string; dokumente: unknown; unterschrieben_am: string }
+interface UnterschriftZeile {
+  person: unknown; name: string; zug: string; dokumente: unknown; unterschrieben_am: string; kanal?: unknown; nachweis?: unknown;
+}
 interface UnterlagenZeile { beratung: string; erstellt_am: string; pruefsummen: unknown; bav_unterschriften: UnterschriftZeile[] | null }
 
 const unterschriftAus = (z: UnterschriftZeile): Unterschrift | null => (istPerson(z.person) ? {
   person: z.person, name: z.name, zug: z.zug,
   dokumente: Array.isArray(z.dokumente) ? z.dokumente.filter(istArt) : [],
   unterschriebenAm: z.unterschrieben_am,
+  kanal: z.kanal === 'link' ? 'link' : 'bildschirm',
+  nachweis: z.kanal === 'link' ? nachweisAus(z.nachweis) : null,
 } : null);
 
 function unterlagenAus(z: UnterlagenZeile): Unterlagen {
@@ -384,7 +414,9 @@ function unterlagenAus(z: UnterlagenZeile): Unterlagen {
   return { beratung: z.beratung, erstelltAm: z.erstellt_am, pruefsummen, unterschriften };
 }
 
-const UNTERLAGEN_SPALTEN = 'beratung, erstellt_am, pruefsummen, bav_unterschriften(person, name, zug, dokumente, unterschrieben_am)';
+// Unterschriften mit allen Spalten — wie bei den Firmen: So laeuft die App auch gegen eine Datenbank, die Kanal
+// und Nachweis (Migration 20261102120000) noch nicht hat.
+const UNTERLAGEN_SPALTEN = 'beratung, erstellt_am, pruefsummen, bav_unterschriften(*)';
 
 /** Der Stand der Unterschriften einer Beratung, ohne das HTML — null: nicht unterschrieben. */
 export async function unterlagenLaden(beratung: string): Promise<Unterlagen | null | 'fehler'> {
@@ -435,6 +467,76 @@ export async function unterschreiben(
     return (data && typeof data === 'object' ? unterschriftAus(data as UnterschriftZeile) : null) ?? 'fehler';
   } catch {
     return 'fehler';
+  }
+}
+
+// --- Unterschrift per Link --------------------------------------------------
+
+/** Ein offener Link — der Token steht nur im Link selbst, nicht in der Datenbank. */
+export interface LinkStand {
+  code: string;
+  erstelltAm: string;
+  gueltigBis: string;
+  fehlversuche: number;
+  /** Wann der Code zum ersten Mal stimmte */
+  geoeffnetAm: string | null;
+}
+
+interface LinkZeile { code: string; erstellt_am: string; gueltig_bis: string; fehlversuche: number; geoeffnet_am: string | null }
+
+/** Der offene Link einer Beratung — null: keiner. */
+export async function linkLaden(beratung: string): Promise<LinkStand | null | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.from('bav_unterschrift_links')
+      .select('code, erstellt_am, gueltig_bis, fehlversuche, geoeffnet_am').eq('beratung', beratung).maybeSingle();
+    if (error) return 'fehler';
+    if (!data) return null;
+    const z = data as unknown as LinkZeile;
+    return { code: z.code, erstelltAm: z.erstellt_am, gueltigBis: z.gueltig_bis, fehlversuche: z.fehlversuche, geoeffnetAm: z.geoeffnet_am };
+  } catch {
+    return 'fehler';
+  }
+}
+
+/** Ein neuer Link: Token fuer die Adresse, Code fuer den Mitarbeiter. */
+export interface NeuerLink { token: string; code: string; gueltigBis: string }
+
+/**
+ * Link erstellen (RPC `bav_link_erstellen`). Gibt es noch keine
+ * festgeschriebenen Unterlagen, schreibt der Link `unterlagen` fest; ein
+ * offener Link wird ersetzt. `seite`: die eigene Adresse fuer die E-Mail an
+ * den Berater (`linkSeite`).
+ */
+export async function linkErstellen(
+  beratung: string, seite: string | null, unterlagen: UnterlagenHtml | null,
+): Promise<NeuerLink | 'ohne_name' | 'unterschrieben' | 'fehler'> {
+  if (!supabase) return 'fehler';
+  try {
+    const { data, error } = await supabase.rpc('bav_link_erstellen', {
+      p_beratung: beratung, p_adresse: seite,
+      p_protokoll: unterlagen?.protokoll ?? null,
+      p_vereinbarung: unterlagen?.vereinbarung ?? null,
+      p_verzicht: unterlagen?.verzicht ?? null,
+    });
+    if (error || !data || typeof data !== 'object') return 'fehler';
+    const v = data as Record<string, unknown>;
+    if (v.status === 'ohne_name' || v.status === 'unterschrieben') return v.status;
+    if (v.status !== 'ok' || typeof v.token !== 'string' || typeof v.code !== 'string' || typeof v.gueltig_bis !== 'string') return 'fehler';
+    return { token: v.token, code: v.code, gueltigBis: v.gueltig_bis };
+  } catch {
+    return 'fehler';
+  }
+}
+
+/** Den offenen Link zurueckziehen — danach oeffnet er nichts mehr. */
+export async function linkZurueckziehen(beratung: string): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase.from('bav_unterschrift_links').delete().eq('beratung', beratung);
+    return !error;
+  } catch {
+    return false;
   }
 }
 

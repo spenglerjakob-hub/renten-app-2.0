@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DOKUMENT_NAME, dokumenteFuer, dokumenteText, pruefsummeKurz, tinte, tinteGenug, vermerkText, zeitpunktText,
+  DOKUMENT_NAME, codeText, dokumenteFuer, dokumenteText, nachweisZeilen, pruefsummeKurz, tinte, tinteGenug, vermerkText,
+  zeitpunktText,
   zugAusStrichen, zugGueltig, zugRahmen, type Strich,
 } from './unterschrift-daten';
 
@@ -101,5 +102,48 @@ describe('Vermerk und Pruefsumme', () => {
 
   it('Pruefsumme kurz in Vierergruppen', () => {
     expect(pruefsummeKurz('012b4315c906aa77ffee00112233')).toBe('012b 4315 c906 aa77');
+  });
+
+  it('per Link steht es im Vermerk', () => {
+    expect(nbsp(vermerkText('Anna Beispiel', '2026-10-23T12:32:00Z', 'link')))
+      .toBe('Elektronisch per Link unterschrieben von Anna Beispiel am 23.10.2026 um 14:32 Uhr');
+  });
+});
+
+describe('Unterschrift per Link', () => {
+  it('Code in zwei Dreiergruppen, mit festem Leerzeichen', () => {
+    expect(codeText('482913')).toBe('482\u00a0913');
+    expect(codeText('12')).toBe('12');
+  });
+
+  it('Nachweis als Zeilen: Zeitpunkte, IP, Browser, volle Pruefsummen', () => {
+    const zeilen = nachweisZeilen({
+      linkErstelltAm: '2026-11-02T09:00:00Z', linkErstelltVon: 'Anton Berater', geoeffnetAm: '2026-11-02T09:30:00Z',
+      codeBestaetigtAm: '2026-11-02T09:35:00Z', ip: '203.0.113.7', weiterleitung: '203.0.113.7, 10.0.0.1',
+      browser: 'Testbrowser/1.0', adresse: 'https://js-rentenplaner.de',
+      pruefsummen: { protokoll: 'a'.repeat(64), vereinbarung: 'b'.repeat(64) },
+    }, '2026-11-02T09:35:00Z', true).map(([k, v]) => [k, nbsp(v)]);
+    expect(zeilen).toEqual([
+      ['Link erstellt', '02.11.2026 um 10:00 Uhr von Anton Berater'],
+      ['Mit Code geöffnet', '02.11.2026 um 10:30 Uhr'],
+      ['Unterschrieben, Code bestätigt', '02.11.2026 um 10:35 Uhr'],
+      ['IP-Adresse', '203.0.113.7'],
+      ['Weiterleitungen', '203.0.113.7, 10.0.0.1'],
+      ['Browser', 'Testbrowser/1.0'],
+      ['Prüfsumme Beratungsprotokoll', 'a'.repeat(64)],
+      ['Prüfsumme AXA-Antrag auf Entgeltumwandlung', 'b'.repeat(64)],
+      ['Seite', 'https://js-rentenplaner.de'],
+    ]);
+  });
+
+  it('fehlt etwas, steht es so da', () => {
+    const zeilen = nachweisZeilen({ pruefsummen: {} }, '2026-11-02T09:35:00Z').map(([k, v]) => [k, nbsp(v)]);
+    expect(zeilen).toEqual([
+      ['Link erstellt', 'nicht erfasst'],
+      ['Mit Code geöffnet', 'nicht erfasst'],
+      ['Unterschrieben, Code bestätigt', '02.11.2026 um 10:35 Uhr'],
+      ['IP-Adresse', 'nicht übermittelt'],
+      ['Browser', 'nicht übermittelt'],
+    ]);
   });
 });
