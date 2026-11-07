@@ -627,6 +627,7 @@ export default function App() {
     mit: mitAnsicht,
     ergebnisMit,
     positionenMit,
+    ansprache: t,
   });
   const [druckAuswahl, setDruckAuswahl] = useState<DruckAuswahl>(ALLES);
   const [druckOffen, setDruckOffen] = useState(false);

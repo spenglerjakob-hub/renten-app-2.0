@@ -2,13 +2,14 @@ import { jePerson, type Jahreszeile, type Szenario } from '@renten/engine';
 import { euro } from '../components/Feld';
 import { Seite, Untertitel, Tabelle, Zeile, Gruppenzeile, Text } from './Bausteine';
 import { personNameAus } from '../features/personen';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * "Die Versorgung beider Partner" — dieselbe Jahreszeile, nach Inhaber
  * aufgeteilt statt nach Schicht.
  *
  * WARUM EINE EIGENE SEITE UND KEIN KASTEN UNTER DER TABELLE: Genau so war es
- * zuerst gebaut. Nachgemessen hatte die Seite "Ihre Renteneinkuenfte" bei
+ * zuerst gebaut. Nachgemessen hatte die Seite zu den Renteneinkuenften bei
  * einem Paar mit fuenf Vertraegen aber nur noch 84 von 979 Punkten frei, und
  * der Block brauchte selbst in der schlanksten Fassung rund 150. Er brach die
  * Seite auf 1 042 Punkte um. Eine eigene Seite kostet Papier, eine
@@ -23,6 +24,7 @@ export function JePersonSeite({
   zeile: Jahreszeile;
   szenario: Szenario;
 }) {
+  const an = useAnsprache();
   const bloecke = jePerson(zeile);
   const monat = (n: number) => euro(n / 12);
   const name = (p: string | null) =>
@@ -97,10 +99,11 @@ export function JePersonSeite({
           Entnahmeplan etwa gehört beiden gemeinsam.
         </Text>
       )}
+      {/* Die Seite gibt es nur fuer ein Paar: auch ohne Paar-Ansprache „euch beide“ */}
       <Text>
         Das Versorgungsziel bleibt aus demselben Grund eine Größe des Haushalts: Miete, Strom und
         Lebensmittel fallen einmal an, nicht zweimal. Die Versorgungslücke auf der vorigen Seite
-        gilt deshalb für Sie beide zusammen.
+        gilt deshalb für {an.w('euch', 'euch', 'Sie')} beide zusammen.
       </Text>
     </Seite>
   );

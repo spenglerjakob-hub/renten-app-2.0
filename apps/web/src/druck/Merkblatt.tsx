@@ -1,4 +1,6 @@
 import { Seite, Untertitel, Text } from './Bausteine';
+import { useAnsprache } from '../components/Ansprache';
+import type { AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * Das Merkblatt zum Mitnehmen.
@@ -8,7 +10,7 @@ import { Seite, Untertitel, Text } from './Bausteine';
  * die am Kuehlschrank landet.
  */
 
-const CHECKLISTE: { was: string; warum: string }[] = [
+const checkliste = (t: AnspracheWoerter): { was: string; warum: string }[] => [
   {
     was: 'Renteninformation der Deutschen Rentenversicherung prüfen',
     warum: 'Sie kommt jährlich ab 27 und nach 5 Beitragsjahren. Der Betrag darin ist der '
@@ -32,7 +34,8 @@ const CHECKLISTE: { was: string; warum: string }[] = [
   {
     was: 'Freistellungsauftrag auf die Sparerpauschbeträge verteilen',
     warum: '1.000 € je Person im Jahr bleiben steuerfrei (2.000 € bei Ehepaaren). Ohne Auftrag '
-      + 'behält die Bank Abgeltungsteuer ein, die Sie sich erst über die Steuererklärung zurückholen.',
+      + `behält die Bank Abgeltungsteuer ein, die ${t.du} ${t.w('dir', 'euch', 'sich')} erst über die Steuererklärung `
+      + `${t.w('zurückholst', 'zurückholt', 'zurückholen')}.`,
   },
   {
     was: 'Diese Rechnung einmal im Jahr wiederholen',
@@ -41,7 +44,7 @@ const CHECKLISTE: { was: string; warum: string }[] = [
   },
 ];
 
-const GLOSSAR: { begriff: string; erklaerung: string }[] = [
+const glossar = (t: AnspracheWoerter): { begriff: string; erklaerung: string }[] => [
   {
     begriff: 'Schicht 1, 2 und 3',
     erklaerung: 'Die drei Ebenen der Altersvorsorge. Schicht 1 ist die Basis — gesetzliche Rente, '
@@ -52,8 +55,8 @@ const GLOSSAR: { begriff: string; erklaerung: string }[] = [
   {
     begriff: 'Brutto und Netto',
     erklaerung: 'Brutto ist, was überwiesen wird. Netto ist, was übrig bleibt, nachdem Steuer und '
-      + 'die Beiträge zur Kranken- und Pflegeversicherung abgegangen sind. Nur das Netto können '
-      + 'Sie ausgeben — deshalb rechnet dieses Gutachten durchgehend damit.',
+      + `die Beiträge zur Kranken- und Pflegeversicherung abgegangen sind. Nur das Netto ${t.w('kannst', 'könnt', 'können')} `
+      + `${t.du} ausgeben — deshalb rechnet dieses Gutachten durchgehend damit.`,
   },
   {
     begriff: 'KVdR',
@@ -94,11 +97,12 @@ const GLOSSAR: { begriff: string; erklaerung: string }[] = [
 ];
 
 export function Merkblatt() {
+  const t = useAnsprache();
   return (
     <Seite titel="Zum Mitnehmen" nummer="Checkliste und Begriffe">
-      <Untertitel>Was Sie in den nächsten Wochen erledigen sollten</Untertitel>
+      <Untertitel>Was {t.du} in den nächsten Wochen erledigen {t.w('solltest', 'solltet', 'sollten')}</Untertitel>
       <ol className="space-y-2">
-        {CHECKLISTE.map((x, i) => (
+        {checkliste(t).map((x, i) => (
           <li key={x.was} className="flex break-inside-avoid gap-2">
             <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-ui-asche text-[10px] font-medium text-ui-schiefer">
               {i + 1}
@@ -119,7 +123,7 @@ export function Merkblatt() {
         wird dafuer nichts.
       */}
       <dl className="space-y-1.5">
-        {GLOSSAR.map((x) => (
+        {glossar(t).map((x) => (
           <div
             key={x.begriff}
             className="break-inside-avoid text-[11px] leading-relaxed text-ui-schiefer"
@@ -132,8 +136,8 @@ export function Merkblatt() {
       </dl>
 
       <Text>
-        Diese Seite enthält bewusst keine Zahlen aus Ihrer Berechnung — sie gilt unabhängig davon,
-        wie sich Ihre Angaben ändern.
+        Diese Seite enthält bewusst keine Zahlen aus {t.dein('er')} Berechnung — sie gilt unabhängig davon,
+        wie sich {t.dein('e')} Angaben ändern.
       </Text>
     </Seite>
   );

@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { DeckblattHeute, DeckblattKopf, DeckblattTitel, PAPIER } from '../druck/DeckblattKopf';
 import { akzentVariablen, type Auftritt } from './auftritt';
+import { AnspracheGeben } from '../components/Ansprache';
+import type { Ansprache } from '../lib/ansprache';
 
 /** Satzspiegel des Gutachtens: A4 (210 mm) minus 2 × 16 mm Rand = 178 mm, in CSS-Pixeln. */
 const SATZ_BREITE = 673;
 const RAND = 24;
+
+/**
+ * Das Gutachten duzt den Kunden — die Vorschau seines Deckblatts auch, ohne
+ * Namen. Die Fenster drumherum (Auftritt, Schnellrechnung) siezen weiter den Berater.
+ */
+const WIE_IM_GUTACHTEN: Ansprache = { form: 'du', mehrere: false, name: '' };
 
 /**
  * Die obere Haelfte des Deckblatts, verkleinert — mit denselben Komponenten
@@ -48,9 +56,11 @@ export function DeckblattVorschau({ auftritt, fuer = 'Ihren Mandanten', zahlen =
             zoom: faktor,
           }}
         >
-          <DeckblattKopf auftritt={auftritt} />
-          <DeckblattTitel titel="Altersvorsorge-Analyse" fuer={fuer} />
-          {zahlen && <DeckblattHeute bedarf={zahlen.bedarf} netto={zahlen.netto} />}
+          <AnspracheGeben wert={WIE_IM_GUTACHTEN}>
+            <DeckblattKopf auftritt={auftritt} />
+            <DeckblattTitel titel="Altersvorsorge-Analyse" fuer={fuer} />
+            {zahlen && <DeckblattHeute bedarf={zahlen.bedarf} netto={zahlen.netto} />}
+          </AnspracheGeben>
         </div>
       </div>
       <figcaption className="mt-1.5 text-xs text-ui-schiefer">

@@ -185,7 +185,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
         )}
         {zielAnteil !== null && (
           <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}
+            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}{' '}
             heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
           </p>
         )}

@@ -3,11 +3,15 @@ import { Logo } from '../components/Logo';
 import { euro } from '../components/Feld';
 import { auftrittSichtbar, kontaktZeile, type Auftritt } from '../features/auftritt';
 import { Untertitel } from './Bausteine';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
  * Die obere Haelfte des Deckblatts — im Gutachten UND in den Vorschauen
  * (Schnellrechnung, Fenster „Ihr Auftritt im Gutachten“). Dieselben
  * Komponenten, damit die Vorschau genau dem Druck entspricht.
+ *
+ * Die Ansprache kommt aus dem Kontext: Das Gutachten duzt („Deine Zukunft“),
+ * die Unterlagen der Mitarbeiterberatung setzen keinen und siezen wie bisher.
  */
 
 /**
@@ -26,6 +30,7 @@ export const PAPIER = 'bg-white text-ui-tinte [&_strong]:font-medium';
  * Trendlinie im Logo — 2 px wie die Linie unter jedem Seitentitel.
  */
 export function DeckblattKopf({ auftritt }: { auftritt?: Auftritt | null }) {
+  const an = useAnsprache();
   const balken = 'border-b-2 border-[color:var(--akzent-linie,rgb(var(--ui-tinte)))] pb-5';
   if (!auftritt || !auftrittSichtbar(auftritt)) {
     return (
@@ -33,7 +38,7 @@ export function DeckblattKopf({ auftritt }: { auftritt?: Auftritt | null }) {
         <Logo klasse="h-20 w-20" />
         <div>
           <div className="ui-titel text-2xl font-medium text-ui-tinte">JS-Rentenplaner</div>
-          <div className="text-sm text-ui-schiefer">Ihre Zukunft. Heute smart geplant.</div>
+          <div className="text-sm text-ui-schiefer">{an.Dein('e')} Zukunft. Heute smart geplant.</div>
         </div>
       </div>
     );
@@ -95,15 +100,16 @@ export function DeckblattTitel({ titel, fuer, children }: { titel: string; fuer:
  * solange daneben nicht steht, dass es dieselben 2.000 EUR von heute sind.
  */
 export function DeckblattHeute({ bedarf, netto }: { bedarf: number; netto: number }) {
+  const an = useAnsprache();
   const luecke = Math.max(0, bedarf - netto);
   return (
     <>
-      <Untertitel>Heute — in der Kaufkraft, die Sie kennen</Untertitel>
+      <Untertitel>Heute — in der Kaufkraft, die {an.du} {an.w('kennst', 'kennt', 'kennen')}</Untertitel>
       <div className="grid grid-cols-3 gap-4 rounded-[10px] border border-ui-linie bg-ui-innen px-4 py-3">
         {[
           { titel: 'Gewünschtes Netto', wert: bedarf },
           { titel: 'Erwartetes Netto', wert: netto },
-          { titel: luecke > 0 ? 'Es fehlen' : 'Darüber hinaus', wert: luecke > 0 ? luecke : netto - bedarf },
+          { titel: luecke > 0 ? an.w(`${an.Dir} fehlen`, undefined, 'Es fehlen') : 'Darüber hinaus', wert: luecke > 0 ? luecke : netto - bedarf },
         ].map((x) => (
           <div key={x.titel}>
             <div className="text-[11px] text-ui-schiefer">

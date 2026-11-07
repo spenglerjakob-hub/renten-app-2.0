@@ -119,7 +119,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
           {anteil && (
             <p className="mt-5 border-t border-ui-linie pt-4 text-sm leading-relaxed text-ui-schiefer">
               Der Startbeitrag von {euro(r.gewaehlt.startbeitrag)} sind{' '}
-              <strong className="font-medium text-ui-tinte">{anteil}</strong> {t.dein('es')}
+              <strong className="font-medium text-ui-tinte">{anteil}</strong> {t.dein('es')}{' '}
               heutigen Haushaltsnettos von {euro(nettoHeute)} im Monat.
             </p>
           )}

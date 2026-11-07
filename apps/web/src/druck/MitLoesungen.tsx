@@ -6,9 +6,10 @@ import {
 } from '../features/tuev-berechnung';
 import { Seite, GrosseZahl, Untertitel, Tabelle, Zeile, Text } from './Bausteine';
 import { Zusammensetzung } from './Renteneinkuenfte';
+import { useAnsprache } from '../components/Ansprache';
 
 /**
- * „Ihr Ergebnis mit den gewählten Lösungen“ — die Etappe „Abschluss“ auf
+ * Das Ergebnis mit den gewaehlten Loesungen — die Etappe „Abschluss“ auf
  * Papier, in beiden Umfaengen, sobald etwas angenommen ist.
  *
  * Gerechnet wird nichts Neues: Die Zahlen kommen aus dem Ergebnis mit den
@@ -42,15 +43,16 @@ export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, ei
     const p = positionen.find((x) => x.angebot.id === id);
     return p?.rente ?? p?.kapital ?? null;
   };
+  const an = useAnsprache();
   const einmal = ergebnisMit.kapitalauszahlungen.filter((k) => mit.neu.has(k.vertragId));
   const spalten = inhaberName ? [30, 14, 18, 20, 18] : [36, 22, 22, 20];
 
   return (
-    <Seite titel="Ihr Ergebnis mit den gewählten Lösungen" nummer={`Im Jahr ${nachher.jahr} · Beträge des jeweiligen Jahres`}>
+    <Seite titel={`${an.Dein()} Ergebnis mit den gewählten Lösungen`} nummer={`Im Jahr ${nachher.jahr} · Beträge des jeweiligen Jahres`}>
       <Text>
-        {mitRenteneinkuenften ? 'Dieselbe Rechnung wie auf der Seite „Ihre Renteneinkünfte“' : 'Dieselbe Rechnung wie für Ihre heutige Versorgung'} —
+        {mitRenteneinkuenften ? `Dieselbe Rechnung wie auf der Seite „${an.Dein('e')} Renteneinkünfte“` : `Dieselbe Rechnung wie für ${an.dein('e')} heutige Versorgung`} —
         jetzt mit den Lösungen, für die
-        {einzelperson ? ` ${einzelperson} sich` : ' Sie sich'} entschieden {einzelperson ? 'hat' : 'haben'}, gemeinsam
+        {einzelperson && an.form === 'sie' ? ` ${einzelperson} sich` : ` ${an.du} ${an.w('dich', 'euch', 'sich')}`} entschieden {einzelperson && an.form === 'sie' ? 'hat' : an.w('hast', 'habt', 'haben')}, gemeinsam
         gerechnet. Zeilen mit der Marke „{NEU_TEXT}“ sind {mitRenteneinkuenften ? 'in den Seiten davor' : 'in der heutigen Versorgung'} nicht enthalten.
       </Text>
 

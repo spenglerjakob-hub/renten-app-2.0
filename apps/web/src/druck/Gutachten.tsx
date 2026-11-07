@@ -30,6 +30,8 @@ import { TuevBogen } from './TuevBogen';
 import { Loesungsvergleich } from './Loesungsvergleich';
 import { MitLoesungen } from './MitLoesungen';
 import type { ThemaId } from './druckauswahl';
+import { useAnsprache } from '../components/Ansprache';
+import { SIE, woerter, type AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * Eine Seite des Gutachtens (oder mehrere zu einem Thema) — mit dem Thema,
@@ -65,6 +67,11 @@ export interface GutachtenDaten {
   ergebnisMit?: ProjektionsErgebnis | null;
   /** Was jede angenommene Loesung netto kostet (`angenommenePositionen`) */
   positionenMit?: AngebotPosition[];
+  /**
+   * Die Ansprache fuer die Seitentitel. Der Hook laeuft in App, ueber dem
+   * Kontext — deshalb kommt sie als Wert; die Seiten selbst lesen den Kontext.
+   */
+  ansprache?: AnspracheWoerter;
 }
 
 /**
@@ -75,8 +82,9 @@ export interface GutachtenDaten {
  * noch auf dem Papier.
  */
 export function useGutachtenSeiten({
-  szenario, ergebnis, zeile, einzelperson, mit = null, ergebnisMit = null, positionenMit = [],
+  szenario, ergebnis, zeile, einzelperson, mit = null, ergebnisMit = null, positionenMit = [], ansprache,
 }: GutachtenDaten): GutachtenSeite[] {
+  const an = ansprache ?? woerter(SIE);
   const jetzt = new Date().getFullYear();
   const avd = useMemo(
     () => parameterFuer(Math.max(jetzt, 2027), { indexRate: szenario.annahmen.tarifIndex }).avd,
@@ -176,10 +184,10 @@ export function useGutachtenSeiten({
   return [
     {
       thema: 'angaben',
-      titel: [hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'],
+      titel: [hatVertraege ? `${an.Dein('e')} Angaben` : `${an.Dein('e')} Angaben und Verträge`],
       knoten: () => (
         <Seite
-          titel={hatVertraege ? 'Ihre Angaben' : 'Ihre Angaben und Verträge'}
+          titel={hatVertraege ? `${an.Dein('e')} Angaben` : `${an.Dein('e')} Angaben und Verträge`}
           nummer="Grundlage der Berechnung"
         >
           <Angaben szenario={szenario} avd={avd} />
@@ -210,9 +218,9 @@ export function useGutachtenSeiten({
     */
     ...(hatVertraege ? [{
       thema: 'vertraege' as const,
-      titel: ['Ihre Verträge'],
+      titel: [`${an.Dein('e')} Verträge`],
       knoten: () => (
-        <Seite titel="Ihre Verträge" nummer="Grundlage der Berechnung">
+        <Seite titel={`${an.Dein('e')} Verträge`} nummer="Grundlage der Berechnung">
           <Vertragsliste
             szenario={szenario}
             hinweise={ergebnis?.vertragsHinweise ?? []}
@@ -224,7 +232,7 @@ export function useGutachtenSeiten({
 
     ...(ergebnis ? [{
       thema: 'renteneinkuenfte' as const,
-      titel: [`Ihre Renteneinkünfte im Jahr ${zeile.jahr}`],
+      titel: [`${an.Dein('e')} Renteneinkünfte im Jahr ${zeile.jahr}`],
       knoten: () => (
         <Renteneinkuenfte
           ergebnis={ergebnis}
@@ -257,7 +265,7 @@ export function useGutachtenSeiten({
     */
     ...(ergebnis && mit && ergebnisMit && zeileMit ? [{
       thema: 'mitLoesungen' as const,
-      titel: ['Ihr Ergebnis mit den gewählten Lösungen'],
+      titel: [`${an.Dein()} Ergebnis mit den gewählten Lösungen`],
       knoten: (gedruckt: (t: ThemaId) => boolean) => (
         <MitLoesungen
           mitRenteneinkuenften={gedruckt('renteneinkuenfte')}
@@ -292,7 +300,7 @@ export function useGutachtenSeiten({
       }] : []),
       ...(sparziel ? [{
         thema: 'sparziel' as const,
-        titel: ['Was Sie jetzt tun können'],
+        titel: [`Was ${an.du} jetzt tun ${an.w('kannst', 'könnt', 'können')}`],
         knoten: () => (
           <Sparziel
             ergebnis={sparziel}
@@ -310,7 +318,7 @@ export function useGutachtenSeiten({
       */
       ...(foerderung.befunde.length > 0 ? [{
         thema: 'foerderung' as const,
-        titel: ['Förderung, die Sie nicht nutzen'],
+        titel: [`Förderung, die ${an.du} nicht ${an.w('nutzt', 'nutzt', 'nutzen')}`],
         knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Foerderung
             mitSparziel={gedruckt('sparziel')}
@@ -327,7 +335,7 @@ export function useGutachtenSeiten({
         thema: 'loesungen' as const,
         // Die Angebote stehen auf eigenem Blatt — und deshalb auch im Verzeichnis.
         titel: ['Lösungen im Vergleich',
-          ...(loesungen.angebote.some((a) => a.rente || a.kapital) ? ['Ihre Angebote im Vergleich'] : [])],
+          ...(loesungen.angebote.some((a) => a.rente || a.kapital) ? [`${an.Dein('e')} Angebote im Vergleich`] : [])],
         knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Loesungsvergleich
             mitRenteneinkuenften={gedruckt('renteneinkuenfte')}
@@ -419,6 +427,8 @@ export function Gutachten({ szenario, ergebnis, zeile, einzelperson, auftritt = 
   seiten: GutachtenSeite[];
 }) {
   const h = szenario.haushalt;
+  // Das Gutachten spricht wie der Rechner: per Du, ein Paar per ihr — der Vorname im ersten Satz
+  const an = useAnsprache();
   const name = h.verheiratet
     ? `${personNameAus(szenario.personen, 'A')} und ${personNameAus(szenario.personen, 'B')}`
     : personNameAus(szenario.personen, 'A');
@@ -469,15 +479,15 @@ export function Gutachten({ szenario, ergebnis, zeile, einzelperson, auftritt = 
         <DeckblattHeute bedarf={bedarfHeute} netto={nettoHeute} />
 
         <Text>
-          Bis zu Ihrem Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}
+          {an.anrede('bis')} zu {an.dein('em')} Rentenbeginn im Jahr {zeile.jahr} steigen die Preise — bei angenommenen{' '}
           <strong>{prozent(szenario.annahmen.inflation)}</strong> Inflation im Jahr. Deshalb stehen
           in den Kacheln darunter größere Zahlen: Es ist dieselbe Rechnung, nur im Geld des
           Rentenjahres statt im Geld von heute.
-          {gedruckt('renteneinkuenfte') && ' Die Seite „Ihre Renteneinkünfte“ nennt beide Maßstäbe nebeneinander.'}
+          {gedruckt('renteneinkuenfte') && ` Die Seite „${an.Dein('e')} Renteneinkünfte“ nennt beide Maßstäbe nebeneinander.`}
           {/* Der Kaufkraftverlust in Euro — dieselbe Umrechnung wie die Kacheln. */}
           {kk && kk.verlustMonat > 0 && (
             <>
-              {' '}Ihr erwartetes Netto von <strong>{euro(kk.nettoNominal)}</strong> im Jahr {kk.jahr} entspricht
+              {' '}{an.Dein()} erwartetes Netto von <strong>{euro(kk.nettoNominal)}</strong> im Jahr {kk.jahr} entspricht
               heute {euro(kk.nettoHeute)} — ein Kaufkraftverlust von{' '}
               <strong>{euro(kk.verlustMonat)} im Monat ({prozent(kk.verlustQuote, 0)})</strong>.
             </>
@@ -528,7 +538,7 @@ export function Gutachten({ szenario, ergebnis, zeile, einzelperson, auftritt = 
         <div className="mt-4 rounded-[10px] border border-ui-linie bg-ui-innen p-3">
           <Text>
             <strong>Was dieses Dokument ist.</strong> Eine Modellrechnung auf Grundlage der von
-            Ihnen gemachten Angaben und der {gedruckt('angaben') ? 'auf Seite „Ihre Angaben“' : 'am Ende des Dokuments'} genannten
+            {' '}{an.dir} gemachten Angaben und der {gedruckt('angaben') ? `auf Seite „${an.Dein('e')} Angaben“` : 'am Ende des Dokuments'} genannten
             Annahmen. Es ist
             keine Steuer-, Renten- oder Anlageberatung und keine Zusage über künftige Leistungen.
             Rechtslage und Rechenwege sind am Ende des Dokuments beschrieben.

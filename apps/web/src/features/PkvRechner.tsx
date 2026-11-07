@@ -122,7 +122,7 @@ export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
           <div className="ui-innen mt-5 p-4">
             <p className="text-xs leading-relaxed text-ui-tinte/80">
               <strong className="font-medium text-ui-tinte">
-                {e.Dein()} Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} {t.dein('es')}
+                {e.Dein()} Beitrag verbraucht im Jahr {r.rentenjahr} rund {prozent(r.anteilAmZiel, 0)} {t.dein('es')}{' '}
                 Zielnettos
               </strong>{' '}
               — {euro(r.beiRente.gesamtMonat)} von {euro(zeile.zielNettoMonat)}. Ein

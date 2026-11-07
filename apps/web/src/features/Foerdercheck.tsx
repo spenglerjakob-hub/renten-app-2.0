@@ -151,7 +151,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                       <>
                         {' '}Über die Zulage hinaus spart der Sonderausgabenabzug{' '}
                         {euro(b.probeMonat - b.nettoAufwandMonat)} Steuer im Monat; netto kostet
-                        {e.dich} der Beitrag dann <strong>{euro(b.nettoAufwandMonat)}</strong>.
+                        {' '}{e.dich} der Beitrag dann <strong>{euro(b.nettoAufwandMonat)}</strong>.
                       </>
                     )}
                   </>
@@ -187,7 +187,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
                   ) : (
                     <>
                       Der Beitrag von {euro(b.probeMonat * 12)} im Jahr mindert {t.dein()} zu
-                      versteuerndes Einkommen. Gerechnet wird die <strong>Differenz</strong> {t.dein('er')}
+                      versteuerndes Einkommen. Gerechnet wird die <strong>Differenz</strong> {t.dein('er')}{' '}
                       Jahressteuer mit und ohne Beitrag — nicht ein Durchschnittssatz. Das ergibt{' '}
                       {euro(b.ersparnisJahr)} im Jahr, also{' '}
                       {Math.round(b.foerderquote * 100)} % des Einsatzes. {t.Dein()} persönlicher
