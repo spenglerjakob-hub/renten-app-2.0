@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, FileUp, Link2, Mail, Printer, Save, Trash2, Undo2, UserCheck } from 'lucide-react';
 import {
-  BEZUGSRECHTE, ANTRAG_FELDER, braucheBank, bezugsrechtText, eingangUebernehmen, ibanGueltig, offeneAngaben,
+  BEZUGSRECHTE, ANTRAG_FELDER, braucheBank, bezugsrechtText, eingangUebernehmen, ibanFehler, offeneAngaben,
   type AntragAngaben, type AntragFeld, type AntragLoesung,
 } from '@renten/schema';
 import { AuswahlFeld, TextFeld } from '../components/Feld';
@@ -243,7 +243,7 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
   const setzeBank = (p: Partial<NonNullable<AntragAngaben['bank']>>) =>
     setAngaben((x) => ({ ...x, bank: { inhaber: x.bank?.inhaber ?? '', iban: x.bank?.iban ?? '', ...p } }));
   const iban = angaben.bank?.iban ?? '';
-  const ibanFehler = iban.trim() && !ibanGueltig(iban) ? 'Die Prüfziffer stimmt nicht — bitte die IBAN vergleichen.' : null;
+  const ibanMeldung = ibanFehler(iban);
 
   return (
     <section aria-labelledby="antrag-titel" className="ui-karte p-5 sm:p-7">
@@ -289,8 +289,8 @@ export function Antragsangaben({ antragId, loesungen, kundeVorschlag, angemeldet
               <legend className="text-sm font-medium text-ui-tinte">Bankverbindung</legend>
               <TextFeld label="Kontoinhaber" wert={angaben.bank?.inhaber ?? ''} onChange={(v) => setzeBank({ inhaber: v })} maxLaenge={120} />
               <div>
-                <TextFeld label="IBAN" wert={iban} onChange={(v) => setzeBank({ iban: v })} maxLaenge={42} fehler={ibanFehler} />
-                {iban.trim() && !ibanFehler && <p className="mt-1 text-xs text-ui-schiefer">Prüfziffer stimmt.</p>}
+                <TextFeld label="IBAN" wert={iban} onChange={(v) => setzeBank({ iban: v })} maxLaenge={42} fehler={ibanMeldung} />
+                {iban.trim() && !ibanMeldung && <p className="mt-1 text-xs text-ui-schiefer">Prüfziffer stimmt.</p>}
               </div>
             </fieldset>
           ) : (

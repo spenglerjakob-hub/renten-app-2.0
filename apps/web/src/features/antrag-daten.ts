@@ -1,5 +1,5 @@
 import {
-  bezugsrechtText, braucheBank, ibanFormatiert, ibanGueltig,
+  bezugsrechtText, braucheBank, ibanFehler, ibanFormatiert,
   type AntragAngaben, type AntragLoesung,
 } from '@renten/schema';
 import { LOESUNG_KURZ, type MitAngenommenen } from './tuev-berechnung';
@@ -104,11 +104,16 @@ export function antragsbogenHtml(d: AntragsbogenDaten): string {
   }).join('');
 
   const bank = d.angaben.bank;
+  // Stimmt die IBAN nicht, steht der Grund daneben — derselbe Satz wie am Feld.
+  const ibanZelle = (iban: string) => {
+    if (!iban.trim()) return '<span class="leer">noch offen</span>';
+    const fehler = ibanFehler(iban);
+    return t(ibanFormatiert(iban)) + (fehler ? ` <span class="leer">(${t(fehler)})</span>` : '');
+  };
   const bankHtml = !braucheBank(d.loesungen) ? ''
     : `<h2>Bankverbindung</h2>${bank && (bank.inhaber.trim() || bank.iban.trim())
       ? `<table><tbody><tr><th>Kontoinhaber</th><td>${t(bank.inhaber)}</td></tr>`
-        + `<tr><th>IBAN</th><td class="wert">${t(ibanFormatiert(bank.iban))}`
-        + `${ibanGueltig(bank.iban) ? '' : ' <span class="leer">(Prüfziffer stimmt nicht)</span>'}</td></tr></tbody></table>`
+        + `<tr><th>IBAN</th><td class="wert">${ibanZelle(bank.iban)}</td></tr></tbody></table>`
       : '<p class="leer">noch offen</p>'}`;
 
   // Eine Kopie, die sich nicht laden ließ, fehlt nicht still: Der Bogen sagt es.

@@ -73,6 +73,37 @@ export function ibanGueltig(iban: string): boolean {
   return rest === 1;
 }
 
+/**
+ * Was an einer IBAN nicht stimmt, in Worten — `null`, wenn sie gültig oder
+ * noch leer ist. Dieselbe Regel wie `ibanGueltig`, nur Schritt für Schritt,
+ * damit die Meldung die Ursache nennt: Eine IBAN mit 18 statt 22 Stellen
+ * fällt auch durch die Prüfziffer, aber „Prüfziffer stimmt nicht“ lässt
+ * Stelle für Stelle vergleichen, wo vier Stellen fehlen.
+ *
+ * Ein einzelnes „D“ zählt schon als deutsch: Beim Tippen zählt die Meldung
+ * so von Anfang an bis 22. Geschützte Leerzeichen halten die Zahl bei ihrem
+ * Wort — am Telefon stand sonst „18.“ allein in der nächsten Zeile. Die Sätze
+ * passen auf die Kundenseite („Sie“) wie zum Berater.
+ */
+export function ibanFehler(iban: string): string | null {
+  const v = ibanBereinigt(iban);
+  if (!v) return null;
+  if (/[^A-Z0-9]/.test(v)) return 'Eine IBAN besteht nur aus Buchstaben und Ziffern.';
+  if (!/^[A-Z]{1,2}$|^[A-Z]{2}[0-9]{1,2}$/.test(v.slice(0, 4))) {
+    return 'Eine IBAN beginnt mit dem Länderkürzel und zwei Ziffern, etwa „DE12“.';
+  }
+  const hier = v.length === 1 ? 'hier ist es eine' : `hier sind es\u00a0${v.length}`;
+  if ('DE'.startsWith(v.slice(0, 2))) {
+    if (v.length !== 22) return `Eine deutsche IBAN hat 22\u00a0Stellen — ${hier}.`;
+    if (/[A-Z]/.test(v.slice(4)) && !ibanGueltig(v)) {
+      return 'Nach „DE“ folgen nur Ziffern — steht irgendwo ein O statt einer 0?';
+    }
+  } else if (v.length < 15 || v.length > 34) {
+    return `Eine IBAN hat 15 bis 34\u00a0Stellen — ${hier}.`;
+  }
+  return ibanGueltig(v) ? null : 'Die Prüfziffer stimmt nicht — bitte die IBAN Stelle für Stelle vergleichen.';
+}
+
 /** In Vierergruppen, wie auf der Bankkarte: „DE89 3704 0044 0532 0130 00“. */
 export const ibanFormatiert = (iban: string) => ibanBereinigt(iban).replace(/(.{4})(?=.)/g, '$1 ');
 

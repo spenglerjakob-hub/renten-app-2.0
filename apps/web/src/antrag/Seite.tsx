@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CheckCircle2, FileUp, Loader2, Trash2 } from 'lucide-react';
-import { BEZUGSRECHTE, bezugsrechtText, ibanGueltig, type AntragEingang, type AntragFeld } from '@renten/schema';
+import { BEZUGSRECHTE, bezugsrechtText, ibanFehler, ibanGueltig, type AntragEingang, type AntragFeld } from '@renten/schema';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { AuswahlFeld, TextFeld } from '../components/Feld';
@@ -144,7 +144,7 @@ function Formular({ code, offen, bis, loesungen, onSperre, onFertig }: {
   const datei = useRef<HTMLInputElement>(null);
   const [seite, setSeite] = useState<AusweisSeite>('vorne');
 
-  const ibanFehler = iban.trim() && !ibanGueltig(iban) ? 'Die Prüfziffer stimmt nicht — bitte vergleichen Sie die IBAN.' : null;
+  const ibanMeldung = ibanFehler(iban);
   const fehlt: string[] = [
     ...(fragtBank && inhaber.trim().length < 2 ? ['den Kontoinhaber'] : []),
     ...(fragtBank && !ibanGueltig(iban) ? ['eine gültige IBAN'] : []),
@@ -243,8 +243,8 @@ function Formular({ code, offen, bis, loesungen, onSperre, onFertig }: {
           <h2 id="bank-titel" className="text-lg font-medium text-ui-tinte">Bankverbindung</h2>
           <TextFeld label="Kontoinhaber" wert={inhaber} onChange={setInhaber} maxLaenge={120} autoComplete="name" />
           <div>
-            <TextFeld label="IBAN" wert={iban} onChange={setIban} maxLaenge={42} fehler={ibanFehler} />
-            {iban.trim() && !ibanFehler && <p className="mt-1 text-xs text-ui-schiefer">Prüfziffer stimmt.</p>}
+            <TextFeld label="IBAN" wert={iban} onChange={setIban} maxLaenge={42} fehler={ibanMeldung} />
+            {iban.trim() && !ibanMeldung && <p className="mt-1 text-xs text-ui-schiefer">Prüfziffer stimmt.</p>}
           </div>
         </section>
       )}
