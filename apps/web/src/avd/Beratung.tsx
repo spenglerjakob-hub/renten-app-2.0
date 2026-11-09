@@ -71,6 +71,9 @@ function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): 
  * Der Knopf oeffnet deshalb das Mailprogramm des Nutzers mit fertigem Text —
  * ABGESCHICKT WIRD ERST VON IHM SELBST. Das steht auch so im Fenster; wer
  * glaubt, die Seite verschicke etwas, waere sonst zu Recht veraergert.
+ *
+ * Das Fenster duzt wie die Seite. Die E-Mail selbst bleibt beim Sie: Darin
+ * schreibt der Besucher an den Berater.
  */
 export function BeratungDialog({
   offen, onSchliessen, empfaenger, eckdaten, name: teile, onName,
@@ -109,7 +112,7 @@ export function BeratungDialog({
     <Dialog
       offen={offen}
       titel="Beratung zum Altersvorsorgedepot"
-      beschreibung="Tragen Sie Ihren Namen ein — wir bereiten daraus eine E-Mail mit Ihren Eckdaten vor."
+      beschreibung="Trag deinen Namen ein — wir bereiten daraus eine E-Mail mit deinen Eckdaten vor."
       onSchliessen={onSchliessen}
     >
       <div className="space-y-4">
@@ -130,8 +133,8 @@ export function BeratungDialog({
         </div>
 
         <Hinweis>
-          Beim Klick öffnet sich <span className="font-medium">Ihr Mailprogramm</span> mit diesem Text.
-          Abgeschickt wird die Nachricht erst, wenn Sie dort auf Senden drücken. Diese Seite
+          Beim Klick öffnet sich <span className="font-medium">dein Mailprogramm</span> mit diesem Text.
+          Abgeschickt wird die Nachricht erst, wenn du dort auf Senden drückst. Diese Seite
           verschickt und speichert nichts.
         </Hinweis>
 
@@ -156,7 +159,7 @@ export function BeratungDialog({
         </div>
 
         <p className="text-xs leading-relaxed text-ui-schiefer">
-          Kein Mailprogramm eingerichtet? Kopieren Sie den Text und schreiben Sie an{' '}
+          Kein Mailprogramm eingerichtet? Kopier den Text und schreib an{' '}
           <span className="font-medium text-ui-tinte">{empfaenger}</span>.
         </p>
       </div>

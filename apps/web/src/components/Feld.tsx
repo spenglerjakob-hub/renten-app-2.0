@@ -115,9 +115,18 @@ export function ZahlFeld(props: {
   };
   /** Der Wert ist noch die Vorbelegung — Marke unter dem Feld */
   vorbelegt?: Vorbelegt;
+  /** Platzhalter im leeren Feld, etwa „z. B. 45.000“ */
+  platzhalter?: string;
+  /**
+   * Null als leeres Feld zeigen statt als „0“ — fuer Angaben, die erst noch
+   * gemacht werden (das Gehalt auf der Depot-Seite). Sonst stuende dort eine
+   * Zahl, die niemand eingetragen hat.
+   */
+  leerBeiNull?: boolean;
 }) {
   const {
     label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl, vorbelegt,
+    platzhalter, leerBeiNull,
   } = props;
   const schritt = props.schritt ?? 1;
   /*
@@ -129,12 +138,13 @@ export function ZahlFeld(props: {
   */
   const eigen = useId();
   const id = props.id ?? `f${eigen}`;
-  const [text, setText] = useState(String(wert).replace('.', ','));
+  const anzeige = (n: number) => (leerBeiNull && n === 0 ? '' : String(n).replace('.', ','));
+  const [text, setText] = useState(() => anzeige(wert));
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Kommt ein neuer Wert von aussen (auch nach einem Wechsel der Einheit),
   // gilt eine alte Fehlermeldung nicht mehr.
-  useEffect(() => { setText(String(wert).replace('.', ',')); setFehler(null); }, [wert]);
+  useEffect(() => { setText(anzeige(wert)); setFehler(null); }, [wert]);
 
   const uebernehmen = (roh: string) => {
     setText(roh);
@@ -172,6 +182,7 @@ export function ZahlFeld(props: {
           type="text"
           inputMode="decimal"
           value={text}
+          placeholder={platzhalter}
           onChange={(e) => uebernehmen(e.target.value)}
           // Pfeiltasten wie beim nativen Zahlenfeld — nur mit Stufenknoepfen,
           // sonst bleibt das Feld, wie es war.

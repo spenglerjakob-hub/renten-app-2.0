@@ -159,7 +159,7 @@ export function KapitalaufbauDiagramm({
     <figure className="m-0">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-base font-medium text-ui-tinte">
-          So wächst Ihr Kapital
+          So wächst dein Kapital
         </h3>
         <button type="button" onClick={() => setAlsTabelle((v) => !v)} className={`${KNOPF_KLEIN} print:hidden`}>
           {alsTabelle ? 'Als Diagramm' : 'Als Tabelle'}
@@ -326,7 +326,7 @@ export function KapitalaufbauDiagramm({
           )}
           {schmal && !tooltip && (
             <p className="mt-2 text-xs text-ui-schiefer">
-              Tippen Sie auf das Diagramm, um die Beträge eines Jahres zu sehen.
+              Tipp auf das Diagramm, um die Beträge eines Jahres zu sehen.
             </p>
           )}
         </div>
