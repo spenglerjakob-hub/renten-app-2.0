@@ -20,8 +20,12 @@ import {
 import {
   SCHNELL_BEISPIEL, ZIEL_FAUSTREGEL, schnellRechnen, type SchnellEingaben, type SchnellFeld,
 } from './eingaben';
+import { STANDARD_ANNAHMEN } from '../store/standard';
 
 const laender = BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }));
+
+/** „2 %“, „1,5 %“ — ohne angehaengte Null, wie im Fliesstext. */
+const prozentKurz = (n: number) => `${(n * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %`;
 
 /**
  * Was ein Konto zusaetzlich bringt — beim Namen genannt, nicht als
@@ -258,7 +262,7 @@ export function Seite() {
 
             <Karte titel="Annahmen">
               <Hinweise punkte={[
-                'Rentenbeginn mit der Regelaltersgrenze; Inflation 2 % und Rentenanpassung 1 % pro Jahr.',
+                `Rentenbeginn mit der Regelaltersgrenze; Inflation ${prozentKurz(STANDARD_ANNAHMEN.inflation)} und Rentenanpassung ${prozentKurz(STANDARD_ANNAHMEN.rentendynamik)} pro Jahr.`,
                 'Alleinstehend, angestellt, gesetzlich krankenversichert (KVdR) mit dem durchschnittlichen Zusatzbeitrag.',
                 'Keine weiteren Verträge — die erfassen Sie im vollen Rechner.',
               ]} />

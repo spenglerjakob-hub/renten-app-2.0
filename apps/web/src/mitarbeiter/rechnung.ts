@@ -8,6 +8,7 @@ import type { BeratungAngaben, BeratungDaten, FirmenAngebot, VersichererWerte } 
 import { leereAntworten, regelRentenbeginn, szenarioAusCheck } from '../check/uebernahme';
 import { belastungsTreppe } from '../features/tuev-berechnung';
 import type { SzenarioParsed } from '../store/szenario';
+import { STANDARD_ANNAHMEN } from '../store/standard';
 
 /**
  * Die Rechnung der Mitarbeiterberatung — ohne Oberflaeche.
@@ -144,11 +145,12 @@ export function grvVon(
 }
 
 /**
- * Angenommene Rentenanpassung im Jahr — in der Mitarbeiterberatung 1,5 %
- * statt der 1 % des Vorsorge-Checks. Gilt fuer das ganze Szenario der
- * Beratung, also fuer die Versorgungsluecke und die Leistung im Alter gleich.
+ * Angenommene Rentenanpassung im Jahr — 1,5 %, dieselbe Vorgabe wie in
+ * Rechner, Schnellrechnung und Vorsorge-Check (`STANDARD_ANNAHMEN`). Gilt
+ * fuer das ganze Szenario der Beratung, also fuer die Versorgungsluecke und
+ * die Leistung im Alter gleich; der Steuertarif waechst mit ihr.
  */
-export const RENTENANPASSUNG = 0.015;
+export const RENTENANPASSUNG = STANDARD_ANNAHMEN.rentendynamik;
 
 /**
  * Das Szenario des Mitarbeiters — ueber `szenarioAusCheck`, wie beim

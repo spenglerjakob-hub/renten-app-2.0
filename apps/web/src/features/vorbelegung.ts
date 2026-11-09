@@ -51,7 +51,7 @@ const EINTRAEGE: Record<string, VorbelegungsEintrag> = {
   'annahmen.inflation': { art: 'standard', text: 'Inflation', hinweis: 'Vorsichtige Annahme: 2 % pro Jahr.' },
   'annahmen.rentendynamik': {
     art: 'standard', text: 'Rentenanpassung',
-    hinweis: '1 % pro Jahr; die Renteninformation zeigt Hochrechnungen mit 1 % und 2 %.',
+    hinweis: 'Vorgabe 1,5 % pro Jahr (bis November 2026: 1 %), zwischen den Hochrechnungen der Renteninformation mit 1 % und 2 %.',
   },
 };
 

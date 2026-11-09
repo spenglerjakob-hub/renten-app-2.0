@@ -40,6 +40,19 @@ export const STANDARD_OFFEN: readonly string[] = [
   'auswertung',
 ];
 
+/**
+ * DIE ANNAHMEN EINES NEUEN FALLS — eine Stelle fuer Rechner, Schnellrechnung,
+ * Vorsorge-Check und Mitarbeiterberatung.
+ *
+ * Rentenanpassung 1,5 % pro Jahr (bis November 2026: 1 %), zwischen den
+ * Hochrechnungen der Renteninformation mit 1 % und 2 %. Der Steuertarif
+ * waechst mit ihr (`annahmenKoppeln`), wie wenn der Berater die
+ * Rentenanpassung im Rechner umstellt. Gespeicherte Faelle behalten ihre Werte.
+ */
+export const STANDARD_ANNAHMEN: Readonly<SzenarioParsed['annahmen']> = {
+  inflation: 0.02, rentendynamik: 0.015, tarifIndex: 0.015, gehaltsdynamik: 0.02,
+};
+
 export function standardSzenario(): SzenarioParsed {
   const jahr = new Date().getFullYear();
   return szenarioSchema.parse({
@@ -49,7 +62,7 @@ export function standardSzenario(): SzenarioParsed {
       hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 600,
       zielNettoHeute: 2000,
     },
-    annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
+    annahmen: { ...STANDARD_ANNAHMEN },
     einkommenHeute: {
       modus: 'brutto', betrag: 4000, auszahlungen: 12,
       besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',

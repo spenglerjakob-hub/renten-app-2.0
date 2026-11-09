@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { STANDARD_OFFEN, standardSzenario } from '../store/standard';
+import { annahmenSchema } from '@renten/schema';
+import { STANDARD_ANNAHMEN, STANDARD_OFFEN, standardSzenario } from '../store/standard';
 import { useSzenario } from '../store/szenario';
 import { leereAntworten, szenarioAusCheck } from '../check/uebernahme';
 import { BEKANNTE_PFADE, SCHRITTE, eintragVon, offeneBeispiele, offenePfade, relevant } from './vorbelegung';
@@ -135,5 +136,31 @@ describe('Vorbelegung', () => {
     expect(relevant(s, 'haushalt.pkv')).toBe(false);
     expect(relevant({ ...s, haushalt: { ...s.haushalt, kvStatus: 'pkv' } }, 'haushalt.pkv')).toBe(true);
     expect(relevant(s, 'personen.B.geburtsdatum')).toBe(false);
+  });
+});
+
+describe('Annahmen eines neuen Falls', () => {
+  beforeEach(() => useSzenario.getState().zuruecksetzen());
+
+  it('Rentenanpassung 1,5 %, der Steuertarif waechst mit — ueberall dieselben', () => {
+    expect(STANDARD_ANNAHMEN.rentendynamik).toBe(0.015);
+    expect(STANDARD_ANNAHMEN.tarifIndex).toBe(STANDARD_ANNAHMEN.rentendynamik);
+    expect(standardSzenario().annahmen).toEqual(STANDARD_ANNAHMEN);
+    expect(szenarioAusCheck(leereAntworten()).annahmen).toEqual(STANDARD_ANNAHMEN);
+    // Fehlt eine Angabe, faellt das Schema auf dieselben Werte zurueck.
+    expect(annahmenSchema.parse({})).toEqual(STANDARD_ANNAHMEN);
+  });
+
+  it('Umstellen der Inflation laesst Rentenanpassung und Steuertarif gekoppelt', () => {
+    useSzenario.getState().setzeAnnahmen({ inflation: 0.025 });
+    const a = useSzenario.getState().szenario.annahmen;
+    expect(a.rentendynamik).toBe(0.015);
+    expect(a.tarifIndex).toBe(0.015);
+  });
+
+  it('ein gespeicherter Fall behaelt seine Rentenanpassung', () => {
+    const alt = { ...standardSzenario(), annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 } };
+    useSzenario.getState().ausJsonImportieren(JSON.stringify(alt));
+    expect(useSzenario.getState().szenario.annahmen).toMatchObject({ rentendynamik: 0.01, tarifIndex: 0.01 });
   });
 });
