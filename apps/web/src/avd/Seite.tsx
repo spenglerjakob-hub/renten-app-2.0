@@ -1,27 +1,29 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  CalendarClock, Eraser, Gift, Info, LineChart, Mail, Printer,
+  Baby, CalendarClock, Gift, Info as InfoSymbol, Mail, PiggyBank, Printer, RotateCcw,
 } from 'lucide-react';
 import {
   avdZulagen, avdAnsparphase, avdSteuervorteil, avdProfitabilitaet,
-  parameterFuer, regelaltersrentenbeginn, parseDatum, toDe, bruttoZuNetto,
-  type AvdKind,
+  parameterFuer, bruttoZuNetto,
 } from '@renten/engine';
 import { SeitenKopf } from '../components/SeitenKopf';
+import { AnspracheGeben } from '../components/Ansprache';
+import type { Ansprache } from '../lib/ansprache';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, AkkordeonKarte, GegenueberZeile, NamenFelder,
   euro, euroGenau, prozent,
 } from '../components/Feld';
 import { AnteilsRing } from '../components/AnteilsRing';
-import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
-  EINLEITUNG, FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Karte, Kernsatz, LINK, Regler, Titel, Vermerk, Zahl,
+  FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Kernsatz, LINK, Regler, Titel, Zahl,
 } from '../components/stil';
 import { vollerName, type NamensTeile } from '../lib/namen';
 import { KapitalaufbauDiagramm } from './Diagramme';
 import { BeratungDialog, type Eckdaten } from './Beratung';
-import { GeburtsdatumDialog } from './Geburtsdatum';
+import { Schritt, ruhig } from './Schritt';
+import { KinderGeburtsdaten, kinderFuerRechnung, type KindEingabe } from './KinderGeburtsdaten';
+import { depotZeitraum, zulagenBisRente } from './zulagen-bis-rente';
 
 /** Feste Effektivkosten. Bewusst nicht einstellbar — siehe Hinweis auf der Seite. */
 const KOSTEN = 0.01;
@@ -30,72 +32,132 @@ const KOSTEN = 0.01;
 const BERATER_MAIL = 'karkossa@axa.de';
 
 /**
+ * DIE ANNAHMEN, mit denen die Seite rechnet, bis der Besucher sie aendert:
+ * der Beitrag der vollen Foerderung (150 € im Monat) und 6 % Rendite im Jahr.
+ * Sie stehen sichtbar als Annahme da — anders als frueher die Beispielwerte,
+ * die so taten, als waeren es die Angaben des Besuchers.
+ */
+const VORGABE = { beitragMonat: 150, rendite: 0.06 } as const;
+
+/**
+ * Pausen zwischen Info und naechster Frage, in Millisekunden. Erst steht die
+ * Antwort da, dann kommt die Frage — nicht beides im selben Augenblick. Mit
+ * „Bewegung reduzieren“ entfallen sie.
+ */
+const PAUSE = { nachDatum: 700, nachKindern: 500, nachGehalt: 700, gehaltRuhig: 600 } as const;
+
+/** Die Seite duzt — auch in den geteilten Bausteinen, etwa im Spruch der Kopfzeile. */
+const DU: Ansprache = { form: 'du', mehrere: false, name: '' };
+
+/**
  * Landingpage zum Altersvorsorgedepot.
  *
  * Steht bewusst UNABHAENGIG vom Rentenplaner: Sie kommt per QR-Code aus einem
  * Brief, richtet sich an Endverbraucher und beantwortet genau eine Frage —
  * was zahle ich ein, was kostet es mich wirklich, welches Kapital kommt dabei
  * heraus. Kein Verweis in den Rechner und keiner zurueck.
- */
-/**
- * Beispielwerte fuer den ersten Aufruf.
  *
- * Die Seite kommt per QR-Code aus einem Brief. Wer sie leer vorfindet, sieht
- * vor allem Platzhalter und muss erst tippen, um zu verstehen, worum es geht.
- * Mit einem Beispiel rechnet sie ab der ersten Sekunde und erklaert sich
- * dadurch selbst.
+ * GEFUEHRT, STUECK FUER STUECK: Am Anfang steht nur eine Frage — das
+ * Geburtsdatum. Jede Antwort bringt eine kurze Info (was das an Zulagen
+ * bedeutet) und dann die naechste Frage: Kinder, Gehalt, zum Schluss Regler
+ * und Diagramm. Jeder Block blendet weich ein (`Schritt.tsx`); beantwortete
+ * Schritte bleiben stehen und lassen sich aendern, alles darunter rechnet
+ * sofort neu. Die Seite duzt, wie der Rechner.
  *
- * Das ist etwas anderes als die frueher verworfene Idee, das GESPEICHERTE
- * Szenario zu laden: Diese Zahlen gehoeren niemandem, und die Seite sagt
- * ausdruecklich, dass es ein Beispiel ist.
+ * Gespeichert wird nichts — auch kein Geburtsdatum im Browser: Auf einem
+ * geteilten Geraet waere das eine unangenehme Ueberraschung.
  */
-const BEISPIEL = {
-  beitragMonat: 100,
-  kinder: [] as readonly AvdKind[],
-  geburtsdatum: '1985-01-01',
-  bruttoJahr: 45_000,
-} as const;
-
 export function Seite() {
-  const [beitragMonat, setBeitragMonat] = useState<number>(BEISPIEL.beitragMonat);
-  const [kinderListe, setKinderListe] = useState<readonly AvdKind[]>(BEISPIEL.kinder);
-  const kinder = kinderListe.length;
-  const [geburtsdatum, setGeburtsdatum] = useState<string>(BEISPIEL.geburtsdatum);
-  const [bruttoJahr, setBruttoJahr] = useState<number>(BEISPIEL.bruttoJahr);
-  const [rendite, setRendite] = useState(0.04);
+  const jetzt = new Date().getFullYear();
+  const p = useMemo(() => parameterFuer(Math.max(jetzt, 2027), { indexRate: 0.01 }), [jetzt]);
+  const a = p.avd;
+
+  const [geburtsdatum, setGeburtsdatum] = useState('');
+  const [kinderAntwort, setKinderAntwort] = useState<'ja' | 'nein' | null>(null);
+  const [kinderEingabe, setKinderEingabe] = useState<KindEingabe[]>([]);
+  const [bruttoJahr, setBruttoJahr] = useState(0);
+  const [ohneSteuer, setOhneSteuer] = useState(false);
   const [verheiratet, setVerheiratet] = useState(false);
+  const [beitragMonat, setBeitragMonat] = useState<number>(VORGABE.beitragMonat);
+  const [rendite, setRendite] = useState<number>(VORGABE.rendite);
+  const [renditeOffen, setRenditeOffen] = useState(false);
+  /** Den Beitrag genau eintippen — fuer Betraege zwischen den Stufen des Reglers oder darueber. */
+  const [genau, setGenau] = useState(false);
   /**
    * Der Name — freiwillig, fuer den Ausdruck und die Beratungsanfrage. Er
-   * bleibt wie alles hier nur im Speicher der Seite und hebt das Beispiel
-   * nicht auf: Es geht um die Zahlen.
+   * bleibt wie alles hier nur im Speicher der Seite.
    */
   const [name, setName] = useState<NamensTeile>({ vorname: '', nachname: '' });
   const ganzerName = vollerName(name);
-  /** Den Beitrag genau eintippen — fuer Betraege zwischen den Stufen des Reglers oder darueber. */
-  const [genau, setGenau] = useState(false);
-  /** Solange nichts angefasst wurde, sind die Zahlen als Beispiel markiert. */
-  const [istBeispiel, setIstBeispiel] = useState(true);
   const [wissenOffen, setWissenOffen] = useState(false);
   const [beratungOffen, setBeratungOffen] = useState(false);
-  /**
-   * Das Geburtsdatum wird beim Aufruf abgefragt, nicht erst irgendwo im
-   * Formular. Bewusst bei JEDEM Aufruf und nicht nur beim allerersten: die
-   * Seite speichert nichts im Browser, und das soll so bleiben — ein
-   * gespeichertes Geburtsdatum waere auf einem geteilten Geraet eine
-   * unangenehme Ueberraschung.
-   */
-  const [geburtsdatumGefragt, setGeburtsdatumGefragt] = useState(false);
 
-  /** Jede eigene Eingabe hebt die Beispiel-Kennzeichnung auf. */
-  const eigen = <T,>(setzen: (v: T) => void) => (v: T) => { setIstBeispiel(false); setzen(v); };
+  const zeitraum = useMemo(() => depotZeitraum(geburtsdatum, p, jetzt), [geburtsdatum, p, jetzt]);
+  const kinderListe = useMemo(
+    () => (kinderAntwort === 'ja' ? kinderFuerRechnung(kinderEingabe) : []),
+    [kinderAntwort, kinderEingabe],
+  );
+  const kinder = kinderListe.length;
+  const bisZu = useMemo(
+    () => (zeitraum && !zeitraum.zuSpaet ? zulagenBisRente(zeitraum, kinderListe, p) : null),
+    [zeitraum, kinderListe, p],
+  );
 
-  const leeren = () => {
-    setIstBeispiel(false);
-    setName({ vorname: '', nachname: '' });
-    setBeitragMonat(0);
-    setKinderListe([]);
+  /*
+    DAS GEHALT „IN RUHE“: Die Steuerinfo und der naechste Schritt warten, bis
+    eine Weile nicht mehr getippt wurde. Sonst sprang bei „4“, „45“, „450“
+    die Info zwischen „bringt nichts“ und einem Betrag hin und her.
+  */
+  const [bruttoRuhig, setBruttoRuhig] = useState(0);
+  useEffect(() => {
+    if (bruttoJahr === bruttoRuhig) return;
+    const t = window.setTimeout(() => setBruttoRuhig(bruttoJahr), ruhig() ? 0 : PAUSE.gehaltRuhig);
+    return () => window.clearTimeout(t);
+  }, [bruttoJahr, bruttoRuhig]);
+
+  /*
+    WIE WEIT DIE EINGABE GEKOMMEN IST. Der Wert waechst nur — was einmal
+    erschienen ist, verschwindet nicht wieder, wenn eine Antwort darueber
+    geaendert wird. Die naechste Frage kommt jeweils nach einer kurzen Pause.
+  */
+  const kinderFertig = kinderAntwort === 'nein' || (kinderAntwort === 'ja' && kinder > 0);
+  const steuerFertig = ohneSteuer || bruttoRuhig > 0;
+  const [erreicht, setErreicht] = useState(1);
+  useEffect(() => {
+    let ziel = 1;
+    if (zeitraum && !zeitraum.zuSpaet) {
+      ziel = 2;
+      if (kinderFertig) {
+        ziel = 3;
+        if (steuerFertig) ziel = 4;
+      }
+    }
+    if (ziel <= erreicht) return;
+    const pause = ruhig() ? 0
+      : ziel === 2 ? PAUSE.nachDatum
+        : ziel === 3 ? PAUSE.nachKindern
+          : ohneSteuer ? 0 : PAUSE.nachGehalt;
+    const t = window.setTimeout(() => setErreicht((e) => Math.max(e, ziel)), pause);
+    return () => window.clearTimeout(t);
+  }, [zeitraum, kinderFertig, steuerFertig, ohneSteuer, erreicht]);
+  /** Ein Schritt steht da, wenn er erreicht ist — und nur, solange das Depot nicht zu spaet kommt. */
+  const offen = (n: number) => erreicht >= n && zeitraum !== null && !zeitraum.zuSpaet;
+
+  const neuBeginnen = () => {
     setGeburtsdatum('');
+    setKinderAntwort(null);
+    setKinderEingabe([]);
     setBruttoJahr(0);
+    setBruttoRuhig(0);
+    setOhneSteuer(false);
+    setVerheiratet(false);
+    setBeitragMonat(VORGABE.beitragMonat);
+    setRendite(VORGABE.rendite);
+    setRenditeOffen(false);
+    setGenau(false);
+    setName({ vorname: '', nachname: '' });
+    setErreicht(1);
+    window.scrollTo({ top: 0, behavior: ruhig() ? 'auto' : 'smooth' });
   };
 
   /**
@@ -108,16 +170,12 @@ export function Seite() {
     [verheiratet],
   );
 
-  const jetzt = new Date().getFullYear();
-  const p = parameterFuer(Math.max(jetzt, 2027), { indexRate: 0.01 });
-  const a = p.avd;
-
-  const geburt = parseDatum(geburtsdatum);
-  const rentenbeginn = geburt ? regelaltersrentenbeginn(geburt) : null;
-  const alterHeute = geburt ? jetzt - geburt.jahr : 0;
-  const startjahr = Math.max(jetzt, a.abJahr);
-  const jahreBisRente = rentenbeginn ? Math.max(0, rentenbeginn.jahr - startjahr) : 0;
-  const alterBeiRente = geburt && rentenbeginn ? rentenbeginn.jahr - geburt.jahr : 0;
+  const rentenbeginn = zeitraum?.rentenbeginn ?? null;
+  const alterHeute = zeitraum?.alterHeute ?? 0;
+  const startjahr = zeitraum?.startjahr ?? Math.max(jetzt, a.abJahr);
+  const jahreBisRente = zeitraum?.jahre ?? 0;
+  const alterBeiRente = zeitraum?.alterBeiRente ?? 0;
+  const rentenbeginnText = rentenbeginn ? `${String(rentenbeginn.monat).padStart(2, '0')}/${rentenbeginn.jahr}` : '';
 
   const zulagen = useMemo(
     () => avdZulagen(
@@ -131,7 +189,7 @@ export function Seite() {
   );
 
   const lauf = useMemo(() => {
-    if (!geburt || jahreBisRente <= 0 || beitragMonat <= 0) return null;
+    if (!zeitraum || jahreBisRente <= 0 || beitragMonat <= 0) return null;
     return avdAnsparphase(
       {
         beitragMonat, dynamik: 0, startkapital: 0, jahre: jahreBisRente,
@@ -140,8 +198,7 @@ export function Seite() {
       },
       p,
     );
-  }, [geburt, jahreBisRente, beitragMonat, rendite, kinderListe,
-      alterHeute, startjahr, p]);
+  }, [zeitraum, jahreBisRente, beitragMonat, rendite, kinderListe, alterHeute, startjahr, p]);
 
   /**
    * Zu versteuerndes Einkommen von heute — Grundlage des
@@ -197,7 +254,7 @@ export function Seite() {
    * fliesst das ins Depot; geteilt durch die Netto-Kosten ist es der Hebel
    * auf jeden Euro, wie „Je Euro Netto-Aufwand“ im Loesungsvergleich des
    * Rechners. Ohne den einmaligen Berufseinsteigerbonus: Er bliese den Hebel
-   * auf und steht ohnehin unter „Ihre Förderung je Jahr“.
+   * auf und steht ohnehin unter „Deine Förderung je Jahr“.
    */
   const monat = useMemo(() => {
     if (beitragMonat <= 0) return null;
@@ -210,6 +267,8 @@ export function Seite() {
     return { netto, steuer, zulage, depot, hebel: netto > 0 ? depot / netto : 0 };
   }, [beitragMonat, zulagen.dauerhaft, bruttoJahr, zveHeute, steuerOpt, p]);
   const zahl2 = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  /** Die Steuerersparnis eines laufenden Jahres ueber die Zulagen hinaus — fuer die Zwischeninfo */
+  const steuerJahr = monat ? monat.steuer * 12 : 0;
 
   /** Was in die Beratungsanfrage geschrieben wird. */
   const eckdaten: Eckdaten = {
@@ -224,70 +283,45 @@ export function Seite() {
     rentenbeginnJahr: rentenbeginn?.jahr ?? 0,
   };
 
+  /** Die Geburtsdaten der Kinder, die gerechnet werden — fuer den Ausdruck. */
+  const kinderDaten = kinderAntwort === 'ja'
+    ? kinderEingabe.filter((k) => kinderFuerRechnung([k]).length > 0).map((k) => k.datum)
+    : [];
+
   return (
+    <AnspracheGeben wert={DU}>
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       {/* Im Druck so knapp wie auf den Arbeitgeber-Seiten: Mit dem Namen unter
           dem Titel passte die erste Ergebniskarte sonst nicht mehr auf Seite 1. */}
       <SeitenKopf innen="print:max-w-none print:px-0 print:py-1" />
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
+      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         {/* Der Titel als Aussage wie in der Beratung; im Druck so gross wie bisher. */}
         <Titel gross klasse="print:text-3xl">
-          Altersvorsorgedepot: Was Ihnen der Staat ab 2027 <Hervor>dazugibt</Hervor>
+          Altersvorsorgedepot: Was dir der Staat ab 2027 <Hervor>dazugibt</Hervor>
         </Titel>
         {/* Im Druck steht, fuer wen gerechnet wurde — wie „für …“ auf dem Deckblatt des Gutachtens. */}
         {ganzerName && <p className="mt-2 hidden text-lg text-ui-tinte print:block">für {ganzerName}</p>}
-        {/* Drei kurze Punkte statt eines Absatzes: Wer die Seite ueber einen
-            QR-Code auf dem Telefon oeffnet, ueberspringt einen Textblock — drei
-            Zeilen mit Symbol liest er. */}
-        {/* Im Druck entfallen die drei Werbepunkte: Das Blatt ist ein
-            Ergebnis, keine Landingpage. */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-3 print:hidden">
-          <Punkt
-            symbol={<CalendarClock className="h-5 w-5" aria-hidden />}
-            titel={`Ab ${a.abJahr}`}
-            text="Das Altersvorsorgedepot löst die Riester-Rente ab. Gesetz beschlossen, Start am 1. Januar."
-          />
-          <Punkt
-            symbol={<Gift className="h-5 w-5" aria-hidden />}
-            titel={`Bis zu ${euro(540)} im Jahr geschenkt`}
-            text={`Der Staat legt auf Ihren Beitrag drauf — mit Kindern ${euro(a.kinderzulage)} je Kind zusätzlich.`}
-          />
-          <Punkt
-            symbol={<LineChart className="h-5 w-5" aria-hidden />}
-            titel="Sie sparen in ETFs"
-            text="Keine Beitragsgarantie — dafür die Rendite des Kapitalmarkts."
-          />
-        </div>
-
-        <p className={`mt-5 ${EINLEITUNG} print:hidden`}>
-          Rechnen Sie hier aus, was das in Ihrem Fall bedeutet.
-        </p>
 
         {/*
-          DIE ANGABEN FUER DAS PAPIER. Die Eingabespalte besteht aus
-          Formularfeldern, Schnellwahlknoepfen und Hilfetexten — gedruckt
-          ergaebe das Kaesten und Knoepfe ohne Sinn. Stattdessen stehen die
-          Werte hier als Text, und die Eingabespalte entfaellt im Druck.
+          DIE ANGABEN FUER DAS PAPIER. Die Fragen bestehen aus Feldern und
+          Knoepfen — gedruckt ergaebe das Kaesten ohne Sinn. Stattdessen
+          stehen die Werte hier als Text, und die Fragen entfallen im Druck.
         */}
         <section className="mt-4 hidden break-inside-avoid rounded-[10px] border border-ui-linie p-3 print:block">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-sm font-medium text-ui-tinte">Ihre Angaben</h2>
-            <span className="text-xs text-ui-schiefer">
-              {istBeispiel ? 'Beispielwerte · ' : ''}Erstellt am {new Date().toLocaleDateString('de-DE')}
-            </span>
+            <h2 className="text-sm font-medium text-ui-tinte">Deine Angaben</h2>
+            <span className="text-xs text-ui-schiefer">Erstellt am {new Date().toLocaleDateString('de-DE')}</span>
           </div>
           <dl className="mt-2 grid grid-cols-2 gap-x-8 gap-y-1 text-xs">
             <DruckAngabe feld="Beitrag monatlich" wert={euro(beitragMonat)} />
             <DruckAngabe
               feld="Geburtsdatum"
-              wert={geburt ? `${toDe(geburt)}${rentenbeginn ? ` · Rente ab ${String(rentenbeginn.monat).padStart(2, '0')}/${rentenbeginn.jahr}` : ''}` : '—'}
+              wert={zeitraum ? `${geburtsdatum} · Rente ab ${rentenbeginnText}` : '—'}
             />
             <DruckAngabe
               feld="Kinder mit Kindergeldanspruch"
-              wert={kinder > 0
-                ? `${kinder} (geboren ${kinderListe.map((k) => k.geburtsjahr).join(', ')})`
-                : 'keine'}
+              wert={kinderDaten.length > 0 ? `${kinderDaten.length} (geboren ${kinderDaten.join(', ')})` : 'keine'}
             />
             <DruckAngabe feld="Bruttoeinkommen im Jahr" wert={bruttoJahr > 0 ? euro(bruttoJahr) : '—'} />
             <DruckAngabe feld="Familienstand" wert={verheiratet ? 'verheiratet (Splittingtarif)' : 'ledig'} />
@@ -298,517 +332,560 @@ export function Seite() {
           </dl>
         </section>
 
-        {/* Angaben links, Wirkung rechts: so sieht man beim Tippen sofort, was
-            sich aendert. Die linke Spalte bleibt beim Scrollen stehen; auf
-            schmalen Geraeten stapelt das Raster wie bisher. */}
-        {/* Im Druck kein Raster: Chrome bricht Rasterzellen nur ungern um
-            und schob jeden Abschnitt auf ein eigenes Blatt. */}
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-4 print:block">
-        <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-4 lg:self-start print:hidden">
+        {/* --- 1. Das Geburtsdatum: am Anfang die einzige Frage auf der Seite --- */}
+        <section aria-labelledby="frage-geburt" className={`mt-8 ${FRAGE} print:hidden`}>
+          <h2 id="frage-geburt" className={FRAGE_TITEL}>Wann bist du geboren?</h2>
+          <p className={FRAGE_TEXT}>
+            Daraus ergibt sich, wann du in Rente gehst — und wie viele Jahre der Staat dazulegt.
+          </p>
+          <div className="mt-4 max-w-xs">
+            <DatumFeld
+              label="Geburtsdatum"
+              wert={geburtsdatum}
+              onChange={setGeburtsdatum}
+              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld."
+            />
+          </div>
+        </section>
 
-        {/* --- Rechner ---
-            Eingabe und Ergebnis sollen sich auf den ersten Blick unterscheiden:
-            die Eingabespalte steht auf getoentem Grund mit kraeftigem Rand, die
-            Ergebnisse rechts auf weissen Karten. */}
-        {/* Die Angaben auf einer weissen Karte wie die Berechnungsgrundlagen der Beratung; das Beispiel steht als Hinweis darin. */}
-        <Karte titel="Ihre Angaben" rechts={istBeispiel ? <Vermerk>Beispiel</Vermerk> : undefined} klasse="print:hidden">
-          {istBeispiel && (
-            <Hinweis klasse="mb-5">
-              Vorbelegt mit einem Beispiel, damit Sie gleich sehen, worum es geht.
-              Tragen Sie einfach Ihre eigenen Zahlen ein.
-            </Hinweis>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1">
-              <NamenFelder vorname={name.vorname} nachname={name.nachname} onChange={setName}
-                platzhalter={['Max', 'Mustermann']} eigener />
-              <p className="col-span-2 -mt-1 text-xs leading-relaxed text-ui-schiefer">
-                Freiwillig — für den Ausdruck. Die Seite speichert nichts.
-              </p>
-            </div>
-
-            {/*
-              Der Beitrag am Regler in 10-€-Schritten wie der Regler der
-              Beratung — bis zur vollen Foerderung; darueber kommt keine Zulage
-              mehr dazu. Was dazwischen oder darueber liegt (25 € fuer die volle
-              Kinderzulage, 200 €), laesst sich genau eintippen.
-            */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <p className={FELD_LABEL}>Beitrag monatlich</p>
-              <p className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
-                <span className="ui-titel text-[40px] font-normal leading-none text-ui-tinte">{euro(beitragMonat)}</span>
-                <span className="text-sm text-ui-schiefer">im Monat · {euro(beitragMonat * 12)} im Jahr</span>
-              </p>
-              <Regler
-                wert={beitragMonat} max={a.stufe2Grenze / 12} schritt={10} onChange={eigen(setBeitragMonat)}
-                beschriftung="Beitrag im Monat" wertText={`${beitragMonat} Euro im Monat`} klasse="mt-4"
+        {zeitraum && (
+          <Schritt klasse="mt-4 print:hidden" beschriftung="Deine Zulagen bis zur Rente">
+            {zeitraum.zuSpaet || !bisZu ? (
+              <Hinweis symbol={CalendarClock}>
+                Dein Rentenbeginn ({rentenbeginnText}) liegt vor dem Start des Depots am 1. Januar{' '}
+                {a.abJahr} — für dich kommt das Altersvorsorgedepot leider zu spät.
+              </Hinweis>
+            ) : (
+              <Info
+                symbol={<Gift className="h-5 w-5" aria-hidden />}
+                etikett="Deine Zulagen bis zur Rente"
+                satz={<>Bis zu <Hervor>{euro(bisZu.ohneKinder)}</Hervor> Zulagen vom Staat bis zu deiner Rente</>}
+                unter={<>
+                  {euro(bisZu.grundzulageJahr)} im Jahr bei {euro(bisZu.beitragVoll)} Beitrag im Monat ·{' '}
+                  {zeitraum.jahre === 1 ? '1 Jahr' : `${zeitraum.jahre} Jahre`} bis zu deinem Rentenbeginn {rentenbeginnText}
+                  {bisZu.bonus > 0 && <> · darin einmalig {euro(bisZu.bonus)} Berufseinsteigerbonus, weil du jünger als {a.berufseinsteigerAlterMax} bist</>}.
+                </>}
               />
-              <div className="mt-1 flex justify-between text-xs tabular-nums text-ui-schiefer">
-                <span>{euro(0)}</span><span>{euro(a.stufe2Grenze / 12)} · volle Förderung</span>
+            )}
+          </Schritt>
+        )}
+
+        {/* --- 2. Kinder --- */}
+        {offen(2) && (
+          <Schritt klasse="mt-6 print:hidden" beschriftung="Kinder">
+            <div className={FRAGE}>
+              <h2 className={FRAGE_TITEL}>Hast du Kinder? Dann gibt es noch mehr Zulagen.</h2>
+              <p className={FRAGE_TEXT}>
+                Für jedes Kind, für das Kindergeld fließt, legt der Staat bis zu {euro(a.kinderzulage)} im Jahr dazu.
+              </p>
+              <div role="group" aria-label="Hast du Kinder?" className="mt-4 flex gap-2">
+                <Wahl
+                  aktiv={kinderAntwort === 'ja'}
+                  onClick={() => {
+                    setKinderAntwort('ja');
+                    if (kinderEingabe.length === 0) setKinderEingabe([{ datum: '' }]);
+                  }}
+                >
+                  Ja
+                </Wahl>
+                <Wahl aktiv={kinderAntwort === 'nein'} onClick={() => setKinderAntwort('nein')}>Nein</Wahl>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-                Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage.
-              </p>
-              <button type="button" onClick={() => setGenau((x) => !x)} aria-expanded={genau} className={`${LINK} mt-2`}>
-                {genau ? 'Genaue Eingabe ausblenden' : 'Betrag genau eingeben'}
-              </button>
-              {genau && (
-                <div className="mt-2">
-                  <ZahlFeld label="Beitrag monatlich, genau" wert={beitragMonat} onChange={eigen(setBeitragMonat)} einheit="€" />
-                </div>
+              {kinderAntwort === 'ja' && (
+                <Schritt klasse="mt-4">
+                  <KinderGeburtsdaten kinder={kinderEingabe} onAendern={setKinderEingabe} a={a} jetzt={jetzt} />
+                </Schritt>
               )}
             </div>
+          </Schritt>
+        )}
 
-            <DatumFeld label="Geburtsdatum" wert={geburtsdatum} onChange={eigen(setGeburtsdatum)}
-              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld." />
+        {offen(2) && kinderAntwort === 'ja' && kinder > 0 && bisZu && (
+          <Schritt klasse="mt-4 print:hidden" beschriftung="Deine Zulagen mit Kindern">
+            <Info
+              symbol={<Baby className="h-5 w-5" aria-hidden />}
+              etikett={kinder === 1 ? 'Mit deinem Kind' : `Mit deinen ${kinder} Kindern`}
+              satz={<>Bis zu <Hervor>{euro(bisZu.mitKindern)}</Hervor> Zulagen vom Staat bis zu deiner Rente</>}
+              unter={<>
+                Je Kind {euro(a.kinderzulage)} im Jahr, solange Kindergeld fließt — zusammen{' '}
+                {euro(bisZu.mitKindern - bisZu.ohneKinder)} mehr als ohne Kinder.
+              </>}
+            />
+          </Schritt>
+        )}
 
-            <div>
-              <ZahlFeld
-                label="Kinder mit Kindergeldanspruch"
-                wert={kinder}
-                onChange={(n) => {
-                  setIstBeispiel(false);
-                  // Vorhandene Kinder behalten, fehlende mit einem Vorschlag
-                  // auffuellen — sonst verliert man beim Vertippen alles.
-                  setKinderListe((bisher) =>
-                    Array.from({ length: Math.max(0, Math.min(15, Math.round(n))) },
-                      (_, i) => bisher[i] ?? { geburtsjahr: jetzt - 5 }),
-                  );
-                }}
-                max={15}
-                hilfe="Die Zulage läuft nur, solange Kindergeld fließt — dafür brauche ich das Geburtsjahr."
-              />
-
-              {kinder > 0 && (
-                <div className="ui-innen mt-2 p-3">
-                  <KinderZeilen
-                    kinder={kinderListe}
-                    onKind={(index, aenderung) => {
-                      setIstBeispiel(false);
-                      setKinderListe((bisher) =>
-                        bisher.map((k, i) => (i === index ? { ...k, ...aenderung } : k)));
-                    }}
-                    a={a}
-                    jetzt={jetzt}
-                  />
-                  <KinderHinweis a={a} />
-                </div>
-              )}
-            </div>
-
-            <div>
-              <ZahlFeld label="Bruttoeinkommen im Jahr" wert={bruttoJahr} onChange={eigen(setBruttoJahr)} einheit="€"
-                hilfe="Ihr eigenes Brutto. Es entscheidet nur über die Steuerersparnis — die Zulagen hängen allein vom Beitrag ab." />
-              <div className="mt-2">
-                <Schalter
-                  label="Verheiratet (Splittingtarif)"
-                  wert={verheiratet}
-                  onChange={eigen(setVerheiratet)}
+        {/* --- 3. Steuerersparnis --- */}
+        {offen(3) && (
+          <Schritt klasse="mt-6 print:hidden" beschriftung="Steuerersparnis">
+            <div className={FRAGE}>
+              <h2 className={FRAGE_TITEL}>Willst du noch deine mögliche Steuerersparnis berechnen?</h2>
+              <p className={FRAGE_TEXT}>Dann kannst du hier dein Bruttojahresgehalt eingeben.</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 sm:items-end">
+                <ZahlFeld
+                  label="Bruttojahresgehalt"
+                  wert={bruttoJahr}
+                  onChange={(n) => { setBruttoJahr(n); if (n > 0) setOhneSteuer(false); }}
+                  einheit="€"
+                  platzhalter="z. B. 45.000"
+                  leerBeiNull
                 />
+                <div className="pb-2">
+                  <Schalter label="Verheiratet (Splittingtarif)" wert={verheiratet} onChange={setVerheiratet} />
+                </div>
               </div>
+              {bruttoJahr <= 0 && !ohneSteuer && (
+                <button type="button" onClick={() => setOhneSteuer(true)} className={`${LINK} mt-4`}>
+                  Ohne Steuer weiter
+                </button>
+              )}
             </div>
+          </Schritt>
+        )}
 
-            <div>
-              <ProzentFeld label="Erwartete Rendite p. a." wert={rendite} onChange={eigen(setRendite)} />
-              {/* Fest, nicht einstellbar: ein realistischer Wert fuer ein
-                  gefoerdertes Depot. Wer daran dreht, rechnet sich die Sache
-                  schoen — und die Seite soll belastbar bleiben. */}
-              <div className="ui-innen mt-2 flex items-baseline justify-between gap-3 px-3 py-2">
-                <span className="text-xs font-medium text-ui-schiefer">Effektivkosten p. a.</span>
-                <span className="text-sm font-medium tabular-nums text-ui-tinte">{prozent(KOSTEN)}</span>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                Fest angesetzt: Fondskosten, Depotführung und Produktkosten zusammen.
+        {offen(3) && bruttoRuhig > 0 && bruttoJahr > 0 && (
+          <Schritt klasse="mt-4 print:hidden" beschriftung="Deine Steuerersparnis">
+            {steuerJahr > 0.5 ? (
+              <Info
+                symbol={<PiggyBank className="h-5 w-5" aria-hidden />}
+                etikett="Deine Steuerersparnis"
+                satz={<><Hervor>{euro(steuerJahr)}</Hervor> im Jahr zusätzlich</>}
+                unter={<>
+                  Über die Zulagen hinaus, bei {euro(beitragMonat)} Beitrag im Monat
+                  {profit && profit.steuerersparnisGesamt > 0 && <> — bis zur Rente rund {euro(profit.steuerersparnisGesamt)}</>}.
+                  Das Finanzamt prüft das von Amts wegen, du musst nichts beantragen.
+                </>}
+              />
+            ) : (
+              <Hinweis>
+                Bei deinem Einkommen bringt der Steuerabzug <span className="font-medium">nichts über die Zulagen
+                hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das Finanzamt
+                automatisch an.
+              </Hinweis>
+            )}
+          </Schritt>
+        )}
+
+        {/* --- 4. Regler und Diagramm: was aus dem Beitrag wird --- */}
+        {offen(4) && (
+          <Schritt klasse="mt-6" beschriftung="Was aus deinem Beitrag wird">
+            <section className={`${KARTE} print:box-decoration-clone`}>
+              <h2 className={KARTE_TITEL}>Was aus deinem Beitrag wird</h2>
+              <p className={`${FRAGE_TEXT} print:hidden`}>
+                Stell deinen Beitrag ein — das Diagramm zeigt, wie dein Depot bis zur Rente wächst.
               </p>
-            </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-ui-linie pt-5">
-            <button type="button" onClick={() => setBeratungOffen(true)} className={`${KNOPF} flex-1`}>
-              <Mail className="h-4 w-4" aria-hidden /> Beratung gewünscht
-            </button>
-            {/* Der Browser-Druck genuegt: Die Eingabespalte ist im Druck
-                durch eine Textfassung ersetzt, Knoepfe und Dialoge
-                entfallen, der Rest steht untereinander. */}
-            <button type="button" onClick={() => window.print()} className={KNOPF_KLEIN}>
-              <Printer className="h-3.5 w-3.5" aria-hidden /> Ergebnis drucken
-            </button>
-            <button type="button" onClick={leeren} className={KNOPF_KLEIN}>
-              <Eraser className="h-3.5 w-3.5" aria-hidden /> Felder leeren
-            </button>
-          </div>
-        </Karte>
-        </div>
-
-        <div className="space-y-4 lg:col-span-7">
-
-        {/* --- Profitabilitaet --- */}
-        {/* Im Druck darf diese Karte zwischen ihren Teilen umbrechen: Als
-            Ganzes sprang sie auf Seite 2, sobald sie nicht mehr ganz auf
-            Seite 1 passte (Name, Bonus, Hinweise), und liess Seite 1 fast
-            leer. Jedes Stueck behaelt Rand und Innenabstand. */}
-        <section className={`${KARTE} print:box-decoration-clone`}>
-          <h2 className={KARTE_TITEL}>Was es kostet, was es bringt</h2>
-
-          {!profit ? (
-            <p className={`mt-4 ${LEER} py-8`}>
-              Tragen Sie links Beitrag, Geburtsdatum und Bruttoeinkommen ein — dann steht hier,
-              was der Vertrag Sie netto kostet und was netto herauskommt.
-            </p>
-          ) : (
-            <div className="mt-4 space-y-4">
               {/*
-                Im Druck stehen Ring und Belastung nebeneinander: untereinander
-                passte die Karte nicht mehr auf das erste Blatt und zog alles
-                Folgende eine Seite weiter.
+                Der Beitrag am Regler in 10-€-Schritten — bis zur vollen
+                Foerderung; darueber kommt keine Zulage mehr dazu. Was
+                dazwischen oder darueber liegt, laesst sich genau eintippen.
               */}
-              <div className="break-inside-avoid space-y-4 print:grid print:grid-cols-2 print:items-start print:gap-4 print:space-y-0">
-              {/*
-                Der Monat als Ring wie die Versorgungsluecke: links der Ring mit
-                dem Hebel, rechts die drei Teile. Im Druck ist neben der
-                Belastung nur eine halbe Breite frei — dort stehen die Teile als
-                kleine Aufstellung unter dem Ring, wie die Belastung daneben.
-              */}
-              {monat && (
-                <div className="break-inside-avoid print:pt-3">
-                  <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center print:flex-col print:gap-3">
-                    <h3 className="hidden w-full text-sm font-medium text-ui-tinte print:block">Jeden Monat</h3>
-                    <AnteilsRing
-                      teile={[
-                        { wert: monat.netto, rolle: 'tinte' },
-                        { wert: monat.steuer, rolle: 'daten-3' },
-                        { wert: monat.zulage, rolle: 'knopf' },
-                      ]}
-                      mitte={`${zahl2(monat.hebel)} ×`}
-                      zeilen={['Hebel auf', 'jeden Euro']}
-                      beschreibung={`Im Monat fließen ${euroGenau(monat.depot)} ins Depot: ${euroGenau(monat.netto)} Netto-Kosten, `
-                        + `${euroGenau(monat.steuer)} Steuerersparnis und ${euroGenau(monat.zulage)} Zulagen — `
-                        + `${zahl2(monat.hebel)}-facher Hebel auf jeden Euro, den Sie netto zahlen`}
-                      klasse="print:h-40 print:w-40"
+              <div className="mt-5">
+                <p className={FELD_LABEL}>Dein Beitrag</p>
+                <p className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
+                  <span className="ui-titel text-[40px] font-normal leading-none text-ui-tinte">{euro(beitragMonat)}</span>
+                  <span className="text-sm text-ui-schiefer">im Monat · {euro(beitragMonat * 12)} im Jahr</span>
+                </p>
+                <div className="print:hidden">
+                  <Regler
+                    wert={beitragMonat} max={a.stufe2Grenze / 12} schritt={10} onChange={setBeitragMonat}
+                    beschriftung="Beitrag im Monat" wertText={`${beitragMonat} Euro im Monat`} klasse="mt-4"
+                  />
+                  <div className="mt-1 flex justify-between text-xs tabular-nums text-ui-schiefer">
+                    <span>{euro(0)}</span><span>{euro(a.stufe2Grenze / 12)} · volle Förderung</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+                    Ab 10 € im Monat gibt es Zulagen, ab 150 € die volle Grundzulage.
+                  </p>
+                  <button type="button" onClick={() => setGenau((x) => !x)} aria-expanded={genau} className={`${LINK} mt-2`}>
+                    {genau ? 'Genaue Eingabe ausblenden' : 'Betrag genau eingeben'}
+                  </button>
+                  {genau && (
+                    <div className="mt-2 max-w-xs">
+                      <ZahlFeld label="Beitrag monatlich, genau" wert={beitragMonat} onChange={setBeitragMonat} einheit="€" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {!lauf ? (
+                <p className={`mt-5 ${LEER}`}>
+                  Stell einen Beitrag ein — dann siehst du hier, wie dein Depot bis zur Rente wächst.
+                </p>
+              ) : (
+                <>
+                  {/*
+                    Das Kapital als Akzent — die eine Zahl der Seite, wie „In
+                    Ihre Vorsorge“ in der Beratung. In der grossen Fassung: Sie
+                    misst auch am Telefon 26 Punkt und gilt damit als grosse
+                    Schrift — Cyan auf Sky Wash erreicht 4,2:1, genug ab 24 Punkt.
+                  */}
+                  <Kernsatz gross etikett="Dein Kapital zum Rentenbeginn" klasse="mt-6 break-inside-avoid print:p-4">
+                    Angespart bis {rentenbeginn!.jahr}:{' '}
+                    <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lauf.endkapital)}</Hervor></span>
+                  </Kernsatz>
+
+                  {/* Die drei Teile mit dem Punkt ihrer Flaeche im Diagramm darunter — wie die Legende der Beratung. */}
+                  <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+                    <Zahl etikett="Deine Eigenbeiträge" punkt={PUNKT.eigen} wert={euro(lauf.eigenbeitraege)} />
+                    <Zahl etikett="Zulagen vom Staat" punkt={PUNKT.zulagen} wert={euro(lauf.zulagenGesamt)} />
+                    <Zahl
+                      etikett="Kursgewinne" punkt={PUNKT.gewinn}
+                      wert={euro(Math.max(0, lauf.endkapital - lauf.eigenbeitraege - lauf.zulagenGesamt))}
                     />
-                    <div className="print:hidden">
-                      <dl className="space-y-4">
-                        <Zahl etikett="Netto-Kosten" punkt={PUNKT.eigen} wert={euroGenau(monat.netto)} zusatz="im Monat" />
-                        <Zahl etikett="Steuerersparnis" punkt={PUNKT.steuer}
-                          wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'}
-                          zusatz={bruttoJahr > 0 ? 'im Monat' : 'ohne Einkommen nicht gerechnet'} />
-                        <Zahl etikett="Zulagen" punkt={PUNKT.zulagen} wert={euroGenau(monat.zulage)} zusatz="im Monat" />
-                      </dl>
-                      <p className="mt-4 text-sm text-ui-tinte">
-                        = <span className="font-medium tabular-nums">{euroGenau(monat.depot)}</span> fließen jeden Monat ins Depot.
+                  </dl>
+
+                  {lauf.hinweise.map((h) => <Hinweis key={h} klasse="mt-3">{h}</Hinweis>)}
+
+                  <div className="mt-5 border-t border-ui-linie pt-5">
+                    <KapitalaufbauDiagramm
+                      verlauf={lauf.verlauf}
+                      steuerersparnisKumuliert={profit?.steuerersparnisKumuliert}
+                    />
+                  </div>
+
+                  <p className="mt-4 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+                    Regelaltersgrenze <strong>{alterBeiRente}</strong>, Rentenbeginn also <strong>{rentenbeginnText}</strong>.
+                    Gerechnet ab {startjahr}, das sind {jahreBisRente} Beitragsjahre — mit der Annahme{' '}
+                    <strong>{prozent(rendite)} Rendite</strong> und {prozent(KOSTEN)} Effektivkosten im Jahr.
+                    Beträge nominal, also ohne Abzug der Inflation — in {jahreBisRente} Jahren ist ein
+                    Euro weniger wert als heute.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setRenditeOffen((x) => !x)}
+                    aria-expanded={renditeOffen}
+                    className={`${LINK} mt-2 print:hidden`}
+                  >
+                    {renditeOffen ? 'Annahme ausblenden' : 'Annahme ändern'}
+                  </button>
+                  {renditeOffen && (
+                    <div className="mt-3 max-w-xs print:hidden">
+                      <ProzentFeld label="Erwartete Rendite p. a." wert={rendite} onChange={setRendite} />
+                      {/* Fest, nicht einstellbar: ein realistischer Wert fuer ein
+                          gefoerdertes Depot. Wer daran dreht, rechnet sich die Sache
+                          schoen — und die Seite soll belastbar bleiben. */}
+                      <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+                        Die Effektivkosten bleiben fest bei {prozent(KOSTEN)}: Fondskosten, Depotführung und
+                        Produktkosten zusammen.
                       </p>
                     </div>
-                    <dl className="hidden w-full space-y-1.5 print:block">
-                      <RingZeile punkt={PUNKT.eigen} text="Netto-Kosten" wert={euroGenau(monat.netto)} />
-                      <RingZeile punkt={PUNKT.steuer} text="Steuerersparnis" wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'} />
-                      <RingZeile punkt={PUNKT.zulagen} text="Zulagen" wert={euroGenau(monat.zulage)} />
-                      <div className="!mt-2 border-t border-ui-linie pt-2">
-                        <RingZeile text="= fließt ins Depot" wert={euroGenau(monat.depot)} />
-                      </div>
-                    </dl>
-                  </div>
-                  {zulagen.bonus > 0 && (
-                    <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-                      Ein laufendes Jahr — ohne den einmaligen Berufseinsteigerbonus von {euro(zulagen.bonus)}.
-                    </p>
                   )}
+                </>
+              )}
+            </section>
+          </Schritt>
+        )}
+
+        {/* --- Danach: Kosten, Foerderung je Jahr, Beratung und Druck, Wissen --- */}
+        {offen(4) && (
+          <Schritt scrollen={false} klasse="mt-4 space-y-4">
+            {/* Im Druck darf diese Karte zwischen ihren Teilen umbrechen: Als
+                Ganzes sprang sie auf die naechste Seite, sobald sie nicht mehr
+                ganz passte, und liess die vorige fast leer. */}
+            <section className={`${KARTE} print:box-decoration-clone`}>
+              <h2 className={KARTE_TITEL}>Was es kostet, was es bringt</h2>
+
+              {!profit ? (
+                <p className={`mt-4 ${LEER} py-8`}>
+                  Stell oben einen Beitrag ein — dann steht hier, was der Vertrag dich netto kostet und
+                  was netto herauskommt.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {/*
+                    Im Druck stehen Ring und Belastung nebeneinander: untereinander
+                    passte die Karte nicht mehr auf ein Blatt.
+                  */}
+                  <div className="break-inside-avoid space-y-4 print:grid print:grid-cols-2 print:items-start print:gap-4 print:space-y-0">
+                  {monat && (
+                    <div className="break-inside-avoid print:pt-3">
+                      <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center print:flex-col print:gap-3">
+                        <h3 className="hidden w-full text-sm font-medium text-ui-tinte print:block">Jeden Monat</h3>
+                        <AnteilsRing
+                          teile={[
+                            { wert: monat.netto, rolle: 'tinte' },
+                            { wert: monat.steuer, rolle: 'daten-3' },
+                            { wert: monat.zulage, rolle: 'knopf' },
+                          ]}
+                          mitte={`${zahl2(monat.hebel)} ×`}
+                          zeilen={['Hebel auf', 'jeden Euro']}
+                          beschreibung={`Im Monat fließen ${euroGenau(monat.depot)} ins Depot: ${euroGenau(monat.netto)} Netto-Kosten, `
+                            + `${euroGenau(monat.steuer)} Steuerersparnis und ${euroGenau(monat.zulage)} Zulagen — `
+                            + `${zahl2(monat.hebel)}-facher Hebel auf jeden Euro, den du netto zahlst`}
+                          klasse="print:h-40 print:w-40"
+                        />
+                        <div className="print:hidden">
+                          <dl className="space-y-4">
+                            <Zahl etikett="Netto-Kosten" punkt={PUNKT.eigen} wert={euroGenau(monat.netto)} zusatz="im Monat" />
+                            <Zahl etikett="Steuerersparnis" punkt={PUNKT.steuer}
+                              wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'}
+                              zusatz={bruttoJahr > 0 ? 'im Monat' : 'ohne Einkommen nicht gerechnet'} />
+                            <Zahl etikett="Zulagen" punkt={PUNKT.zulagen} wert={euroGenau(monat.zulage)} zusatz="im Monat" />
+                          </dl>
+                          <p className="mt-4 text-sm text-ui-tinte">
+                            = <span className="font-medium tabular-nums">{euroGenau(monat.depot)}</span> fließen jeden Monat ins Depot.
+                          </p>
+                        </div>
+                        <dl className="hidden w-full space-y-1.5 print:block">
+                          <RingZeile punkt={PUNKT.eigen} text="Netto-Kosten" wert={euroGenau(monat.netto)} />
+                          <RingZeile punkt={PUNKT.steuer} text="Steuerersparnis" wert={bruttoJahr > 0 ? euroGenau(monat.steuer) : '—'} />
+                          <RingZeile punkt={PUNKT.zulagen} text="Zulagen" wert={euroGenau(monat.zulage)} />
+                          <div className="!mt-2 border-t border-ui-linie pt-2">
+                            <RingZeile text="= fließt ins Depot" wert={euroGenau(monat.depot)} />
+                          </div>
+                        </dl>
+                      </div>
+                      {zulagen.bonus > 0 && (
+                        <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+                          Ein laufendes Jahr — ohne den einmaligen Berufseinsteigerbonus von {euro(zulagen.bonus)}.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="ui-innen p-4 print:p-3">
+                    <h3 className="mb-2 text-sm font-medium text-ui-tinte">
+                      Deine Belastung (Ansparphase)
+                    </h3>
+                    <div className="space-y-1.5">
+                      <GegenueberZeile
+                        text={`Deine Eigenbeiträge über ${jahreBisRente} Jahre — bis Alter ${alterBeiRente}`}
+                        wert={euro(profit.eigenbeitraegeGesamt)} />
+                      <GegenueberZeile text="+ Zulagen vom Staat"
+                        wert={euro(profit.zulagenGesamt)} />
+                      <div className="!mt-2 border-t border-ui-linie pt-2">
+                        <GegenueberZeile text="= fließt ins Depot"
+                          wert={euro(profit.zuflussInsDepotGesamt)} />
+                      </div>
+                      {profit.steuerersparnisGesamt > 0 && (
+                        <GegenueberZeile text="− Steuerersparnis"
+                          wert={euro(profit.steuerersparnisGesamt)} />
+                      )}
+                    </div>
+                    {/* Die Summe unter einer Linie in Tinte, wie in den Aufstellungen der Beratung. */}
+                    <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2">
+                      <span className="text-sm font-medium text-ui-tinte">Kostet dich wirklich</span>
+                      <span className="text-xl font-medium tabular-nums text-ui-tinte">
+                        {euro(profit.eigenaufwandNettoGesamt)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+                      Die Zulagen mindern deine Kosten nicht — sie kommen vom Staat und stehen als
+                      höheres Kapital auf der anderen Seite.
+                    </p>
+                  </div>
+                  </div>
+
+                  {profit.hinweise.map((h) => <Hinweis key={h} klasse="break-inside-avoid">{h}</Hinweis>)}
+
+                  <p className="text-xs leading-relaxed text-ui-schiefer">
+                    Die Steuerersparnis ist mit deinem heutigen Einkommen gerechnet und auf die Laufzeit
+                    hochgerechnet. Genauer wäre Jahr für Jahr — dafür müsste man aber eine
+                    Gehaltsentwicklung unterstellen, die niemand kennt.
+                    {verheiratet && (
+                      <> Bei „Verheiratet“ wird der Splittingtarif auf dein eigenes Einkommen angewandt.
+                      Verdient dein Partner ebenfalls, fällt die Steuerersparnis in Wirklichkeit
+                      kleiner aus.</>
+                    )}
+                  </p>
                 </div>
               )}
+            </section>
 
-              <div className="ui-innen p-4 print:p-3">
-                <h3 className="mb-2 text-sm font-medium text-ui-tinte">
-                  Ihre Belastung (Ansparphase)
-                </h3>
-                <div className="space-y-1.5">
-                  <GegenueberZeile
-                    text={`Ihre Eigenbeiträge über ${jahreBisRente} Jahre — bis Alter ${alterBeiRente}`}
-                    wert={euro(profit.eigenbeitraegeGesamt)} />
-                  <GegenueberZeile text="+ Zulagen vom Staat"
-                    wert={euro(profit.zulagenGesamt)} />
-                  <div className="!mt-2 border-t border-ui-linie pt-2">
-                    <GegenueberZeile text="= fließt ins Depot"
-                      wert={euro(profit.zuflussInsDepotGesamt)} />
-                  </div>
-                  {profit.steuerersparnisGesamt > 0 && (
-                    <GegenueberZeile text="− Steuerersparnis"
-                      wert={euro(profit.steuerersparnisGesamt)} />
+            {/* --- Zulagen --- */}
+            <section className={`break-inside-avoid ${KARTE}`}>
+              <h2 className={KARTE_TITEL}>Deine Förderung je Jahr</h2>
+
+              {beitragMonat <= 0 ? (
+                <p className={`mt-4 ${LEER}`}>
+                  Stell oben einen monatlichen Beitrag ein.
+                </p>
+              ) : (
+                <>
+                  <dl className="mt-3 divide-y divide-ui-linie">
+                    <Zeile text={`Grundzulage Stufe 1 — 50 % auf die ersten ${euro(a.stufe1Grenze)}`} wert={euro(zulagen.stufe1)} />
+                    <Zeile text={`Grundzulage Stufe 2 — 25 % auf die weiteren ${euro(a.stufe2Grenze - a.stufe1Grenze)}`} wert={euro(zulagen.stufe2)} />
+                    {kinder > 0 && (
+                      <Zeile
+                        text={
+                          zulagen.kinderMitAnspruch > 0
+                            ? `Kinderzulage — ${euro(a.kinderzulage)} je Kind, noch für ${zulagen.kinderMitAnspruch} von ${kinder}`
+                            : 'Kinderzulage — kein Kind mehr im Kindergeldalter'
+                        }
+                        wert={euro(zulagen.kinderzulage)}
+                      />
+                    )}
+                    <Summe text="Zulagen jedes Jahr" wert={euro(zulagen.dauerhaft)} />
+                  </dl>
+
+                  {/* Der Bonus steht BEWUSST unter dem Jahresbetrag und nicht darin:
+                      Er faellt einmal an. In die Jahressumme gerechnet verspraeche
+                      er fuer die ganze Laufzeit eine Foerderung, die es nur im
+                      ersten Jahr gibt. */}
+                  {zulagen.bonus > 0 && (
+                    <div className="ui-innen mt-3 flex items-baseline justify-between gap-4 px-3 py-2">
+                      <span className="text-xs text-ui-schiefer">
+                        Dazu <span className="font-medium text-ui-tinte">einmalig im ersten Jahr</span>: Berufseinsteigerbonus
+                        (unter {a.berufseinsteigerAlterMax})
+                      </span>
+                      <span className="shrink-0 text-sm font-medium tabular-nums text-ui-tinte">
+                        {euro(zulagen.bonus)}
+                      </span>
+                    </div>
                   )}
-                </div>
-                {/* Die Summe unter einer Linie in Tinte, wie in den Aufstellungen der Beratung. */}
-                <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2">
-                  <span className="text-sm font-medium text-ui-tinte">Kostet Sie wirklich</span>
-                  <span className="text-xl font-medium tabular-nums text-ui-tinte">
-                    {euro(profit.eigenaufwandNettoGesamt)}
-                  </span>
-                </div>
-                {/* Was das im Monat heisst, zeigt der Ring darueber. */}
-                <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                  Die Zulagen mindern Ihre Kosten nicht — sie kommen vom Staat und stehen als
-                  höheres Kapital auf der anderen Seite.
+
+                  {/* Die Foerderquote als Satz in Tinte — statt eines gruenen Kastens. */}
+                  <p className="mt-4 text-base leading-relaxed text-ui-tinte">
+                    Auf {euro(beitragMonat * 12)} eigenen Beitrag kommen jedes Jahr{' '}
+                    {euro(zulagen.dauerhaft)} vom Staat — das sind{' '}
+                    <span className="font-medium">{prozent(zulagen.foerderquoteDauerhaft)}</span> obendrauf.
+                    {zulagen.bonus > 0 && (
+                      <> Im ersten Jahr einmalig {euro(zulagen.bonus)} mehr.</>
+                    )}
+                  </p>
+
+                  {zulagen.hinweise.map((h) => <Hinweis key={h} klasse="mt-3">{h}</Hinweis>)}
+
+                  {/* Sonderausgabenabzug: wirkt nur, soweit er die Zulagen uebersteigt. */}
+                  <div className="mt-5 border-t border-ui-linie pt-5">
+                    <h3 className="text-base font-medium text-ui-tinte">
+                      Dazu der Steuervorteil
+                    </h3>
+                    {bruttoJahr <= 0 ? (
+                      <p className="mt-2 text-sm text-ui-schiefer">
+                        Trag oben dein Bruttojahresgehalt ein — ob der Sonderausgabenabzug über die
+                        Zulagen hinaus etwas bringt, hängt an deinem Steuersatz.
+                      </p>
+                    ) : steuervorteil.ueberZulagen <= 0 ? (
+                      // Ohne Wirkung braucht es keine vierzeilige Herleitung, die
+                      // am Ende null ergibt. Ein Satz sagt dasselbe.
+                      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
+                        Bei deinem Einkommen bringt der Steuerabzug <span className="font-medium text-ui-tinte">nichts über die Zulagen
+                        hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das
+                        Finanzamt automatisch an. Deine {euro(beitragMonat * 12)} Beitrag kosten dich
+                        damit auch nach Steuern {euro(steuervorteil.eigenaufwandNetto)} im Jahr.
+                      </p>
+                    ) : (
+                      <>
+                        <dl className="mt-2 divide-y divide-ui-linie">
+                          <Zeile text={`Absetzbar (Beitrag bis ${euro(a.hoechstbetragEigenbeitrag)} plus Zulagen)`}
+                            wert={euro(steuervorteil.abzugsfaehig)} />
+                          <Zeile text="Steuerersparnis daraus" wert={euro(steuervorteil.steuerersparnis)} />
+                          <Zeile text="− bereits gewährte Zulagen" wert={`− ${euro(zulagen.gesamt)}`} />
+                          <Summe text="Zusätzlich über die Zulagen hinaus" wert={euro(steuervorteil.ueberZulagen)} />
+                        </dl>
+                        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+                          Bei deinem Einkommen ist der Abzug günstiger als die bloße Zulage. Das
+                          Finanzamt prüft das von Amts wegen — du musst nichts beantragen.
+                          Unterm Strich kosten dich {euro(beitragMonat * 12)} Beitrag nur{' '}
+                          <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* --- Beratung, Ausdruck, neu beginnen --- */}
+            <section className={`${KARTE} print:hidden`} aria-label="Beratung und Ausdruck">
+              <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                <NamenFelder vorname={name.vorname} nachname={name.nachname} onChange={setName}
+                  platzhalter={['Max', 'Mustermann']} eigener />
+                <p className="col-span-2 -mt-1 text-xs leading-relaxed text-ui-schiefer">
+                  Freiwillig — für den Ausdruck und die Beratungsanfrage. Die Seite speichert nichts.
                 </p>
               </div>
+              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ui-linie pt-5">
+                <button type="button" onClick={() => setBeratungOffen(true)} className={`${KNOPF} flex-1 sm:flex-none`}>
+                  <Mail className="h-4 w-4" aria-hidden /> Beratung gewünscht
+                </button>
+                {/* Der Browser-Druck genuegt: Die Fragen sind im Druck durch eine
+                    Textfassung ersetzt, Knoepfe und Dialoge entfallen. */}
+                <button type="button" onClick={() => window.print()} className={KNOPF_KLEIN}>
+                  <Printer className="h-3.5 w-3.5" aria-hidden /> Ergebnis drucken
+                </button>
+                <button type="button" onClick={neuBeginnen} className={KNOPF_KLEIN}>
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Neu beginnen
+                </button>
               </div>
+            </section>
 
-              {/*
-                Das Kapital als Akzent — die eine Zahl der Seite, wie „In Ihre
-                Vorsorge“ in der Beratung. In der grossen Fassung: Sie misst auch
-                am Telefon 26 Punkt und gilt damit als grosse Schrift — Cyan auf
-                Sky Wash erreicht 4,2:1, genug ab 24 Punkt, zu wenig darunter.
-              */}
-              <Kernsatz gross etikett="Ihr Kapital zum Rentenbeginn" klasse="break-inside-avoid print:p-4">
-                Angespart bis {rentenbeginn!.jahr}:{' '}
-                <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(profit.endkapital)}</Hervor></span>
-              </Kernsatz>
+            {/* --- Einordnung --- erklaerender Text, kein Ergebnis. */}
+            <AkkordeonKarte
+              titel="Was du wissen solltest"
+              symbol={<InfoSymbol className="h-4 w-4 text-ui-schiefer" aria-hidden />}
+              offen={wissenOffen}
+              onUmschalten={() => setWissenOffen((v) => !v)}
+            >
+              <ul className="space-y-2 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
+                <li>
+                  <strong>Ab dem 1. Januar {a.abJahr}.</strong> Das Altersvorsorgedepot löst die
+                  Riester-Rente ab — das Gesetz ist beschlossen.
+                </li>
+                <li>
+                  <strong>Du sparst in ETFs.</strong> Es gibt keine Beitragsgarantie — dafür die Rendite
+                  des Kapitalmarkts.
+                </li>
+                <li>
+                  <strong>Die Förderung ist gestaffelt.</strong> Auf die ersten {euro(a.stufe1Grenze)} im Jahr
+                  gibt es {Math.round(a.stufe1Satz * 100)} %, auf die weiteren{' '}
+                  {euro(a.stufe2Grenze - a.stufe1Grenze)} noch {Math.round(a.stufe2Satz * 100)} %. Darüber
+                  steigt die Grundzulage nicht mehr — die höchste Förderquote erreichen kleine Beiträge.
+                </li>
+                <li>
+                  <strong>Unter {euro(a.mindesteigenbeitragJahr)} im Jahr gibt es gar nichts.</strong> Nicht
+                  anteilig weniger, sondern null. Das war schon bei Riester der häufigste Fehler.
+                </li>
+                <li>
+                  <strong>Die Kinderzulage hängt am Beitrag.</strong> Je Kind gibt es einen Euro für jeden
+                  eigenen Euro, höchstens {euro(a.kinderzulage)}. Die vollen {euro(a.kinderzulage)} je Kind
+                  erreichst du ab {euro(a.kinderzulage)} Jahresbeitrag — unabhängig davon, wie viele
+                  Kinder es sind.
+                </li>
+                <li>
+                  <strong>Ausgezahlt wird ab {a.auszahlungAbAlter}</strong>, als lebenslange Rente oder als
+                  Auszahlplan, der mindestens bis {a.auszahlplanBisAlter} läuft. Zu Rentenbeginn darfst du
+                  einmalig bis zu {Math.round(a.teilauszahlungMax * 100)} % förderunschädlich entnehmen —
+                  darüber hinaus ist eine freie Entnahme nicht vorgesehen.
+                </li>
+                <li>
+                  <strong>In der Ansparphase fällt keine Vorabpauschale an.</strong> Gegenüber einem freien
+                  Depot bleibt dadurch mehr investiert — der Unterschied wächst über die Jahre.
+                </li>
+                <li>
+                  <strong>Dafür ist die Auszahlung voll steuerpflichtig.</strong> Ein freies Depot zahlt
+                  25 % Abgeltungsteuer nur auf den Gewinn; hier wird der gesamte Betrag mit dem
+                  persönlichen Satz besteuert. Ob sich die Förderung lohnt, entscheidet sich genau an
+                  diesem Punkt — und damit an deinem Steuersatz im Alter.
+                </li>
+              </ul>
 
-              {profit.hinweise.map((h) => <Hinweis key={h} klasse="break-inside-avoid">{h}</Hinweis>)}
-
-              <p className="text-xs leading-relaxed text-ui-schiefer">
-                Die Steuerersparnis ist mit Ihrem heutigen Einkommen gerechnet und auf die Laufzeit
-                hochgerechnet. Genauer wäre Jahr für Jahr — dafür müsste man aber eine
-                Gehaltsentwicklung unterstellen, die niemand kennt.
-                {verheiratet && (
-                  <> Bei „Verheiratet" wird der Splittingtarif auf Ihr eigenes Einkommen angewandt.
-                  Verdient Ihr Partner ebenfalls, fällt die Steuerersparnis in Wirklichkeit
-                  kleiner aus.</>
-                )}
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* --- Zulagen --- */}
-        <section className={`break-inside-avoid ${KARTE}`}>
-          <h2 className={KARTE_TITEL}>Ihre Förderung je Jahr</h2>
-
-          {beitragMonat <= 0 ? (
-            <p className={`mt-4 ${LEER}`}>
-              Tragen Sie links einen monatlichen Beitrag ein.
-            </p>
-          ) : (
-            <>
-              <dl className="mt-3 divide-y divide-ui-linie">
-                <Zeile text={`Grundzulage Stufe 1 — 50 % auf die ersten ${euro(a.stufe1Grenze)}`} wert={euro(zulagen.stufe1)} />
-                <Zeile text={`Grundzulage Stufe 2 — 25 % auf die weiteren ${euro(a.stufe2Grenze - a.stufe1Grenze)}`} wert={euro(zulagen.stufe2)} />
-                {kinder > 0 && (
-                  <Zeile
-                    text={
-                      zulagen.kinderMitAnspruch > 0
-                        ? `Kinderzulage — ${euro(a.kinderzulage)} je Kind, noch für ${zulagen.kinderMitAnspruch} von ${kinder}`
-                        : 'Kinderzulage — kein Kind mehr im Kindergeldalter'
-                    }
-                    wert={euro(zulagen.kinderzulage)}
-                  />
-                )}
-                <Summe text="Zulagen jedes Jahr" wert={euro(zulagen.dauerhaft)} />
-              </dl>
-
-              {/* Der Bonus steht BEWUSST unter dem Jahresbetrag und nicht darin:
-                  Er faellt einmal an. In die Jahressumme gerechnet verspraeche
-                  er fuer die ganze Laufzeit eine Foerderung, die es nur im
-                  ersten Jahr gibt. */}
-              {zulagen.bonus > 0 && (
-                <div className="ui-innen mt-3 flex items-baseline justify-between gap-4 px-3 py-2">
-                  <span className="text-xs text-ui-schiefer">
-                    Dazu <span className="font-medium text-ui-tinte">einmalig im ersten Jahr</span>: Berufseinsteigerbonus
-                    (unter {a.berufseinsteigerAlterMax})
-                  </span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums text-ui-tinte">
-                    {euro(zulagen.bonus)}
-                  </span>
-                </div>
-              )}
-
-              {/* Die Foerderquote als Satz in Tinte — statt eines gruenen Kastens. */}
-              <p className="mt-4 text-base leading-relaxed text-ui-tinte">
-                Auf {euro(beitragMonat * 12)} eigenen Beitrag kommen jedes Jahr{' '}
-                {euro(zulagen.dauerhaft)} vom Staat — das sind{' '}
-                <span className="font-medium">{prozent(zulagen.foerderquoteDauerhaft)}</span> obendrauf.
-                {zulagen.bonus > 0 && (
-                  <> Im ersten Jahr einmalig {euro(zulagen.bonus)} mehr.</>
-                )}
+              <p className="ui-innen mt-4 px-3 py-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+                <strong>Zum Sparerpauschbetrag:</strong> Er gilt hier <em>nicht</em>. Die Auszahlung ist
+                eine sonstige Einkunft nach § 22 Nr. 5 EStG, kein Kapitalertrag — anders als beim freien
+                Depot, wo er sehr wohl greift. Der Werbungskosten-Pauschbetrag von 102 € gilt dagegen
+                schon; diese Rechnung setzt ihn bei der gesetzlichen Rente an. Wer keine gesetzliche
+                Rente bezieht, steht hier deshalb um rund 30 € Steuer im Jahr zu ungünstig da.
               </p>
 
-              {zulagen.hinweise.map((h) => <Hinweis key={h} klasse="mt-3">{h}</Hinweis>)}
-
-              {/* Sonderausgabenabzug: wirkt nur, soweit er die Zulagen uebersteigt. */}
-              <div className="mt-5 border-t border-ui-linie pt-5">
-                <h3 className="text-base font-medium text-ui-tinte">
-                  Dazu der Steuervorteil
-                </h3>
-                {bruttoJahr <= 0 ? (
-                  <p className="mt-2 text-sm text-ui-schiefer">
-                    Tragen Sie links Ihr Bruttoeinkommen ein — ob der Sonderausgabenabzug über die
-                    Zulagen hinaus etwas bringt, hängt an Ihrem Steuersatz.
-                  </p>
-                ) : steuervorteil.ueberZulagen <= 0 ? (
-                  // Ohne Wirkung braucht es keine vierzeilige Herleitung, die
-                  // am Ende null ergibt. Ein Satz sagt dasselbe.
-                  <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-                    Bei Ihrem Einkommen bringt der Steuerabzug <span className="font-medium text-ui-tinte">nichts über die Zulagen
-                    hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das
-                    Finanzamt automatisch an. Ihre {euro(beitragMonat * 12)} Beitrag kosten Sie
-                    damit auch nach Steuern {euro(steuervorteil.eigenaufwandNetto)} im Jahr.
-                  </p>
-                ) : (
-                  <>
-                    <dl className="mt-2 divide-y divide-ui-linie">
-                      <Zeile text={`Absetzbar (Beitrag bis ${euro(a.hoechstbetragEigenbeitrag)} plus Zulagen)`}
-                        wert={euro(steuervorteil.abzugsfaehig)} />
-                      <Zeile text="Steuerersparnis daraus" wert={euro(steuervorteil.steuerersparnis)} />
-                      <Zeile text="− bereits gewährte Zulagen" wert={`− ${euro(zulagen.gesamt)}`} />
-                      <Summe text="Zusätzlich über die Zulagen hinaus" wert={euro(steuervorteil.ueberZulagen)} />
-                    </dl>
-                    <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-                      Bei Ihrem Einkommen ist der Abzug günstiger als die bloße Zulage. Das
-                      Finanzamt prüft das von Amts wegen — Sie müssen nichts beantragen.
-                      Unterm Strich kosten Sie {euro(beitragMonat * 12)} Beitrag nur{' '}
-                      <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
-                    </p>
-                  </>
-                )}
-              </div>
-
-            </>
-          )}
-        </section>
-
-        {/* --- Hochrechnung --- */}
-        <section className={`break-inside-avoid ${KARTE}`}>
-          <h2 className={KARTE_TITEL}>Bis zu Ihrem Rentenbeginn</h2>
-
-          {!geburt ? (
-            <p className={`mt-4 ${LEER}`}>
-              Tragen Sie links Ihr Geburtsdatum ein — daraus ergibt sich Ihr Rentenbeginn.
-            </p>
-          ) : !lauf ? (
-            <p className={`mt-4 ${LEER}`}>
-              Tragen Sie links einen monatlichen Beitrag ein.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-                Regelaltersgrenze <strong>{alterBeiRente}</strong>, Rentenbeginn also{' '}
-                <strong>{String(rentenbeginn!.monat).padStart(2, '0')}/{rentenbeginn!.jahr}</strong>.
-                Gerechnet ab {startjahr}, das sind {jahreBisRente} Beitragsjahre.
+              <p className="ui-innen mt-3 px-3 py-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+                <strong>Zum Steuervorteil:</strong> Absetzbar sind Eigenbeiträge bis{' '}
+                {euro(a.hoechstbetragEigenbeitrag)} im Jahr <em>zuzüglich</em> deines Zulagenanspruchs — für
+                Alleinstehende ohne Kinder also {euro(a.hoechstbetragEigenbeitrag + 540)}. Das Finanzamt
+                prüft von Amts wegen, ob der Abzug günstiger ist als die Zulage; wirksam wird davon nur,
+                was über die Zulagen hinausgeht.
               </p>
+            </AkkordeonKarte>
+          </Schritt>
+        )}
 
-              {/* Das Kapital selbst steht schon oben — hier nur, woraus es
-                  besteht. Zweimal dieselbe Zahl macht die Seite laenger, nicht
-                  klarer. */}
-              {/* Die drei Teile mit dem Punkt ihrer Flaeche im Diagramm darunter — wie die Legende der Beratung. */}
-              <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-                <Zahl etikett="Ihre Eigenbeiträge" punkt={PUNKT.eigen} wert={euro(lauf.eigenbeitraege)} />
-                <Zahl etikett="Zulagen vom Staat" punkt={PUNKT.zulagen} wert={euro(lauf.zulagenGesamt)} />
-                <Zahl
-                  etikett="Kursgewinne" punkt={PUNKT.gewinn}
-                  wert={euro(Math.max(0, lauf.endkapital - lauf.eigenbeitraege - lauf.zulagenGesamt))}
-                />
-              </dl>
-
-              {lauf.hinweise.map((h) => <Hinweis key={h} klasse="mt-3">{h}</Hinweis>)}
-
-              <div className="mt-5 border-t border-ui-linie pt-5">
-                <KapitalaufbauDiagramm
-                  verlauf={lauf.verlauf}
-                  steuerersparnisKumuliert={profit?.steuerersparnisKumuliert}
-                />
-              </div>
-
-              <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
-                Gerechnet mit {prozent(rendite)} Rendite und {prozent(KOSTEN)} Effektivkosten.
-                Beträge nominal, also ohne Abzug der Inflation — in {jahreBisRente} Jahren ist ein
-                Euro weniger wert als heute.
-              </p>
-            </>
-          )}
-        </section>
-
-        </div>
-        </div>
-
-        {/* --- Einordnung ---
-            Ueber die volle Breite: erklaerender Text, kein Ergebnis. Er
-            braucht keine Spalte neben den Eingaben. */}
-        <AkkordeonKarte
-          titel="Was Sie wissen sollten"
-          symbol={<Info className="h-4 w-4 text-ui-schiefer" aria-hidden />}
-          offen={wissenOffen}
-          onUmschalten={() => setWissenOffen((v) => !v)}
-          klasse="mt-4"
-        >
-          <ul className="space-y-2 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
-            <li>
-              <strong>Die Förderung ist gestaffelt.</strong> Auf die ersten {euro(a.stufe1Grenze)} im Jahr
-              gibt es {Math.round(a.stufe1Satz * 100)} %, auf die weiteren{' '}
-              {euro(a.stufe2Grenze - a.stufe1Grenze)} noch {Math.round(a.stufe2Satz * 100)} %. Darüber
-              steigt die Grundzulage nicht mehr — die höchste Förderquote erreichen kleine Beiträge.
-            </li>
-            <li>
-              <strong>Unter {euro(a.mindesteigenbeitragJahr)} im Jahr gibt es gar nichts.</strong> Nicht
-              anteilig weniger, sondern null. Das war schon bei Riester der häufigste Fehler.
-            </li>
-            <li>
-              <strong>Die Kinderzulage hängt am Beitrag.</strong> Je Kind gibt es einen Euro für jeden
-              eigenen Euro, höchstens {euro(a.kinderzulage)}. Die vollen {euro(a.kinderzulage)} je Kind
-              erreichen Sie ab {euro(a.kinderzulage)} Jahresbeitrag — unabhängig davon, wie viele
-              Kinder es sind.
-            </li>
-            <li>
-              <strong>Ausgezahlt wird ab {a.auszahlungAbAlter}</strong>, als lebenslange Rente oder als
-              Auszahlplan, der mindestens bis {a.auszahlplanBisAlter} läuft. Zu Rentenbeginn dürfen Sie
-              einmalig bis zu {Math.round(a.teilauszahlungMax * 100)} % förderunschädlich entnehmen —
-              darüber hinaus ist eine freie Entnahme nicht vorgesehen.
-            </li>
-            <li>
-              <strong>In der Ansparphase fällt keine Vorabpauschale an.</strong> Gegenüber einem freien
-              Depot bleibt dadurch mehr investiert — der Unterschied wächst über die Jahre.
-            </li>
-            <li>
-              <strong>Dafür ist die Auszahlung voll steuerpflichtig.</strong> Ein freies Depot zahlt
-              25 % Abgeltungsteuer nur auf den Gewinn; hier wird der gesamte Betrag mit dem
-              persönlichen Satz besteuert. Ob sich die Förderung lohnt, entscheidet sich genau an
-              diesem Punkt — und damit an Ihrem Steuersatz im Alter.
-            </li>
-          </ul>
-
-          <p className="ui-innen mt-4 px-3 py-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-            <strong>Zum Sparerpauschbetrag:</strong> Er gilt hier <em>nicht</em>. Die Auszahlung ist
-            eine sonstige Einkunft nach § 22 Nr. 5 EStG, kein Kapitalertrag — anders als beim freien
-            Depot, wo er sehr wohl greift. Der Werbungskosten-Pauschbetrag von 102 € gilt dagegen
-            schon; diese Rechnung setzt ihn bei der gesetzlichen Rente an. Wer keine gesetzliche
-            Rente bezieht, steht hier deshalb um rund 30 € Steuer im Jahr zu ungünstig da.
-          </p>
-
-          <p className="ui-innen mt-3 px-3 py-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-            <strong>Zum Steuervorteil:</strong> Absetzbar sind Eigenbeiträge bis{' '}
-            {euro(a.hoechstbetragEigenbeitrag)} im Jahr <em>zuzüglich</em> Ihres Zulagenanspruchs — für
-            Alleinstehende ohne Kinder also {euro(a.hoechstbetragEigenbeitrag + 540)}. Das Finanzamt
-            prüft von Amts wegen, ob der Abzug günstiger ist als die Zulage; wirksam wird davon nur,
-            was über die Zulagen hinausgeht.
-          </p>
-        </AkkordeonKarte>
-
-        <p className="mt-6 text-center text-xs leading-relaxed text-ui-schiefer">
+        <p className="mt-8 text-center text-xs leading-relaxed text-ui-schiefer">
           Modellrechnung ohne Gewähr. Keine Steuer-, Renten- oder Anlageberatung. Rechtsstand des
           am 8. Mai 2026 verabschiedeten Gesetzes, Anwendung ab 1. Januar 2027. Die Berechnung läuft
-          vollständig in Ihrem Browser — Ihre Eingaben verlassen dieses Gerät nicht.
+          vollständig in deinem Browser — deine Eingaben verlassen dieses Gerät nicht.
         </p>
         <RechtsLinks klasse="mt-4" />
       </main>
-
-      {/*
-        Die Beispielwerte fuer Beitrag und Brutto bleiben stehen: die Seite
-        soll unmittelbar nach dem Schliessen etwas rechnen und sich dadurch
-        selbst erklaeren. Nur das Geburtsdatum ist danach das eigene.
-      */}
-      <GeburtsdatumDialog
-        offen={!geburtsdatumGefragt}
-        onFertig={(datum) => {
-          setGeburtsdatum(datum);
-          setGeburtsdatumGefragt(true);
-        }}
-      />
 
       <BeratungDialog
         offen={beratungOffen}
@@ -819,16 +896,59 @@ export function Seite() {
         onName={setName}
       />
     </div>
+    </AnspracheGeben>
   );
 }
 
-/** Karten der Ergebnisspalte — wie die Karten der Beratung, im Druck enger und ohne Schatten. */
+/** Karten der Ergebnisse — wie die Karten der Beratung, im Druck enger und ohne Schatten. */
 const KARTE = 'ui-karte p-5 sm:p-7 print:p-3 print:shadow-none';
 const KARTE_TITEL = 'text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl';
+/** Eine Frage der gefuehrten Eingabe: weisse Karte, die Frage gross wie ein Kernsatz. */
+const FRAGE = 'ui-karte p-5 sm:p-7';
+const FRAGE_TITEL = 'ui-titel text-balance text-[24px] font-normal leading-snug text-ui-tinte sm:text-[28px]';
+const FRAGE_TEXT = 'mt-1.5 text-sm leading-relaxed text-ui-schiefer';
 /** Was steht, solange eine Angabe fehlt. */
 const LEER = 'rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer';
 /** Die Punkte der Flaechen — dieselben Farben wie im Diagramm (Diagramme.tsx); Asche fuer die Steuerersparnis im Ring. */
 const PUNKT = { eigen: 'bg-ui-tinte', steuer: 'bg-ui-daten-3', zulagen: 'bg-ui-knopf', gewinn: 'bg-ui-luecke' } as const;
+
+/**
+ * Eine Zwischeninfo: was die Antwort davor an Geld bedeutet. Kein Kernsatz in
+ * der Akzentkarte — den gibt es hoechstens einmal je Ansicht, und er gehoert
+ * dem Kapital zum Rentenbeginn. Die Zahl ist hervorgehoben, der Satz gross
+ * genug (mindestens 24 px), dass das Cyan auf Sky Wash reicht.
+ */
+function Info({ symbol, etikett, satz, unter }: {
+  symbol: ReactNode; etikett: string; satz: ReactNode; unter?: ReactNode;
+}) {
+  return (
+    // Am Telefon steht das Symbol ueber dem Satz — daneben naehme es ihm ein Viertel der Breite.
+    <div className="ui-karte flex flex-col gap-3 p-5 sm:flex-row sm:gap-4 sm:p-6">
+      <span className="ui-innen flex h-10 w-10 shrink-0 items-center justify-center text-ui-tinte">{symbol}</span>
+      <div className="min-w-0">
+        <p className="text-sm text-ui-schiefer">{etikett}</p>
+        <p className="ui-titel mt-1 text-balance text-[24px] font-normal leading-snug text-ui-tinte sm:text-[28px]">{satz}</p>
+        {unter && <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">{unter}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Eine Antwort zum Antippen — gedrueckt dunkel wie die aktive Pille. */
+function Wahl({ aktiv, onClick, children }: { aktiv: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={aktiv}
+      onClick={onClick}
+      className={`min-w-24 rounded-full border px-5 py-2.5 text-sm font-medium transition-colors ${
+        aktiv ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function DruckAngabe({ feld, wert }: { feld: string; wert: string }) {
   return (
@@ -867,19 +987,6 @@ function Summe({ text, wert }: { text: string; wert: string }) {
     <div className="!border-t-ui-tinte flex items-baseline justify-between gap-4 pt-3">
       <dt className="text-sm font-medium text-ui-tinte">{text}</dt>
       <dd className="text-xl font-medium tabular-nums text-ui-tinte">{wert}</dd>
-    </div>
-  );
-}
-
-/** Einer der drei Punkte am Anfang — wie die Karten am Anfang des Rechners: Symbol in der Innenflaeche, ohne Farbe. */
-function Punkt({ symbol, titel, text }: { symbol: ReactNode; titel: string; text: string }) {
-  return (
-    <div className="ui-karte flex gap-3 p-4">
-      <span className="ui-innen flex h-10 w-10 shrink-0 items-center justify-center text-ui-tinte">{symbol}</span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-ui-tinte">{titel}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-ui-schiefer">{text}</span>
-      </span>
     </div>
   );
 }

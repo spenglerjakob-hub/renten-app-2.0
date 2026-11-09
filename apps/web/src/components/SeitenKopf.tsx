@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Logo } from './Logo';
+import { useAnsprache } from './Ansprache';
 
 /**
  * Die Kopfzeile der Unterseiten (Schnellrechnung, Preise, Arbeitgeber-
@@ -11,6 +12,9 @@ import { Logo } from './Logo';
  *
  * Hell, ohne eigene Flaeche: Der Stil kennt keine dunklen Leisten — der Kopf
  * steht auf der Flaeche der Seite, wie im Druck.
+ *
+ * Der Spruch folgt der Ansprache der Seite: Die Depot-Seite duzt („Deine
+ * Zukunft“), alle anderen setzen keine und bleiben beim „Ihre Zukunft“.
  */
 export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, klasse = '', innen = '' }: {
   /** Tailwind-Klasse der Inhaltsbreite, gleich der von <main> */
@@ -27,6 +31,7 @@ export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, kla
   /** Zusaetzliche Klassen an der inneren Zeile */
   innen?: string;
 }) {
+  const an = useAnsprache();
   const name = <span className="text-sm font-medium tracking-tight">JS-Rentenplaner</span>;
   return (
     <header className={`text-ui-tinte ${klasse}`}>
@@ -34,7 +39,7 @@ export function SeitenKopf({ breite = 'max-w-6xl', verlinkt = false, rechts, kla
         <Logo klasse="h-9 w-9 print:h-6 print:w-6" />
         <div className="min-w-0 flex-1">
           {verlinkt ? <a href="/" className="underline-offset-4 hover:underline">{name}</a> : name}
-          <p className="text-xs text-ui-schiefer print:hidden">Ihre Zukunft. Smart geplant.</p>
+          <p className="text-xs text-ui-schiefer print:hidden">{an.Dein('e')} Zukunft. Smart geplant.</p>
         </div>
         {rechts}
       </div>
