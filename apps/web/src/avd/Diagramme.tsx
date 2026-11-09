@@ -331,8 +331,12 @@ export function KapitalaufbauDiagramm({
           )}
         </div>
       )}
-
-      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">{zusammenfassung}</p>
+      {/*
+        Die Zusammenfassung steht NICHT sichtbar unter dem Diagramm: Endkapital,
+        Eigenbeitraege, Zulagen und Kursgewinne nennt die Seite schon direkt
+        darueber. Fuer Screenreader bleibt sie Titel des Diagramms und
+        Beschriftung der Tabelle.
+      */}
     </figure>
   );
 }

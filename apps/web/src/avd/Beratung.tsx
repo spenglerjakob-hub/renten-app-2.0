@@ -158,10 +158,19 @@ export function BeratungDialog({
           </button>
         </div>
 
-        <p className="text-xs leading-relaxed text-ui-schiefer">
-          Kein Mailprogramm eingerichtet? Kopier den Text und schreib an{' '}
-          <span className="font-medium text-ui-tinte">{empfaenger}</span>.
-        </p>
+        {/*
+          Gross, mit der Adresse auf eigener Zeile: Ohne Mailprogramm passiert
+          beim Klick auf „Mail öffnen“ nichts Sichtbares — dann muss sofort ins
+          Auge fallen, wohin die Nachricht geht. Ein Tipp auf die Adresse
+          markiert sie ganz, zum Kopieren; ohne Punkt dahinter, damit keiner
+          mitkopiert wird.
+        */}
+        <div className="ui-innen px-4 py-3">
+          <p className="text-base leading-relaxed text-ui-tinte">
+            Kein Mailprogramm eingerichtet? Kopier den Text und schreib an:
+          </p>
+          <p className="mt-1 select-all break-all text-xl font-medium text-ui-tinte">{empfaenger}</p>
+        </div>
       </div>
     </Dialog>
   );
