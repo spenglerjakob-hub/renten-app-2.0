@@ -379,6 +379,8 @@ export function TextFeld(props: {
   typ?: 'text' | 'tel' | 'email';
   maxLaenge?: number;
   autoComplete?: string;
+  /** Beim Verlassen des Felds — etwa um erst dann auf Tippfehler hinzuweisen */
+  onBlur?: () => void;
 }) {
   const id = `t${useId()}`;
   return (
@@ -392,6 +394,7 @@ export function TextFeld(props: {
         maxLength={props.maxLaenge}
         autoComplete={props.autoComplete}
         onChange={(e) => props.onChange(e.target.value)}
+        onBlur={props.onBlur}
         aria-invalid={props.fehler ? true : undefined}
         className={`ui-feld w-full p-2 text-sm ${props.fehler ? FEHLER_RAHMEN : ''}`}
       />

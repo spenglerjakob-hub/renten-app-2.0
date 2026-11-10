@@ -194,7 +194,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
           </div>
         )}
 
-        {reiter === 'uebersicht' && <Uebersicht firma={firma} logo={logo} beratungen={liste} />}
+        {reiter === 'uebersicht' && <Uebersicht firma={firma} logo={logo} beratungen={liste} onGespeichert={setFirma} />}
       </div>
 
       <Dialog offen={loeschen !== null} titel="Beratung löschen?" onSchliessen={() => setLoeschen(null)}>

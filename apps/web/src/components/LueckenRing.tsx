@@ -8,11 +8,17 @@ export interface RingTexte {
   mitte: string;
   /** Der gedeckte Teil, etwa „Netto-Altersrente“ */
   gedeckt: string;
+  /** Worauf sich die Prozente beziehen, wenn nicht auf das Ganze — etwa „des Nettolohns“ */
+  prozentVon?: string;
 }
 
 const NETTOLOHN: RingTexte = { ganz: 'Nettolohn', mitte: 'Ihr Nettolohn', gedeckt: 'Netto-Altersrente' };
 /** Gemessen am Ziel statt am Nettolohn — Schnellrechnung und Ergebnis des Rechners. */
 export const ZIEL_RING: RingTexte = { ganz: 'Ziel', mitte: 'Ihr Ziel', gedeckt: 'Netto im Ruhestand' };
+/** Gemessen am Rentenziel, einem Anteil am Nettolohn — Mitarbeiterberatung. */
+export const RENTENZIEL_RING: RingTexte = {
+  ganz: 'Rentenziel', mitte: 'Ihr Rentenziel', gedeckt: 'Netto-Altersrente', prozentVon: 'des Nettolohns',
+};
 
 const R = 42;
 const UMFANG = 2 * Math.PI * R;
@@ -49,9 +55,10 @@ export function LueckenRing({ ganz, gedeckt, luecke, gedecktProzent, lueckeProze
   const ganzzahl = (x: number) => euro(Math.round(x));
   const darin = neu && boegen.neu > 0
     ? `, darin ${ganzzahl(neu.wert)} neu durch die gewählten Lösungen (${neu.prozent} %),` : '';
+  const von = texte.prozentVon ? ` ${texte.prozentVon}` : '';
   return (
     <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
-      aria-label={`${texte.ganz} ${ganzzahl(ganz)}: davon ${ganzzahl(gedeckt)} ${texte.gedeckt} (${gedecktProzent} %)${darin} und ${ganzzahl(luecke)} Versorgungslücke (${lueckeProzent} %)`}>
+      aria-label={`${texte.ganz} ${ganzzahl(ganz)}: davon ${ganzzahl(gedeckt)} ${texte.gedeckt} (${gedecktProzent} %${von})${darin} und ${ganzzahl(luecke)} Versorgungslücke (${lueckeProzent} %${von})`}>
       <circle cx="60" cy="60" r={R} fill="none" style={{ stroke: 'rgb(var(--ui-luecke))' }} strokeWidth="12" />
       <circle cx="60" cy="60" r={R} fill="none" style={{ stroke: 'rgb(var(--ui-tinte))' }} strokeWidth="12"
         strokeDasharray={`${boegen.alt} ${UMFANG}`} transform="rotate(-90 60 60)" />

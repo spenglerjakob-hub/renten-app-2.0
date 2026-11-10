@@ -116,6 +116,7 @@ export {
 export {
   bavMitarbeiter, bavRahmenVoll, grvMinderung,
   type FirmenModell, type MitarbeiterEingaben, type MitarbeiterBav, type MitarbeiterVertrag,
+  type FirmenSaetze, type ArbeitgeberBelastung,
 } from './analyse/bav-mitarbeiter.js';
 export {
   bkvModell, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, PAUSCHAL_40_GRENZE_JAHR, PAUSCHAL_40_MINDEST_MA,

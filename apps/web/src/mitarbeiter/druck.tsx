@@ -5,7 +5,7 @@ import type { Firma, UnterschriftPerson } from '../lib/bav-beratung';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import { DeckblattKopf } from '../druck/DeckblattKopf';
 import { laufzeitText } from '../features/tuev-berechnung';
-import { LueckenRing } from '../components/LueckenRing';
+import { LueckenRing, RENTENZIEL_RING } from '../components/LueckenRing';
 import { KRANKENKASSEN } from '../features/krankenkassen';
 import { euroGenau } from '../components/Feld';
 import {
@@ -17,7 +17,10 @@ import {
   KLASSE_ROEMISCH, MODELL_NAME, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
   nettolohnGrundlage, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
-import { STATUS_TEXT, anzahlText, type UebersichtSummen, type UebersichtZeile } from './uebersicht-daten';
+import {
+  STATUS_TEXT, anzahlText, belastungsZeilen, durchdringung, durchdringungText, quoteText, satzText,
+  type UebersichtSummen, type UebersichtZeile,
+} from './uebersicht-daten';
 
 /**
  * Die Unterlagen der Mitarbeiterberatung — fuer `window.print` (DruckBereich).
@@ -177,8 +180,13 @@ function angabenZeilen(daten: BeratungDaten, firma: Firma): [string, ReactNode][
   const grv = grvVon(a.jahresbrutto, a.grvRente, a.geburtsdatum, rentenbeginnVon(a));
   const kasse = KRANKENKASSEN.find((k) => k.name === a.krankenkasse);
   const kinder = a.kinder.length === 0 ? 'keine' : `${a.kinder.length} (Geburtsjahre ${a.kinder.map((k) => k.geburtsjahr).join(', ')})`;
+  // Der Kontakt nur, wenn eingetragen — Beratungen von vorher kennen ihn nicht.
+  const kontakt: [string, ReactNode][] = [];
+  if (a.email.trim()) kontakt.push(['E-Mail', <span className="break-words">{a.email.trim()}</span>]);
+  if (a.telefon.trim()) kontakt.push(['Telefon', a.telefon.trim()]);
   return [
     ['Geburtsdatum', a.geburtsdatum || '—'],
+    ...kontakt,
     ['Bruttogehalt', a.gehaelter === 12
       ? `${euroGenau(monatsgehalt(a))} im Monat (${euroGenau(a.jahresbrutto)} im Jahr)`
       : `${euroGenau(monatsgehalt(a))} im Monat × ${gehaelterText(a.gehaelter)} = ${euroGenau(a.jahresbrutto)} im Jahr`],
@@ -277,12 +285,15 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         <Abschnitt titel="Versorgungslücke">
           <Paare zeilen={[
             ['Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
+            ['Rentenziel', `${luecke.zielProzent} % des Nettolohns: ${euroGenau(luecke.zielMonat)} im Monat`],
             [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat (heutige Kaufkraft)`],
             ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} % des Nettolohns`],
           ]} />
           <p className="mt-1 text-[9pt] text-ui-schiefer">
-            Die gesetzliche Rente ersetzt rund {luecke.renteProzent} % des Nettolohns{luecke.lueckeProzent > 0 ? `; es fehlen ${luecke.lueckeProzent} %` : ''}. Angenommen: Inflation{' '}
-            {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr; Nettolohn
+            Die gesetzliche Rente ersetzt rund {luecke.renteProzent}&nbsp;% des Nettolohns{luecke.lueckeProzent > 0
+              ? `; bis zum Rentenziel von ${luecke.zielProzent}\u00a0% fehlen ${luecke.lueckeProzent}\u00a0%`
+              : `; das Rentenziel von ${luecke.zielProzent}\u00a0% ist erreicht`}. Angenommen: Inflation{' '}
+            {zahl(luecke.inflation * 100, 1)}&nbsp;%, Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)}&nbsp;% im Jahr; Nettolohn
             {' '}{nettolohnGrundlage(a.steuerklasse, a.gehaelter)}.
           </p>
           {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
@@ -490,23 +501,24 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
       {luecke && (
         <Abschnitt titel={`${nr()}Ihre Versorgungslücke`}>
           <div className="flex items-center gap-6">
-            <LueckenRing ganz={luecke.lohn.nettoMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
-              gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
+            <LueckenRing ganz={luecke.zielMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+              gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} texte={RENTENZIEL_RING} />
             <div className="min-w-0 flex-1">
               <Paare zeilen={[
                 ['Ihr Nettolohn heute', `${euroGenau(luecke.lohn.nettoMonat)} im Monat`],
+                ['Ihr Rentenziel', `${euroGenau(luecke.zielMonat)} im Monat — ${luecke.zielProzent} %`],
                 [`Gesetzliche Rente netto ${luecke.rentenbeginnJahr}`, `${euroGenau(luecke.rente.nettoMonat)} im Monat — ${luecke.renteProzent} %`],
                 ['Versorgungslücke', `${euroGenau(luecke.lueckeMonat)} im Monat — ${luecke.lueckeProzent} %`],
               ]} />
               {luecke.lueckeProzent > 0 && (
                 <p className="mt-2 font-medium">
-                  Im Alter fehlen Ihnen <span className="ui-hervor whitespace-nowrap">{luecke.lueckeProzent} %</span> Ihres heutigen Nettolohns.
+                  Bis zu Ihrem Rentenziel fehlen Ihnen <span className="ui-hervor whitespace-nowrap">{luecke.lueckeProzent} %</span> Ihres heutigen Nettolohns.
                 </p>
               )}
               {lueckeSatz(luecke, leistung, daten) && <p className="mt-1">{lueckeSatz(luecke, leistung, daten)}</p>}
               <p className="mt-1 text-[9pt] text-ui-schiefer">
-                In heutiger Kaufkraft. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)} %, Rentenanpassung{' '}
-                {zahl(luecke.rentenanpassung * 100, 1)} % im Jahr.
+                In heutiger Kaufkraft, die Prozente vom Nettolohn. Angenommen: Inflation {zahl(luecke.inflation * 100, 1)}&nbsp;%,
+                Rentenanpassung {zahl(luecke.rentenanpassung * 100, 1)}&nbsp;% im Jahr.
               </p>
             </div>
           </div>
@@ -806,6 +818,8 @@ export function Verzicht({ firma, logo, daten, r }: DokumentProps) {
 /**
  * Was der Berater der Personalabteilung gibt: wer teilnimmt, mit welchem
  * Betrag und ab wann. Ein Dokument des Beraters — mit seinem Briefkopf.
+ * Unter den Summen, was die Beitraege den Arbeitgeber netto kosten, und die
+ * Durchdringungsquote — wie am Bildschirm.
  */
 export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
   firma: Firma; logo: string | null; zeilen: readonly UebersichtZeile[]; summen: UebersichtSummen; auftritt: Auftritt | null;
@@ -813,6 +827,10 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
   const fussCss = fusszeileCss(auftritt);
   const zelle = 'border-b border-ui-linie px-1.5 py-1 align-top';
   const zahl = `${zelle} text-right tabular-nums`;
+  const belastung = belastungsZeilen(summen.belastung, firma.angebot);
+  const netto = belastung[belastung.length - 1]!;
+  const quote = durchdringung(summen, firma.angebot.belegschaft);
+  const f = firma.angebot;
   return (
     <article className="text-ui-tinte [&_strong]:font-medium" style={akzentVariablen(auftritt) as CSSProperties}>
       {fussCss && <style>{fussCss}</style>}
@@ -873,10 +891,49 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
         </tfoot>
       </table>
 
+      {summen.teilnahmen + summen.verzichte + summen.offen > 0 && (
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,13rem)] gap-8 break-inside-avoid text-[9.5pt]">
+          <div>
+            <p className="text-[10pt] font-medium">{netto.text.replace(/^= /, '')} des Arbeitgebers</p>
+            <table className="mt-1 w-full border-collapse">
+              <thead>
+                <tr className="text-[8.5pt] text-ui-schiefer [&_th]:font-medium">
+                  <th className="py-0.5 text-left" />
+                  <th className="whitespace-nowrap py-0.5 pl-3 text-right">im Monat</th>
+                  <th className="whitespace-nowrap py-0.5 pl-3 text-right">im Jahr</th>
+                </tr>
+              </thead>
+              <tbody>
+                {belastung.map((z) => (
+                  <tr key={z.text} className={z.art === 'summe' ? 'border-t border-ui-tinte font-medium' : z.art === 'zwischensumme' ? 'border-t border-ui-linie' : ''}>
+                    <td className="py-0.5">{z.text}</td>
+                    <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euroGenau(z.monat)}</td>
+                    <td className="whitespace-nowrap py-0.5 pl-3 text-right tabular-nums">{euroGenau(z.monat * 12)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-1 text-[8.5pt] leading-snug text-ui-schiefer">
+              Steuersatz auf den Gewinn {satzText(f.unternehmensSteuersatz)}, {f.umlagenSatz > 0 ? `Umlagen ${satzText(f.umlagenSatz)}` : 'ohne Umlagen'}.
+              {summen.teilnahmen > 1 ? ` Im Schnitt ${euroGenau(netto.monat / summen.teilnahmen)} je Teilnehmer im Monat.` : ''}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10pt] font-medium">Durchdringungsquote</p>
+            <p className="ui-titel mt-1 text-[22pt] leading-none tabular-nums">{quoteText(quote.quote)}</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-ui-luecke" aria-hidden>
+              <div className="h-full rounded-full bg-ui-tinte" style={{ width: `${Math.min(1, Math.max(0, quote.quote ?? 0)) * 100}%` }} />
+            </div>
+            <p className="mt-2 leading-snug">{durchdringungText(quote)}</p>
+          </div>
+        </div>
+      )}
+
       <p className="mt-4 text-[8.5pt] leading-snug text-ui-schiefer">
         Beträge im Monat laut Beratung. Maßgeblich sind die unterschriebenen Vereinbarungen. Der Arbeitgeberbeitrag enthält
-        den Zuschuss nach § 1a Abs. 1a BetrAVG, soweit er anfällt. Gehälter und weitere persönliche Angaben enthält diese
-        Übersicht bewusst nicht.
+        den Zuschuss nach § 1a Abs. 1a BetrAVG, soweit er anfällt. Die Netto-Belastung rechnet mit den Arbeitgeberanteilen zur
+        Sozialversicherung, die die beitragsfreie Umwandlung spart, und dem angegebenen Steuersatz — eine Näherung, keine
+        Steuerberatung. Gehälter und weitere persönliche Angaben enthält diese Übersicht bewusst nicht.
       </p>
     </article>
   );

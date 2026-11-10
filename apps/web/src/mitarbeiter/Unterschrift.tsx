@@ -9,6 +9,7 @@ import {
   type Unterlagen, type Unterschrift, type UnterschriftPerson,
 } from '../lib/bav-beratung';
 import { LINK_TAGE, LINK_VERSUCHE, unterschriftLink } from '../lib/unterschrift-link';
+import { emailGueltig, mailEmpfaenger } from '../lib/email';
 import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_KLEIN, KNOPF_ZWEIT, Karte, LINK } from '../components/stil';
 import { useDrucken } from './bausteine';
 import { UnterschriebeneUnterlage, mitUnterschriften, pruefsummeVon } from './festschreiben';
@@ -105,6 +106,11 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
 }
 
 const SYMBOL_KNOPF = 'shrink-0 rounded-full p-2 text-ui-schiefer transition-colors hover:bg-ui-innen hover:text-ui-tinte';
+
+/** Wie der Mitarbeiter zu erreichen ist — aus den Angaben der Beratung. */
+export interface Kontakt { email: string; telefon: string }
+const KEIN_KONTAKT: Kontakt = { email: '', telefon: '' };
+
 const DATUM = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' });
 const datum = (iso: string) => DATUM.format(new Date(iso));
 
@@ -113,9 +119,11 @@ const datum = (iso: string) => DATUM.format(new Date(iso));
  * und Code zeigen. Den Token gibt es nur in diesem Moment — die Datenbank
  * kennt nur seine Pruefsumme.
  */
-function LinkDialog({ offen, mitarbeiter, berater, festgeschrieben, ersetzt, beraterFehlt, onErstellen, onSchliessen }: {
+function LinkDialog({ offen, mitarbeiter, kontakt, berater, festgeschrieben, ersetzt, beraterFehlt, onErstellen, onSchliessen }: {
   offen: boolean;
   mitarbeiter: string;
+  /** Aus den Angaben: die E-Mail fuer den Empfaenger, das Telefon fuer den Code */
+  kontakt: Kontakt;
   /** Fuer den Gruss in der E-Mail */
   berater: string;
   /** Die Unterlagen sind schon festgeschrieben */
@@ -153,8 +161,9 @@ function LinkDialog({ offen, mitarbeiter, berater, festgeschrieben, ersetzt, ber
       + `${link}\n\n`
       + `Den Code zum Öffnen nenne ich Ihnen getrennt. Der Link ist bis zum ${neu ? datum(neu.gueltigBis) : ''} gültig.\n\n`
       + `Viele Grüße${berater ? `\n${berater}` : ''}`;
-    return `mailto:?subject=${encodeURIComponent('Ihre Unterlagen zur betrieblichen Altersversorgung')}&body=${encodeURIComponent(text)}`;
+    return `mailto:${mailEmpfaenger(kontakt.email)}?subject=${encodeURIComponent('Ihre Unterlagen zur betrieblichen Altersversorgung')}&body=${encodeURIComponent(text)}`;
   };
+  const telefon = kontakt.telefon.trim();
 
   return (
     <Dialog offen={offen} titel={`Unterschrift per Link · ${mitarbeiter}`} onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
@@ -187,15 +196,18 @@ function LinkDialog({ offen, mitarbeiter, berater, festgeschrieben, ersetzt, ber
           <div>
             <p className="font-medium">Link für {mitarbeiter} — gültig bis {datum(neu.gueltigBis)}:</p>
             <div className="mt-2"><LinkFeld link={link} neu beschriftung={`Link für ${mitarbeiter}`} /></div>
-            <a href={mail()} className={`mt-2 ${KNOPF_KLEIN}`}>
-              <Mail className="h-3.5 w-3.5" aria-hidden /> Per E-Mail senden
+            {/* Eine lange Adresse bricht im Knopf um, statt ueber den Rand des Fensters zu ragen. */}
+            <a href={mail()} className={`mt-2 max-w-full ${KNOPF_KLEIN}`}>
+              <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="min-w-0 break-all">{emailGueltig(kontakt.email) ? `Per E-Mail an ${kontakt.email.trim()}` : 'Per E-Mail senden'}</span>
             </a>
           </div>
           <div className="ui-innen p-4">
             <p className={ETIKETT}>Code zum Öffnen</p>
             <p className="mt-1 font-mono text-3xl font-medium tracking-wider tabular-nums">{codeText(neu.code)}</p>
             <p className="mt-2 text-ui-schiefer">
-              Nennen Sie den Code getrennt vom Link — am Telefon oder per SMS. Sie finden ihn auch später in der Karte.
+              Nennen Sie den Code getrennt vom Link — am Telefon oder per SMS{telefon ? <> an <span className="whitespace-nowrap">{telefon}</span></> : ''}.
+              Sie finden ihn auch später in der Karte.
             </p>
           </div>
           <p className="text-xs text-ui-schiefer">
@@ -292,8 +304,11 @@ export interface Luecke { text: string; schritt: number }
  */
 export function UnterschriftenKarte({
   status, unterlagen, unterzeichner, luecken, bereit, geheZu, onUnterschreiben, onLinkErstellen, onAufgehoben, beratungId, axa = false,
+  kontakt = KEIN_KONTAKT,
 }: {
   status: BeratungStatus;
+  /** E-Mail und Telefon des Mitarbeiters aus den Angaben — fuer den Link per E-Mail */
+  kontakt?: Kontakt;
   /** An Stelle der Vereinbarung steht der AXA-Antrag — der Berater unterschreibt dort mit. */
   axa?: boolean;
   unterlagen: Unterlagen | null | 'fehler';
@@ -470,7 +485,7 @@ export function UnterschriftenKarte({
       )}
 
       {mitarbeiter && (
-        <LinkDialog offen={linkDialog} mitarbeiter={mitarbeiter.name} berater={berater?.name ?? ''} festgeschrieben={fest !== null}
+        <LinkDialog offen={linkDialog} mitarbeiter={mitarbeiter.name} kontakt={kontakt} berater={berater?.name ?? ''} festgeschrieben={fest !== null}
           ersetzt={link !== null} beraterFehlt={!beraterFertig}
           onErstellen={onLinkErstellen}
           onSchliessen={() => { setLinkDialog(false); void linkNachladen(); }} />

@@ -1,23 +1,40 @@
-import { useMemo, useState } from 'react';
-import { Download, Printer } from 'lucide-react';
-import type { Beratung, Firma } from '../lib/bav-beratung';
-import { euroGenau } from '../components/Feld';
-import { KNOPF, KNOPF_ZWEIT, Karte } from '../components/stil';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { Download, Printer, SlidersHorizontal } from 'lucide-react';
+import { firmenAngebotSchema } from '@renten/schema';
+import { firmaSpeichern, type Beratung, type Firma } from '../lib/bav-beratung';
+import { Dialog } from '../components/Dialog';
+import { ProzentFeld, ZahlFeld, euroGenau } from '../components/Feld';
+import { KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, Karte } from '../components/stil';
+import { UmlagenErklaerung } from '../arbeitgeber/bausteine';
 import { StatusChip, useBeraterAuftritt, useDrucken } from './bausteine';
 import { UebersichtDruck } from './druck';
-import { anzahlText, csvDateiname, uebersichtCsv, uebersichtSummen, uebersichtZeilen } from './uebersicht-daten';
+import {
+  anzahlText, belastungsZeilen, csvDateiname, durchdringung, durchdringungText, quoteText, satzText, uebersichtCsv, uebersichtSummen,
+  uebersichtZeilen, type BelastungsZeile, type Durchdringung,
+} from './uebersicht-daten';
 
 /**
  * Die Uebersicht fuer den Arbeitgeber: am Bildschirm, gedruckt (als PDF)
  * und als CSV fuer die Lohnabrechnung. Sie entsteht beim Berater — der
  * Arbeitgeber bekommt nur, was der Berater ihm gibt.
+ *
+ * Unter den Summen: was die Beitraege den Arbeitgeber netto kosten und wie
+ * viele aus der Belegschaft mitmachen. Die Annahmen dafuer (Steuersatz,
+ * Umlagen, Mitarbeiterzahl) gehoeren zur Firma und gelten fuer alle, die sie
+ * sehen; aendern kann sie, wer die Firma angelegt hat.
  */
-export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: string | null; beratungen: readonly Beratung[] }) {
+export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
+  firma: Firma; logo: string | null; beratungen: readonly Beratung[];
+  /** Nach dem Speichern der Annahmen: die Firma mit dem neuen Angebot */
+  onGespeichert: (f: Firma) => void;
+}) {
   const zeilen = useMemo(() => uebersichtZeilen(firma, beratungen), [firma, beratungen]);
   const summen = useMemo(() => uebersichtSummen(zeilen), [zeilen]);
+  const quote = useMemo(() => durchdringung(summen, firma.angebot.belegschaft), [summen, firma.angebot.belegschaft]);
   const drucken = useDrucken();
   const auftritt = useBeraterAuftritt();
   const [geladen, setGeladen] = useState(false);
+  const [annahmen, setAnnahmen] = useState(false);
 
   const herunterladen = () => {
     const url = URL.createObjectURL(new Blob([uebersichtCsv(zeilen)], { type: 'text/csv;charset=utf-8' }));
@@ -130,6 +147,18 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
             </table>
           </div>
 
+          {/* Unter den Summen: was der Arbeitgeber netto traegt — und rechts, wie viele mitmachen. */}
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+            <NettoBelastung
+              zeilen={belastungsZeilen(summen.belastung, firma.angebot)}
+              teilnahmen={summen.teilnahmen}
+              annahmen={`Steuersatz auf den Gewinn ${satzText(firma.angebot.unternehmensSteuersatz)}, ${
+                firma.angebot.umlagenSatz > 0 ? `Umlagen ${satzText(firma.angebot.umlagenSatz)}` : 'ohne Umlagen'}.`}
+              aendern={firma.eigene ? () => setAnnahmen(true) : null}
+            />
+            <DurchdringungKasten d={quote} />
+          </div>
+
           <p role="status" className="mt-3 text-xs leading-relaxed text-ui-schiefer">
             {geladen
               ? 'Die CSV-Datei liegt in Ihrem Download-Ordner. Sie öffnet sich direkt in Excel.'
@@ -137,6 +166,172 @@ export function Uebersicht({ firma, logo, beratungen }: { firma: Firma; logo: st
           </p>
         </>
       )}
+
+      {firma.eigene && (
+        <AnnahmenDialog offen={annahmen} firma={firma} onSchliessen={() => setAnnahmen(false)} onGespeichert={onGespeichert} />
+      )}
     </Karte>
+  );
+}
+
+/**
+ * Was die Beitraege den Arbeitgeber netto kosten: Beitrag, abzueglich der
+ * gesparten Sozialabgaben und der Steuer. Am Telefon nur der Monat, das Jahr
+ * der Summe darunter — drei Spalten passen dort nicht neben die Texte.
+ */
+function NettoBelastung({ zeilen, teilnahmen, annahmen, aendern }: {
+  zeilen: BelastungsZeile[]; teilnahmen: number; annahmen: string;
+  /** null: Die Annahmen pflegt, wer die Firma angelegt hat */
+  aendern: (() => void) | null;
+}) {
+  const titel = useId();
+  const summe = zeilen[zeilen.length - 1]!;
+  const zelle = 'py-1.5 align-top';
+  const betrag = `${zelle} pl-3 text-right tabular-nums whitespace-nowrap`;
+  return (
+    <section aria-labelledby={titel} className="ui-innen p-4 sm:p-5">
+      <h3 id={titel} className="text-base font-medium text-ui-tinte">{summe.text.replace(/^= /, '')} des Arbeitgebers</h3>
+      <p className="mt-1 text-sm leading-relaxed text-ui-schiefer">
+        Was die Beiträge den Arbeitgeber wirklich kosten: Er spart Sozialabgaben auf die umgewandelten Gehälter, und sein
+        Beitrag ist Betriebsausgabe.
+      </p>
+      <table className="mt-3 w-full border-collapse text-sm">
+        <thead>
+          <tr className="text-xs text-ui-schiefer">
+            <th className={`${zelle} text-left font-normal`}><span className="sr-only">Posten</span></th>
+            <th className={`${betrag} font-normal`}>im Monat</th>
+            <th className={`${betrag} hidden font-normal sm:table-cell`}>im Jahr</th>
+          </tr>
+        </thead>
+        <tbody>
+          {zeilen.map((z) => {
+            const art = z.art === 'summe'
+              ? 'border-t border-ui-tinte font-medium text-ui-tinte'
+              : z.art === 'zwischensumme' ? 'border-t border-ui-linie text-ui-tinte' : 'text-ui-schiefer';
+            return (
+              <tr key={z.text} className={art}>
+                <td className={zelle}>{z.text}</td>
+                <td className={`${betrag} ${z.art === 'posten' ? 'text-ui-tinte' : ''}`}>{euroGenau(z.monat)}</td>
+                <td className={`${betrag} hidden sm:table-cell ${z.art === 'posten' ? 'text-ui-tinte' : ''}`}>{euroGenau(z.monat * 12)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="mt-2 text-sm tabular-nums text-ui-tinte sm:hidden">
+        {summe.text.replace(/^= /, '')} im Jahr: {euroGenau(summe.monat * 12)}
+      </p>
+      {teilnahmen > 1 && (
+        <p className="mt-2 text-sm tabular-nums text-ui-schiefer">
+          Im Schnitt {euroGenau(summe.monat / teilnahmen)} je Teilnehmer im Monat.
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ui-linie pt-3 text-xs leading-relaxed text-ui-schiefer">
+        <span>{annahmen}</span>
+        {aendern
+          ? (
+            <button type="button" onClick={aendern} className={KNOPF_KLEIN}>
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Annahmen ändern
+            </button>
+          )
+          : <span>Die Annahmen pflegt, wer die Firma angelegt hat.</span>}
+      </div>
+    </section>
+  );
+}
+
+/** Wie viele aus der Belegschaft das Angebot nutzen — die Zahl gross, darunter ein Balken und der Satz dazu. */
+function DurchdringungKasten({ d }: { d: Durchdringung }) {
+  const titel = useId();
+  const anteil = d.quote === null ? 0 : Math.min(1, Math.max(0, d.quote));
+  return (
+    <section aria-labelledby={titel} className="ui-innen self-start p-4 sm:p-5">
+      <h3 id={titel} className="text-base font-medium text-ui-tinte">Durchdringungsquote</h3>
+      <p className="ui-titel mt-2 text-[40px] leading-none tabular-nums text-ui-tinte">{quoteText(d.quote)}</p>
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-ui-luecke" aria-hidden>
+        <div className="h-full rounded-full bg-ui-tinte" style={{ width: `${anteil * 100}%` }} />
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-ui-tinte">{durchdringungText(d)}</p>
+      {d.angebotZuKlein && (
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+          Die Mitarbeiterzahl unter „Annahmen“ ist kleiner als die Liste — gezählt sind deshalb die Mitarbeiter in der Liste.
+        </p>
+      )}
+      {d.quelle === 'liste' && !d.angebotZuKlein && (
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+          Gezählt sind alle Mitarbeiter in der Liste, auch mit Verzicht oder offener Entscheidung. Mit der Mitarbeiterzahl
+          unter „Annahmen“ zählt die ganze Belegschaft.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Steuersatz, Umlagen und Mitarbeiterzahl der Firma — gespeichert im Angebot,
+ * wie alles, was die Firma ausmacht. Gespeichert wird erst mit „Übernehmen“,
+ * geprueft mit demselben Schema, mit dem gelesen wird.
+ */
+function AnnahmenDialog({ offen, firma, onSchliessen, onGespeichert }: {
+  offen: boolean; firma: Firma; onSchliessen: () => void; onGespeichert: (f: Firma) => void;
+}) {
+  const a = firma.angebot;
+  const [steuersatz, setSteuersatz] = useState(a.unternehmensSteuersatz);
+  const [umlagen, setUmlagen] = useState(a.umlagenSatz);
+  const [belegschaft, setBelegschaft] = useState(a.belegschaft);
+  const [laeuft, setLaeuft] = useState(false);
+  const [meldung, setMeldung] = useState<string | null>(null);
+
+  // Bei jedem Oeffnen die gespeicherten Werte — Abbrechen verwirft, was eingetippt war.
+  useEffect(() => {
+    if (!offen) return;
+    setSteuersatz(a.unternehmensSteuersatz);
+    setUmlagen(a.umlagenSatz);
+    setBelegschaft(a.belegschaft);
+    setMeldung(null);
+  }, [offen, a.unternehmensSteuersatz, a.umlagenSatz, a.belegschaft]);
+
+  const uebernehmen = async () => {
+    const geprueft = firmenAngebotSchema.safeParse({
+      ...a, unternehmensSteuersatz: steuersatz, umlagenSatz: umlagen, belegschaft: Math.max(0, Math.round(belegschaft)),
+    });
+    if (!geprueft.success) {
+      setMeldung('Bitte die Angaben prüfen: Steuersatz bis 60 %, Umlagen bis 10 %.');
+      return;
+    }
+    setLaeuft(true);
+    setMeldung(null);
+    const ok = await firmaSpeichern({ id: firma.id, name: firma.name, angebot: geprueft.data, logoPfad: firma.logoPfad });
+    setLaeuft(false);
+    if (!ok) {
+      setMeldung('Die Annahmen konnten nicht gespeichert werden. Bitte versuchen Sie es noch einmal.');
+      return;
+    }
+    onGespeichert({ ...firma, angebot: geprueft.data });
+    onSchliessen();
+  };
+
+  return (
+    <Dialog offen={offen} titel="Annahmen für den Arbeitgeber" onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
+      <div className="space-y-3">
+        <ZahlFeld label="Mitarbeiter im Unternehmen" wert={belegschaft} onChange={setBelegschaft} min={0} schritt={1} leerBeiNull
+          hilfe="Für die Durchdringungsquote. Leer: alle Mitarbeiter in der Liste." />
+        <ProzentFeld label="Steuersatz auf den Gewinn" wert={steuersatz} onChange={setSteuersatz} min={0} max={60}
+          hilfe="GmbH mit 400 % Hebesatz rund 30 %. Einzelunternehmen und Personengesellschaften: persönlicher Satz." />
+        <ProzentFeld label="Umlagen U1, U2, Insolvenzgeld" wert={umlagen} onChange={setUmlagen} min={0} max={10} stellen={2}
+          hilfe="Spart der Arbeitgeber auf den beitragsfreien Teil zusätzlich. 0: nicht eingerechnet." />
+        <UmlagenErklaerung onWaehlen={setUmlagen} />
+      </div>
+      {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
+      <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
+        <button type="button" onClick={onSchliessen} disabled={laeuft} className={KNOPF_ZWEIT}>Abbrechen</button>
+        <button type="button" onClick={() => void uebernehmen()} disabled={laeuft} className={KNOPF}>
+          {laeuft ? 'Wird gespeichert …' : 'Übernehmen'}
+        </button>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+        Die Annahmen gehören zur Firma: Sie gelten für die Übersicht und ihren Ausdruck, nicht für die Beratung der Mitarbeiter.
+      </p>
+    </Dialog>
   );
 }

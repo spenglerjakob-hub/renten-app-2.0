@@ -78,6 +78,71 @@ describe('Mitarbeiter-Sicht: dieselben Zahlen wie auf den Arbeitgeber-Seiten', (
   });
 });
 
+describe('Netto-Belastung des Arbeitgebers', () => {
+  const firma = { unternehmensSteuersatz: 0.3, umlagenSatz: 0.02 };
+
+  it('dieselben Posten wie auf den Arbeitgeber-Seiten', () => {
+    const z = bavMitarbeiter(ZUSCHUSS, ma(), steuer, p, firma).arbeitgeberBelastung;
+    const agZ = zuschussModell({ ...agSeite, quote: 0.5, deckelMonat: 100 }, steuer, p).arbeitgeber;
+    expect(z).toEqual({
+      beitragMonat: agZ.zuschussMonat, svErsparnisMonat: agZ.svErsparnisMonat, umlagenErsparnisMonat: agZ.umlagenErsparnisMonat,
+      kostenVorSteuerMonat: agZ.kostenVorSteuerMonat, steuerersparnisMonat: agZ.steuerersparnisMonat, nettoKostenMonat: agZ.nettoKostenMonat,
+    });
+
+    const f = bavMitarbeiter(FESTBETRAG, ma(), steuer, p, firma).arbeitgeberBelastung;
+    const agF = festbetragModell({ ...agSeite, festbetragMonat: 50, mindestUmwandlungMonat: 50 }, steuer, p).arbeitgeber;
+    expect(f.beitragMonat).toBeCloseTo(agF.zuschussMonat, 9);
+    expect(f.nettoKostenMonat).toBeCloseTo(agF.nettoKostenMonat, 9);
+
+    const m = bavMitarbeiter(MATCHING, ma(), steuer, p, firma).arbeitgeberBelastung;
+    const agM = matchingModell({ ...agSeite, weg: 'dv', matchingMonat: 100, zuschussImMatching: false }, steuer, p).arbeitgeber;
+    expect(m.beitragMonat).toBeCloseTo(agM.pflichtzuschussMonat + agM.ukasseMonat, 9);
+    expect(m.svErsparnisMonat).toBeCloseTo(agM.svErsparnisMonat, 9);
+    expect(m.nettoKostenMonat).toBeCloseTo(agM.nettoKostenMonat, 9);
+  });
+
+  it('die Posten gehen auf: Beitrag − Sozialabgaben − Umlagen − Steuer = netto', () => {
+    for (const modell of [ZUSCHUSS, FESTBETRAG, MATCHING]) {
+      const r = bavMitarbeiter(modell, ma(), steuer, p, firma);
+      const b = r.arbeitgeberBelastung;
+      expect(b.beitragMonat).toBeCloseTo(r.arbeitgeberMonat, 9);
+      expect(b.svErsparnisMonat).toBeGreaterThan(0);
+      expect(b.umlagenErsparnisMonat).toBeCloseTo(150 * 0.02, 9);
+      expect(b.beitragMonat - b.svErsparnisMonat - b.umlagenErsparnisMonat).toBeCloseTo(b.kostenVorSteuerMonat, 9);
+      expect(b.steuerersparnisMonat).toBeCloseTo(b.kostenVorSteuerMonat * 0.3, 9);
+      expect(b.kostenVorSteuerMonat - b.steuerersparnisMonat).toBeCloseTo(b.nettoKostenMonat, 9);
+      expect(b.nettoKostenMonat).toBeLessThan(b.beitragMonat);
+    }
+  });
+
+  it('die Seite des Mitarbeiters ändert sich mit den Sätzen der Firma nicht', () => {
+    for (const modell of [ZUSCHUSS, FESTBETRAG, MATCHING]) {
+      const { arbeitgeberBelastung: ohneSaetze, ...ohne } = bavMitarbeiter(modell, ma(), steuer, p);
+      const { arbeitgeberBelastung: mitSaetzen, ...mit } = bavMitarbeiter(modell, ma(), steuer, p, { unternehmensSteuersatz: 0.45, umlagenSatz: 0.035 });
+      expect(mit).toEqual(ohne);
+      expect(mitSaetzen.beitragMonat).toBe(ohneSaetze.beitragMonat);
+      expect(mitSaetzen.nettoKostenMonat).toBeLessThan(ohneSaetze.nettoKostenMonat - 1);
+    }
+  });
+
+  it('ohne Sätze: keine Umlagen, keine Steuer — netto sind die Kosten vor Steuer', () => {
+    const b = bavMitarbeiter(ZUSCHUSS, ma(), steuer, p).arbeitgeberBelastung;
+    expect(b.umlagenErsparnisMonat).toBe(0);
+    expect(b.steuerersparnisMonat).toBe(0);
+    expect(b.nettoKostenMonat).toBe(b.kostenVorSteuerMonat);
+  });
+
+  it('nur der Pflichtzuschuss: Die gesparten Abgaben übersteigen ihn — netto bleibt eine Ersparnis', () => {
+    const r = bavMitarbeiter({ art: 'zuschuss', quote: 0, deckelMonat: 0 }, ma(), steuer, p, firma);
+    expect(r.arbeitgeberMonat).toBeCloseTo(0.15 * 150, 6);
+    expect(r.arbeitgeberBelastung.kostenVorSteuerMonat).toBeLessThan(0);
+    // Die Ersparnis erhoeht den Gewinn: Die Steuer darauf schmaelert sie, hebt sie aber nicht auf.
+    expect(r.arbeitgeberBelastung.steuerersparnisMonat).toBeLessThan(0);
+    expect(r.arbeitgeberBelastung.nettoKostenMonat).toBeLessThan(0);
+    expect(r.arbeitgeberBelastung.nettoKostenMonat).toBeGreaterThan(r.arbeitgeberBelastung.kostenVorSteuerMonat);
+  });
+});
+
 describe('Hinweise für den Mitarbeiter', () => {
   it('Deckel des Zuschusses', () => {
     const r = bavMitarbeiter(ZUSCHUSS, ma({ umwandlungMonat: 250 }), steuer, p);
