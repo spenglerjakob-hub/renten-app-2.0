@@ -1,4 +1,4 @@
-import type { Szenario, Person, PersonId, Vertrag } from '../model.js';
+import { istKinderpolice, type Szenario, type Person, type PersonId, type Vertrag } from '../model.js';
 import { parameterFuer, rechtsstandInfo, type RechtsstandInfo } from '../params/registry.js';
 import {
   haushaltssteuer, zusatzsteuer, abgeltungsteuer, type Einkunftsquelle,
@@ -230,7 +230,17 @@ function bezugImJahr(k: PersonKontext, jahr: number, dynamik: number): number {
   return k.startbezugMonat * 12 * Math.pow(1 + dynamik, jahreSeitBeginn);
 }
 
-export function projiziere(s: Szenario): ProjektionsErgebnis {
+export function projiziere(eingabe: Szenario): ProjektionsErgebnis {
+  /*
+    KINDERPOLICEN ZAEHLEN NICHT ZUR EIGENEN RENTE. Versichert ist ein Kind
+    oder Enkel; ausgezahlt wird Jahrzehnte nach dem Ruhestand des Kunden und
+    an das Kind. Sie bleiben deshalb am Eingang der Zeitachse draussen — an
+    EINER Stelle, damit keine der vielen Schleifen unten sie vergessen kann.
+    Bewertet werden sie im Vertrags-TUEV (`analyse/kinderpolice.ts`).
+  */
+  const s: Szenario = eingabe.vertraege.some(istKinderpolice)
+    ? { ...eingabe, vertraege: eingabe.vertraege.filter((v) => !istKinderpolice(v)) }
+    : eingabe;
   const jetzt = heute();
   const hinweise: string[] = [];
   const vertragsHinweise: ProjektionsErgebnis['vertragsHinweise'] = [];

@@ -157,6 +157,45 @@ describe('Abwaertskompatibilitaet', () => {
   });
 });
 
+describe('Kinderpolice', () => {
+  it('alte Dateien laden ohne versicherte Person und ohne „Beiträge bis“', () => {
+    const r = importiere(JSON.stringify({ ...vollstaendig, tuev: [{ id: 't1', vertragId: 'v1' }] }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.vertraege.every((v) => v.versichertePerson === undefined)).toBe(true);
+    expect(r.szenario.tuev[0]!.beitragBis).toBeUndefined();
+  });
+
+  it('versicherte Person und „Beiträge bis“ überstehen Export und Import — mit Vorgaben', () => {
+    const kind = {
+      id: 'k1', inhaber: 'A' as const, schicht: 3 as const, typ: 'prvRente' as const, name: 'Kinderpolice',
+      brutto: 600, strategie: 'rente' as const, altvertrag: false,
+      versichertePerson: { vorname: 'Lena', geburtsdatum: '12.03.2025' },
+    };
+    const r = importiere(JSON.stringify({
+      ...vollstaendig,
+      vertraege: [...vollstaendig.vertraege, kind],
+      tuev: [{ id: 't1', vertragId: 'k1', beitragMonat: 50, beginnDatum: '01.12.2026', beitragBis: '12.03.2043' }],
+    }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.szenario.vertraege[2]!.versichertePerson).toEqual({
+      vorname: 'Lena', geburtsdatum: '12.03.2025', rentenbeginn: '', steuersatzImAlter: 0.25,
+    });
+    expect(r.szenario.tuev[0]!.beitragBis).toBe('12.03.2043');
+    const zurueck = importiere(exportiere(r.szenario));
+    expect(zurueck.ok && zurueck.szenario).toEqual(r.szenario);
+  });
+
+  it('ein halb eingetipptes Geburtsdatum lädt trotzdem', () => {
+    const r = szenarioSchema.safeParse({
+      ...vollstaendig,
+      vertraege: [{ ...vollstaendig.vertraege[0]!, id: 'k', typ: 'prvRente', schicht: 3, versichertePerson: { geburtsdatum: '12.03.' } }],
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
 describe('Kopplung der Annahmen', () => {
   it('gleicht Gehaltsdynamik an die Inflation an und warnt dabei', () => {
     const abweichend = {

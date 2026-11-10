@@ -166,7 +166,27 @@ export interface Vertrag {
   teilfreistellung?: number;
   /** Einstandswert des heutigen Kapitals (fuer die Gewinnermittlung) */
   einstandswert?: number;
+  /**
+   * KINDERPOLICE: versichert ist ein Kind oder Enkel, nicht der Inhaber.
+   * Solche Vertraege zaehlen nie zur eigenen Rente — `projiziere` laesst sie
+   * weg; bewertet werden sie im Vertrags-TUEV (`analyse/kinderpolice.ts`).
+   */
+  versichertePerson?: VersichertePerson;
 }
+
+/** Die versicherte Person einer Kinderpolice. */
+export interface VersichertePerson {
+  vorname: string;
+  /** TT.MM.JJJJ */
+  geburtsdatum: string;
+  /** Vertragsende laut Vertrag, TT.MM.JJJJ — leer: Monat nach dem 67. Geburtstag */
+  rentenbeginn: string;
+  /** Persoenlicher Steuersatz des Kindes im Alter — Annahme */
+  steuersatzImAlter: number;
+}
+
+/** Ist der Vertrag eine Kinderpolice (versichert ist ein anderer als der Inhaber)? */
+export const istKinderpolice = (v: Pick<Vertrag, 'versichertePerson'>): boolean => v.versichertePerson !== undefined;
 
 export interface Annahmen {
   /** Alle als Dezimalzahl, z. B. 0.02 fuer 2 % */

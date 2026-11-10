@@ -153,4 +153,11 @@ export { euroText } from './util/text.js';
 export type {
   Szenario, Person, Vertrag, Haushalt, Annahmen, EinkommenHeute, Entnahmeplaner,
   PersonId, Versorgungsart, VertragsTyp, Auszahlungsstrategie, Teilzeitphase, GehaltsEingabe,
+  VersichertePerson,
 } from './model.js';
+export { istKinderpolice } from './model.js';
+export {
+  kinderpoliceAuszahlung, kinderRentenbeginn, beitragBisVorschlag, KINDERPOLICE_RENTENALTER,
+  KINDERPOLICE_BEITRAG_BIS_ALTER, KINDERPOLICE_LEBENSERWARTUNG,
+  type KinderpoliceAuszahlung,
+} from './analyse/kinderpolice.js';
