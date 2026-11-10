@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Mail, Copy, Check } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
 import type { AvdKind } from '@renten/engine';
-import { NamenFelder, TextFeld, euro } from '../components/Feld';
+import { NamenFelder, TextFeld } from '../components/Feld';
 import { Hinweis, KNOPF, KNOPF_ZWEIT } from '../components/stil';
 import { vollerName, type NamensTeile } from '../lib/namen';
 
@@ -22,19 +22,61 @@ export interface Eckdaten {
   rentenbeginnJahr: number;
 }
 
-function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): string {
+/*
+  NUR EINFACHE ZEICHEN IN DIE E-MAIL. Ein mailto-Link traegt Betreff und Text
+  prozentkodiert in UTF-8 (RFC 6068). Nicht jede Mail-App liest das richtig:
+  Yahoo Mail auf Android machte aus „über“ „%3%Cber“, aus „150 €“
+  „150%2%0%2�%C“ und brach den Betreff am Gedankenstrich ab. Fehlerfrei
+  kommen dort nur Zeichen an, deren Kodierung mit einer Ziffer beginnt — und
+  das sind genau die ASCII-Zeichen.
+
+  Der feste Text ist deshalb ohne Umlaute formuliert, Betraege stehen als
+  „EUR“. Was der Besucher selbst eintraegt (Name, Erreichbarkeit), wird
+  umgeschrieben: ä → ae, ß → ss. Das Fenster zeigt denselben Text, also genau
+  das, was ankommt.
+*/
+const ERSATZ: Readonly<Record<string, string>> = {
+  'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue', 'ß': 'ss', 'ẞ': 'SS',
+  '€': 'EUR',
+  '\u00a0': ' ', '\u202f': ' ', '\u2009': ' ',
+  '–': '-', '—': '-', '‑': '-',
+  '„': '"', '“': '"', '”': '"', '«': '"', '»': '"', '‚': "'", '‘': "'", '’': "'", '‹': "'", '›': "'",
+  '…': '...', '·': '-',
+  'æ': 'ae', 'Æ': 'Ae', 'œ': 'oe', 'Œ': 'Oe', 'ø': 'o', 'Ø': 'O', 'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ı': 'i',
+};
+
+/** Text fuer die E-Mail: Umlaute, Euro, Striche und Anfuehrungszeichen in ihrer ASCII-Form, Akzente ohne Akzent. */
+export function mailText(s: string): string {
+  return s.replace(/[^\x00-\x7F]/gu, (z) => {
+    const ersatz = ERSATZ[z];
+    if (ersatz !== undefined) return ersatz;
+    // é → e, ç → c; was sich so nicht zerlegen laesst (etwa chinesische
+    // Schrift), bleibt stehen — die meisten Mail-Apps kommen damit zurecht.
+    const ohneAkzent = z.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return /^[\x00-\x7F]+$/.test(ohneAkzent) ? ohneAkzent : z;
+  });
+}
+
+/** Ein Betrag in der E-Mail: „1.800 EUR“ — mit Tausenderpunkt, ohne Eurozeichen. */
+const eur = (n: number) => `${Math.round(n).toLocaleString('de-DE')} EUR`;
+
+/** Der Betreff — der Name dahinter wie im Text, ohne Gedankenstrich. */
+export function betreffText(name: string): string {
+  return mailText(`Beratung zum Altersvorsorgedepot${name ? ` - ${name}` : ''}`);
+}
+
+export function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): string {
   const zeilen = [
     'Guten Tag,',
     '',
-    'ich habe mich auf Ihrer Seite über das Altersvorsorgedepot informiert',
-    'und hätte dazu gerne eine Beratung.',
+    'ich habe mich auf Ihrer Seite zum Altersvorsorgedepot informiert und bitte um eine Beratung.',
     '',
     `Name: ${name}`,
     telefon ? `Telefon: ${telefon}` : null,
     zeit ? `Am besten erreichbar: ${zeit}` : null,
     '',
     'Meine Angaben im Rechner:',
-    `- Beitrag: ${euro(d.beitragMonat)} im Monat (${euro(d.beitragMonat * 12)} im Jahr)`,
+    `- Beitrag: ${eur(d.beitragMonat)} im Monat (${eur(d.beitragMonat * 12)} im Jahr)`,
     d.geburtsdatum ? `- Geburtsdatum: ${d.geburtsdatum}` : null,
     `- Familienstand: ${d.verheiratet ? 'verheiratet' : 'alleinstehend'}`,
     d.kinder.length > 0
@@ -46,21 +88,21 @@ function anfrageText(name: string, telefon: string, zeit: string, d: Eckdaten): 
       : '- Kinder: keine',
     '',
     'Das Ergebnis der Rechnung:',
-    `- Zulagen: ${euro(d.zulagenJahr)} pro Jahr`,
-    d.bonus > 0 ? `- Berufseinsteigerbonus: ${euro(d.bonus)} einmalig` : null,
+    `- Zulagen: ${eur(d.zulagenJahr)} pro Jahr`,
+    d.bonus > 0 ? `- Berufseinsteigerbonus: ${eur(d.bonus)} einmalig` : null,
     d.steuerersparnisJahr > 0
-      ? `- Steuerersparnis: ${euro(d.steuerersparnisJahr)} pro Jahr`
+      ? `- Steuerersparnis: ${eur(d.steuerersparnisJahr)} pro Jahr`
       : null,
     d.endkapital > 0 && d.rentenbeginnJahr > 0
-      ? `- Kapital zum Rentenbeginn ${d.rentenbeginnJahr}: ${euro(d.endkapital)}`
+      ? `- Kapital zum Rentenbeginn ${d.rentenbeginnJahr}: ${eur(d.endkapital)}`
       : null,
     '',
-    'Die Zahlen stammen aus einer Modellrechnung ohne Gewähr.',
+    'Die Zahlen stammen aus einer unverbindlichen Modellrechnung.',
     '',
-    'Mit freundlichen Grüßen',
+    'Mit freundlichen Gruessen',
     name,
   ];
-  return zeilen.filter((z) => z !== null).join('\n');
+  return mailText(zeilen.filter((z) => z !== null).join('\n'));
 }
 
 /**
@@ -93,7 +135,7 @@ export function BeratungDialog({
   const name = vollerName(teile);
   const bereit = teile.vorname.trim().length > 0 && teile.nachname.trim().length > 0;
 
-  const betreff = `Beratung zum Altersvorsorgedepot${name ? ` — ${name}` : ''}`;
+  const betreff = betreffText(name);
   const text = anfrageText(name, telefon.trim(), zeit.trim(), eckdaten);
   const mailto =
     `mailto:${empfaenger}?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;
