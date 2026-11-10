@@ -167,10 +167,20 @@ function WegZeile({ text, rente, kapital, hervor }: {
  * rechnet: was er netto wirklich kostet gegen das, was netto ankommt.
  */
 export function VertragsTuev({
-  ergebnis, szenario,
+  ergebnis, szenario, mitFoerdercheck = true, automatischGeprueft = false, mitEinkommen = true,
 }: {
   ergebnis: ProjektionsErgebnis | null;
   szenario: SzenarioParsed;
+  /** Der Foerdercheck am Ende — die Vertragspruefung zeigt nur die Vertraege */
+  mitFoerdercheck?: boolean;
+  /**
+   * Jeder Vertrag steht in der Pruefung, ohne Auswahl: Die Vertragspruefung
+   * legt die Eintraege selbst an. Dann gibt es weder die Auswahl oben noch
+   * das Entfernen am Eintrag — entfernt wird der Vertrag selbst.
+   */
+  automatischGeprueft?: boolean;
+  /** Der Einkommensblock — entfaellt, wenn nur Kinderpolicen geprueft werden */
+  mitEinkommen?: boolean;
 }) {
   const tuev = useSzenario((x) => x.szenario.tuev);
   const vertraege = useSzenario((x) => x.szenario.vertraege);
@@ -222,13 +232,22 @@ export function VertragsTuev({
         <div>
           <Titel als="h2">Vertrags-TÜV</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
-            Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
-            Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
+            {mitEinkommen ? (
+              <>
+                Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
+                Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
+                Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
+              </>
+            ) : (
+              <>
+                Hier stehen {a.dein('e')} Verträge nebeneinander: was jeder {a.dich} wirklich kostet und was am
+                Ende netto ankommt.
+              </>
+            )}
           </p>
         </div>
 
-        <div className="w-full shrink-0 md:w-72 print:hidden">
+        {!automatischGeprueft && <div className="w-full shrink-0 md:w-72 print:hidden">
           <label htmlFor="tuev-auswahl" className="sr-only">Vertrag zur Prüfung hinzufügen</label>
           <select
             id="tuev-auswahl"
@@ -250,7 +269,7 @@ export function VertragsTuev({
               </option>
             ))}
           </select>
-        </div>
+        </div>}
       </div>
 
       {/*
@@ -268,7 +287,7 @@ export function VertragsTuev({
         `print:hidden`, weil das Gutachten die Angaben auf seinem eigenen
         Blatt fuehrt.
       */}
-      <div className="print:hidden">
+      {mitEinkommen && <div className="print:hidden">
         <AkkordeonKarte
           titel={szenario.einkommenGetrennt
             ? `Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
@@ -338,12 +357,14 @@ export function VertragsTuev({
             />
           </div>
         </AkkordeonKarte>
-      </div>
+      </div>}
 
       {tuev.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          Noch kein Vertrag zur Prüfung ausgewählt. Oben einen auswählen — dann steht hier,
-          was er {a.dich} wirklich kostet und was er wirklich bringt.
+          {automatischGeprueft
+            ? 'Noch kein Vertrag erfasst. Oben einen anlegen — dann steht hier,'
+            : 'Noch kein Vertrag zur Prüfung ausgewählt. Oben einen auswählen — dann steht hier,'}
+          {' '}was er {a.dich} wirklich kostet und was er wirklich bringt.
         </p>
       ) : (
         <div className="space-y-5 sm:space-y-6">
@@ -388,14 +409,16 @@ export function VertragsTuev({
                     </span>
                     <span className="block truncate text-lg font-medium tracking-[-0.01em] text-ui-tinte">{v.name || v.typ}</span>
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => tuevEntfernen(t.id)}
-                    aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
-                    className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
+                  {!automatischGeprueft && (
+                    <button
+                      type="button"
+                      onClick={() => tuevEntfernen(t.id)}
+                      aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
+                      className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  )}
                 </header>
 
                 <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-3 lg:gap-6">
@@ -1036,7 +1059,7 @@ export function VertragsTuev({
         Liste, weil er nicht an der Auswahl haengt — auch wer noch keinen
         Vertrag zur Pruefung gewaehlt hat, soll seinen freien Rahmen sehen.
       */}
-      <Foerdercheck zeile={zeile ?? null} />
+      {mitFoerdercheck && <Foerdercheck zeile={zeile ?? null} />}
     </section>
   );
 }

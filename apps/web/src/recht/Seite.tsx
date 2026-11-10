@@ -167,8 +167,8 @@ function Datenschutz() {
         ab, was für die von Ihnen genutzte Funktion unbedingt erforderlich ist (§ 25 Abs. 2 Nr. 2 TDDDG):
       </P>
       <Liste>
-        <li>Ihre Eingaben im Rechner, damit sie beim nächsten Aufruf noch da sind
-          (<code>rentenplaner.szenario.v1</code>),</li>
+        <li>Ihre Eingaben im Rechner und in der Vertragsprüfung, damit sie beim nächsten Aufruf noch da sind
+          (<code>rentenplaner.szenario.v1</code>, <code>rentenplaner.vertragspruefung.v1</code>),</li>
         <li>Zwischenstände des Vorsorge-Checks (<code>rentenplaner.check.v1…</code>),</li>
         <li>bei Anmeldung die Sitzung (<code>sb-…-auth-token</code>) und der Zeitpunkt Ihrer letzten Nutzung
           (<code>rentenplaner.auth.aktiv</code>) — nach zwei Tagen ohne Nutzung werden Sie abgemeldet,</li>
@@ -176,8 +176,9 @@ function Datenschutz() {
           Hinweise (<code>rentenplaner.band.…</code>),</li>
         <li>ein persönlicher Einladungs- oder Early-Adopter-Link, bis er nach Ihrer Anmeldung eingelöst ist
           (<code>rentenplaner.einladung</code>, <code>rentenplaner.fruehstart</code>; höchstens 14 Tage),</li>
-        <li>ein Fall aus der Schnellrechnung, den Sie mit „Fall speichern“ vorgemerkt haben, bis Sie ihn nach der
-          Anmeldung übernehmen oder verwerfen (<code>rentenplaner.musterfall.v1</code>; höchstens 14 Tage),</li>
+        <li>ein Fall aus der Schnellrechnung („Fall speichern“) oder aus der Vertragsprüfung („Im Rechner
+          weiterrechnen“), bis Sie ihn im Rechner übernehmen oder verwerfen
+          (<code>rentenplaner.musterfall.v1</code>; höchstens 14 Tage),</li>
         <li>Logo, Firmenname und Farbe, die Sie in der Schnellrechnung für das Gutachten eingetragen haben, bis
           sie nach der Anmeldung in Ihr Konto übernommen sind oder Sie sie entfernen
           (<code>rentenplaner.auftritt.v1</code>; höchstens 14 Tage).</li>

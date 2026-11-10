@@ -44,13 +44,15 @@ const KV_TEXT = {
  */
 export type BasisTeil = 'ziel' | 'haushalt' | 'einkommen' | 'personen';
 
-export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: {
+export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, ohneNamen = false }: {
   ergebnis?: ProjektionsErgebnis | null;
   onEhepartnerDialog?: () => void;
   /** Nur diesen Teil zeigen, ohne Einklappen — fuer den Assistenten */
   teil?: BasisTeil;
   /** Wechsel in den Assistenten; ohne Angabe fuehrt der Hinweis zum Vorsorge-Check */
   onAssistent?: () => void;
+  /** Ohne Vor- und Nachname — die Vertragspruefung fragt sie in ihrem eigenen Abschnitt ab */
+  ohneNamen?: boolean;
 } = {}) {
   const zeige = (t: BasisTeil) => teil === undefined || teil === t;
   const einklappbar = teil === undefined;
@@ -441,8 +443,10 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent }: 
       {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
         <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
-              onChange={(teile) => setzePerson(p.id, mitName(teile))} />
+            {!ohneNamen && (
+              <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
+                onChange={(teile) => setzePerson(p.id, mitName(teile))} />
+            )}
             <AuswahlFeld label="Versorgungsart" wert={p.art}
               onChange={(v) => setzePerson(p.id, { art: v })}
               optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />

@@ -26,7 +26,7 @@ import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
 import { ErgebnisKopf, ErgebnisRing } from './features/ErgebnisKern';
 import { nettoHeuteMonat } from './features/bezug';
-import { musterfallVerwerfen, offenerMusterfall, type Musterfall } from './lib/musterfall';
+import { HERKUNFT_TEXT, musterfallVerwerfen, offenerMusterfall, type Musterfall } from './lib/musterfall';
 import { auftrittLokalVerwerfen, offenerAuftrittLokal, type AuftrittEntwurf } from './lib/auftritt-lokal';
 import { dataUrlZuBlob } from './lib/bild';
 import { AUFTRITT_LEER } from './features/auftritt';
@@ -333,7 +333,9 @@ export default function App() {
   */
   const [musterfall, setMusterfall] = useState<Musterfall | null>(() => offenerMusterfall());
   const musterfallLaden = useCallback((m: Musterfall) => {
-    uebernehmen(m.szenario, 'Ihr Musterfall aus der Schnellrechnung ist geladen.');
+    uebernehmen(m.szenario, m.herkunft === 'vertragspruefung'
+      ? `Ihr Fall ${HERKUNFT_TEXT[m.herkunft]} ist geladen.`
+      : `Ihr Musterfall ${HERKUNFT_TEXT[m.herkunft]} ist geladen.`);
     musterfallVerwerfen();
     setMusterfall(null);
     geheZu('ergebnis');
@@ -1075,7 +1077,9 @@ export default function App() {
             </>
           )}>
             <p>
-              <strong>Musterfall aus der Schnellrechnung übernehmen?</strong>{' '}
+              <strong>
+                {musterfall.herkunft === 'vertragspruefung' ? 'Fall' : 'Musterfall'} {HERKUNFT_TEXT[musterfall.herkunft]} übernehmen?
+              </strong>{' '}
               {musterfall.kurz && <>({musterfall.kurz}) </>}
               Ihr aktueller Fall in diesem Browser wird dabei ersetzt — sichern Sie ihn vorher im Konto, wenn Sie
               ihn behalten möchten.

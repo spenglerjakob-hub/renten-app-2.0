@@ -16,21 +16,34 @@ import { exportiere, importiere, type SzenarioParsed } from '@renten/schema';
 const SCHLUESSEL = 'rentenplaner.musterfall.v1';
 const TAGE = 14;
 
+/**
+ * Woher der Fall kommt. Die Vertragspruefung legt ihren Fall auf demselben
+ * Weg ab („Im Rechner weiterrechnen“) — das Band im Rechner nennt die Quelle.
+ * Aeltere Eintraege ohne Angabe stammen aus der Schnellrechnung.
+ */
+export type Herkunft = 'schnellrechnung' | 'vertragspruefung';
+export const HERKUNFT_TEXT: Record<Herkunft, string> = {
+  schnellrechnung: 'aus der Schnellrechnung',
+  vertragspruefung: 'aus der Vertragsprüfung',
+};
+
 interface Abgelegt {
   seit: number;
   /** Eine Zeile fuer die Anmeldemaske: „Jahrgang 1985 · 4.000 € brutto · …“ */
   kurz: string;
   szenario: string;
+  herkunft?: Herkunft;
 }
 
 export interface Musterfall {
   szenario: SzenarioParsed;
   kurz: string;
+  herkunft: Herkunft;
 }
 
-export function musterfallMerken(szenario: SzenarioParsed, kurz: string): boolean {
+export function musterfallMerken(szenario: SzenarioParsed, kurz: string, herkunft: Herkunft = 'schnellrechnung'): boolean {
   try {
-    const wert: Abgelegt = { seit: Date.now(), kurz, szenario: exportiere(szenario) };
+    const wert: Abgelegt = { seit: Date.now(), kurz, szenario: exportiere(szenario), herkunft };
     localStorage.setItem(SCHLUESSEL, JSON.stringify(wert));
     return true;
   } catch {
@@ -48,7 +61,11 @@ export function offenerMusterfall(jetzt = Date.now()): Musterfall | null {
       localStorage.removeItem(SCHLUESSEL);
       return null;
     }
-    return { szenario: r.szenario, kurz: typeof a.kurz === 'string' ? a.kurz : '' };
+    return {
+      szenario: r.szenario,
+      kurz: typeof a.kurz === 'string' ? a.kurz : '',
+      herkunft: a.herkunft === 'vertragspruefung' ? 'vertragspruefung' : 'schnellrechnung',
+    };
   } catch {
     return null;
   }

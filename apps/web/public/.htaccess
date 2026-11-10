@@ -62,6 +62,12 @@ DirectoryIndex index.html
   # fuer Suchmaschinen gesperrt wie die Preisseite.
   RewriteRule ^schnellrechnung/?$ /schnellrechnung.html [NC,L]
 
+  # --- Vertragspruefung ---------------------------------------------------
+  # Eigene Seite mit Anmeldung (Paket Rente): bestehende Vertraege und
+  # Kinderpolicen pruefen, ohne Gutachten. VOR dem Auffangmuster; nie in
+  # Suchmaschinen (Kopfzeile unten, Meta-Tag im HTML).
+  RewriteRule ^vertragspruefung/?$ /vertragspruefung.html [NC,L]
+
   # --- bAV-Mitarbeiterberatung --------------------------------------------
   # Eigene Seite mit Anmeldung (Paket Arbeitgeber-Vorsorgemodelle), VOR dem
   # Auffangmuster. Nie in Suchmaschinen (Kopfzeile unten, Meta-Tag im HTML).
@@ -106,6 +112,11 @@ DirectoryIndex index.html
   # Die Mitarbeiterberatung ist ein Arbeitsbereich hinter der Anmeldung —
   # dauerhaft nicht in Suchmaschinen.
   <FilesMatch "^mitarbeiterberatung\.html$">
+    Header set X-Robots-Tag "noindex, nofollow"
+  </FilesMatch>
+
+  # Ebenso die Vertragspruefung — ein Arbeitsbereich hinter der Anmeldung.
+  <FilesMatch "^vertragspruefung\.html$">
     Header set X-Robots-Tag "noindex, nofollow"
   </FilesMatch>
 

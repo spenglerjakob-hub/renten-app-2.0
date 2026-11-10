@@ -42,7 +42,8 @@ function kopfBetrag(v: Vertrag): string | null {
   return null;
 }
 
-function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
+/** Ein Vertrag als Karte — im Rechner je Schicht, in der Vertragspruefung in einer Liste. */
+export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;
   verrentung?: KapitalVerrentung;
 }) {

@@ -18,7 +18,10 @@ const SYMBOL_LOESCHEN = 'shrink-0 rounded-full p-2 text-ui-schiefer transition-c
  * (`Zugangsschranke.tsx`) — wer diesen Bereich sieht, ist bereits angemeldet.
  * Hier bleiben die Szenarienliste und der Weg hinaus.
  */
-export function Konto() {
+export function Konto({ namensZusatz }: {
+  /** Haengt sich an den vorgeschlagenen Namen, etwa „Vertragsprüfung“ — so findet man den Fall in der Liste wieder */
+  namensZusatz?: string;
+} = {}) {
   const {
     liste, laedt, meldung,
     initialisieren, listeLaden,
@@ -32,7 +35,11 @@ export function Konto() {
   const setze = useSzenario((s) => s.setze);
 
   // Vorgeschlagen wird der Name aus dem Rechner — „Mein Plan“ nur, solange dort keiner steht.
-  const [name, setName] = useState(() => fallNameAus(szenario.personen, szenario.haushalt.verheiratet) || 'Mein Plan');
+  const [name, setName] = useState(() => {
+    const fall = fallNameAus(szenario.personen, szenario.haushalt.verheiratet);
+    if (namensZusatz) return fall ? `${fall} – ${namensZusatz}` : namensZusatz;
+    return fall || 'Mein Plan';
+  });
 
   useEffect(() => { void initialisieren(); }, [initialisieren]);
 

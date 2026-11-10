@@ -12,6 +12,12 @@ import {
   Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text, KASTEN, KASTEN_TITEL, Summe,
 } from './Bausteine';
 
+/** „nach 1 Jahr“, „nach 2,5 Jahren“ — ohne das „nach“. */
+function jahreNach(n: number): string {
+  const text = n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+  return `${text} ${text === '1' ? 'Jahr' : 'Jahren'}`;
+}
+
 /** Beginn der Beitraege als „12/2026“ — aus dem genauen Datum, sonst Januar des Jahres. */
 function beginnText(t: SzenarioParsed['tuev'][number]): string {
   const d = parseDatum(t.beginnDatum);
@@ -268,7 +274,7 @@ export function TuevBogen({
           <Angabe
             feld="Eingesetztes Geld zurück nach"
             wert={ohne ? 'kein eigener Aufwand' : r.amortisationsJahre > 0
-              ? `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren`
+              ? jahreNach(r.amortisationsJahre)
               : 'nicht erreicht'}
           />
         )}
