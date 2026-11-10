@@ -2,12 +2,19 @@ import { create } from 'zustand';
 import {
   importiere, exportiere, annahmenKoppeln, einkommenHeuteSchema, type SzenarioParsed,
 } from '@renten/schema';
-import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze } from '@renten/engine';
+import {
+  parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze, istKinderpolice, KINDERPOLICE_LEBENSERWARTUNG,
+} from '@renten/engine';
 import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 import { standardSzenario } from './standard';
 import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
 
-const SPEICHER_SCHLUESSEL = 'rentenplaner.szenario.v1';
+/**
+ * Wo der Fall im Browser liegt. Der Rechner nimmt den Standardplatz; eine
+ * Seite mit eigenem Fall (die Vertragspruefung) waehlt ihren eigenen mit
+ * `szenarioSpeicherWaehlen` — der Fall im Rechner bleibt dann unberuehrt.
+ */
+let speicherSchluessel = 'rentenplaner.szenario.v1';
 
 export type Angebot = SzenarioParsed['loesungen']['angebote'][number];
 
@@ -20,7 +27,7 @@ const AVD_AB_JAHR = 2027;
 
 function ladeGespeichert(): SzenarioParsed {
   if (typeof localStorage === 'undefined') return standardSzenario();
-  const roh = localStorage.getItem(SPEICHER_SCHLUESSEL);
+  const roh = localStorage.getItem(speicherSchluessel);
   if (!roh) return standardSzenario();
   const r = importiere(roh);
   return r.ok ? r.szenario : standardSzenario();
@@ -81,9 +88,16 @@ export interface SzenarioStore {
   /** Ein Angebot annehmen oder die Annahme zuruecknehmen — „Lösungen annehmen“. */
   angebotAnnehmen: (id: string, an: boolean) => void;
 
-  vertragHinzufuegen: (schicht: 1 | 2 | 3) => void;
+  /** Legt einen Vertrag an — in der Vertragsart, sonst der ersten der Schicht — und gibt seine ID zurueck. */
+  vertragHinzufuegen: (schicht: 1 | 2 | 3, typ?: Vertrag['typ']) => string;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
   vertragEntfernen: (id: string) => void;
+  /**
+   * Eine private Rente zur Kinderpolice machen — oder zurueck. Vertrag und
+   * Pruefung ziehen gemeinsam mit: Die Kinderpolice kennt nur Rente oder
+   * Kapital, und das Kind lebt laenger als der Kunde (Lebenserwartung 90).
+   */
+  kinderpoliceUmschalten: (id: string, an: boolean) => void;
 
   /**
    * Eine vorbelegte Angabe als geprueft markieren, ohne sie zu aendern —
@@ -125,7 +139,7 @@ function neueId(praefix: string) {
 }
 
 function speichere(s: SzenarioParsed) {
-  try { localStorage.setItem(SPEICHER_SCHLUESSEL, exportiere(s)); } catch { /* Speicher voll oder gesperrt */ }
+  try { localStorage.setItem(speicherSchluessel, exportiere(s)); } catch { /* Speicher voll oder gesperrt */ }
 }
 
 export const useSzenario = create<SzenarioStore>((set, get) => ({
@@ -284,7 +298,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
             ? Math.max(new Date().getFullYear(), AVD_AB_JAHR)
             : new Date().getFullYear()),
         fruehereBeitraege: [],
-        lebenserwartung: 85,
+        lebenserwartung: v && istKinderpolice(v) ? KINDERPOLICE_LEBENSERWARTUNG : 85,
         vergleichen: false,
         vergleichKapitalNetto: 0,
       }],
@@ -349,18 +363,51 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     return { ...s, loesungen: { ...s.loesungen, angenommen: neu } };
   }),
 
-  vertragHinzufuegen: (schicht) => get().setze((s) => {
-    const typ = schicht === 1 ? 'basis' : schicht === 2 ? 'bav' : 'prvRente';
-    const neu: Vertrag = {
-      id: neueId('v'),
-      inhaber: 'A', schicht, typ, name: '', brutto: 0,
-      strategie: 'rente', altvertrag: false,
-    };
-    return geprueft({ ...s, vertraege: [...s.vertraege, neu] }, ['vertraege']);
-  }),
+  vertragHinzufuegen: (schicht, typ) => {
+    const id = neueId('v');
+    get().setze((s) => {
+      const neu: Vertrag = {
+        id,
+        inhaber: 'A', schicht, typ: typ ?? (schicht === 1 ? 'basis' : schicht === 2 ? 'bav' : 'prvRente'),
+        name: '', brutto: 0,
+        strategie: 'rente', altvertrag: false,
+      };
+      return geprueft({ ...s, vertraege: [...s.vertraege, neu] }, ['vertraege']);
+    });
+    return id;
+  },
 
-  vertragAendern: (id, p) => get().setze((s) => ({
-    ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
+  vertragAendern: (id, p) => {
+    // Eine Kinderpolice gibt es nur als private Rentenversicherung: Wechselt
+    // die Vertragsart, endet sie — samt „Beiträge bis“ in der Pruefung.
+    const vorher = get().szenario.vertraege.find((v) => v.id === id);
+    if (vorher?.versichertePerson && p.typ !== undefined && p.typ !== 'prvRente') get().kinderpoliceUmschalten(id, false);
+    get().setze((s) => ({
+      ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
+    }));
+  },
+
+  kinderpoliceUmschalten: (id, an) => get().setze((s) => ({
+    ...s,
+    vertraege: s.vertraege.map((v) => {
+      if (v.id !== id) return v;
+      if (!an) return { ...v, versichertePerson: undefined };
+      return {
+        ...v,
+        versichertePerson: v.versichertePerson ?? { vorname: '', geburtsdatum: '', rentenbeginn: '', steuersatzImAlter: 0.25 },
+        strategie: v.strategie === 'kapital' ? 'kapital' as const : 'rente' as const,
+      };
+    }),
+    tuev: s.tuev.map((t) => {
+      if (t.vertragId !== id) return t;
+      return an
+        ? { ...t, lebenserwartung: t.lebenserwartung === 85 ? KINDERPOLICE_LEBENSERWARTUNG : t.lebenserwartung }
+        : {
+          ...t,
+          beitragBis: undefined,
+          lebenserwartung: t.lebenserwartung === KINDERPOLICE_LEBENSERWARTUNG ? 85 : t.lebenserwartung,
+        };
+    }),
   })),
 
   vertragEntfernen: (id) => get().setze((s) => ({
@@ -401,5 +448,15 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
 
   zuruecksetzen: () => { const s = standardSzenario(); speichere(s); set({ szenario: s, importMeldung: null }); },
 }));
+
+/**
+ * EIN EIGENER SPEICHERPLATZ fuer eine Seite mit eigenem Fall. Vor dem ersten
+ * Zeichnen aufrufen: Der Fall wird vom neuen Platz geladen (oder beginnt neu),
+ * und jede Aenderung landet dort — nie im Fall des Rechners.
+ */
+export function szenarioSpeicherWaehlen(schluessel: string): void {
+  speicherSchluessel = schluessel;
+  useSzenario.setState({ szenario: ladeGespeichert(), importMeldung: null });
+}
 
 export type { SzenarioParsed, Szenario };

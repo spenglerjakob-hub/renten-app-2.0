@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Building2, Check, ClipboardList, Copy, ExternalLink, HandCoins, HeartPulse, LineChart, Scale, Users, X,
+  Building2, Check, ClipboardList, Copy, ExternalLink, FileSearch, HandCoins, HeartPulse, LineChart, Scale, Users, X,
 } from 'lucide-react';
 import { RechtsLinks } from './RechtsLinks';
 
@@ -56,6 +56,10 @@ export const KUNDEN: Seite[] = [
   {
     href: '/vorsorge-check', titel: 'Vorsorge-Check', text: 'Angaben Schritt für Schritt erfassen',
     symbol: <ClipboardList className="h-4 w-4" aria-hidden />,
+  },
+  {
+    href: '/vertragspruefung', titel: 'Vertragsprüfung', text: 'Verträge und Kinderpolicen prüfen',
+    symbol: <FileSearch className="h-4 w-4" aria-hidden />,
   },
   {
     href: '/altersvorsorgedepot', titel: 'Altersvorsorgedepot', text: 'Zulagen und Kapital ab 2027', oeffentlich: true,

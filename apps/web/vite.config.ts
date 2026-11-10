@@ -72,6 +72,8 @@ export default defineConfig({
         preise: resolve(hier, 'preise.html'),
         // Die Schnellrechnung ohne Anmeldung — oeffentlich, vorerst noindex.
         schnellrechnung: resolve(hier, 'schnellrechnung.html'),
+        // Die Vertragspruefung — mit Anmeldung, Paket Rente: Vertraege und Kinderpolicen ohne Gutachten.
+        vertragspruefung: resolve(hier, 'vertragspruefung.html'),
         // Die bAV-Mitarbeiterberatung — mit Anmeldung, Paket Arbeitgeber-Vorsorgemodelle.
         mitarbeiterberatung: resolve(hier, 'mitarbeiterberatung.html'),
         // Unterschrift per Link — fuer den Mitarbeiter, ohne Konto, nur mit Link und Code.

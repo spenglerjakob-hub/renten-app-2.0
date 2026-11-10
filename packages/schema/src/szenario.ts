@@ -240,6 +240,28 @@ export const vertragSchema = z.object({
   sonderzahlungJahr: z.number().int().min(1900).max(2200).optional(),
   teilfreistellung: z.number().min(0).max(1).optional(),
   einstandswert: z.number().min(0).optional(),
+  /**
+   * KINDERPOLICE: Der Kunde zahlt, versichert ist ein Kind oder Enkel.
+   *
+   * Nur bei der privaten Rentenversicherung. Die Rente beginnt dann mit dem
+   * Vertragsende beim Kind — Jahrzehnte nach dem eigenen Ruhestand — und
+   * zaehlt deshalb NIE zur Rente des Kunden (der Rechenkern laesst solche
+   * Vertraege in der Zeitachse weg).
+   *
+   * Datumsfelder als freier Text und nicht als `datumString`: Waehrend der
+   * Eingabe steht dort noch nichts Gueltiges, und ein Fall mit halb
+   * eingetipptem Geburtsdatum muss trotzdem laden. Gerechnet wird erst, wenn
+   * das Datum lesbar ist.
+   */
+  versichertePerson: z.object({
+    vorname: z.string().max(80).default(''),
+    /** TT.MM.JJJJ */
+    geburtsdatum: z.string().max(10).default(''),
+    /** Vertragsende laut Vertrag, TT.MM.JJJJ — leer: Monat nach dem 67. Geburtstag */
+    rentenbeginn: z.string().max(10).default(''),
+    /** Persoenlicher Steuersatz des Kindes im Alter — eine Annahme, vorbelegt 25 % */
+    steuersatzImAlter: z.number().min(0).max(0.45).default(0.25),
+  }).optional(),
 }).transform((v) => {
   /*
     ALTLAST: Bis hierher waren „bAV (Kapitalauszahlung)" und „Private Rente
@@ -467,6 +489,13 @@ export const tuevPositionSchema = z.object({
     beitragMonat: z.number().min(0).max(100_000),
     agZuschussMonat: z.number().min(0).max(100_000).default(0),
   })).max(5).default([]),
+  /**
+   * Bis wann Beitraege fliessen (TT.MM.JJJJ, der Monat zaehlt mit) — danach
+   * ruht der Vertrag bis zur Auszahlung. Vorbelegt bei der Kinderpolice mit
+   * dem 18. Geburtstag. Fehlt es, wird bis zum Rentenbeginn gezahlt — wie
+   * bisher.
+   */
+  beitragBis: z.string().regex(/^\d{2}\.\d{2}\.\d{4}$/).optional(),
   lebenserwartung: z.number().int().min(60).max(120).default(85),
   /** Zusaetzlich Rente gegen Kapital gegenueberstellen */
   vergleichen: z.boolean().default(false),

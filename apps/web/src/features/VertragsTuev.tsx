@@ -3,8 +3,9 @@ import { Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, parseDatum, toDe, type ProjektionsErgebnis } from '@renten/engine';
 import {
   tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand,
+  beiKind, kindName, desKindes, jahreText,
 } from './tuev-berechnung';
-import { kenntKapitalwahl } from './vertragsarten';
+import { kenntKapitalwahl, kinderpoliceText, monatJahr } from './vertragsarten';
 import { EinkommenFelder } from './EinkommenFelder';
 import { personNameAus } from './personen';
 import { Foerdercheck } from './Foerdercheck';
@@ -166,10 +167,20 @@ function WegZeile({ text, rente, kapital, hervor }: {
  * rechnet: was er netto wirklich kostet gegen das, was netto ankommt.
  */
 export function VertragsTuev({
-  ergebnis, szenario,
+  ergebnis, szenario, mitFoerdercheck = true, automatischGeprueft = false, mitEinkommen = true,
 }: {
   ergebnis: ProjektionsErgebnis | null;
   szenario: SzenarioParsed;
+  /** Der Foerdercheck am Ende — die Vertragspruefung zeigt nur die Vertraege */
+  mitFoerdercheck?: boolean;
+  /**
+   * Jeder Vertrag steht in der Pruefung, ohne Auswahl: Die Vertragspruefung
+   * legt die Eintraege selbst an. Dann gibt es weder die Auswahl oben noch
+   * das Entfernen am Eintrag — entfernt wird der Vertrag selbst.
+   */
+  automatischGeprueft?: boolean;
+  /** Der Einkommensblock — entfaellt, wenn nur Kinderpolicen geprueft werden */
+  mitEinkommen?: boolean;
 }) {
   const tuev = useSzenario((x) => x.szenario.tuev);
   const vertraege = useSzenario((x) => x.szenario.vertraege);
@@ -179,6 +190,7 @@ export function VertragsTuev({
   const tuevHinzufuegen = useSzenario((x) => x.tuevHinzufuegen);
   const tuevAendern = useSzenario((x) => x.tuevAendern);
   const tuevEntfernen = useSzenario((x) => x.tuevEntfernen);
+  const vertragAendern = useSzenario((x) => x.vertragAendern);
   const tuevKindHinzufuegen = useSzenario((x) => x.tuevKindHinzufuegen);
   const tuevKindAendern = useSzenario((x) => x.tuevKindAendern);
   const tuevKindEntfernen = useSzenario((x) => x.tuevKindEntfernen);
@@ -220,13 +232,22 @@ export function VertragsTuev({
         <div>
           <Titel als="h2">Vertrags-TÜV</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
-            Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
-            Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
+            {mitEinkommen ? (
+              <>
+                Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
+                Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
+                Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
+              </>
+            ) : (
+              <>
+                Hier stehen {a.dein('e')} Verträge nebeneinander: was jeder {a.dich} wirklich kostet und was am
+                Ende netto ankommt.
+              </>
+            )}
           </p>
         </div>
 
-        <div className="w-full shrink-0 md:w-72 print:hidden">
+        {!automatischGeprueft && <div className="w-full shrink-0 md:w-72 print:hidden">
           <label htmlFor="tuev-auswahl" className="sr-only">Vertrag zur Prüfung hinzufügen</label>
           <select
             id="tuev-auswahl"
@@ -248,7 +269,7 @@ export function VertragsTuev({
               </option>
             ))}
           </select>
-        </div>
+        </div>}
       </div>
 
       {/*
@@ -266,7 +287,7 @@ export function VertragsTuev({
         `print:hidden`, weil das Gutachten die Angaben auf seinem eigenen
         Blatt fuehrt.
       */}
-      <div className="print:hidden">
+      {mitEinkommen && <div className="print:hidden">
         <AkkordeonKarte
           titel={szenario.einkommenGetrennt
             ? `Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
@@ -336,12 +357,14 @@ export function VertragsTuev({
             />
           </div>
         </AkkordeonKarte>
-      </div>
+      </div>}
 
       {tuev.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          Noch kein Vertrag zur Prüfung ausgewählt. Oben einen auswählen — dann steht hier,
-          was er {a.dich} wirklich kostet und was er wirklich bringt.
+          {automatischGeprueft
+            ? 'Noch kein Vertrag erfasst. Oben einen anlegen — dann steht hier,'
+            : 'Noch kein Vertrag zur Prüfung ausgewählt. Oben einen auswählen — dann steht hier,'}
+          {' '}was er {a.dich} wirklich kostet und was er wirklich bringt.
         </p>
       ) : (
         <div className="space-y-5 sm:space-y-6">
@@ -356,7 +379,7 @@ export function VertragsTuev({
             // andere Zahlen als der Ausdruck.
             const pos = positionen.find((x) => x.vertrag.id === v.id);
             if (!pos) return null;
-            const { ergebnis: r, vergleich, istKapital, wege } = pos;
+            const { ergebnis: r, vergleich, istKapital, wege, kind } = pos;
 
             const gut = r.nettoHebel >= 1;
             // Rein arbeitgeberfinanziert: Hebel, Rendite und Amortisation messen am eigenen Aufwand.
@@ -381,17 +404,21 @@ export function VertragsTuev({
               <article key={t.id} className="ui-karte overflow-hidden druckbereich">
                 <header className="flex items-center justify-between gap-3 border-b border-ui-linie px-5 py-4 sm:px-7">
                   <h3 className="min-w-0">
-                    <span className="block text-xs text-ui-schiefer">Schicht {v.schicht}</span>
+                    <span className="block text-xs text-ui-schiefer">
+                      Schicht {v.schicht}{kind ? ` · ${kinderpoliceText(v)} — nicht in ${e.dein('er')} Rente` : ''}
+                    </span>
                     <span className="block truncate text-lg font-medium tracking-[-0.01em] text-ui-tinte">{v.name || v.typ}</span>
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => tuevEntfernen(t.id)}
-                    aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
-                    className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
+                  {!automatischGeprueft && (
+                    <button
+                      type="button"
+                      onClick={() => tuevEntfernen(t.id)}
+                      aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
+                      className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  )}
                 </header>
 
                 <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-3 lg:gap-6">
@@ -449,7 +476,7 @@ export function VertragsTuev({
                         stufen
                       />
                       <ZahlFeld
-                        label="Lebenserwartung"
+                        label={kind ? `Lebenserwartung ${desKindes(kind)}` : 'Lebenserwartung'}
                         wert={t.lebenserwartung}
                         onChange={(n) => tuevAendern(t.id, { lebenserwartung: n })}
                         min={60}
@@ -458,6 +485,40 @@ export function VertragsTuev({
                         stufen
                       />
                     </div>
+
+                    {/*
+                      KINDERPOLICE: Die Beitraege enden meist lange vor der
+                      Auszahlung — vorbelegt mit dem 18. Geburtstag; danach
+                      ruht der Vertrag. Versteuert wird beim Kind, zu seinem
+                      Satz im Alter: eine Annahme, vorbelegt mit 25 %.
+                    */}
+                    {kind && v.versichertePerson && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <DatumFeld
+                          label="Beiträge bis"
+                          wert={t.beitragBis ?? (kind.beitragBis ? toDe(kind.beitragBis) : '')}
+                          leerErlaubt
+                          onChange={(s) => {
+                            // Geleert: zurueck zum Vorschlag, dem 18. Geburtstag.
+                            const d = parseDatum(s);
+                            tuevAendern(t.id, { beitragBis: d ? toDe(d) : undefined });
+                          }}
+                          hilfe={kind.beitragBisVorgeschlagen
+                            ? '18. Geburtstag — danach ruht der Vertrag.'
+                            : 'Danach ruht der Vertrag bis zur Auszahlung.'}
+                          stufen
+                        />
+                        <ProzentFeld
+                          label={`Steuersatz ${desKindes(kind)} im Alter`}
+                          wert={v.versichertePerson.steuersatzImAlter}
+                          onChange={(n) => vertragAendern(v.id, {
+                            versichertePerson: { ...v.versichertePerson!, steuersatzImAlter: n },
+                          })}
+                          max={45}
+                          hilfe="Annahme — den Satz in Jahrzehnten kennt niemand."
+                        />
+                      </div>
+                    )}
 
                     {v.typ === 'riester' && (
                       <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-3">
@@ -539,12 +600,14 @@ export function VertragsTuev({
                       </div>
                     )}
 
-                    <Schalter
-                      label="Rente gegen Kapital vergleichen"
-                      wert={t.vergleichen}
-                      onChange={(b) => tuevAendern(t.id, { vergleichen: b })}
-                    />
-                    {t.vergleichen && r.nettoKapital === 0 && (
+                    {!kind && (
+                      <Schalter
+                        label="Rente gegen Kapital vergleichen"
+                        wert={t.vergleichen}
+                        onChange={(b) => tuevAendern(t.id, { vergleichen: b })}
+                      />
+                    )}
+                    {!kind && t.vergleichen && r.nettoKapital === 0 && (
                       <ZahlFeld
                         label="Alternative Kapitalauszahlung (netto)"
                         wert={t.vergleichKapitalNetto}
@@ -671,19 +734,42 @@ export function VertragsTuev({
                       nebeneinander, was der Vertrag monatlich netto kostet und
                       was er monatlich netto bringt.
                     */}
+                    {kind && !kind.vollstaendig ? (
+                      <div className={BLOCK}>
+                        <div className={BLOCK_TITEL}>Was {beiKind(kind)} ankommt</div>
+                        <p className="text-xs leading-relaxed text-ui-tinte/80">
+                          Am Vertrag fehlt noch das Geburtsdatum {kind.vorname.trim() ? `von ${kind.vorname.trim()}` : 'des Kindes'} —
+                          dann steht hier, was nach Steuer ankommt.
+                        </p>
+                      </div>
+                    ) : (
                     <div className={BLOCK}>
                       <div className={BLOCK_TITEL}>
-                        {e.Dein()} Ertrag (Auszahlungsphase)
+                        {kind
+                          ? `Was ${beiKind(kind)} ankommt${kind.rentenbeginn ? ` (ab ${monatJahr(kind.rentenbeginn)}, mit ${kind.alterBeiRentenbeginn})` : ''}`
+                          : `${e.Dein()} Ertrag (Auszahlungsphase)`}
                       </div>
                       <div className="space-y-1.5">
                         <GegenueberZeile
                           text={istKapital ? 'Brutto-Kapital' : 'Brutto-Rente'}
                           wert={euro(istKapital ? r.bruttoKapital : r.bruttoRenteMonat)}
                         />
+                        {kind && !istKapital && r.steuerMonat > 0 && (
+                          <GegenueberZeile
+                            text={`− Steuer (Ertragsanteil ${prozent(kind.ertragsanteil, 0)} zu ${prozent(kind.steuersatz, 0)})`}
+                            wert={euro(r.steuerMonat)}
+                          />
+                        )}
+                        {kind && istKapital && r.steuerKapital > 0 && (
+                          <GegenueberZeile
+                            text={`− Steuer (${kind.halbeinkuenfte ? 'halber Ertrag' : 'Ertrag'} zu ${prozent(kind.steuersatz, 0)})`}
+                            wert={euro(r.steuerKapital)}
+                          />
+                        )}
                         {!istKapital && r.kvPvMonat > 0 && (
                           <GegenueberZeile text="− KV/PV-Abzug" wert={euro(r.kvPvMonat)} />
                         )}
-                        {!istKapital && r.steuerMonat > 0 && (
+                        {!kind && !istKapital && r.steuerMonat > 0 && (
                           <GegenueberZeile text="− Steuer-Abzug" wert={euro(r.steuerMonat)} />
                         )}
                         {/*
@@ -694,7 +780,7 @@ export function VertragsTuev({
                           liess sich nicht erkennen, warum dieselbe Auszahlung
                           in der Eingabemaske hoeher ausgewiesen ist.
                         */}
-                        {istKapital && r.steuerKapital > 0 && (
+                        {!kind && istKapital && r.steuerKapital > 0 && (
                           <GegenueberZeile text="− Steuer im Zuflussjahr" wert={euro(r.steuerKapital)} />
                         )}
                         {istKapital && r.kvPvKapital > 0 && (
@@ -713,8 +799,19 @@ export function VertragsTuev({
                             {!istKapital && <span className="text-xs font-normal text-ui-schiefer"> / Monat</span>}
                           </span>
                         </div>
+                        {/* Jahrzehnte entfernt: was der Betrag in heutigem Geld wert ist. */}
+                        {kind && kind.kaufkraftfaktor > 1.0001 && (
+                          <p className="text-xs leading-relaxed text-ui-schiefer">
+                            In heutigem Geld rund{' '}
+                            <span className="font-medium tabular-nums text-ui-tinte">
+                              {euro((istKapital ? r.nettoKapital : r.nettoRenteMonat) / kind.kaufkraftfaktor)}
+                            </span>
+                            {!istKapital && ' im Monat'} — bei {prozent(szenario.annahmen.inflation)} Inflation pro Jahr.
+                          </p>
+                        )}
                       </div>
                     </div>
+                    )}
 
                     <div className={BLOCK}>
                       <div className={BLOCK_TITEL}>
@@ -730,6 +827,13 @@ export function VertragsTuev({
                           wert={euro(r.summeAuszahlung)}
                         />
                       </div>
+                      {kind && kind.vollstaendig && kind.ruhezeitJahre > 0 && kind.rentenbeginn && kind.beitragBis && (
+                        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+                          Beitrag bis {monatJahr(kind.beitragBis)}, danach {jahreText(kind.ruhezeitJahre)} ohne
+                          Beitrag — das Geld arbeitet weiter. {istKapital ? 'Auszahlung' : 'Rente ab'}{' '}
+                          {monatJahr(kind.rentenbeginn)}, wenn {kindName(kind)} {kind.alterBeiRentenbeginn} ist.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -752,8 +856,8 @@ export function VertragsTuev({
                         </>
                       ) : (
                         <>
-                          Je eingezahltem Euro kommen netto{gut ? '' : ' nur'}{' '}
-                          <Hervor>{euroGenau(Math.round(r.nettoHebel * 100) / 100)}</Hervor> zurück.
+                          Je eingezahltem Euro kommen{kind ? ` ${beiKind(kind)}` : ''} netto{gut ? '' : ' nur'}{' '}
+                          <Hervor>{euroGenau(Math.round(r.nettoHebel * 100) / 100)}</Hervor> {kind ? 'an' : 'zurück'}.
                         </>
                       )}
                     </Kernsatz>
@@ -860,17 +964,23 @@ export function VertragsTuev({
                             `renteOderKapital` rechnet ab dem Alter bei
                             Rentenbeginn. "Ab 12 Jahren" waere schlicht falsch.
                           */}
-                          <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn {e.du}{' '}
+                          <strong>Break-even:</strong> Die Rente holt das Kapital ein, wenn {kind ? kindName(kind) : e.du}{' '}
                           <strong>
                             {wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre
                           </strong>{' '}
-                          alt {e.w('wirst', undefined, 'werden')} — ohne Verzinsung.
+                          alt {kind ? 'wird' : e.w('wirst', undefined, 'werden')} — ohne Verzinsung.
                           {wege.breakEven.kapitalTraegtSichSelbst
                             ? ' Mit 2 % Verzinsung nie: der Kapitalertrag allein trägt die Rente.'
                             : ` Mit 2 % Verzinsung erst mit ${wege.breakEven.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren.`}
-                          {' '}In die Gesamtübersicht geht{' '}
-                          <strong>{istKapital ? 'das Kapital' : 'die Rente'}</strong> ein — links
-                          umstellbar.
+                          {kind ? (
+                            <>{' '}Gerechnet ist <strong>{istKapital ? 'das Kapital' : 'die Rente'}</strong> — am Vertrag umstellbar.</>
+                          ) : (
+                            <>
+                              {' '}In die Gesamtübersicht geht{' '}
+                              <strong>{istKapital ? 'das Kapital' : 'die Rente'}</strong> ein — links
+                              umstellbar.
+                            </>
+                          )}
                         </p>
                       </div>
                     )}
@@ -949,7 +1059,7 @@ export function VertragsTuev({
         Liste, weil er nicht an der Auswahl haengt — auch wer noch keinen
         Vertrag zur Pruefung gewaehlt hat, soll seinen freien Rahmen sehen.
       */}
-      <Foerdercheck zeile={zeile ?? null} />
+      {mitFoerdercheck && <Foerdercheck zeile={zeile ?? null} />}
     </section>
   );
 }

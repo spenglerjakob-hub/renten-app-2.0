@@ -63,6 +63,15 @@ export interface TuevAnnahmen {
    * laufende Beitrag oben. Feste historische Betraege, ohne Dynamik.
    */
   fruehereBeitraege?: TuevBeitragsstufe[];
+  /**
+   * Letzter Beitragsmonat (Jahr und Monat 1–12, einschliesslich). Danach
+   * ruht der Vertrag bis zur Auszahlung — etwa eine Kinderpolice, deren
+   * Beitraege mit dem 18. Geburtstag enden. Die beitragsfreien Jahre bleiben
+   * mit null in der Zahlungsreihe: Nur so stimmt die Rendite, denn das Geld
+   * arbeitet in dieser Zeit weiter. Fehlt die Angabe, wird bis zum
+   * Rentenbeginn gezahlt — wie bisher.
+   */
+  beitragBis?: { jahr: number; monat: number };
   /** Angenommene Lebenserwartung — bestimmt die Dauer der Auszahlphase */
   lebenserwartung: number;
   /**
@@ -560,6 +569,9 @@ export function vertragsTuev(
   */
   const beginnMonat = Math.min(12, Math.max(1, Math.round(a.beginnMonat ?? 1)));
   const beginnIndex = a.beginnJahr * 12 + beginnMonat - 1;
+  const endeIndex = a.beitragBis
+    ? a.beitragBis.jahr * 12 + Math.min(12, Math.max(1, Math.round(a.beitragBis.monat))) - 1
+    : Infinity;
   const stufen = (a.fruehereBeitraege ?? [])
     .map((st) => ({
       ende: st.bisJahr * 12 + Math.min(12, Math.max(1, Math.round(st.bisMonat))) - 1,
@@ -601,7 +613,7 @@ export function vertragsTuev(
     let monate = 0, monateLaufend = 0, beitragStufen = 0, agStufen = 0;
     for (let m = 0; m < 12; m++) {
       const index = jahr * 12 + m;
-      if (index < beginnIndex) continue;
+      if (index < beginnIndex || index > endeIndex) continue;
       monate++;
       const st = stufen.find((x) => index <= x.ende);
       if (st) { beitragStufen += st.beitrag; agStufen += st.ag; } else monateLaufend++;

@@ -1,4 +1,4 @@
-import type { Vertrag, VertragsTyp } from '@renten/engine';
+import { istKinderpolice, type Vertrag, type VertragsTyp } from '@renten/engine';
 
 /**
  * Die Beschriftungen der Vertragsarten — EINE Quelle fuer Bildschirm und
@@ -87,6 +87,27 @@ export const STRATEGIEN: Record<
   ],
 };
 
+/**
+ * KINDERPOLICE: nur zwei Wege. Entnahmeplaner und Verrentung gehoeren zur
+ * eigenen Rente, „Nicht einrechnen“ ist sie ohnehin — sie zaehlt nie zur
+ * Rente des Kunden.
+ */
+export const KINDERPOLICE_WEGE: { wert: Vertrag['strategie']; text: string }[] = [
+  { wert: 'rente', text: 'Laufende Rente beim Kind' },
+  { wert: 'kapital', text: 'Kapitalauszahlung beim Kind' },
+];
+
+/** „Kinderpolice für Lena“ — oder nur „Kinderpolice“ ohne Namen; null bei eigenen Verträgen. */
+export function kinderpoliceText(v: Pick<Vertrag, 'typ' | 'versichertePerson'>): string | null {
+  const vp = v.versichertePerson;
+  if (!vp || !istKinderpolice(v)) return null;
+  const name = vp.vorname.trim();
+  return name ? `Kinderpolice für ${name}` : 'Kinderpolice';
+}
+
+/** Monat und Jahr, etwa „04/2092“. */
+export const monatJahr = (d: { monat: number; jahr: number }) => `${String(d.monat).padStart(2, '0')}/${d.jahr}`;
+
 /** Welche Strategieliste zu einer Vertragsart gehoert. */
 export function strategieGruppe(t: VertragsTyp): keyof typeof STRATEGIEN {
   if (t === 'etf') return 'etf';
@@ -123,6 +144,11 @@ export function vertragsBezeichnung(v: Pick<Vertrag, 'name' | 'typ' | 'schicht'>
 
 /** Klartext fuer die gewaehlte Verwendung. */
 export function strategieText(v: Vertrag): string {
+  const vp = v.versichertePerson;
+  if (vp && istKinderpolice(v)) {
+    const an = vp.vorname.trim() ? `an ${vp.vorname.trim()}` : 'an das Kind';
+    return `${v.strategie === 'kapital' ? 'Kapital' : 'Rente'} ${an} — nicht in der eigenen Rente`;
+  }
   const treffer = STRATEGIEN[strategieGruppe(v.typ)].find((x) => x.wert === v.strategie);
   if (!treffer) return v.strategie;
   if (v.strategie === 'verrenten') {

@@ -1,15 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import {
-  parameterFuer, parseDatum,
+  parameterFuer, parseDatum, kinderRentenbeginn, istKinderpolice,
   type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
   TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, kenntKapitalwahl, strategieGruppe, typText,
-  VERRENTUNG_JAHRE, VERRENTUNG_RENDITE,
+  VERRENTUNG_JAHRE, VERRENTUNG_RENDITE, KINDERPOLICE_WEGE, kinderpoliceText, monatJahr,
 } from './vertragsarten';
 import { personNameAus } from './personen';
 import { KNOPF_ZWEIT } from '../components/stil';
@@ -42,12 +42,14 @@ function kopfBetrag(v: Vertrag): string | null {
   return null;
 }
 
-function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
+/** Ein Vertrag als Karte — im Rechner je Schicht, in der Vertragspruefung in einer Liste. */
+export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;
   verrentung?: KapitalVerrentung;
 }) {
   const vertragAendern = useSzenario((x) => x.vertragAendern);
   const vertragEntfernen = useSzenario((x) => x.vertragEntfernen);
+  const kinderpoliceUmschalten = useSzenario((x) => x.kinderpoliceUmschalten);
   const verheiratet = useSzenario((x) => x.szenario.haushalt.verheiratet);
   const haushaltsKinder = useSzenario((x) => x.szenario.haushalt.kinder);
   const personen = useSzenario((x) => x.szenario.personen);
@@ -78,6 +80,11 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
     () => !v.name && !v.brutto && !v.monatsbeitrag && !v.sparrate && !v.kapitalHeute,
   );
   const betrag = kopfBetrag(v);
+  /** Kinderpolice: versichert ist ein Kind oder Enkel — die Rente zaehlt nicht zur eigenen. */
+  const vp = istKinderpolice(v) ? v.versichertePerson : undefined;
+  const vpBeginn = vp ? kinderRentenbeginn(vp) : null;
+  const vpName = vp?.vorname.trim() || 'das Kind';
+  const kp = kinderpoliceText(v);
 
   return (
     /*
@@ -101,7 +108,9 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             <span className="block truncate text-sm font-medium text-ui-tinte">
               {v.name || 'Ohne Bezeichnung'}
             </span>
-            <span className="block truncate text-xs text-ui-schiefer">{typText(v.typ)}</span>
+            <span className="block truncate text-xs text-ui-schiefer">
+              {typText(v.typ)}{kp ? ` · ${kp}` : ''}
+            </span>
           </span>
           {betrag && (
             <span className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-ui-tinte">
@@ -158,6 +167,41 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             onChange={(n) => vertragAendern(v.id, { kapitalAlternative: n })}
             einheit="€"
             hilfe="Was der Anbieter stattdessen einmalig zahlen würde." />
+        )}
+
+        {/*
+          KINDERPOLICE. Der Kunde zahlt, versichert ist ein Kind oder Enkel —
+          ausgezahlt wird an das Kind, Jahrzehnte nach dem eigenen Ruhestand.
+          Die Rente zaehlt deshalb nicht zur eigenen; der Rechenkern laesst
+          sie in der Zeitachse weg. Bewertet wird sie im Vertrags-TUEV, dort
+          stehen auch Beitrag und „Beiträge bis“.
+        */}
+        {v.typ === 'prvRente' && (
+          <div className="sm:col-span-2">
+            <Schalter label="Für ein Kind oder Enkel (Kinderpolice)" wert={vp !== undefined}
+              onChange={(an) => kinderpoliceUmschalten(v.id, an)} />
+          </div>
+        )}
+        {vp && (
+          <div className="ui-innen grid gap-3 p-3 sm:col-span-2 sm:grid-cols-2 sm:p-4">
+            <TextFeld label="Vorname des Kindes" wert={vp.vorname}
+              onChange={(n) => vertragAendern(v.id, { versichertePerson: { ...vp, vorname: n } })}
+              platzhalter="z. B. Lena" />
+            <DatumFeld label="Geburtsdatum des Kindes" wert={vp.geburtsdatum}
+              onChange={(d) => vertragAendern(v.id, { versichertePerson: { ...vp, geburtsdatum: d } })} />
+            <DatumFeld label="Rentenbeginn laut Vertrag" wert={vp.rentenbeginn} leerErlaubt
+              onChange={(d) => vertragAendern(v.id, { versichertePerson: { ...vp, rentenbeginn: d } })}
+              hilfe={vp.rentenbeginn.trim()
+                ? 'Das Vertragsende beim Kind.'
+                : vpBeginn
+                  ? `Leer gelassen: ${monatJahr(vpBeginn)}, der Monat nach dem 67. Geburtstag.`
+                  : 'Leer gelassen: der Monat nach dem 67. Geburtstag.'} />
+            <p className="text-xs leading-relaxed text-ui-schiefer sm:col-span-2">
+              Zählt nicht zu {t.dein('er')} eigenen Rente — ausgezahlt wird an {vpName}
+              {vpBeginn ? `, ab ${monatJahr(vpBeginn)}` : ''}. Was sie kostet und was {vpName} davon hat,
+              steht im Vertrags-TÜV.
+            </p>
+          </div>
         )}
 
         {v.typ === 'immobilie' && (
@@ -247,7 +291,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           </>
         )}
 
-        {v.typ === 'prvRente' && (v.kapitalAlternative ?? 0) > 0 && (
+        {v.typ === 'prvRente' && !vp && (v.kapitalAlternative ?? 0) > 0 && (
           <>
             <ZahlFeld label="Vertragsbeginn (Jahr)" wert={v.beginnJahr ?? 2010}
               onChange={(n) => vertragAendern(v.id, { beginnJahr: n })} min={1900} max={2200} />
@@ -278,7 +322,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
         <AuswahlFeld label="Auszahlungsstrategie" wert={v.strategie}
           onChange={(st) => vertragAendern(v.id, { strategie: st })}
-          optionen={STRATEGIEN[strategieGruppe(v.typ)]} />
+          optionen={vp ? KINDERPOLICE_WEGE : STRATEGIEN[strategieGruppe(v.typ)]} />
 
         {/*
           Ohne diese beiden Felder gab es fuer eine Kapitalauszahlung keinen
@@ -404,10 +448,14 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           {v.typ === 'prvRente' ? (
             <>
               Steuerpflichtig ist nicht die Auszahlung, sondern nur der <strong>Ertrag</strong> —
-              die Auszahlung abzüglich {e.dein('er')} eingezahlten Beiträge (§ 20 Abs. 1 Nr. 6 EStG).
+              die Auszahlung abzüglich {vp ? 'der' : e.dein('er')} eingezahlten Beiträge (§ 20 Abs. 1 Nr. 6 EStG).
               Läuft der Vertrag mindestens <strong>12 Jahre</strong> und wird nach dem{' '}
               <strong>62. Lebensjahr</strong> ausgezahlt (bei Abschluss bis 2011: nach dem 60.),
-              zählt davon nur die <strong>Hälfte</strong>, versteuert mit {e.dein('em')} persönlichen Satz.
+              zählt davon nur die <strong>Hälfte</strong>, versteuert mit{' '}
+              {/* Bei der Kinderpolice versteuert das Kind — zu seinem Satz, nicht zu dem des Kunden. */}
+              {vp
+                ? (vp.vorname.trim() ? `dem persönlichen Satz von ${vp.vorname.trim()}` : 'dem persönlichen Satz des Kindes')
+                : `${e.dein('em')} persönlichen Satz`}.
               Wird eine der beiden Bedingungen verfehlt, ist der ganze Ertrag steuerpflichtig.
               Kranken- und Pflegeversicherungsbeiträge fallen <strong>nicht</strong> an — anders
               als bei einer Betriebsrente.
