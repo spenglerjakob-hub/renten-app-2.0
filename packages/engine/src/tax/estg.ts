@@ -88,6 +88,30 @@ export function grenzsteuersatz(zve: number, verheiratet: boolean, p: LegalParam
   return (b - a) / schritt;
 }
 
+/**
+ * Grenzsteuersatz als ABLEITUNG des Tarifs § 32a — fuer die Darstellung.
+ *
+ * `grenzsteuersatz` misst die Differenz ueber 100 EUR. Weil die Steuer auf
+ * volle Euro abgerundet wird, kommt dabei je nach Lage 28 % oder 29 % heraus,
+ * wo der Tarif 28,6 % hat; im Splitting verdoppelt sich der Rundungsfehler.
+ * Fuer eine Rechnung, die einem Kunden „dein Grenzsteuersatz“ nennt, ist das
+ * zu grob. Hier steht der Satz, den der Tarif an dieser Stelle hat.
+ *
+ * Gerechnet wird damit nichts: Ersparnisse ergeben sich weiter aus der Steuer
+ * selbst, mit und ohne Abzug.
+ */
+export function tarifGrenzsteuersatz(zve: number, verheiratet: boolean, p: LegalParameters): number {
+  const e = p.est;
+  // Im Splitting gilt der Satz des halben gemeinsamen Einkommens.
+  const x = Math.max(0, verheiratet ? zve / 2 : zve);
+  if (x <= e.grundfreibetrag) return 0;
+  const k = koeffizienten(e);
+  if (x <= e.zone2Ende) return (2 * k.a2 * ((x - e.grundfreibetrag) / 10000) + k.b2) / 10000;
+  if (x <= e.zone3Ende) return (2 * k.a3 * ((x - e.zone2Ende) / 10000) + k.b3) / 10000;
+  if (x <= e.zone4Ende) return SPITZENSATZ;
+  return REICHENSATZ;
+}
+
 /** Durchschnittssteuersatz — nur fuer die Darstellung, nie fuer Grenzbetraege. */
 export function durchschnittssteuersatz(zve: number, verheiratet: boolean, p: LegalParameters): number {
   if (zve <= 0) return 0;

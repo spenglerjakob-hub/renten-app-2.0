@@ -9,5 +9,7 @@ dist/
 
 # Ueber `npx skills add` installierte Agent-Skills.
 # Reproduzierbar aus skills-lock.json, deshalb nicht eingecheckt.
+# Projekteigene Skills liegen daneben und werden eingecheckt.
 .agents/
-.claude/skills/
+.claude/skills/*
+!.claude/skills/jahreswechsel/

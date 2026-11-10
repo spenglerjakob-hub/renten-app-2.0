@@ -3,8 +3,8 @@ import {
   Baby, CalendarClock, Gift, Info as InfoSymbol, Mail, PiggyBank, Printer, RotateCcw,
 } from 'lucide-react';
 import {
-  avdZulagen, avdAnsparphase, avdSteuervorteil, avdProfitabilitaet,
-  parameterFuer, bruttoZuNetto,
+  avdZulagen, avdAnsparphase, avdSteuervorteil, avdSteuerrechnung, avdProfitabilitaet,
+  parameterFuer,
 } from '@renten/engine';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { AnspracheGeben } from '../components/Ansprache';
@@ -19,8 +19,10 @@ import {
   FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, Kernsatz, LINK, Regler, Titel, Zahl,
 } from '../components/stil';
 import { vollerName, type NamensTeile } from '../lib/namen';
+import { Schublade } from '../components/Schublade';
 import { KapitalaufbauDiagramm } from './Diagramme';
 import { BeratungDialog, type Eckdaten } from './Beratung';
+import { RechnungKnopf, SteuerrechnungInhalt } from './Steuerrechnung';
 import { Schritt, ruhig } from './Schritt';
 import { KinderGeburtsdaten, kinderFuerRechnung, type KindEingabe } from './KinderGeburtsdaten';
 import { depotZeitraum, zulagenBisRente } from './zulagen-bis-rente';
@@ -56,6 +58,23 @@ const GEHALT_AB = 10_000;
 const DU: Ansprache = { form: 'du', mehrere: false, name: '' };
 
 /**
+ * Uebernimmt ein getipptes Jahresgehalt in die Rechnung: ein fuenfstelliges,
+ * sobald eine Weile nicht mehr getippt wurde; ein kleineres erst, wenn das
+ * Feld verlassen oder mit Enter bestaetigt wird — dafuer gibt der Hook den
+ * Setzer mit zurueck.
+ */
+function useUebernahme(feld: number): [number, (n: number) => void] {
+  const [wert, setWert] = useState(0);
+  useEffect(() => {
+    if (feld === wert) return;
+    if (feld > 0 && feld < GEHALT_AB) return;
+    const t = window.setTimeout(() => setWert(feld), ruhig() ? 0 : PAUSE.gehaltRuhig);
+    return () => window.clearTimeout(t);
+  }, [feld, wert]);
+  return [wert, setWert];
+}
+
+/**
  * Landingpage zum Altersvorsorgedepot.
  *
  * Steht bewusst UNABHAENGIG vom Rentenplaner: Sie kommt per QR-Code aus einem
@@ -84,6 +103,10 @@ export function Seite() {
   const [bruttoJahr, setBruttoJahr] = useState(0);
   const [ohneSteuer, setOhneSteuer] = useState(false);
   const [verheiratet, setVerheiratet] = useState(false);
+  /** Bruttojahresgehalt des Ehepartners, wie es im Feld steht; 0 = verdient nichts */
+  const [partnerBrutto, setPartnerBrutto] = useState(0);
+  /** Die Schublade mit der Steuerrechnung */
+  const [rechnungOffen, setRechnungOffen] = useState(false);
   const [beitragMonat, setBeitragMonat] = useState<number>(VORGABE.beitragMonat);
   const [rendite, setRendite] = useState<number>(VORGABE.rendite);
   const [renditeOffen, setRenditeOffen] = useState(false);
@@ -120,13 +143,9 @@ export function Seite() {
     „4.500“ im Feld, und die Info sprang zwischen „bringt nichts“ und einem
     Betrag hin und her.
   */
-  const [gehalt, setGehalt] = useState(0);
-  useEffect(() => {
-    if (bruttoJahr === gehalt) return;
-    if (bruttoJahr > 0 && bruttoJahr < GEHALT_AB) return;
-    const t = window.setTimeout(() => setGehalt(bruttoJahr), ruhig() ? 0 : PAUSE.gehaltRuhig);
-    return () => window.clearTimeout(t);
-  }, [bruttoJahr, gehalt]);
+  const [gehalt, setGehalt] = useUebernahme(bruttoJahr);
+  /** Das Gehalt des Ehepartners — nach derselben Regel uebernommen */
+  const [partnerGehalt, setPartnerGehalt] = useUebernahme(partnerBrutto);
   /** Bleibt ein Betrag unter 10.000 € stehen, erinnert ein Satz daran, dass das Jahresgehalt gefragt ist. */
   const [gehaltKlein, setGehaltKlein] = useState(false);
   useEffect(() => {
@@ -172,6 +191,9 @@ export function Seite() {
     setGehalt(0);
     setOhneSteuer(false);
     setVerheiratet(false);
+    setPartnerBrutto(0);
+    setPartnerGehalt(0);
+    setRechnungOffen(false);
     setBeitragMonat(VORGABE.beitragMonat);
     setRendite(VORGABE.rendite);
     setRenditeOffen(false);
@@ -222,18 +244,33 @@ export function Seite() {
   }, [zeitraum, jahreBisRente, beitragMonat, rendite, kinderListe, alterHeute, startjahr, p]);
 
   /**
-   * Zu versteuerndes Einkommen von heute — Grundlage des
-   * Sonderausgabenabzugs. Wiederverwendet wird dieselbe Funktion, die auch
-   * der Rechner fuer die Erwerbsphase nutzt.
+   * DIE STEUERRECHNUNG, Schritt fuer Schritt — fuer ein laufendes Jahr, also
+   * mit den Zulagen ohne den einmaligen Bonus, wie die Steuerinfo, die sie in
+   * der Schublade erklaert.
+   *
+   * Ihr zu versteuerndes Einkommen ist die Grundlage aller Steuerzahlen der
+   * Seite. Bei Verheirateten ist es das GEMEINSAME: Sie werden zusammen
+   * veranlagt, gleich welche Steuerklassen sie haben. Frueher stand hier das
+   * Splitting auf das Einkommen eines Partners allein — wer zu zweit
+   * verdient, bekam eine zu kleine Ersparnis gezeigt.
    */
-  const zveHeute = useMemo(() => {
-    if (gehalt <= 0) return 0;
-    return bruttoZuNetto(
-      gehalt,
-      { ...steuerOpt, kinder: { hatKinder: kinder > 0, kinderUnter25: kinder } },
+  const steuerrechnung = useMemo(() => {
+    if (gehalt <= 0) return null;
+    return avdSteuerrechnung(
+      {
+        eigenbeitragJahr: beitragMonat * 12,
+        zulagenJahr: zulagen.dauerhaft,
+        bruttoJahr: gehalt,
+        partnerBruttoJahr: verheiratet ? partnerGehalt : 0,
+        kinder: { hatKinder: kinder > 0, kinderUnter25: kinder },
+      },
+      steuerOpt,
       p,
-    ).zve;
-  }, [gehalt, kinder, steuerOpt, p]);
+    );
+  }, [gehalt, beitragMonat, zulagen.dauerhaft, verheiratet, partnerGehalt, kinder, steuerOpt, p]);
+  const zveHeute = steuerrechnung?.zve ?? 0;
+  // Ohne Rechnung gibt es nichts zu zeigen — und beim naechsten Gehalt soll die Schublade nicht von selbst aufgehen.
+  useEffect(() => { if (!steuerrechnung) setRechnungOffen(false); }, [steuerrechnung]);
 
   /**
    * Sonderausgabenabzug § 10a mit Guenstigerpruefung. Abziehbar ist der
@@ -280,13 +317,12 @@ export function Seite() {
   const monat = useMemo(() => {
     if (beitragMonat <= 0) return null;
     const zulage = zulagen.dauerhaft / 12;
-    const steuer = gehalt > 0
-      ? avdSteuervorteil({ eigenbeitragJahr: beitragMonat * 12, zulagenJahr: zulagen.dauerhaft, zveHeute }, steuerOpt, p).ueberZulagen / 12
-      : 0;
+    // Dieselbe Zahl, die die Schublade herleitet.
+    const steuer = steuerrechnung ? steuerrechnung.ueberZulagen / 12 : 0;
     const netto = Math.max(0, beitragMonat - steuer);
     const depot = beitragMonat + zulage;
     return { netto, steuer, zulage, depot, hebel: netto > 0 ? depot / netto : 0 };
-  }, [beitragMonat, zulagen.dauerhaft, gehalt, zveHeute, steuerOpt, p]);
+  }, [beitragMonat, zulagen.dauerhaft, steuerrechnung]);
   const zahl2 = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   /** Die Steuerersparnis ueber die ganze Ansparphase — ein Teil der eingezahlten Beitraege, den das Finanzamt erstattet */
   const steuerGesamt = gehalt > 0 ? (profit?.steuerersparnisGesamt ?? 0) : 0;
@@ -324,10 +360,9 @@ export function Seite() {
         Die Steuerersparnis ist mit deinem heutigen Einkommen gerechnet und auf die Laufzeit
         hochgerechnet. Genauer wäre Jahr für Jahr — dafür müsste man aber eine
         Gehaltsentwicklung unterstellen, die niemand kennt.
-        {verheiratet && (
-          <> Bei „Verheiratet“ wird der Splittingtarif auf dein eigenes Einkommen angewandt.
-          Verdient dein Partner ebenfalls, fällt die Steuerersparnis in Wirklichkeit
-          kleiner aus.</>
+        {verheiratet && (partnerGehalt > 0
+          ? <> Verheiratet: gerechnet mit eurem gemeinsamen Einkommen im Splittingtarif.</>
+          : <> Verheiratet: gerechnet im Splittingtarif, dein Partner ohne eigenes Einkommen.</>
         )}
       </p>
     </>
@@ -476,7 +511,11 @@ export function Seite() {
               wert={kinderDaten.length > 0 ? `${kinderDaten.length} (geboren ${kinderDaten.join(', ')})` : 'keine'}
             />
             <DruckAngabe feld="Bruttoeinkommen im Jahr" wert={gehalt > 0 ? euro(gehalt) : '—'} />
-            <DruckAngabe feld="Familienstand" wert={verheiratet ? 'verheiratet (Splittingtarif)' : 'ledig'} />
+            <DruckAngabe
+              feld="Familienstand"
+              wert={!verheiratet ? 'ledig'
+                : partnerGehalt > 0 ? `verheiratet, Partner ${euro(partnerGehalt)}` : 'verheiratet, Partner ohne Einkommen'}
+            />
             <DruckAngabe
               feld="Rendite / Effektivkosten p. a."
               wert={`${prozent(rendite)} / ${prozent(KOSTEN)}`}
@@ -587,6 +626,26 @@ export function Seite() {
                   <Schalter label="Verheiratet (Splittingtarif)" wert={verheiratet} onChange={setVerheiratet} />
                 </div>
               </div>
+              {/*
+                Verheiratete werden zusammen veranlagt: Was der Abzug spart,
+                haengt am GEMEINSAMEN Einkommen — nicht an der Steuerklasse,
+                die nur den monatlichen Lohnsteuerabzug regelt.
+              */}
+              {verheiratet && (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <ZahlFeld
+                    label="Bruttojahresgehalt deines Partners"
+                    wert={partnerBrutto}
+                    onChange={setPartnerBrutto}
+                    onVerlassen={() => setPartnerGehalt(partnerBrutto)}
+                    einheit="€"
+                    platzhalter="z. B. 30.000"
+                    leerBeiNull
+                    tausenderpunkte
+                    hilfe="Ihr werdet zusammen veranlagt. Leer lassen, wenn dein Partner nichts verdient oder nur einen Minijob hat."
+                  />
+                </div>
+              )}
               {bruttoJahr <= 0 && !ohneSteuer && (
                 <button type="button" onClick={() => setOhneSteuer(true)} className={`${LINK} mt-4`}>
                   Ohne Steuer weiter
@@ -596,7 +655,7 @@ export function Seite() {
           </Schritt>
         )}
 
-        {offen(3) && gehalt > 0 && (
+        {offen(3) && steuerrechnung && (
           <Schritt klasse="mt-4 print:hidden" beschriftung="Deine Steuerersparnis">
             {steuerJahr > 0.5 ? (
               <Info
@@ -611,11 +670,13 @@ export function Seite() {
               />
             ) : (
               <Hinweis>
-                Bei deinem Einkommen bringt der Steuerabzug <span className="font-medium">nichts über die Zulagen
-                hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das Finanzamt
-                automatisch an.
+                Bei {verheiratet ? 'eurem' : 'deinem'} Einkommen bringt der Steuerabzug <span className="font-medium">nichts
+                über die Zulagen hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das
+                Finanzamt automatisch an.
               </Hinweis>
             )}
+            {/* Das Info-Kaestchen: ein Klick oeffnet die Rechnung dahinter. */}
+            <RechnungKnopf r={steuerrechnung} onOeffnen={() => setRechnungOffen(true)} />
           </Schritt>
         )}
 
@@ -846,7 +907,7 @@ export function Seite() {
                       // Ohne Wirkung braucht es keine vierzeilige Herleitung, die
                       // am Ende null ergibt. Ein Satz sagt dasselbe.
                       <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">
-                        Bei deinem Einkommen bringt der Steuerabzug <span className="font-medium text-ui-tinte">nichts über die Zulagen
+                        Bei {verheiratet ? 'eurem' : 'deinem'} Einkommen bringt der Steuerabzug <span className="font-medium text-ui-tinte">nichts über die Zulagen
                         hinaus</span> — die Zulage ist der günstigere Weg, und genau den wendet das
                         Finanzamt automatisch an. Deine {euro(beitragMonat * 12)} Beitrag kosten dich
                         damit auch nach Steuern {euro(steuervorteil.eigenaufwandNetto)} im Jahr.
@@ -861,7 +922,7 @@ export function Seite() {
                           <Summe text="Zusätzlich über die Zulagen hinaus" wert={euro(steuervorteil.ueberZulagen)} />
                         </dl>
                         <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-                          Bei deinem Einkommen ist der Abzug günstiger als die bloße Zulage. Das
+                          Bei {verheiratet ? 'eurem' : 'deinem'} Einkommen ist der Abzug günstiger als die bloße Zulage. Das
                           Finanzamt prüft das von Amts wegen — du musst nichts beantragen.
                           Unterm Strich kosten dich {euro(beitragMonat * 12)} Beitrag nur{' '}
                           <strong>{euro(steuervorteil.eigenaufwandNetto)}</strong> im Jahr.
@@ -982,6 +1043,15 @@ export function Seite() {
         name={name}
         onName={setName}
       />
+
+      <Schublade
+        offen={rechnungOffen && steuerrechnung !== null}
+        titel="So rechnen wir deine Steuerersparnis"
+        untertitel={`Ein Beitragsjahr mit ${euro(beitragMonat)} im Monat · Steuerjahr ${p.jahr}`}
+        onSchliessen={() => setRechnungOffen(false)}
+      >
+        {steuerrechnung && <SteuerrechnungInhalt r={steuerrechnung} p={p} bonus={zulagen.bonus} />}
+      </Schublade>
     </div>
     </AnspracheGeben>
   );

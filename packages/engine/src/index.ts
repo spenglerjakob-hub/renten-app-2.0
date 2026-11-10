@@ -8,7 +8,7 @@ export {
 
 // Steuer
 export {
-  grundtarif, einkommensteuer, grenzsteuersatz, durchschnittssteuersatz,
+  grundtarif, einkommensteuer, grenzsteuersatz, tarifGrenzsteuersatz, durchschnittssteuersatz,
   solidaritaetszuschlag, kirchensteuersatz, koeffizienten,
 } from './tax/estg.js';
 export {
@@ -35,8 +35,9 @@ export {
 
 // Erwerbsphase
 export {
-  bruttoZuNetto, nettoZuBrutto, erwerbHaushalt,
+  bruttoZuNetto, nettoZuBrutto, erwerbHaushalt, zveAufschluesselung,
   type ErwerbsNetto, type ErwerbsOptionen, type HaushaltsPerson, type ErwerbHaushaltErgebnis,
+  type ZveAufschluesselung,
 } from './erwerb/netto.js';
 export {
   erwerbsBasisHeute, personenHeute, kvJePersonHeute, einkommenJePersonHeute,
@@ -75,10 +76,10 @@ export {
   entnahmeRate, entnahmeplanBewerten, type EntnahmeErgebnis,
 } from './products/entnahmeplaner.js';
 export {
-  avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdGegenFreiesDepot,
+  avdZulagen, avdAnsparphase, avdAuszahlung, avdSteuervorteil, avdSteuerrechnung, avdGegenFreiesDepot,
   avdProfitabilitaet, avdKinderzulageBis,
   type AvdKind, type AvdZulagen, type AvdAnsparErgebnis, type AvdJahr,
-  type AvdSteuervorteil, type DepotSeite, type AvdProfitabilitaet,
+  type AvdSteuervorteil, type AvdSteuerrechnung, type SteuerBetrag, type DepotSeite, type AvdProfitabilitaet,
 } from './products/altersvorsorgedepot.js';
 
 // Analyse

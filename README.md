@@ -86,6 +86,17 @@ Jaehrliche Aktualisierung: vier Zahlen je Jahrgang plus Beitragssaetze und
 Bemessungsgrenzen eintragen. Die Tests pruefen Stetigkeit, Monotonie und den
 Verlauf des Grenzsteuersatzes automatisch.
 
+Was zum Jahreswechsel sonst noch anfaellt — auch ausserhalb von `params`, etwa
+Kassenliste, Vorgaben in Formularen, Texte mit Betraegen und Umlagen —, listet
+
+```bash
+node .claude/skills/jahreswechsel/scripts/rechengroessen.mjs --probelauf
+```
+
+Der Bericht nennt jede Fundstelle, meldet veraltete Werte und laesst die Tests
+mit einer Uhr im Januar des neuen Jahres laufen. Der gleichnamige Claude-Skill
+(`.claude/skills/jahreswechsel`) fuehrt von dort durch die Aktualisierung.
+
 ## Entwicklung
 
 ```bash
@@ -118,7 +129,8 @@ sich dann aus.
 funktioniert nur in einem echten Terminal, nicht in einer Web-Sitzung.
 
 Die begleitenden Agent-Skills sind nicht eingecheckt, sondern aus
-`skills-lock.json` reproduzierbar:
+`skills-lock.json` reproduzierbar. Eingecheckt ist nur der projekteigene Skill
+`.claude/skills/jahreswechsel`.
 
 ```bash
 npx skills add supabase/agent-skills
