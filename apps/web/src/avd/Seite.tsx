@@ -288,6 +288,8 @@ export function Seite() {
     return { netto, steuer, zulage, depot, hebel: netto > 0 ? depot / netto : 0 };
   }, [beitragMonat, zulagen.dauerhaft, gehalt, zveHeute, steuerOpt, p]);
   const zahl2 = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  /** Die Steuerersparnis ueber die ganze Ansparphase — ein Teil der eingezahlten Beitraege, den das Finanzamt erstattet */
+  const steuerGesamt = gehalt > 0 ? (profit?.steuerersparnisGesamt ?? 0) : 0;
   /** Die Steuerersparnis eines laufenden Jahres ueber die Zulagen hinaus — fuer die Zwischeninfo */
   const steuerJahr = monat ? monat.steuer * 12 : 0;
 
@@ -700,9 +702,24 @@ export function Seite() {
                     <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lauf.endkapital)}</Hervor></span>
                   </Kernsatz>
 
-                  {/* Die drei Teile mit dem Punkt ihrer Flaeche im Diagramm darunter — wie die Legende der Beratung. */}
-                  <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-                    <Zahl etikett="Deine Eigenbeiträge" punkt={PUNKT.eigen} wert={euro(lauf.eigenbeitraege)} />
+                  {/*
+                    Die Teile mit dem Punkt ihrer Flaeche im Diagramm darunter — wie die Legende der Beratung.
+                    DEIN EIGENBEITRAG NACH STEUERERSPARNIS: dieselbe Zahl wie „Kostet dich wirklich“ unten,
+                    nicht der hochgerechnete Zahlbeitrag. Die Ersparnis steht daneben als eigener Teil (wie
+                    im Ring): Zusammen ergeben beide die eingezahlten Beitraege — und alle Teile das Kapital.
+                    Ohne Einkommen gibt es keine Ersparnis; dann bleibt es bei drei Teilen.
+                  */}
+                  {/* Im Druck in einer Reihe — zwei Reihen schoben die Anmerkungen von Seite 2 auf Seite 3. */}
+                  <dl className={`mt-5 grid gap-4 ${steuerGesamt > 0 ? 'sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4' : 'sm:grid-cols-3'}`}>
+                    <Zahl
+                      etikett="Dein Eigenbeitrag" punkt={PUNKT.eigen}
+                      wert={euro(steuerGesamt > 0 && profit ? profit.eigenaufwandNettoGesamt : lauf.eigenbeitraege)}
+                      unter={steuerGesamt > 0 ? `nach Steuerersparnis · eingezahlt ${euro(lauf.eigenbeitraege)}` : undefined}
+                    />
+                    {steuerGesamt > 0 && (
+                      <Zahl etikett="Steuerersparnis" punkt={PUNKT.steuer} wert={euro(steuerGesamt)}
+                        unter="kommt über die Steuer zurück" />
+                    )}
                     <Zahl etikett="Zulagen vom Staat" punkt={PUNKT.zulagen} wert={euro(lauf.zulagenGesamt)} />
                     <Zahl
                       etikett="Kursgewinne" punkt={PUNKT.gewinn}
