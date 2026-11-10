@@ -1,6 +1,9 @@
 import type { AvdParameter, LegalParameters } from '../params/types.js';
 import { ansparphase, entnahmeplan, type DepotVerlauf } from './kapitalanlage.js';
 import { zusatzsteuer, abgeltungsteuer } from '../tax/haushalt.js';
+import { einkommensteuer, solidaritaetszuschlag, kirchensteuersatz, tarifGrenzsteuersatz } from '../tax/estg.js';
+import { zveAufschluesselung, type ZveAufschluesselung } from '../erwerb/netto.js';
+import type { KinderStatus } from '../social/kv-pv.js';
 import { kennzahlen } from '../analyse/kennzahlen.js';
 
 /**
@@ -458,6 +461,139 @@ export function avdSteuervorteil(
     eigenaufwandNetto: Math.max(0, eigen - ueberZulagen),
     zuflussInsDepot: eigen + zulagen,
     guenstigerAlsZulage: steuerersparnis > zulagen,
+  };
+}
+
+/** Steuer eines zvE mit Soli und Kirchensteuer — so, wie `zusatzsteuer` die Differenz bildet. */
+export interface SteuerBetrag {
+  est: number;
+  soli: number;
+  kirchensteuer: number;
+  gesamt: number;
+}
+
+function steuerBetrag(
+  zve: number,
+  opt: { verheiratet: boolean; bundesland: string; kirchensteuerpflichtig: boolean },
+  p: LegalParameters,
+): SteuerBetrag {
+  const est = einkommensteuer(zve, opt.verheiratet, p);
+  const soli = solidaritaetszuschlag(est, opt.verheiratet, p);
+  const kirchensteuer = opt.kirchensteuerpflichtig ? est * kirchensteuersatz(opt.bundesland) : 0;
+  return { est, soli, kirchensteuer, gesamt: est + soli + kirchensteuer };
+}
+
+/**
+ * DIE STEUERERSPARNIS DES DEPOTS, SCHRITT FUER SCHRITT.
+ *
+ * Fuer eine Darstellung, die die Rechnung offenlegt: vom Bruttogehalt ueber
+ * das zu versteuernde Einkommen und den Grenzsteuersatz bis zur
+ * Guenstigerpruefung. Die Zahlen sind dieselben wie in `avdSteuervorteil` —
+ * die Ersparnis wird dort gerechnet und hier nur aufgeschluesselt, damit die
+ * Aufstellung nie von dem Betrag abweicht, der daneben steht.
+ *
+ * VERHEIRATETE werden zusammen veranlagt: Die Ersparnis ergibt sich aus dem
+ * GEMEINSAMEN Einkommen im Splittingtarif, ganz gleich, welche
+ * Steuerklassen auf den Lohnabrechnungen stehen — die regeln nur den
+ * monatlichen Lohnsteuerabzug, und den senkt der Depotbeitrag nicht. Frueher
+ * rechnete die Depot-Seite das Splitting auf das Einkommen EINES Partners;
+ * verdiente der andere mit, fiel die Ersparnis dadurch zu niedrig aus, bei
+ * zweimal 45.000 EUR brutto um 150 EUR im Jahr.
+ */
+export interface AvdSteuerrechnung {
+  /** Wer das Depot bespart */
+  person: ZveAufschluesselung;
+  /** Ehepartner in der Zusammenveranlagung; null bei Alleinstehenden */
+  partner: ZveAufschluesselung | null;
+  splitting: boolean;
+  /** Das zvE, auf das der Tarif angewandt wird — bei Verheirateten das gemeinsame */
+  zve: number;
+  /** Grenzsteuersatz der Einkommensteuer an dieser Stelle (Ableitung des Tarifs) */
+  grenzsteuersatzEst: number;
+  /** Mit Soli und Kirchensteuer, soweit sie den naechsten Euro belasten */
+  grenzsteuersatz: number;
+  /** true, wenn der naechste Euro auch Solidaritaetszuschlag kostet */
+  mitSoli: boolean;
+  /** Eigenbeitrag, soweit abziehbar */
+  eigenbeitragAbziehbar: number;
+  /** Hoechstbetrag fuer den Eigenbeitrag (§ 10a) */
+  hoechstbetrag: number;
+  zulagen: number;
+  /** Sonderausgabenabzug: abziehbarer Eigenbeitrag plus Zulagen */
+  abzug: number;
+  steuerOhneAbzug: SteuerBetrag;
+  steuerMitAbzug: SteuerBetrag;
+  /** Steuer ohne Abzug minus Steuer mit Abzug — gleich `avdSteuervorteil().steuerersparnis` */
+  ersparnis: number;
+  /** Ersparnis je abgezogenem Euro: der Durchschnittssatz ueber den Abzug */
+  satzAufAbzug: number;
+  /** Was nach der Guenstigerpruefung ueber die Zulagen hinaus bleibt */
+  ueberZulagen: number;
+  guenstigerAlsZulage: boolean;
+}
+
+export function avdSteuerrechnung(
+  args: {
+    eigenbeitragJahr: number;
+    zulagenJahr: number;
+    bruttoJahr: number;
+    /**
+     * Nur bei Verheirateten: Bruttojahresgehalt des Ehepartners. 0, wenn er
+     * nichts verdient — dann ist das gemeinsame Einkommen das eigene.
+     */
+    partnerBruttoJahr?: number;
+    /** Fuer den Pflegebeitrag (Zuschlag fuer Kinderlose, Abschlaege) */
+    kinder: KinderStatus;
+  },
+  opt: { verheiratet: boolean; bundesland: string; kirchensteuerpflichtig: boolean },
+  p: LegalParameters,
+): AvdSteuerrechnung {
+  const erwerb = { ...opt, kinder: args.kinder };
+  const person = zveAufschluesselung(args.bruttoJahr, erwerb, p);
+  const partner = opt.verheiratet
+    ? zveAufschluesselung(Math.max(0, args.partnerBruttoJahr ?? 0), erwerb, p)
+    : null;
+  const zve = person.zve + (partner?.zve ?? 0);
+
+  const vorteil = avdSteuervorteil(
+    { eigenbeitragJahr: args.eigenbeitragJahr, zulagenJahr: args.zulagenJahr, zveHeute: zve },
+    opt,
+    p,
+  );
+  // Dieselbe Basis wie in `avdSteuervorteil` (dort ueber `zusatzsteuer`).
+  const basis = Math.max(0, zve - vorteil.abzugsfaehig);
+  const steuerMitAbzug = steuerBetrag(basis, opt, p);
+  const steuerOhneAbzug = steuerBetrag(basis + vorteil.abzugsfaehig, opt, p);
+
+  const grenzsteuersatzEst = tarifGrenzsteuersatz(zve, opt.verheiratet, p);
+  // Der Soli belastet den naechsten Euro nur oberhalb der Freigrenze — in der
+  // Milderungszone mit 11,9 % der Einkommensteuer, danach mit 5,5 %.
+  const freigrenze = p.soli.freigrenze * (opt.verheiratet ? 2 : 1);
+  const est = steuerOhneAbzug.est;
+  const soliFaktor = est <= freigrenze
+    ? 0
+    : (est - freigrenze) * p.soli.milderungssatz < est * p.soli.satz ? p.soli.milderungssatz : p.soli.satz;
+  const kistFaktor = opt.kirchensteuerpflichtig ? kirchensteuersatz(opt.bundesland) : 0;
+  const zulagen = Math.max(0, args.zulagenJahr);
+
+  return {
+    person,
+    partner,
+    splitting: opt.verheiratet,
+    zve,
+    grenzsteuersatzEst,
+    grenzsteuersatz: grenzsteuersatzEst * (1 + soliFaktor + kistFaktor),
+    mitSoli: soliFaktor > 0 && grenzsteuersatzEst > 0,
+    eigenbeitragAbziehbar: vorteil.abzugsfaehig - zulagen,
+    hoechstbetrag: p.avd.hoechstbetragEigenbeitrag,
+    zulagen,
+    abzug: vorteil.abzugsfaehig,
+    steuerOhneAbzug,
+    steuerMitAbzug,
+    ersparnis: vorteil.steuerersparnis,
+    satzAufAbzug: vorteil.abzugsfaehig > 0 ? vorteil.steuerersparnis / vorteil.abzugsfaehig : 0,
+    ueberZulagen: vorteil.ueberZulagen,
+    guenstigerAlsZulage: vorteil.guenstigerAlsZulage,
   };
 }
 

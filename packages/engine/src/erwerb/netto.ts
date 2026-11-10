@@ -93,7 +93,10 @@ function personAnteil(
     /** Zusatzbeitrag der eigenen Kasse; ohne Angabe der des Rechtsstands. */
     zusatzbeitrag?: number;
   },
-): { brutto: number; sv: number; zveBeitrag: number; zveVorSonderausgaben: number } {
+): {
+  brutto: number; sv: number; zveBeitrag: number; zveVorSonderausgaben: number;
+  arbeitnehmerPauschbetrag: number; vorsorgeAbzug: number;
+} {
   const brutto = Math.max(0, jahresbrutto);
   const beamter = eigen.beamter;
   const pkvPraemieMonat = eigen.pkvPraemieMonat;
@@ -213,7 +216,49 @@ function personAnteil(
   const zveVorSonderausgaben = Math.max(0, brutto - arbeitnehmerPauschbetrag - vorsorgeAbzug);
   const zveBeitrag = Math.max(0, zveVorSonderausgaben - p.pauschbetraege.sonderausgaben);
 
-  return { brutto, sv, zveBeitrag, zveVorSonderausgaben };
+  return { brutto, sv, zveBeitrag, zveVorSonderausgaben, arbeitnehmerPauschbetrag, vorsorgeAbzug };
+}
+
+/**
+ * Wie aus dem Bruttogehalt das zu versteuernde Einkommen wird — Posten fuer
+ * Posten, fuer Darstellungen, die die Rechnung offenlegen.
+ *
+ * Dieselbe Rechnung wie `bruttoZuNetto`, `zve` ist identisch mit dessen
+ * `zve`. Die Posten sind die TATSAECHLICH abgezogenen Betraege: Wer wenig
+ * oder nichts verdient, bekommt den Pauschbetrag nicht in voller Hoehe, weil
+ * das Einkommen nicht unter null sinkt. So geht die Aufstellung immer auf.
+ */
+export interface ZveAufschluesselung {
+  brutto: number;
+  /** § 9a Satz 1 Nr. 1a EStG — nur bei Arbeitslohn */
+  arbeitnehmerPauschbetrag: number;
+  /** Abziehbare Vorsorgeaufwendungen: Renten-, Kranken- (ohne Krankengeldanteil) und Pflegeversicherung */
+  vorsorgeaufwand: number;
+  /** § 10c EStG */
+  sonderausgabenPauschbetrag: number;
+  zve: number;
+}
+
+export function zveAufschluesselung(
+  jahresbrutto: number,
+  o: ErwerbsOptionen,
+  p: LegalParameters,
+): ZveAufschluesselung {
+  const a = personAnteil(jahresbrutto, o, p, {
+    beamter: o.beamter ?? false,
+    pkvPraemieMonat: o.pkvPraemieMonat ?? 0,
+    selbststaendig: o.selbststaendig ?? false,
+    grvBeitragJahr: o.grvBeitragJahr ?? 0,
+  });
+  const arbeitnehmer = Math.min(a.arbeitnehmerPauschbetrag, a.brutto);
+  const vorsorge = Math.min(a.vorsorgeAbzug, a.brutto - arbeitnehmer);
+  return {
+    brutto: a.brutto,
+    arbeitnehmerPauschbetrag: arbeitnehmer,
+    vorsorgeaufwand: vorsorge,
+    sonderausgabenPauschbetrag: a.zveVorSonderausgaben - a.zveBeitrag,
+    zve: a.zveBeitrag,
+  };
 }
 
 /** Brutto -> Netto fuer die Erwerbsphase, EINE Person. */

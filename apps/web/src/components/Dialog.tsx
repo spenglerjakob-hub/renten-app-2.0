@@ -1,14 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useModal } from './useModal';
 
 /**
  * Schlichtes modales Fenster.
  *
- * Barrierefreiheit ist hier kein Beiwerk: Ein Dialog, aus dem der Tastaturfokus
- * herausrutscht, ist fuer Tastatur- und Screenreader-Nutzer eine Sackgasse.
- * Deshalb wandert der Fokus beim Oeffnen hinein, bleibt darin gefangen,
- * Escape schliesst, und beim Schliessen kehrt er auf das ausloesende Element
- * zurueck.
+ * Fokus, Escape und der ruhende Hintergrund kommen aus `useModal` — dieselbe
+ * Fuehrung wie in der Schublade von rechts.
  */
 export function Dialog({
   offen, titel, beschreibung, onSchliessen, schliessbar = true, children,
@@ -27,56 +25,7 @@ export function Dialog({
   children: ReactNode;
 }) {
   const kastenRef = useRef<HTMLDivElement>(null);
-  const vorherRef = useRef<HTMLElement | null>(null);
-  /*
-    DER SCHLIESSER LIEGT IN EINER REF, nicht in der Abhaengigkeitsliste.
-
-    Aufrufer uebergeben ihn meist als Pfeilfunktion, die bei jedem Rendern
-    neu entsteht. Stand er in der Liste, lief der Effekt bei jedem Rendern
-    des Aufrufers neu: Aufraeumen gab den Fokus an das ausloesende Element
-    zurueck, der Neustart setzte ihn auf den ersten Knopf. Wer im
-    Ehepartner-Dialog ein Einkommen eintippte, verlor so nach der ersten
-    Ziffer das Feld — jede Eingabe aendert das Szenario, und die Seite
-    rendert neu.
-  */
-  const schliessenRef = useRef(onSchliessen);
-  useLayoutEffect(() => { schliessenRef.current = onSchliessen; });
-
-  useEffect(() => {
-    if (!offen) return;
-
-    vorherRef.current = document.activeElement as HTMLElement | null;
-    const kasten = kastenRef.current;
-    kasten?.querySelector<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    )?.focus();
-
-    const beiTaste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { if (schliessbar) schliessenRef.current(); return; }
-      if (e.key !== 'Tab' || !kasten) return;
-
-      const ziele = [...kasten.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )].filter((el) => !el.hasAttribute('disabled'));
-      if (ziele.length === 0) return;
-
-      const erstes = ziele[0]!;
-      const letztes = ziele[ziele.length - 1]!;
-      if (e.shiftKey && document.activeElement === erstes) { e.preventDefault(); letztes.focus(); }
-      else if (!e.shiftKey && document.activeElement === letztes) { e.preventDefault(); erstes.focus(); }
-    };
-
-    document.addEventListener('keydown', beiTaste);
-    // Hintergrund nicht mitscrollen lassen.
-    const vorherigesOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', beiTaste);
-      document.body.style.overflow = vorherigesOverflow;
-      vorherRef.current?.focus();
-    };
-  }, [offen, schliessbar]);
+  useModal(offen, kastenRef, onSchliessen, schliessbar);
 
   if (!offen) return null;
 
