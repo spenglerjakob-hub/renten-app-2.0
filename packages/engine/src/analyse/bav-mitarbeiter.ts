@@ -19,7 +19,9 @@ import {
  * nicht.
  *
  * Was nur den Arbeitgeber angeht (Steuersatz des Unternehmens, Umlagen),
- * aendert an der Seite des Mitarbeiters nichts und wird mit null gerechnet.
+ * aendert an der Seite des Mitarbeiters nichts. Es zaehlt allein fuer die
+ * Netto-Belastung des Arbeitgebers (`arbeitgeberBelastung`, Uebersicht fuer
+ * den Arbeitgeber) und wird ohne Angabe mit null gerechnet.
  * Die Hinweise sind eigene: Die der Modelle sprechen den Arbeitgeber an
  * („Der Zuschuss senkt Ihre Kosten …“), hier geht es um den Mitarbeiter.
  */
@@ -53,6 +55,35 @@ export interface MitarbeiterVertrag {
   arbeitgeberMonat: number;
 }
 
+/** Was nur den Arbeitgeber angeht — die Saetze seiner Firma. */
+export interface FirmenSaetze {
+  /** Steuersatz des Unternehmens auf den Gewinn, z. B. 0,30 fuer eine GmbH */
+  unternehmensSteuersatz: number;
+  /** Umlagen U1, U2 und Insolvenzgeld als Satz auf das RV-pflichtige Entgelt */
+  umlagenSatz: number;
+}
+
+/**
+ * Was der Beitrag den Arbeitgeber netto kostet — dieselben Posten wie auf den
+ * Arbeitgeber-Seiten: Er spart Sozialabgaben und Umlagen auf die
+ * beitragsfreie Umwandlung; was danach bleibt, ist Betriebsausgabe und senkt
+ * die Steuer auf den Gewinn.
+ */
+export interface ArbeitgeberBelastung {
+  /** = `arbeitgeberMonat`: Pflichtzuschuss und was er darueber hinaus gibt */
+  beitragMonat: number;
+  /** Gesparte Arbeitgeberanteile zur Sozialversicherung — die Umwandlung ist beitragsfrei */
+  svErsparnisMonat: number;
+  /** Gesparte Umlagen; 0 ohne Umlagensatz */
+  umlagenErsparnisMonat: number;
+  /** = Beitrag − SV-Ersparnis − Umlagen; negativ, wenn die Ersparnis den Beitrag uebersteigt */
+  kostenVorSteuerMonat: number;
+  /** Steuer auf den Gewinn, die der Aufwand spart; negativ mit `kostenVorSteuerMonat` */
+  steuerersparnisMonat: number;
+  /** = Kosten vor Steuer − Steuerersparnis */
+  nettoKostenMonat: number;
+}
+
 export interface MitarbeiterBav {
   umwandlungMonat: number;
   svErsparnisMonat: number;
@@ -72,6 +103,8 @@ export interface MitarbeiterBav {
   gesamtMonat: number;
   /** Im Vertrag je Euro Netto-Aufwand */
   hebel: number;
+  /** Was der Beitrag den Arbeitgeber netto kostet — mit den Saetzen seiner Firma */
+  arbeitgeberBelastung: ArbeitgeberBelastung;
   hinweise: string[];
 }
 
@@ -81,15 +114,28 @@ const euro = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 const bisher = (bavBestandMonat: number): BisherigeLeistungen | undefined =>
   bavBestandMonat > 0 ? { vlMonat: 0, vlUmgang: 'anrechnen', bavBestandMonat } : undefined;
 
-const kern = (m: MitarbeiterEingaben) => ({
+const kern = (m: MitarbeiterEingaben, firma?: FirmenSaetze) => ({
   jahresbrutto: Math.max(0, m.jahresbrutto),
   umwandlungMonat: Math.max(0, m.umwandlungMonat),
-  unternehmensSteuersatz: 0,
-  umlagenSatz: 0,
+  unternehmensSteuersatz: firma?.unternehmensSteuersatz ?? 0,
+  umlagenSatz: firma?.umlagenSatz ?? 0,
   privatVersichert: m.privatVersichert,
   pkvPraemieMonat: m.privatVersichert ? Math.max(0, m.pkvPraemieMonat) : 0,
   kinder: m.kinder,
   bisher: bisher(m.bavBestandMonat),
+});
+
+/** Die Posten des Arbeitgebers aus dem Ergebnis eines Modells — der Beitrag ist der, den der Mitarbeiter sieht. */
+const belastung = (
+  beitragMonat: number,
+  ag: Pick<ArbeitgeberBelastung, 'svErsparnisMonat' | 'umlagenErsparnisMonat' | 'kostenVorSteuerMonat' | 'steuerersparnisMonat' | 'nettoKostenMonat'>,
+): ArbeitgeberBelastung => ({
+  beitragMonat,
+  svErsparnisMonat: ag.svErsparnisMonat,
+  umlagenErsparnisMonat: ag.umlagenErsparnisMonat,
+  kostenVorSteuerMonat: ag.kostenVorSteuerMonat,
+  steuerersparnisMonat: ag.steuerersparnisMonat,
+  nettoKostenMonat: ag.nettoKostenMonat,
 });
 
 export function bavMitarbeiter(
@@ -97,11 +143,13 @@ export function bavMitarbeiter(
   m: MitarbeiterEingaben,
   steuerOpt: MatchingSteuer,
   p: LegalParameters,
+  /** Nur fuer `arbeitgeberBelastung` — die Seite des Mitarbeiters bleibt gleich */
+  firma?: FirmenSaetze,
 ): MitarbeiterBav {
   let r: Omit<MitarbeiterBav, 'hinweise'>;
   if (modell.art === 'matching') {
     const x = matchingModell(
-      { ...kern(m), weg: modell.weg, matchingMonat: modell.matchingMonat, zuschussImMatching: modell.zuschussImMatching },
+      { ...kern(m, firma), weg: modell.weg, matchingMonat: modell.matchingMonat, zuschussImMatching: modell.zuschussImMatching },
       steuerOpt, p,
     );
     const vertraege: MitarbeiterVertrag[] = [];
@@ -119,11 +167,12 @@ export function bavMitarbeiter(
       vertraege,
       gesamtMonat: x.vertrag.gesamtMonat,
       hebel: x.hebelMitarbeiter,
+      arbeitgeberBelastung: belastung(x.arbeitgeber.pflichtzuschussMonat + x.arbeitgeber.ukasseMonat, x.arbeitgeber),
     };
   } else {
     const x = modell.art === 'zuschuss'
-      ? zuschussModell({ ...kern(m), quote: modell.quote, deckelMonat: modell.deckelMonat }, steuerOpt, p)
-      : festbetragModell({ ...kern(m), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
+      ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: modell.deckelMonat }, steuerOpt, p)
+      : festbetragModell({ ...kern(m, firma), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
     r = {
       ...x.mitarbeiter,
       pflichtzuschussMonat: x.arbeitgeber.davonPflichtzuschussMonat,
@@ -134,6 +183,7 @@ export function bavMitarbeiter(
         : [],
       gesamtMonat: x.vertragMonat,
       hebel: x.hebelMitarbeiter,
+      arbeitgeberBelastung: belastung(x.arbeitgeber.zuschussMonat, x.arbeitgeber),
     };
   }
   return { ...r, hinweise: mitarbeiterHinweise(modell, m, r, p) };

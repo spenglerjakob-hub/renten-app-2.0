@@ -1,8 +1,8 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import {
-  AXA_KANAELE, steuerklasseAus,
+  AXA_KANAELE, RENTENZIELE, steuerklasseAus,
   type AxaAngaben, type BeratungAngaben, type BeratungDaten, type BeratungStatus, type FirmenAngebot, type VersichererWerte,
 } from '@renten/schema';
 import {
@@ -16,12 +16,13 @@ import {
   AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, NamenFelder, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
 import { mitName, namensTeile, vollerName } from '../lib/namen';
+import { emailGueltig } from '../lib/email';
 import { laufzeitText } from '../features/tuev-berechnung';
 import {
   AKZENT, Anteile, ETIKETT, FELD_LABEL, Hervor, Hinweise, KNOPF, KNOPF_ZWEIT, Karte, LINK, Posten, SCHWEBEND, TextBereich, Titel,
   Vermerk, WertKarte, Zahl,
 } from '../components/stil';
-import { LueckenRing } from '../components/LueckenRing';
+import { LueckenRing, RENTENZIEL_RING } from '../components/LueckenRing';
 import { AnteilsRing } from '../components/AnteilsRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
@@ -143,6 +144,10 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
   const a = daten.angaben;
   const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
   const regel = rentenbeginnVon({ ...a, rentenbeginn: '' });
+  // Auf einen Tippfehler erst hinweisen, wenn das Feld verlassen ist — nicht mitten im Tippen.
+  const [mailVerlassen, setMailVerlassen] = useState(false);
+  const mailFehler = mailVerlassen && a.email.trim() !== '' && !emailGueltig(a.email)
+    ? 'Bitte prüfen Sie die Adresse — etwa name@beispiel.de.' : null;
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -150,6 +155,12 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <NamenFelder {...namensTeile(a.name, a.vorname, a.nachname)} onChange={(teile) => setzeA(mitName(teile))} />
+          </div>
+          {/* Kontakt fuer Rueckfragen und die Unterlagen per E-Mail. „off“: nicht die eigenen Daten des Beraters vorschlagen. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextFeld label="E-Mail" typ="email" wert={a.email} onChange={(email) => setzeA({ email })} onBlur={() => setMailVerlassen(true)}
+              fehler={mailFehler} maxLaenge={120} autoComplete="off" />
+            <TextFeld label="Telefon" typ="tel" wert={a.telefon} onChange={(telefon) => setzeA({ telefon })} maxLaenge={40} autoComplete="off" />
           </div>
           <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
           {istAxaAntrag(firma.angebot) && (
@@ -253,7 +264,27 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
 
 const prozentText = (x: number, stellen = 1) => `${(x * 100).toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen })} %`;
 
+/** Die drei Rentenziele als Pillen — wie die Vorgabe im Loesungsvergleich. */
+function RentenzielWahl({ wert, onWahl, titelId }: { wert: number; onWahl: (ziel: number) => void; titelId: string }) {
+  return (
+    <div role="radiogroup" aria-labelledby={titelId} className="inline-flex gap-1 rounded-full border border-ui-linie bg-ui-karte p-1">
+      {RENTENZIELE.map((ziel) => {
+        const aktiv = Math.abs(wert - ziel) < 1e-9;
+        return (
+          <button key={ziel} type="button" role="radio" aria-checked={aktiv} onClick={() => onWahl(ziel)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium tabular-nums transition-colors ${
+              aktiv ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
+            }`}>
+            {Math.round(ziel * 100)}&nbsp;%
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & { luecke: Versorgungsluecke | null; aktuell: boolean }) {
+  const zielTitel = useId();
   const a = daten.angaben;
   const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
   const rentenbeginn = rentenbeginnVon(a);
@@ -274,43 +305,60 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
       <div>
         <Titel als="h2" gross>
           {reicht
-            ? <>Ihre gesetzliche Rente im Vergleich zum <Hervor>Nettolohn</Hervor></>
+            ? <>Ihre gesetzliche Rente im Vergleich zum <Hervor>Rentenziel</Hervor></>
             : <>Ihre gesetzliche Rente <Hervor>reicht nicht aus</Hervor></>}
         </Titel>
         <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
-          Im Alter brauchen die meisten etwas weniger Geld als heute — trotzdem reicht die gesetzliche Rente oft nicht. Die
-          Differenz zum heutigen Nettolohn heißt Versorgungslücke. Eine Betriebsrente kann sie verkleinern.
+          Im Alter brauchen die meisten etwas weniger Geld als heute: Als Rentenziel gelten meist 70 bis 85 % des heutigen
+          Nettolohns. Was die gesetzliche Rente bis dahin offenlässt, heißt Versorgungslücke. Eine Betriebsrente kann sie
+          verkleinern.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Der Ring als schwebendes Stueck Produkt; die Luecke selbst in der Akzentkarte darunter. */}
-        <div className={`${SCHWEBEND} self-start p-5 sm:p-7 ${aktuell ? '' : 'opacity-60'}`}>
-          {luecke ? (
-            <>
-              <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
-                <LueckenRing ganz={luecke.lohn.nettoMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
-                  gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} />
-                <dl className="space-y-4">
-                  <Zahl etikett="Netto-Altersrente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} zusatz={`${luecke.renteProzent} %`} />
-                  <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke.lueckeMonat)}
-                    zusatz={`${luecke.lueckeProzent} %`} />
-                </dl>
-              </div>
-              {luecke.lueckeProzent > 0 && (
-                <div className={`${AKZENT} mt-6 px-5 py-4`}>
-                  <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
-                    Im Alter fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
-                  </p>
-                </div>
-              )}
-              <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-                Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
+        {/* Der Ring als schwebendes Stueck Produkt; die Luecke selbst in der Akzentkarte darunter. Oben die Wahl des Rentenziels. */}
+        <div className={`${SCHWEBEND} self-start p-5 sm:p-7`}>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div>
+              <p id={zielTitel} className="text-sm font-medium text-ui-tinte">Ihr Rentenziel</p>
+              <p className="text-xs tabular-nums text-ui-schiefer">
+                {luecke
+                  ? `${euro(luecke.zielMonat)} im Monat — ${luecke.zielProzent} % von ${euro(luecke.lohn.nettoMonat)} Nettolohn`
+                  : 'ein Anteil am heutigen Nettolohn'}
               </p>
-            </>
-          ) : (
-            <p className="text-sm text-ui-schiefer">Wird gerechnet …</p>
-          )}
+            </div>
+            <RentenzielWahl wert={daten.rentenziel} onWahl={(rentenziel) => setze((d) => ({ ...d, rentenziel }))} titelId={zielTitel} />
+          </div>
+          <div className={`mt-6 ${aktuell ? '' : 'opacity-60'}`}>
+            {luecke ? (
+              <>
+                <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
+                  <LueckenRing ganz={luecke.zielMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+                    gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} texte={RENTENZIEL_RING} />
+                  <dl className="space-y-4">
+                    <Zahl etikett="Netto-Altersrente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} zusatz={`${luecke.renteProzent} %`} />
+                    <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke.lueckeMonat)}
+                      zusatz={`${luecke.lueckeProzent} %`} />
+                  </dl>
+                </div>
+                {luecke.lueckeProzent > 0 && (
+                  <div className={`${AKZENT} mt-6 px-5 py-4`}>
+                    <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
+                      Bis zu Ihrem Rentenziel fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
+                    </p>
+                  </div>
+                )}
+                <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+                  Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
+                  {luecke.lueckeProzent > 0
+                    ? ` Zum Rentenziel von ${luecke.zielProzent} % fehlen ${luecke.lueckeProzent} %.`
+                    : ` Ihr Rentenziel von ${luecke.zielProzent} % ist damit erreicht.`}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-ui-schiefer">Wird gerechnet …</p>
+            )}
+          </div>
         </div>
 
         <Karte titel="Berechnungsgrundlagen">
@@ -336,6 +384,7 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
               {([
                 [a.gehaelter > 12 ? 'Ihr Bruttolohn im Monatsdurchschnitt' : 'Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
                 [a.gehaelter > 12 ? 'Ihr Nettolohn heute, im Monatsdurchschnitt' : 'Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
+                [`Ihr Rentenziel: ${luecke.zielProzent} % davon`, euro(luecke.zielMonat)],
                 ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
                 ['Angenommene Inflation', prozentText(luecke.inflation)],
                 ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
@@ -361,7 +410,8 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
         Der Nettolohn rechnet {nettolohnGrundlage(a.steuerklasse, a.gehaelter)}
         {a.steuerklasse === 5 ? ' — den höheren Abzug der Klasse V gleicht die Steuererklärung aus' : ''}, die Steuer im Alter
         {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
-        Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
+        Das Rentenziel ist eine Faustregel: Im Alter fallen manche Ausgaben weg, etwa die Fahrt zur Arbeit oder das Sparen
+        fürs Alter. Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
       </p>
     </div>
   );
@@ -839,7 +889,7 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
 function LueckeMitBetriebsrenteKarte({ luecke, x, aktuell }: { luecke: Versorgungsluecke; x: LueckeMitBetriebsrente; aktuell: boolean }) {
   const haupt = x.prognose ?? x.garantiert!;
   const art = x.prognose ? (x.geschaetzt ? 'Prognose, geschätzt' : 'Prognose') : 'garantiert';
-  // Im Ring hoechstens die Luecke — was darueber hinausgeht, hat im Nettolohn keinen Platz
+  // Im Ring hoechstens die Luecke — was darueber hinausgeht, hat im Rentenziel keinen Platz
   const imRing = Math.min(haupt.betriebsrenteMonat, x.lueckeMonat);
   return (
     <Karte titel="Ihre Versorgungslücke mit Betriebsrente">
@@ -853,7 +903,7 @@ function LueckeMitBetriebsrenteKarte({ luecke, x, aktuell }: { luecke: Versorgun
             ]}
             mitte={`${haupt.prozent} %`}
             zeilen={['der Lücke', 'geschlossen']}
-            beschreibung={`Nettolohn ${euro(luecke.lohn.nettoMonat)}: gesetzliche Rente ${euro(luecke.rente.nettoMonat)}, `
+            beschreibung={`Rentenziel ${euro(luecke.zielMonat)}: gesetzliche Rente ${euro(luecke.rente.nettoMonat)}, `
               + `Betriebsrente ${euro(haupt.betriebsrenteMonat)}, offen ${euro(haupt.restMonat)} — `
               + `die Betriebsrente schließt ${haupt.prozent} % der Versorgungslücke`}
           />
@@ -1288,7 +1338,7 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
       <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
         bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben}
         onLinkErstellen={linkErstellenUndFestschreiben} onAufgehoben={aktualisieren}
-        beratungId={beratungId} axa={axa} />
+        beratungId={beratungId} axa={axa} kontakt={{ email: daten.angaben.email, telefon: daten.angaben.telefon }} />
 
       <Karte titel="Unterlagen">
         <p className="text-sm leading-relaxed text-ui-schiefer">

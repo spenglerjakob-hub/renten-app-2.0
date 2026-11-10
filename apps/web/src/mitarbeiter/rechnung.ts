@@ -74,9 +74,16 @@ export function eingabenVon(a: BeratungAngaben, umwandlungMonat: number): Mitarb
   };
 }
 
-/** Schritt 4: was die Umwandlung kostet und was in den Vertrag fliesst. */
+/**
+ * Schritt 4: was die Umwandlung kostet und was in den Vertrag fliesst. Mit den
+ * Saetzen der Firma dazu, was der Beitrag den Arbeitgeber netto kostet — fuer
+ * die Uebersicht; die Seite des Mitarbeiters aendern sie nicht.
+ */
 export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): MitarbeiterBav {
-  return bavMitarbeiter(f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f), p);
+  return bavMitarbeiter(
+    f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f), p,
+    { unternehmensSteuersatz: f.unternehmensSteuersatz, umlagenSatz: f.umlagenSatz },
+  );
 }
 
 /** „Rahmen voll nutzen“: die Umwandlung, mit der der beitragsfreie Rahmen genau voll ist. */
@@ -310,8 +317,8 @@ export function leistungsRechnung(
 }
 
 /* --------------------------------------------------------------------------
- * VERSORGUNGSLUECKE — der Nettolohn heute gegen die gesetzliche Rente netto,
- * beides in heutiger Kaufkraft.
+ * VERSORGUNGSLUECKE — das Rentenziel (ein Anteil am Nettolohn heute) gegen
+ * die gesetzliche Rente netto, beides in heutiger Kaufkraft.
  * ------------------------------------------------------------------------ */
 
 /** Lohn heute, im Monat: Lohnsteuer samt Zuschlaegen, Sozialabgaben, Netto. */
@@ -365,10 +372,17 @@ export interface Versorgungsluecke {
   grv: { monat: number; geschaetzt: boolean };
   /** Die gesetzliche Rente im ersten Rentenjahr, in heutiger Kaufkraft */
   rente: AuszahlungsWerte;
+  /** Das Rentenziel als Anteil am Nettolohn, z. B. 0,78 */
+  ziel: number;
+  /** Dasselbe in ganzen Prozent */
+  zielProzent: number;
+  /** Das Rentenziel im Monat: Anteil mal Nettolohn */
+  zielMonat: number;
+  /** Was die gesetzliche Rente bis zum Rentenziel offenlaesst, im Monat */
   lueckeMonat: number;
   /** Netto-Rente / Nettolohn */
   anteil: number;
-  /** Was fehlt, in ganzen Prozent des Nettolohns; mit `renteProzent` zusammen 100 */
+  /** Was fehlt, in ganzen Prozent des Nettolohns; mit `renteProzent` zusammen `zielProzent` */
   lueckeProzent: number;
   /** Was die Rente ersetzt, in ganzen Prozent des Nettolohns */
   renteProzent: number;
@@ -380,7 +394,8 @@ export interface Versorgungsluecke {
 }
 
 /**
- * Was von der gesetzlichen Rente netto bleibt, gegen den Nettolohn heute.
+ * Was von der gesetzlichen Rente netto bleibt, gegen das Rentenziel: einen
+ * Anteil am Nettolohn heute (`rentenziel` der Beratung, vorbelegt 78 %).
  *
  * Die Rente kommt aus der Projektion (Posten `person-A` im ersten
  * Rentenjahr): mit Rentenanpassung bis dahin, nach Kranken- und
@@ -405,17 +420,25 @@ export function versorgungslueckeRechnung(f: FirmenAngebot, d: BeratungDaten, p:
   };
   // Das ganze Jahr wie die Rente, die daraus geschaetzt ist — mit Sonderzahlungen
   const lohn = nettolohnHeute(a, f, p, 'jahr');
-  const lueckeMonat = Math.max(0, lohn.nettoMonat - rente.nettoMonat);
+  const ziel = d.rentenziel;
+  const zielProzent = Math.round(ziel * 100);
+  const zielMonat = ziel * lohn.nettoMonat;
+  const lueckeMonat = Math.max(0, zielMonat - rente.nettoMonat);
   const anteil = lohn.nettoMonat > 0 ? rente.nettoMonat / lohn.nettoMonat : 0;
-  // Ganze Prozent, die sich zu 100 ergaenzen: die Luecke als Rest der gerundeten Rente
-  const renteProzent = Math.round(anteil * 100);
+  // Ganze Prozent des Nettolohns, die sich zum Rentenziel ergaenzen: die Luecke als
+  // Rest der gerundeten Rente. Bleibt eine Luecke, zeigt sie mindestens 1 %.
+  const offen = lueckeMonat >= 0.5;
+  const renteProzent = offen ? Math.min(Math.round(anteil * 100), zielProzent - 1) : Math.round(anteil * 100);
   return {
     lohn,
     grv: b.grv,
     rente,
+    ziel,
+    zielProzent,
+    zielMonat,
     lueckeMonat,
     anteil,
-    lueckeProzent: lueckeMonat >= 0.5 ? Math.max(0, 100 - renteProzent) : 0,
+    lueckeProzent: offen ? zielProzent - renteProzent : 0,
     renteProzent,
     rentenbeginn,
     rentenbeginnJahr: b.zeile.jahr,

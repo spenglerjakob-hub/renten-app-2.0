@@ -63,6 +63,16 @@ export const firmenAngebotSchema = z.object({
   kollektivnummer: z.string().max(40).default(''),
   /** AXA-Antrag: Organisationsnummer (Organr.) — Vorgabe fuer die Beratungen, jede kann eine eigene haben */
   organisationsnummer: z.string().max(40).default(''),
+  /**
+   * Fuer die Netto-Belastung in der Uebersicht: Steuersatz der Firma auf den
+   * Gewinn — Vorgabe wie auf den Arbeitgeber-Seiten (GmbH, 400 % Hebesatz).
+   * Grenze wie dort im Rechenkern.
+   */
+  unternehmensSteuersatz: z.number().min(0).max(0.6).default(0.3),
+  /** Umlagen U1, U2 und Insolvenzgeld auf das RV-pflichtige Entgelt; 0: nicht eingerechnet */
+  umlagenSatz: z.number().min(0).max(0.1).default(0),
+  /** Mitarbeiter im Unternehmen — fuer die Durchdringungsquote; 0: alle Mitarbeiter in der Liste */
+  belegschaft: z.number().int().min(0).max(1_000_000).default(0),
 });
 
 /** Die Steuerklassen der Beratung — VI (zweites Dienstverhaeltnis) gibt es nicht. */
@@ -96,6 +106,13 @@ const angabenFelder = z.object({
   vorname: z.string().max(60).default(''),
   nachname: z.string().max(60).default(''),
   geburtsdatum: datum(),
+  /**
+   * Kontakt des Mitarbeiters — fuer Rueckfragen und die Unterlagen per
+   * E-Mail. Geprueft wird die Form am Feld, nicht hier: Eine Beratung mit
+   * einer Tippfehler-Adresse muss lesbar bleiben.
+   */
+  email: z.string().max(120).default(''),
+  telefon: z.string().max(40).default(''),
   /** Mit Sonderzahlungen; das Monatsgehalt ist `jahresbrutto / gehaelter` */
   jahresbrutto: betrag(2_000_000).default(0),
   /** Gehaelter im Jahr (`GEHAELTER_IM_JAHR`) — erfasst wird das Monatsgehalt */
@@ -206,6 +223,9 @@ export const entscheidungSchema = z.object({
  * Ansparphase, vor Kosten — benannt wie beim ETF-Depot am `Vertrag`. Alle
  * anderen Annahmen stehen fest in der Rechnung der Web-App. Grenze wie das Feld.
  */
+/** Die Rentenziele zur Wahl, als Anteil am heutigen Nettolohn — vorbelegt ist der mittlere. */
+export const RENTENZIELE = [0.7, 0.78, 0.85] as const;
+
 export const hochrechnungSchema = z.object({
   renditeAnsparphase: z.number().min(0).max(0.2).default(0.06),
 });
@@ -224,6 +244,12 @@ export const beratungDatenSchema = z.object({
   entscheidung: entscheidungSchema.default({}),
   /** Bis zu welchem Alter die Rente in die Kennzahlen eingeht — dieselbe Vorgabe wie im Loesungsvergleich */
   lebenserwartung: z.number().int().min(60).max(120).default(85),
+  /**
+   * Das Rentenziel als Anteil am heutigen Nettolohn — die Versorgungsluecke
+   * ist, was die gesetzliche Rente bis dahin offenlaesst. Waehlbar sind
+   * `RENTENZIELE`; die Grenzen sind weiter, damit nichts unlesbar wird.
+   */
+  rentenziel: z.number().min(0.5).max(1).default(0.78),
   /** Die Rendite der beispielhaften Hochrechnung — fruehere Felder (`beispielZins`, feste Annahmen) verwirft das Lesen */
   hochrechnung: hochrechnungSchema.default({}),
   /** Der zuletzt offene Schritt (0–6) — zum Weitermachen */

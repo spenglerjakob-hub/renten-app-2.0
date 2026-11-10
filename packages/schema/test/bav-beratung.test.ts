@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   firmenAngebotSchema, beratungDatenSchema, angebotLesen, beratungLesen, MODELL_VORGABE,
-  STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, steuerklasseAus,
+  STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, RENTENZIELE, steuerklasseAus,
 } from '../src/bav-beratung.js';
 
 describe('Firmenangebot', () => {
@@ -151,5 +151,54 @@ describe('Steuerklasse und Gehälter im Jahr', () => {
   it('Rundlauf: was gelesen und wieder gespeichert wird, bleibt gleich', () => {
     const d = beratungLesen({ angaben: { verheiratet: true, partnerBrutto: 0, jahresbrutto: 48_000 } });
     expect(beratungLesen(JSON.parse(JSON.stringify(d)))).toEqual(d);
+  });
+});
+
+describe('Kontakt, Rentenziel und die Annahmen für den Arbeitgeber', () => {
+  it('neu: ohne Kontakt, Rentenziel 78 %, Steuersatz 30 %, ohne Umlagen, Belegschaft aus der Liste', () => {
+    const d = beratungDatenSchema.parse({});
+    expect([d.angaben.email, d.angaben.telefon]).toEqual(['', '']);
+    expect(d.rentenziel).toBe(0.78);
+    expect(RENTENZIELE).toEqual([0.7, 0.78, 0.85]);
+    expect(RENTENZIELE).toContain(d.rentenziel);
+    const a = firmenAngebotSchema.parse({});
+    expect([a.unternehmensSteuersatz, a.umlagenSatz, a.belegschaft]).toEqual([0.3, 0, 0]);
+  });
+
+  it('Beratungen und Angebote von vorher lesen sich mit den Vorgaben — nichts geht verloren', () => {
+    const d = beratungLesen({ version: 2, schritt: 2, angaben: { name: 'Anna Beispiel', jahresbrutto: 48_000 } });
+    expect(d).toMatchObject({ schritt: 2, rentenziel: 0.78, angaben: { name: 'Anna Beispiel', email: '', telefon: '' } });
+    const a = angebotLesen({ versicherer: 'Muster Leben AG', modell: { art: 'festbetrag' } });
+    expect(a).toMatchObject({ versicherer: 'Muster Leben AG', unternehmensSteuersatz: 0.3, umlagenSatz: 0, belegschaft: 0 });
+  });
+
+  it('übernimmt, was eingetragen ist', () => {
+    const d = beratungLesen({ rentenziel: 0.85, angaben: { email: 'anna@beispiel.de', telefon: '0221 123456' } });
+    expect(d.rentenziel).toBe(0.85);
+    expect(d.angaben).toMatchObject({ email: 'anna@beispiel.de', telefon: '0221 123456' });
+    expect(angebotLesen({ unternehmensSteuersatz: 0.42, umlagenSatz: 0.032, belegschaft: 48 }))
+      .toMatchObject({ unternehmensSteuersatz: 0.42, umlagenSatz: 0.032, belegschaft: 48 });
+  });
+
+  it('eine Adresse mit Tippfehler bleibt lesbar — geprüft wird am Feld', () => {
+    expect(beratungLesen({ angaben: { name: 'Anna', email: 'anna@beispiel' } }).angaben).toMatchObject({ name: 'Anna', email: 'anna@beispiel' });
+  });
+
+  it('weist Unsinn ab', () => {
+    expect(beratungDatenSchema.safeParse({ rentenziel: 1.2 }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ rentenziel: 0.3 }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ angaben: { email: 'x'.repeat(121) } }).success).toBe(false);
+    expect(beratungDatenSchema.safeParse({ angaben: { telefon: '1'.repeat(41) } }).success).toBe(false);
+    expect(firmenAngebotSchema.safeParse({ unternehmensSteuersatz: 0.7 }).success).toBe(false);
+    expect(firmenAngebotSchema.safeParse({ umlagenSatz: -0.01 }).success).toBe(false);
+    expect(firmenAngebotSchema.safeParse({ belegschaft: 12.5 }).success).toBe(false);
+    expect(firmenAngebotSchema.safeParse({ belegschaft: -1 }).success).toBe(false);
+  });
+
+  it('Rundlauf mit den neuen Feldern', () => {
+    const d = beratungLesen({ rentenziel: 0.7, angaben: { email: 'a@b.de', telefon: '+49 221 1' } });
+    expect(beratungLesen(JSON.parse(JSON.stringify(d)))).toEqual(d);
+    const a = angebotLesen({ unternehmensSteuersatz: 0.25, umlagenSatz: 0.0185, belegschaft: 12 });
+    expect(angebotLesen(JSON.parse(JSON.stringify(a)))).toEqual(a);
   });
 });

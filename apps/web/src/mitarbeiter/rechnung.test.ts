@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bavMitarbeiter } from '@renten/engine';
-import { beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
+import { RENTENZIELE, beratungDatenSchema, firmenAngebotSchema, type BeratungDaten } from '@renten/schema';
 import {
   HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, kapitalNach, spaeterBeginnen, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   laufendesJahresbrutto, lueckeMitBetriebsrente, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
@@ -35,9 +35,20 @@ describe('Beitragsseite der Mitarbeiterberatung', () => {
       { jahresbrutto: 48_000, umwandlungMonat: 150, privatVersichert: false, pkvPraemieMonat: 0, kinder: { hatKinder: false, kinderUnter25: 0 }, bavBestandMonat: 0 },
       { verheiratet: false, bundesland: 'Bayern', kirchensteuerpflichtig: false, partnerZveJahr: 0 },
       P,
+      // Die Saetze der Firma (Vorgabe: 30 % Steuer, ohne Umlagen) — nur fuer die Netto-Belastung des Arbeitgebers
+      { unternehmensSteuersatz: 0.3, umlagenSatz: 0 },
     );
     expect(r).toEqual(direkt);
     expect(r.arbeitgeberMonat).toBeCloseTo(75, 6);
+    expect(r.arbeitgeberBelastung.steuerersparnisMonat).toBeCloseTo(r.arbeitgeberBelastung.kostenVorSteuerMonat * 0.3, 9);
+  });
+
+  it('die Sätze der Firma ändern die Seite des Mitarbeiters nicht', () => {
+    const d = beratung();
+    const { arbeitgeberBelastung: a1, ...vorgabe } = beitragsRechnung(firma, d);
+    const { arbeitgeberBelastung: a2, ...andere } = beitragsRechnung({ ...firma, unternehmensSteuersatz: 0.45, umlagenSatz: 0.03 }, d);
+    expect(andere).toEqual(vorgabe);
+    expect(a2.nettoKostenMonat).toBeLessThan(a1.nettoKostenMonat);
   });
 
   it('leeres Bundesland: das der Firma; gerechnet wird mit der Steuerklasse, das Gehalt des Partners zählt nicht', () => {
@@ -132,16 +143,18 @@ describe('Beginn automatisch', () => {
 });
 
 describe('Versorgungslücke', () => {
-  it('Nettolohn heute gegen die gesetzliche Rente netto, in heutiger Kaufkraft', () => {
+  it('Rentenziel (78 % des Nettolohns) gegen die gesetzliche Rente netto, in heutiger Kaufkraft', () => {
     const v = versorgungslueckeRechnung(firma, anna())!;
     expect(v.lohn.bruttoMonat).toBeCloseTo(4500, 6);
     expect(v.lohn.nettoMonat).toBeCloseTo(v.lohn.bruttoMonat - v.lohn.steuernMonat - v.lohn.svMonat, 6);
     expect(v.rente.nettoMonat).toBeGreaterThan(0);
     expect(v.rente.nettoMonat).toBeCloseTo(v.rente.bruttoMonat - v.rente.kvPvMonat - v.rente.steuerMonat, 6);
-    expect(v.lueckeMonat).toBeCloseTo(v.lohn.nettoMonat - v.rente.nettoMonat, 6);
+    expect([v.ziel, v.zielProzent]).toEqual([0.78, 78]);
+    expect(v.zielMonat).toBeCloseTo(0.78 * v.lohn.nettoMonat, 9);
+    expect(v.lueckeMonat).toBeCloseTo(v.zielMonat - v.rente.nettoMonat, 6);
     expect(v.anteil).toBeCloseTo(v.rente.nettoMonat / v.lohn.nettoMonat, 9);
-    // In ganzen Prozent, zusammen 100
-    expect(v.renteProzent + v.lueckeProzent).toBe(100);
+    // In ganzen Prozent des Nettolohns, zusammen das Rentenziel
+    expect(v.renteProzent + v.lueckeProzent).toBe(78);
     expect(Math.abs(v.lueckeProzent - (v.lueckeMonat / v.lohn.nettoMonat) * 100)).toBeLessThanOrEqual(0.5 + 1e-9);
     expect(v.rentenanpassung).toBe(RENTENANPASSUNG);
     expect(v.grv.geschaetzt).toBe(true);
@@ -160,6 +173,25 @@ describe('Versorgungslücke', () => {
     const reicht = versorgungslueckeRechnung(firma, { ...d, angaben: { ...d.angaben, grvRente: 6000 } })!;
     expect(reicht.lueckeMonat).toBe(0);
     expect(reicht.lueckeProzent).toBe(0);
+  });
+
+  it('Rentenziel 70, 78 oder 85 %: Die Rente bleibt, die Lücke wächst um genau den Unterschied im Ziel', () => {
+    const d = anna();
+    const [v70, v78, v85] = RENTENZIELE.map((rentenziel) => versorgungslueckeRechnung(firma, { ...d, rentenziel })!);
+    expect(versorgungslueckeRechnung(firma, d)).toEqual(v78);
+    expect([v70!.zielProzent, v78!.zielProzent, v85!.zielProzent]).toEqual([70, 78, 85]);
+    expect(v85!.rente.nettoMonat).toBe(v70!.rente.nettoMonat);
+    expect(v85!.lueckeMonat - v70!.lueckeMonat).toBeCloseTo(0.15 * v70!.lohn.nettoMonat, 6);
+    for (const v of [v70!, v78!, v85!]) expect(v.renteProzent + v.lueckeProzent).toBe(v.zielProzent);
+  });
+
+  it('knapp unter dem Ziel: mindestens 1 % Lücke, die Prozente ergänzen sich trotzdem zum Ziel', () => {
+    const d = anna();
+    const v = versorgungslueckeRechnung(firma, d)!;
+    const knapp = versorgungslueckeRechnung(firma, { ...d, rentenziel: v.anteil + 0.002 })!;
+    expect(knapp.lueckeMonat).toBeGreaterThan(0.5);
+    expect(knapp.lueckeProzent).toBe(1);
+    expect(knapp.renteProzent + knapp.lueckeProzent).toBe(knapp.zielProzent);
   });
 
   it('Rentenanpassung der Beratung: 1,5 % im Szenario, für Lücke und Leistung', () => {
