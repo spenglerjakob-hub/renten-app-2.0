@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import {
   importiere, exportiere, annahmenKoppeln, einkommenHeuteSchema, type SzenarioParsed,
 } from '@renten/schema';
-import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze } from '@renten/engine';
+import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze, KINDERPOLICE_LEBENSERWARTUNG } from '@renten/engine';
 import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 import { standardSzenario } from './standard';
 import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
@@ -84,6 +84,12 @@ export interface SzenarioStore {
   vertragHinzufuegen: (schicht: 1 | 2 | 3) => void;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
   vertragEntfernen: (id: string) => void;
+  /**
+   * Eine private Rente zur Kinderpolice machen — oder zurueck. Vertrag und
+   * Pruefung ziehen gemeinsam mit: Die Kinderpolice kennt nur Rente oder
+   * Kapital, und das Kind lebt laenger als der Kunde (Lebenserwartung 90).
+   */
+  kinderpoliceUmschalten: (id: string, an: boolean) => void;
 
   /**
    * Eine vorbelegte Angabe als geprueft markieren, ohne sie zu aendern —
@@ -284,7 +290,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
             ? Math.max(new Date().getFullYear(), AVD_AB_JAHR)
             : new Date().getFullYear()),
         fruehereBeitraege: [],
-        lebenserwartung: 85,
+        lebenserwartung: v?.versichertePerson ? KINDERPOLICE_LEBENSERWARTUNG : 85,
         vergleichen: false,
         vergleichKapitalNetto: 0,
       }],
@@ -361,6 +367,29 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
 
   vertragAendern: (id, p) => get().setze((s) => ({
     ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
+  })),
+
+  kinderpoliceUmschalten: (id, an) => get().setze((s) => ({
+    ...s,
+    vertraege: s.vertraege.map((v) => {
+      if (v.id !== id) return v;
+      if (!an) return { ...v, versichertePerson: undefined };
+      return {
+        ...v,
+        versichertePerson: v.versichertePerson ?? { vorname: '', geburtsdatum: '', rentenbeginn: '', steuersatzImAlter: 0.25 },
+        strategie: v.strategie === 'kapital' ? 'kapital' as const : 'rente' as const,
+      };
+    }),
+    tuev: s.tuev.map((t) => {
+      if (t.vertragId !== id) return t;
+      return an
+        ? { ...t, lebenserwartung: t.lebenserwartung === 85 ? KINDERPOLICE_LEBENSERWARTUNG : t.lebenserwartung }
+        : {
+          ...t,
+          beitragBis: undefined,
+          lebenserwartung: t.lebenserwartung === KINDERPOLICE_LEBENSERWARTUNG ? 85 : t.lebenserwartung,
+        };
+    }),
   })),
 
   vertragEntfernen: (id) => get().setze((s) => ({

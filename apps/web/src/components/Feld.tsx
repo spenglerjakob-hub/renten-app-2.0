@@ -428,6 +428,12 @@ export function DatumFeld(props: {
    */
   stufen?: boolean;
   vorbelegt?: Vorbelegt;
+  /**
+   * Ein leeres Feld ist eine Antwort: „nichts eingetragen, die Vorgabe
+   * gilt“ — etwa der Rentenbeginn laut Vertrag. Ohne diese Angabe bleibt
+   * beim Leeren der zuletzt gueltige Wert stehen.
+   */
+  leerErlaubt?: boolean;
 }) {
   const id = `d${useId()}`;
   const { stufen, vorbelegt } = props;
@@ -462,8 +468,10 @@ export function DatumFeld(props: {
 
     const ziffern = maskiert.replace(/\D/g, '');
     if (ziffern.length < 8) {
-      // Noch im Tippen — kein Fehler anzeigen, nichts weitergeben.
+      // Noch im Tippen — kein Fehler anzeigen, nichts weitergeben. Ganz
+      // geleert heisst bei einem freiwilligen Feld: zurueck zur Vorgabe.
       setFehler(null);
+      if (ziffern.length === 0 && props.leerErlaubt) props.onChange('');
       return;
     }
 

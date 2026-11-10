@@ -1,7 +1,9 @@
 import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
   versorgungsluecke, projiziere, kenntKapitalwahl, nurPerson, grenzsteuersatz, grenzLohnsteuersatz, SV_FREI_QUOTE, euroText,
+  kinderpoliceAuszahlung, kinderRentenbeginn, beitragBisVorschlag,
   type Steuerklasse, type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
+  type TuevAnnahmen, type VersichertePerson, type Datum,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
   type LegalParameters, type FoerderKontext, type ErwerbsPersonHeute, type BavVorbelegung, type LoesungsOptionen,
   type Loesung, type LoesungId,
@@ -40,7 +42,42 @@ export interface TuevPosition {
     /** Ab welchem Alter die Rente das Kapital ueberholt */
     breakEven: RenteOderKapital;
   } | null;
+  /**
+   * KINDERPOLICE: Der Kunde zahlt, ausgezahlt wird an ein Kind oder Enkel.
+   * Fehlt bei allen anderen Vertraegen. Rentenbeginn und Alter oben sind
+   * dann die DES KINDES.
+   */
+  kind?: KinderpoliceAngaben;
 }
+
+/** Was eine Kinderpolice ueber die versicherte Person weiss — fuer Bildschirm und Druck. */
+export interface KinderpoliceAngaben {
+  /** Vorname des Kindes; leer, solange nichts eingetragen ist */
+  vorname: string;
+  /** false, solange Geburtsdatum oder Rentenbeginn nicht lesbar sind — dann ist nur die Einzahlseite gerechnet */
+  vollstaendig: boolean;
+  rentenbeginn: Datum | null;
+  alterBeiRentenbeginn: number;
+  /** Letzter Beitragsmonat; null, solange das Geburtsdatum fehlt und nichts eingetragen ist */
+  beitragBis: Datum | null;
+  /** true, wenn „Beiträge bis“ der Vorschlag ist (18. Geburtstag) und nicht eingetragen */
+  beitragBisVorgeschlagen: boolean;
+  /** Jahre ohne Beitrag zwischen dem letzten Beitrag und dem Rentenbeginn */
+  ruhezeitJahre: number;
+  ertragsanteil: number;
+  steuersatz: number;
+  /** Kapitalauszahlung: nur der halbe Ertrag ist steuerpflichtig (12/62) */
+  halbeinkuenfte: boolean;
+  /** Preisniveau zum Rentenbeginn gegenueber heute — Netto geteilt durch ihn ist Netto in heutigem Geld */
+  kaufkraftfaktor: number;
+}
+
+/** „bei Lena“ — oder „beim Kind“, solange kein Name eingetragen ist. */
+export const beiKind = (k: Pick<KinderpoliceAngaben, 'vorname'>) => (k.vorname.trim() ? `bei ${k.vorname.trim()}` : 'beim Kind');
+/** „Lena“ — oder „das Kind“. */
+export const kindName = (k: Pick<KinderpoliceAngaben, 'vorname'>) => k.vorname.trim() || 'das Kind';
+/** Fuer Beschriftungen: „Steuersatz Lena“ — oder „Steuersatz des Kindes“. */
+export const desKindes = (k: Pick<KinderpoliceAngaben, 'vorname'>) => k.vorname.trim() || 'des Kindes';
 
 /**
  * Bemessungsgrundlage: das tatsaechliche Bruttogehalt und das zvE.
@@ -249,6 +286,133 @@ function stammKontext(
   };
 }
 
+/**
+ * Die Annahmen des Vertrags-TUEV aus einem Eintrag der Pruefliste — EINE
+ * Ableitung fuer eigene Vertraege und Kinderpolicen.
+ */
+function annahmenAus(
+  szenario: SzenarioParsed,
+  t: SzenarioParsed['tuev'][number],
+  v: Vertrag,
+  beitragBis: Datum | null,
+): TuevAnnahmen {
+  return {
+    beitragMonat: t.beitragMonat,
+    dynamik: t.dynamik,
+    agZuschussMonat: t.agZuschussMonat,
+    kinder: t.kinder,
+    beginnJahr: parseDatum(t.beginnDatum)?.jahr ?? t.beginnJahr,
+    // Der Monat aus dem genauen Datum; ohne Datum (aeltere Szenarien) Januar.
+    beginnMonat: parseDatum(t.beginnDatum)?.monat ?? 1,
+    fruehereBeitraege: t.fruehereBeitraege.flatMap((st) => {
+      const bis = parseDatum(st.bis);
+      return bis
+        ? [{ bisJahr: bis.jahr, bisMonat: bis.monat, beitragMonat: st.beitragMonat, agZuschussMonat: st.agZuschussMonat }]
+        : [];
+    }),
+    ...(beitragBis ? { beitragBis: { jahr: beitragBis.jahr, monat: beitragBis.monat } } : {}),
+    lebenserwartung: t.lebenserwartung,
+    bavVorbelegung: v.typ.startsWith('bav') ? bavVorbelegung(szenario, v) : undefined,
+  };
+}
+
+/** Die Auszahlseite des TUEV-Kontexts. */
+type Auszahlseite = Pick<TuevKontext,
+  'bruttoRenteMonat' | 'kvPvMonat' | 'steuerMonat' | 'nettoRenteMonat'
+  | 'bruttoKapital' | 'steuerKapital' | 'kvPvKapital' | 'nettoKapital'>;
+
+const KEINE_AUSZAHLUNG: Auszahlseite = {
+  bruttoRenteMonat: 0, kvPvMonat: 0, steuerMonat: 0, nettoRenteMonat: 0,
+  bruttoKapital: 0, steuerKapital: 0, kvPvKapital: 0, nettoKapital: 0,
+};
+
+/**
+ * DIE KINDERPOLICE IM VERTRAGS-TUEV. Die Zeitachse kennt sie nicht (sie
+ * zaehlt nicht zur eigenen Rente) — die Auszahlseite kommt deshalb aus
+ * `kinderpoliceAuszahlung`: Rente und Kapital laut Angebot, versteuert beim
+ * Kind. Zweistufig, weil der Ertrag einer Kapitalauszahlung an der
+ * Beitragssumme haengt: erst die Einzahlseite, dann die Auszahlung.
+ */
+function kinderpolicePosition(
+  szenario: SzenarioParsed,
+  basis: ReturnType<typeof tuevBasis>,
+  t: SzenarioParsed['tuev'][number],
+  v: Vertrag,
+  vp: VersichertePerson,
+  jetzt: number,
+): TuevPosition {
+  const rentenbeginn = kinderRentenbeginn(vp);
+  const eingetragen = parseDatum(t.beitragBis);
+  const beitragBis = eingetragen ?? parseDatum(beitragBisVorschlag(vp.geburtsdatum));
+  const annahmen = annahmenAus(szenario, t, v, beitragBis);
+  const kontext = {
+    ...stammKontext(szenario, basis, erwerbVon(basis, v.inhaber)),
+    // Ohne lesbares Datum ein Platzhalter weit in der Zukunft — gezeigt wird dann nur die Einzahlseite.
+    rentenbeginnJahr: rentenbeginn?.jahr ?? jetzt + 60,
+    alterBeiRentenbeginn: 67,
+  };
+  const einzahlung = vertragsTuev(v, annahmen, { ...kontext, ...KEINE_AUSZAHLUNG }, szenario, basis.p);
+  const aus = kinderpoliceAuszahlung({
+    versichertePerson: vp,
+    bruttoRenteMonat: v.brutto,
+    bruttoKapital: v.kapitalAlternative ?? 0,
+    beitragssumme: einzahlung.summeEinzahlung,
+    vertragsbeginnJahr: annahmen.beginnJahr,
+    altvertrag: v.altvertrag,
+  });
+
+  const kind: KinderpoliceAngaben = {
+    vorname: vp.vorname,
+    vollstaendig: aus !== null,
+    rentenbeginn,
+    alterBeiRentenbeginn: aus?.alterBeiRentenbeginn ?? 0,
+    beitragBis,
+    beitragBisVorgeschlagen: !eingetragen && beitragBis !== null,
+    ruhezeitJahre: rentenbeginn && beitragBis
+      ? Math.max(0, Math.round(((rentenbeginn.jahr * 12 + rentenbeginn.monat) - (beitragBis.jahr * 12 + beitragBis.monat) - 1) / 12))
+      : 0,
+    ertragsanteil: aus?.ertragsanteil ?? 0,
+    steuersatz: aus?.steuersatz ?? vp.steuersatzImAlter,
+    halbeinkuenfte: aus?.halbeinkuenfte ?? false,
+    kaufkraftfaktor: rentenbeginn ? Math.pow(1 + szenario.annahmen.inflation, Math.max(0, rentenbeginn.jahr - jetzt)) : 1,
+  };
+  if (!aus) {
+    return {
+      vertrag: v, ergebnis: einzahlung, vergleich: null, istKapital: false,
+      alterBeiRentenbeginn: 0, rentenbeginnJahr: rentenbeginn?.jahr ?? 0, wege: null, kind,
+    };
+  }
+
+  const kontextKind = { ...kontext, alterBeiRentenbeginn: aus.alterBeiRentenbeginn };
+  const renteSeite: Auszahlseite = {
+    ...KEINE_AUSZAHLUNG,
+    bruttoRenteMonat: aus.bruttoRenteMonat, steuerMonat: aus.steuerMonat, nettoRenteMonat: aus.nettoRenteMonat,
+  };
+  const kapitalSeite: Auszahlseite = {
+    ...KEINE_AUSZAHLUNG,
+    bruttoKapital: aus.bruttoKapital, steuerKapital: aus.steuerKapital, nettoKapital: aus.nettoKapital,
+  };
+  // Nur Rente oder Kapital — Entnahmeplaner und Verrentung gibt es fuer die Kinderpolice nicht.
+  const istKapital = v.strategie === 'kapital' || (v.brutto <= 0 && aus.bruttoKapital > 0);
+  const rechne = (vertrag: Vertrag, seite: Auszahlseite) =>
+    vertragsTuev(vertrag, annahmen, { ...kontextKind, ...seite }, szenario, basis.p);
+  const ergebnis = rechne(v, istKapital ? kapitalSeite : renteSeite);
+
+  const beide = v.brutto > 0 && aus.bruttoKapital > 0;
+  const wege: TuevPosition['wege'] = beide
+    ? {
+      rente: rechne({ ...v, strategie: 'rente' }, renteSeite),
+      kapital: rechne({ ...v, strategie: 'kapital' }, kapitalSeite),
+      breakEven: renteOderKapital(aus.nettoRenteMonat, aus.nettoKapital, aus.alterBeiRentenbeginn),
+    }
+    : null;
+
+  return {
+    vertrag: v, ergebnis, vergleich: wege?.breakEven ?? null, istKapital,
+    alterBeiRentenbeginn: aus.alterBeiRentenbeginn, rentenbeginnJahr: aus.rentenbeginn.jahr, wege, kind,
+  };
+}
+
 export function tuevPositionen(
   szenario: SzenarioParsed,
   zeile: Jahreszeile | null,
@@ -280,6 +444,8 @@ export function tuevPositionen(
     if (!v) return [];
     if (gesehen.has(v.id)) return [];
     gesehen.add(v.id);
+
+    if (v.versichertePerson) return [kinderpolicePosition(szenario, basis, t, v, v.versichertePerson, jetzt)];
 
     const posten = zeile?.posten.find((x) => x.id === v.id);
     // Nicht die Vertragsart entscheidet, sondern die gewaehlte Verwendung:
@@ -357,23 +523,7 @@ export function tuevPositionen(
       bruttoKapital: number; steuerKapital: number; kvPvKapital: number; nettoKapital: number;
     }) => vertragsTuev(
       vertrag,
-      {
-        beitragMonat: t.beitragMonat,
-        dynamik: t.dynamik,
-        agZuschussMonat: t.agZuschussMonat,
-        kinder: t.kinder,
-        beginnJahr: parseDatum(t.beginnDatum)?.jahr ?? t.beginnJahr,
-        // Der Monat aus dem genauen Datum; ohne Datum (aeltere Szenarien) Januar.
-        beginnMonat: parseDatum(t.beginnDatum)?.monat ?? 1,
-        fruehereBeitraege: t.fruehereBeitraege.flatMap((st) => {
-          const bis = parseDatum(st.bis);
-          return bis
-            ? [{ bisJahr: bis.jahr, bisMonat: bis.monat, beitragMonat: st.beitragMonat, agZuschussMonat: st.agZuschussMonat }]
-            : [];
-        }),
-        lebenserwartung: t.lebenserwartung,
-        bavVorbelegung: v.typ.startsWith('bav') ? bavVorbelegung(szenario, v) : undefined,
-      },
+      annahmenAus(szenario, t, v, parseDatum(t.beitragBis)),
       {
         ...stammKontext(szenario, basis, erwerb),
         rentenbeginnJahr,
@@ -826,6 +976,9 @@ export function laufendeZulageJahr(r: TuevErgebnis): number {
  * Eine Laufzeit in Monaten als „29 Jahre, 3 Monate". Seit der Beginn
  * monatsgenau ist, stimmte eine glatte Jahreszahl nicht mehr.
  */
+/** „1 Jahr“, „49 Jahre“ */
+export const jahreText = (n: number) => (n === 1 ? '1 Jahr' : `${n} Jahre`);
+
 export function laufzeitText(monate: number): string {
   const j = Math.floor(monate / 12);
   const m = monate % 12;

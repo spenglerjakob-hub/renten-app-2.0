@@ -1,14 +1,22 @@
 import {
-  belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand, type TuevPosition,
+  belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand, beiKind, kindName, desKindes, jahreText,
+  type TuevPosition,
 } from '../features/tuev-berechnung';
+import { parseDatum } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
-import { typText, vertragsBezeichnung } from '../features/vertragsarten';
+import { typText, vertragsBezeichnung, kinderpoliceText, monatJahr } from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import type { SzenarioParsed } from '../store/szenario';
 import { useAnsprache } from '../components/Ansprache';
 import {
   Seite, Untertitel, Angabe, Zweispaltig, GrosseZahl, Tabelle, Zeile, Text, KASTEN, KASTEN_TITEL, Summe,
 } from './Bausteine';
+
+/** Beginn der Beitraege als „12/2026“ — aus dem genauen Datum, sonst Januar des Jahres. */
+function beginnText(t: SzenarioParsed['tuev'][number]): string {
+  const d = parseDatum(t.beginnDatum);
+  return monatJahr(d ?? { monat: 1, jahr: t.beginnJahr });
+}
 
 /**
  * Der Vertrags-TUEV als Gutachtenbogen — eine Seite je geprueftem Vertrag.
@@ -26,7 +34,15 @@ export function TuevBogen({
   position: TuevPosition;
   szenario: SzenarioParsed;
 }) {
-  const { vertrag: v, ergebnis: r, vergleich, istKapital, wege } = position;
+  const { vertrag: v, ergebnis: r, vergleich, istKapital, wege, kind } = position;
+  /*
+    KINDERPOLICE: Der Kunde zahlt, ausgezahlt wird an ein Kind oder Enkel —
+    Jahrzehnte spaeter und versteuert zu dessen Satz. Derselbe Bogen, aber
+    „was ankommt“ kommt beim Kind an; dazu die versicherte Person, das Ende
+    der Beitraege und was man ueber Schenkung und Beitragszahler wissen muss.
+  */
+  const vp = v.versichertePerson;
+  const offen = kind !== undefined && !kind.vollstaendig;
   // Ein Vertrag gehoert einer Person — auch beim Paar „du“, wie am Bildschirm
   const e = useAnsprache().einzeln;
   const t = szenario.tuev.find((x) => x.vertragId === v.id);
@@ -40,7 +56,7 @@ export function TuevBogen({
   return (
     <Seite
       titel={`Vertrags-Prüfung: ${vertragsBezeichnung(v)}`}
-      nummer={`${typText(v.typ)} · Schicht ${v.schicht}`}
+      nummer={kind ? `${kinderpoliceText(v)} — nicht in ${e.dein('er')} Rente` : `${typText(v.typ)} · Schicht ${v.schicht}`}
     >
       <div className="grid grid-cols-3 gap-3">
         <GrosseZahl
@@ -48,22 +64,38 @@ export function TuevBogen({
           wert={euro(r.echterAufwandMonat)}
           hinweis={`Beitrag ${euro(r.beitragMonat)}`}
         />
-        <GrosseZahl
-          titel={istKapital ? 'Auszahlung netto' : 'Netto-Rente im Monat'}
-          wert={istKapital ? euro(r.nettoKapital) : euro(r.nettoRenteMonat)}
-          hinweis={`Einzahlung: ${laufzeitText(r.monateEinzahlung)}`}
-        />
+        {kind ? (
+          <GrosseZahl
+            titel={istKapital ? `Kapital für ${kindName(kind)} (netto)` : `Rente für ${kindName(kind)} im Monat (netto)`}
+            wert={offen ? '—' : istKapital ? euro(r.nettoKapital) : euro(r.nettoRenteMonat)}
+            hinweis={offen || !kind.rentenbeginn
+              ? 'Geburtsdatum fehlt'
+              : `${istKapital ? 'Ausgezahlt' : 'Ab'} ${monatJahr(kind.rentenbeginn)}, mit ${kind.alterBeiRentenbeginn}`}
+          />
+        ) : (
+          <GrosseZahl
+            titel={istKapital ? 'Auszahlung netto' : 'Netto-Rente im Monat'}
+            wert={istKapital ? euro(r.nettoKapital) : euro(r.nettoRenteMonat)}
+            hinweis={`Einzahlung: ${laufzeitText(r.monateEinzahlung)}`}
+          />
+        )}
         <GrosseZahl
           titel="Aus einem Euro Aufwand werden"
-          wert={hebel(r.nettoHebel)}
-          ton={ohne ? 'neutral' : gut ? 'gut' : 'schlecht'}
+          wert={offen ? '—' : hebel(r.nettoHebel)}
+          ton={ohne || offen ? 'neutral' : gut ? 'gut' : 'schlecht'}
           hinweis={ohne ? 'Rein arbeitgeberfinanziert' : gut ? 'Der Vertrag trägt sich' : 'Unter dem Einsatz'}
         />
       </div>
 
       <Untertitel>Zugrunde gelegt</Untertitel>
       <Zweispaltig>
-        <Angabe feld="Inhaber" wert={personNameAus(szenario.personen, v.inhaber)} />
+        <Angabe feld={kind ? 'Beitragszahler' : 'Inhaber'} wert={personNameAus(szenario.personen, v.inhaber)} />
+        {vp && (
+          <Angabe
+            feld="Versicherte Person"
+            wert={`${vp.vorname.trim() || 'Kind'}${vp.geburtsdatum.trim() ? `, geboren ${vp.geburtsdatum.trim()}` : ', Geburtsdatum fehlt'}`}
+          />
+        )}
         <Angabe feld="Beitrag im Monat" wert={euroGenau(r.beitragMonat)} />
         {t && t.dynamik !== 0 && (
           <Angabe feld="Beitragsdynamik" wert={`${prozent(t.dynamik)} pro Jahr`} />
@@ -71,7 +103,17 @@ export function TuevBogen({
         {r.agZuschussMonat > 0 && (
           <Angabe feld="Arbeitgeberzuschuss" wert={`${euroGenau(r.agZuschussMonat)} im Monat`} />
         )}
-        {t && <Angabe feld="Einzahlung ab" wert={t.beginnDatum ?? `01.01.${t.beginnJahr}`} />}
+        {/* Kinderpolice: Beginn und Ende der Beitraege in einer Zeile — danach ruht der Vertrag. */}
+        {t && (kind ? (
+          <Angabe
+            feld="Beiträge"
+            wert={kind.beitragBis
+              ? `${beginnText(t)} bis ${monatJahr(kind.beitragBis)}${kind.beitragBisVorgeschlagen ? ' (18. Geburtstag)' : ''}`
+              : `ab ${beginnText(t)}`}
+          />
+        ) : (
+          <Angabe feld="Einzahlung ab" wert={t.beginnDatum ?? `01.01.${t.beginnJahr}`} />
+        ))}
         {/* Fruehere Beitraege stehen hier, weil sie die Summe der
             Einzahlungen tragen, die Treppe unten aber nur den heutigen Monat. */}
         {t?.fruehereBeitraege.map((st, i) => (
@@ -84,8 +126,25 @@ export function TuevBogen({
           />
         ))}
         <Angabe feld="Einzahlungsdauer" wert={laufzeitText(r.monateEinzahlung)} />
-        {t && <Angabe feld="Angenommene Lebenserwartung" wert={`${t.lebenserwartung} Jahre`} />}
-        <Angabe feld="Auszahlungsdauer" wert={`${r.jahreAuszahlung} Jahre`} />
+        {kind && kind.ruhezeitJahre > 0 && (
+          <Angabe feld="Danach ohne Beitrag" wert={jahreText(kind.ruhezeitJahre)} />
+        )}
+        {/* Rentenbeginn und Alter stehen in der Kachel oben — als Zeile nur, solange sie dort fehlen. */}
+        {kind?.rentenbeginn && offen && (
+          <Angabe feld={istKapital ? 'Auszahlung' : 'Rentenbeginn'} wert={monatJahr(kind.rentenbeginn)} />
+        )}
+        {t && (
+          <Angabe
+            feld={kind ? `Lebenserwartung ${desKindes(kind)}` : 'Angenommene Lebenserwartung'}
+            wert={kind && !istKapital && !offen
+              ? `${t.lebenserwartung} Jahre (${jahreText(r.jahreAuszahlung)} Rente)`
+              : `${t.lebenserwartung} Jahre`}
+          />
+        )}
+        {!kind && <Angabe feld="Auszahlungsdauer" wert={`${r.jahreAuszahlung} Jahre`} />}
+        {kind && (
+          <Angabe feld={`Steuersatz ${desKindes(kind)} im Alter`} wert={`${prozent(kind.steuersatz, 0)} (Annahme)`} />
+        )}
       </Zweispaltig>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
@@ -104,9 +163,18 @@ export function TuevBogen({
           <Summe text={`Kostet ${e.dich} wirklich`} wert={euro(treppe.aufwand)} />
         </div>
 
+        {kind && offen ? (
+          <div className={KASTEN}>
+            <div className={KASTEN_TITEL}>Was {beiKind(kind)} ankommt</div>
+            <p className="text-[11px] leading-relaxed text-ui-tinte">
+              Am Vertrag fehlt das Geburtsdatum {vp?.vorname.trim() ? `von ${vp.vorname.trim()}` : 'des Kindes'} —
+              ohne es lässt sich nicht rechnen, was nach Steuer ankommt.
+            </p>
+          </div>
+        ) : (
         <div className={KASTEN}>
           <div className={KASTEN_TITEL}>
-            Was ankommt {istKapital ? '(einmalig)' : '(monatlich)'}
+            Was {kind ? `${beiKind(kind)} ` : ''}ankommt {istKapital ? '(einmalig)' : '(monatlich)'}
           </div>
           <Angabe
             feld={istKapital ? 'Kapital brutto' : 'Brutto-Rente'}
@@ -115,8 +183,14 @@ export function TuevBogen({
           {!istKapital && r.kvPvMonat > 0 && (
             <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(r.kvPvMonat)} />
           )}
+          {/* Bei der Kinderpolice steht dabei, WIE versteuert wird: Ertragsanteil
+              bzw. Ertrag zum angenommenen Satz des Kindes. */}
           <Angabe
-            feld={istKapital ? '− Steuer im Zuflussjahr' : '− Steuer'}
+            feld={kind
+              ? istKapital
+                ? `− Steuer (${kind.halbeinkuenfte ? 'halber Ertrag' : 'Ertrag'} zu ${prozent(kind.steuersatz, 0)})`
+                : `− Steuer (Ertragsanteil ${prozent(kind.ertragsanteil, 0)} zu ${prozent(kind.steuersatz, 0)})`
+              : istKapital ? '− Steuer im Zuflussjahr' : '− Steuer'}
             wert={euro(istKapital ? r.steuerKapital : r.steuerMonat)}
           />
           {/* Beitraege auf die Kapitalleistung: beim Zufluss abgezogen, nicht
@@ -125,8 +199,22 @@ export function TuevBogen({
           {istKapital && r.kvPvKapital > 0 && (
             <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(r.kvPvKapital)} />
           )}
-          <Summe text={`Bleibt ${e.dir}`} wert={euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)} />
+          <Summe
+            text={kind ? `Bleibt ${kindName(kind)}` : `Bleibt ${e.dir}`}
+            wert={euro(istKapital ? r.nettoKapital : r.nettoRenteMonat)}
+          />
+          {/* Jahrzehnte entfernt: was der Betrag in heutigem Geld wert ist. */}
+          {kind && kind.kaufkraftfaktor > 1.0001 && (
+            <p className="mt-1 text-[11px] leading-relaxed text-ui-schiefer">
+              In heutigem Geld rund{' '}
+              <strong className="font-medium text-ui-tinte">
+                {euro((istKapital ? r.nettoKapital : r.nettoRenteMonat) / kind.kaufkraftfaktor)}
+              </strong>{' '}
+              ({prozent(szenario.annahmen.inflation)} Inflation pro Jahr)
+            </p>
+          )}
         </div>
+        )}
       </div>
 
       {/*
@@ -169,15 +257,21 @@ export function TuevBogen({
       <Untertitel>Über die gesamte Laufzeit</Untertitel>
       <Zweispaltig>
         <Angabe feld={`Summe ${e.dein('es')} Aufwands`} wert={euro(r.summeEinzahlung)} />
-        <Angabe feld="Summe der Auszahlung (netto)" wert={euro(r.summeAuszahlung)} />
-        <Angabe feld="Überschuss" wert={euro(r.echterGewinn)} />
-        <Angabe feld={`Rendite auf ${e.dein('en')} Aufwand`} wert={ohne ? '—' : prozent(r.rendite)} />
         <Angabe
-          feld="Eingesetztes Geld zurück nach"
-          wert={ohne ? 'kein eigener Aufwand' : r.amortisationsJahre > 0
-            ? `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren`
-            : 'nicht erreicht'}
+          feld={kind ? `Summe der Auszahlung an ${kindName(kind)} (netto)` : 'Summe der Auszahlung (netto)'}
+          wert={offen ? '—' : euro(r.summeAuszahlung)}
         />
+        <Angabe feld="Überschuss" wert={offen ? '—' : euro(r.echterGewinn)} />
+        <Angabe feld={`Rendite auf ${e.dein('en')} Aufwand`} wert={ohne || offen ? '—' : prozent(r.rendite)} />
+        {/* Bei der Kinderpolice nicht: Das Geld fliesst an das Kind, nie zurueck an den Beitragszahler. */}
+        {!kind && (
+          <Angabe
+            feld="Eingesetztes Geld zurück nach"
+            wert={ohne ? 'kein eigener Aufwand' : r.amortisationsJahre > 0
+              ? `${r.amortisationsJahre.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahren`
+              : 'nicht erreicht'}
+          />
+        )}
       </Zweispaltig>
 
       {/*
@@ -220,6 +314,18 @@ export function TuevBogen({
               ohne ? '—' : prozent(wege.kapital.rendite),
             ]} />
           </Tabelle>
+          {kind ? (
+            <Text>
+              <strong>Break-even:</strong> Ohne Verzinsung des Kapitals müsste {kindName(kind)}{' '}
+              <strong>{wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>{' '}
+              alt werden, damit die laufende Rente die Einmalzahlung einholt
+              {wege.breakEven.kapitalTraegtSichSelbst
+                ? '; mit 2 % Verzinsung holt sie das Kapital nie ein.'
+                : <>; mit 2 % Verzinsung{' '}
+                  <strong>{wege.breakEven.breakEvenMitZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>.</>}{' '}
+              Oben gerechnet ist <strong>{istKapital ? 'die Kapitalauszahlung' : 'die laufende Rente'}</strong>.
+            </Text>
+          ) : (
           <Text>
             <strong>Break-even:</strong> Ohne Verzinsung des Kapitals {e.w('müsstest', undefined, 'müssten')} {e.du}{' '}
             <strong>{wege.breakEven.breakEvenOhneZins.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Jahre</strong>{' '}
@@ -236,6 +342,7 @@ export function TuevBogen({
             Gesamtübersicht dieses Gutachtens geht{' '}
             <strong>{istKapital ? 'die Kapitalauszahlung' : 'die laufende Rente'}</strong> ein.
           </Text>
+          )}
         </div>
       ) : vergleich && (
         <>
@@ -268,6 +375,39 @@ export function TuevBogen({
           </div>
           <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-relaxed text-ui-tinte">
             {r.hinweise.map((h) => <li key={h}>{h}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/*
+        Was bei einer Kinderpolice ausserhalb der Rechnung zaehlt. Bewusst
+        kurz und ohne Ratschlag: Schenkung und Beitragsbefreiung haengen am
+        Vertrag und an der Familie, nicht an dieser Rechnung.
+      */}
+      {kind && (
+        <div className="mt-3 break-inside-avoid rounded-[10px] border border-ui-linie bg-ui-innen p-2">
+          <div className="mb-1 text-[11px] font-medium text-ui-schiefer">
+            Gut zu wissen bei einer Kinderpolice
+          </div>
+          <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-relaxed text-ui-tinte">
+            <li>
+              <strong>Steuer beim Kind:</strong> die Rente mit dem Ertragsanteil, ein Kapital mit dem Ertrag
+              — zur Hälfte nach 12 Jahren Laufzeit und Auszahlung ab 62. Satz{' '}
+              {prozent(kind.steuersatz, 0)} angenommen; in der Krankenversicherung der Rentner beitragsfrei.
+            </li>
+            <li>
+              <strong>Schenkung:</strong> Was {kindName(kind)} erhält, gilt als Zuwendung des Beitragszahlers —
+              steuerfrei je Schenker in zehn Jahren bis 400.000 € an ein Kind, 200.000 € an ein Enkelkind
+              (§§ 14, 16 ErbStG).
+            </li>
+            <li>
+              <strong>Tod des Beitragszahlers:</strong> Ohne vereinbarte Beitragsbefreiung muss jemand
+              weiterzahlen, sonst sinkt die Leistung.
+            </li>
+            <li>
+              <strong>Angebot:</strong> Rente und Kapital sind Werte des Versicherers; garantiert ist meist nur
+              ein Teil davon.
+            </li>
           </ul>
         </div>
       )}

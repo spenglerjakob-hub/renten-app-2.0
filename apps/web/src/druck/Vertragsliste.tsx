@@ -1,7 +1,9 @@
-import type { ProjektionsErgebnis, Vertrag } from '@renten/engine';
+import { kinderRentenbeginn, type ProjektionsErgebnis, type Vertrag } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
-import { SCHICHT_TITEL, typText, strategieText, istKapital } from '../features/vertragsarten';
+import {
+  SCHICHT_TITEL, typText, strategieText, istKapital, kinderpoliceText, monatJahr,
+} from '../features/vertragsarten';
 import { personNameAus } from '../features/personen';
 import { Untertitel, Tabelle, Zeile, Gruppenzeile, Hinweiszeile, Text } from './Bausteine';
 
@@ -30,6 +32,13 @@ function betragText(v: Vertrag): string {
 
 function detailText(v: Vertrag): string {
   const teile: string[] = [];
+  // Kinderpolice: wer versichert ist und wann ausgezahlt wird — Jahrzehnte spaeter.
+  const vp = v.versichertePerson;
+  if (vp) {
+    if (vp.geburtsdatum.trim()) teile.push(`${vp.vorname.trim() || 'Kind'} geboren ${vp.geburtsdatum.trim()}`);
+    const beginn = kinderRentenbeginn(vp);
+    if (beginn) teile.push(`${v.strategie === 'kapital' ? 'Auszahlung' : 'Rente ab'} ${monatJahr(beginn)}`);
+  }
   if (v.kapitalHeute) teile.push(`${euro(v.kapitalHeute)} vorhanden`);
   if (v.renditeAnsparphase !== undefined) teile.push(`${prozent(v.renditeAnsparphase)} Rendite`);
   if (v.ter !== undefined) teile.push(`${prozent(v.ter)} Kosten`);
@@ -109,7 +118,9 @@ export function Vertragsliste({
                 zellen={[
                   <>
                     <span className="font-medium text-ui-tinte">{v.name || 'ohne Bezeichnung'}</span>
-                    <span className="block text-ui-schiefer">{typText(v.typ)}</span>
+                    <span className="block text-ui-schiefer">
+                      {typText(v.typ)}{kinderpoliceText(v) ? ` · ${kinderpoliceText(v)}` : ''}
+                    </span>
                   </>,
                   ...(verheiratet ? [personNameAus(szenario.personen, v.inhaber)] : []),
                   betragText(v),
@@ -146,6 +157,8 @@ export function Vertragsliste({
       <Text>
         Renditen und Kosten sind Annahmen, keine Zusage des Anbieters. Verträge mit der Verwendung
         „Nicht einrechnen“ bleiben im Ergebnis unberücksichtigt.
+        {szenario.vertraege.some((v) => v.versichertePerson)
+          && ' Ebenso Kinderpolicen — ausgezahlt wird an das versicherte Kind, nicht an den Beitragszahler.'}
       </Text>
     </>
   );
