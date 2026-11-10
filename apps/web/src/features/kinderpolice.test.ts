@@ -76,6 +76,17 @@ describe('Kinderpolice umschalten', () => {
     expect(vertrag(id).versichertePerson?.vorname).toBe('Lena');
   });
 
+  it('wechselt die Vertragsart, endet die Kinderpolice', () => {
+    const id = privateRente();
+    st().kinderpoliceUmschalten(id, true);
+    st().tuevAendern(pruefung(id).id, { beitragBis: '31.12.2036' });
+    st().vertragAendern(id, { typ: 'etf' });
+    expect(vertrag(id).typ).toBe('etf');
+    expect(vertrag(id).versichertePerson).toBeUndefined();
+    expect(pruefung(id).beitragBis).toBeUndefined();
+    expect(pruefung(id).lebenserwartung).toBe(85);
+  });
+
   it('übersteht Speichern und Laden', () => {
     const id = privateRente();
     st().kinderpoliceUmschalten(id, true);
@@ -198,7 +209,8 @@ describe('Kinderpolice — Texte', () => {
     expect(strategieText(v)).toBe('Rente an Lena — nicht in der eigenen Rente');
     expect(strategieText({ ...v, strategie: 'kapital' })).toBe('Kapital an Lena — nicht in der eigenen Rente');
     expect(kinderpoliceText(v)).toBe('Kinderpolice für Lena');
-    expect(kinderpoliceText({ versichertePerson: { ...v.versichertePerson, vorname: '' } })).toBe('Kinderpolice');
-    expect(kinderpoliceText({ versichertePerson: undefined })).toBeNull();
+    expect(kinderpoliceText({ typ: 'prvRente', versichertePerson: { ...v.versichertePerson, vorname: '' } })).toBe('Kinderpolice');
+    expect(kinderpoliceText({ typ: 'prvRente', versichertePerson: undefined })).toBeNull();
+    expect(kinderpoliceText({ typ: 'etf', versichertePerson: v.versichertePerson })).toBeNull();
   });
 });

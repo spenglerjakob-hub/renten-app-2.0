@@ -1,4 +1,4 @@
-import type { Vertrag, VertragsTyp } from '@renten/engine';
+import { istKinderpolice, type Vertrag, type VertragsTyp } from '@renten/engine';
 
 /**
  * Die Beschriftungen der Vertragsarten — EINE Quelle fuer Bildschirm und
@@ -98,9 +98,9 @@ export const KINDERPOLICE_WEGE: { wert: Vertrag['strategie']; text: string }[] =
 ];
 
 /** „Kinderpolice für Lena“ — oder nur „Kinderpolice“ ohne Namen; null bei eigenen Verträgen. */
-export function kinderpoliceText(v: Pick<Vertrag, 'versichertePerson'>): string | null {
+export function kinderpoliceText(v: Pick<Vertrag, 'typ' | 'versichertePerson'>): string | null {
   const vp = v.versichertePerson;
-  if (!vp) return null;
+  if (!vp || !istKinderpolice(v)) return null;
   const name = vp.vorname.trim();
   return name ? `Kinderpolice für ${name}` : 'Kinderpolice';
 }
@@ -145,7 +145,7 @@ export function vertragsBezeichnung(v: Pick<Vertrag, 'name' | 'typ' | 'schicht'>
 /** Klartext fuer die gewaehlte Verwendung. */
 export function strategieText(v: Vertrag): string {
   const vp = v.versichertePerson;
-  if (vp) {
+  if (vp && istKinderpolice(v)) {
     const an = vp.vorname.trim() ? `an ${vp.vorname.trim()}` : 'an das Kind';
     return `${v.strategie === 'kapital' ? 'Kapital' : 'Rente'} ${an} — nicht in der eigenen Rente`;
   }

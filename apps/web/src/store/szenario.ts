@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import {
   importiere, exportiere, annahmenKoppeln, einkommenHeuteSchema, type SzenarioParsed,
 } from '@renten/schema';
-import { parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze, KINDERPOLICE_LEBENSERWARTUNG } from '@renten/engine';
+import {
+  parseDatum, toDe, regelaltersrentenbeginn, regelaltersgrenze, istKinderpolice, KINDERPOLICE_LEBENSERWARTUNG,
+} from '@renten/engine';
 import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 import { standardSzenario } from './standard';
 import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
@@ -290,7 +292,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
             ? Math.max(new Date().getFullYear(), AVD_AB_JAHR)
             : new Date().getFullYear()),
         fruehereBeitraege: [],
-        lebenserwartung: v?.versichertePerson ? KINDERPOLICE_LEBENSERWARTUNG : 85,
+        lebenserwartung: v && istKinderpolice(v) ? KINDERPOLICE_LEBENSERWARTUNG : 85,
         vergleichen: false,
         vergleichKapitalNetto: 0,
       }],
@@ -365,9 +367,15 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     return geprueft({ ...s, vertraege: [...s.vertraege, neu] }, ['vertraege']);
   }),
 
-  vertragAendern: (id, p) => get().setze((s) => ({
-    ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
-  })),
+  vertragAendern: (id, p) => {
+    // Eine Kinderpolice gibt es nur als private Rentenversicherung: Wechselt
+    // die Vertragsart, endet sie — samt „Beiträge bis“ in der Pruefung.
+    const vorher = get().szenario.vertraege.find((v) => v.id === id);
+    if (vorher?.versichertePerson && p.typ !== undefined && p.typ !== 'prvRente') get().kinderpoliceUmschalten(id, false);
+    get().setze((s) => ({
+      ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
+    }));
+  },
 
   kinderpoliceUmschalten: (id, an) => get().setze((s) => ({
     ...s,

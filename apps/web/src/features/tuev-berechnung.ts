@@ -1,7 +1,7 @@
 import {
   vertragsTuev, renteOderKapital, erwerbsBasisHeute, parameterFuer, parseDatum, pkvImJahr,
   versorgungsluecke, projiziere, kenntKapitalwahl, nurPerson, grenzsteuersatz, grenzLohnsteuersatz, SV_FREI_QUOTE, euroText,
-  kinderpoliceAuszahlung, kinderRentenbeginn, beitragBisVorschlag,
+  kinderpoliceAuszahlung, kinderRentenbeginn, beitragBisVorschlag, istKinderpolice,
   type Steuerklasse, type Jahreszeile, type TuevErgebnis, type RenteOderKapital, type Vertrag,
   type TuevAnnahmen, type VersichertePerson, type Datum,
   type ProjektionsErgebnis, type Szenario, type TuevKontext,
@@ -445,7 +445,7 @@ export function tuevPositionen(
     if (gesehen.has(v.id)) return [];
     gesehen.add(v.id);
 
-    if (v.versichertePerson) return [kinderpolicePosition(szenario, basis, t, v, v.versichertePerson, jetzt)];
+    if (istKinderpolice(v)) return [kinderpolicePosition(szenario, basis, t, v, v.versichertePerson!, jetzt)];
 
     const posten = zeile?.posten.find((x) => x.id === v.id);
     // Nicht die Vertragsart entscheidet, sondern die gewaehlte Verwendung:

@@ -41,7 +41,7 @@ export function TuevBogen({
     „was ankommt“ kommt beim Kind an; dazu die versicherte Person, das Ende
     der Beitraege und was man ueber Schenkung und Beitragszahler wissen muss.
   */
-  const vp = v.versichertePerson;
+  const vp = kind ? v.versichertePerson : undefined;
   const offen = kind !== undefined && !kind.vollstaendig;
   // Ein Vertrag gehoert einer Person — auch beim Paar „du“, wie am Bildschirm
   const e = useAnsprache().einzeln;

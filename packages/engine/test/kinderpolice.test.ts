@@ -137,9 +137,20 @@ describe('Vertrags-TÜV mit „Beiträge bis“', () => {
 });
 
 describe('Die Kinderpolice zählt nicht zur eigenen Rente', () => {
-  it('istKinderpolice erkennt sie an der versicherten Person', () => {
+  it('istKinderpolice erkennt sie an der versicherten Person — nur bei einer privaten Rentenversicherung', () => {
     expect(istKinderpolice(kinderpolice)).toBe(true);
-    expect(istKinderpolice({ versichertePerson: undefined })).toBe(false);
+    expect(istKinderpolice({ typ: 'prvRente', versichertePerson: undefined })).toBe(false);
+    // Eine liegengebliebene versicherte Person macht aus einem Depot keine Kinderpolice.
+    expect(istKinderpolice({ typ: 'etf', versichertePerson: LENA })).toBe(false);
+  });
+
+  it('ein Depot mit liegengebliebener versicherter Person zaehlt zur eigenen Rente', () => {
+    const depot: Vertrag = {
+      id: 'depot', inhaber: 'A', schicht: 3, typ: 'etf', name: 'Depot', brutto: 0,
+      sparrate: 100, kapitalHeute: 20_000, strategie: 'rente', altvertrag: false, versichertePerson: LENA,
+    };
+    const ohneKind = projiziere({ ...szenario, vertraege: [{ ...depot, versichertePerson: undefined }] });
+    expect(projiziere({ ...szenario, vertraege: [depot] })).toEqual(ohneKind);
   });
 
   it('die Zeitachse rechnet mit Kinderpolice genau wie ohne', () => {

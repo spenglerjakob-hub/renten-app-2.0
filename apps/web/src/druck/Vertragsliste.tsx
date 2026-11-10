@@ -1,4 +1,4 @@
-import { kinderRentenbeginn, type ProjektionsErgebnis, type Vertrag } from '@renten/engine';
+import { kinderRentenbeginn, istKinderpolice, type ProjektionsErgebnis, type Vertrag } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import {
@@ -33,7 +33,7 @@ function betragText(v: Vertrag): string {
 function detailText(v: Vertrag): string {
   const teile: string[] = [];
   // Kinderpolice: wer versichert ist und wann ausgezahlt wird — Jahrzehnte spaeter.
-  const vp = v.versichertePerson;
+  const vp = istKinderpolice(v) ? v.versichertePerson : undefined;
   if (vp) {
     if (vp.geburtsdatum.trim()) teile.push(`${vp.vorname.trim() || 'Kind'} geboren ${vp.geburtsdatum.trim()}`);
     const beginn = kinderRentenbeginn(vp);
@@ -157,7 +157,7 @@ export function Vertragsliste({
       <Text>
         Renditen und Kosten sind Annahmen, keine Zusage des Anbieters. Verträge mit der Verwendung
         „Nicht einrechnen“ bleiben im Ergebnis unberücksichtigt.
-        {szenario.vertraege.some((v) => v.versichertePerson)
+        {szenario.vertraege.some(istKinderpolice)
           && ' Ebenso Kinderpolicen — ausgezahlt wird an das versicherte Kind, nicht an den Beitragszahler.'}
       </Text>
     </>

@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import {
-  parameterFuer, parseDatum, kinderRentenbeginn,
+  parameterFuer, parseDatum, kinderRentenbeginn, istKinderpolice,
   type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
@@ -80,7 +80,7 @@ function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   );
   const betrag = kopfBetrag(v);
   /** Kinderpolice: versichert ist ein Kind oder Enkel — die Rente zaehlt nicht zur eigenen. */
-  const vp = v.versichertePerson;
+  const vp = istKinderpolice(v) ? v.versichertePerson : undefined;
   const vpBeginn = vp ? kinderRentenbeginn(vp) : null;
   const vpName = vp?.vorname.trim() || 'das Kind';
   const kp = kinderpoliceText(v);

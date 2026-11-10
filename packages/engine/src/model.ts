@@ -186,7 +186,8 @@ export interface VersichertePerson {
 }
 
 /** Ist der Vertrag eine Kinderpolice (versichert ist ein anderer als der Inhaber)? */
-export const istKinderpolice = (v: Pick<Vertrag, 'versichertePerson'>): boolean => v.versichertePerson !== undefined;
+export const istKinderpolice = (v: Pick<Vertrag, 'typ' | 'versichertePerson'>): boolean =>
+  v.typ === 'prvRente' && v.versichertePerson !== undefined;
 
 export interface Annahmen {
   /** Alle als Dezimalzahl, z. B. 0.02 fuer 2 % */
