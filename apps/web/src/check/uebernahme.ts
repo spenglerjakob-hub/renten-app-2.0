@@ -5,6 +5,7 @@ import {
 import { TYPEN } from '../features/vertragsarten';
 import type { DokumentEintrag } from '../lib/check';
 import { mitName, namensTeile } from '../lib/namen';
+import { STANDARD_ANNAHMEN } from '../store/standard';
 
 /**
  * Was der Vorsorge-Check abfragt — und wie daraus ein Szenario wird.
@@ -282,7 +283,8 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
       pkv: x.pkv,
       zielNettoHeute: x.zielNettoHeute > 0 ? x.zielNettoHeute : 2000,
     },
-    annahmen: { inflation: 0.02, rentendynamik: 0.01, tarifIndex: 0.01, gehaltsdynamik: 0.02 },
+    // Dieselben Annahmen wie ein neuer Fall im Rechner (store/standard.ts).
+    annahmen: { ...STANDARD_ANNAHMEN },
     einkommenHeute: x.a.einkommen,
     einkommenGetrennt: paar,
     einkommenPartner: paar ? x.b.einkommen : undefined,

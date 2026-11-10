@@ -386,8 +386,14 @@ export const haushaltSchema = z.object({
 
 export const annahmenSchema = z.object({
   inflation: z.number().min(-0.1).max(0.2).default(0.02),
-  rentendynamik: z.number().min(-0.1).max(0.2).default(0.01),
-  tarifIndex: z.number().min(0).max(0.2).default(0.01),
+  /*
+    Rentenanpassung 1,5 % pro Jahr (bis November 2026: 1 %) — zwischen den
+    Hochrechnungen der Renteninformation mit 1 % und 2 %. Die Fortschreibung
+    des Steuertarifs folgt ihr wie beim Umstellen im Rechner
+    (`annahmenKoppeln`), deshalb steht sie auf demselben Wert.
+  */
+  rentendynamik: z.number().min(-0.1).max(0.2).default(0.015),
+  tarifIndex: z.number().min(0).max(0.2).default(0.015),
   gehaltsdynamik: z.number().min(-0.1).max(0.2).default(0.02),
 });
 

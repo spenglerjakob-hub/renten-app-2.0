@@ -123,10 +123,18 @@ export function ZahlFeld(props: {
    * Zahl, die niemand eingetragen hat.
    */
   leerBeiNull?: boolean;
+  /**
+   * Ganze Euro mit Tausenderpunkt schon beim Tippen: aus „45000“ wird
+   * „45.000“, der Cursor bleibt hinter derselben Ziffer. Fuer grosse
+   * Betraege, bei denen man sonst Nullen zaehlt (das Jahresgehalt).
+   */
+  tausenderpunkte?: boolean;
+  /** Das Feld wird verlassen oder mit Enter bestaetigt. */
+  onVerlassen?: () => void;
 }) {
   const {
     label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl, vorbelegt,
-    platzhalter, leerBeiNull,
+    platzhalter, leerBeiNull, tausenderpunkte, onVerlassen,
   } = props;
   const schritt = props.schritt ?? 1;
   /*
@@ -138,9 +146,38 @@ export function ZahlFeld(props: {
   */
   const eigen = useId();
   const id = props.id ?? `f${eigen}`;
-  const anzeige = (n: number) => (leerBeiNull && n === 0 ? '' : String(n).replace('.', ','));
+  const anzeige = (n: number) => (leerBeiNull && n === 0 ? ''
+    : tausenderpunkte ? Math.round(n).toLocaleString('de-DE')
+      : String(n).replace('.', ','));
   const [text, setText] = useState(() => anzeige(wert));
   const [fehler, setFehler] = useState<string | null>(null);
+
+  /*
+    TAUSENDERPUNKTE BEIM TIPPEN. Der Punkt wird neu gesetzt, sobald sich die
+    Ziffern aendern — dabei springt der Cursor sonst ans Ende. Gemerkt wird
+    deshalb, hinter der wievielten Ziffer er stand, und nach dem Zeichnen
+    wieder dorthin gesetzt.
+  */
+  const feld = useRef<HTMLInputElement>(null);
+  const cursor = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const pos = cursor.current;
+    cursor.current = null;
+    if (pos !== null && feld.current && document.activeElement === feld.current) {
+      feld.current.setSelectionRange(pos, pos);
+    }
+  });
+  const mitPunkten = (roh: string, stelle: number) => {
+    const ziffernDavor = roh.slice(0, stelle).replace(/\D/g, '').length;
+    const ziffern = roh.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    const neu = ziffern === '' ? '' : Number(ziffern).toLocaleString('de-DE');
+    let pos = 0;
+    for (let gezaehlt = 0; pos < neu.length && gezaehlt < ziffernDavor; pos++) {
+      if (/\d/.test(neu[pos]!)) gezaehlt++;
+    }
+    cursor.current = pos;
+    return neu;
+  };
 
   // Kommt ein neuer Wert von aussen (auch nach einem Wechsel der Einheit),
   // gilt eine alte Fehlermeldung nicht mehr.
@@ -178,17 +215,23 @@ export function ZahlFeld(props: {
       <label htmlFor={id} className={FELD_LABEL}>{label}</label>
       <div className="relative">
         <input
+          ref={feld}
           id={id}
           type="text"
-          inputMode="decimal"
+          inputMode={tausenderpunkte ? 'numeric' : 'decimal'}
           value={text}
           placeholder={platzhalter}
-          onChange={(e) => uebernehmen(e.target.value)}
+          onChange={(e) => uebernehmen(tausenderpunkte
+            ? mitPunkten(e.target.value, e.target.selectionStart ?? e.target.value.length)
+            : e.target.value)}
+          onBlur={onVerlassen}
           // Pfeiltasten wie beim nativen Zahlenfeld — nur mit Stufenknoepfen,
-          // sonst bleibt das Feld, wie es war.
-          onKeyDown={stufen ? (e) => {
-            if (e.key === 'ArrowUp') { e.preventDefault(); stufe(1); }
-            if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
+          // sonst bleibt das Feld, wie es war. Enter bestaetigt, wo jemand
+          // darauf wartet.
+          onKeyDown={stufen || onVerlassen ? (e) => {
+            if (stufen && e.key === 'ArrowUp') { e.preventDefault(); stufe(1); }
+            if (stufen && e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
+            if (onVerlassen && e.key === 'Enter') onVerlassen();
           } : undefined}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={[
