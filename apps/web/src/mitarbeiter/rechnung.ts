@@ -1,6 +1,6 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
-  renteOderKapital, schaetzeEntgeltpunkte, SV_FREI_QUOTE,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
+  renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE, SV_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
@@ -89,6 +89,11 @@ export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalPar
 /** „Rahmen voll nutzen“: die Umwandlung, mit der der beitragsfreie Rahmen genau voll ist. */
 export function rahmenVoll(f: FirmenAngebot, a: BeratungAngaben, p: LegalParameters = P): number {
   return bavRahmenVoll(f.modell as FirmenModell, eingabenVon(a, 0), bundeslandVon(a, f), p);
+}
+
+/** Das Ende des Reglers: die Umwandlung, mit der der Gesamtbeitrag den steuerfreien Rahmen (8 % der BBG) genau fuellt. */
+export function steuerRahmenVoll(f: FirmenAngebot, a: BeratungAngaben, p: LegalParameters = P): number {
+  return bavSteuerRahmenVoll(f.modell as FirmenModell, eingabenVon(a, 0), bundeslandVon(a, f), p);
 }
 
 /** Rentenbeginn als TT.MM.JJJJ: der eingetragene oder die Regelaltersgrenze. Null ohne Geburtsdatum. */
@@ -507,35 +512,48 @@ const nettoBei = (f: FirmenAngebot, d: BeratungDaten, u: number, p: LegalParamet
 
 export interface ReglerGrenzen {
   /**
-   * Hoechstens so viel Umwandlung: bis der Rahmen voll ist, der frei von
-   * Sozialabgaben bleibt — 4 % der BBG, Beitraege des Arbeitgebers in den
-   * Vertrag zaehlen mit (`rahmenVoll`, wie „Rahmen voll“ auf den
-   * Arbeitgeber-Seiten). Darueber fielen auf die Umwandlung Sozialabgaben an;
-   * fuer den Mitarbeiter lohnt sie sich dann kaum.
+   * Hoechstens so viel Umwandlung: bis der Gesamtbeitrag 8 % der BBG
+   * erreicht — so viel ist steuerfrei (`steuerRahmenVoll`, 2026: 676 €).
    */
   maxUmwandlung: number;
-  /** Der Netto-Aufwand dafuer */
+  /** Der Netto-Aufwand dafuer — das Ende des Reglers */
   maxNetto: number;
-  /** Der Rahmen im Monat: 4 % der BBG */
+  /**
+   * Bis hier bleibt die Umwandlung frei von Sozialabgaben: 4 % der BBG,
+   * Beitraege des Arbeitgebers in den Vertrag zaehlen mit (`rahmenVoll`, wie
+   * „Rahmen voll“ auf den Arbeitgeber-Seiten). Darueber sparen Mitarbeiter
+   * nur noch Steuer — die Markierung auf dem Regler.
+   */
+  rahmenUmwandlung: number;
+  /** Der Netto-Aufwand bis zur Markierung */
+  rahmenNetto: number;
+  /** 4 % der BBG im Monat */
   rahmenMonat: number;
+  /** 8 % der BBG im Monat — der Gesamtbeitrag am Ende des Reglers */
+  steuerRahmenMonat: number;
 }
 
 export function reglerGrenzen(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): ReglerGrenzen {
-  const maxUmwandlung = rahmenVoll(f, d.angaben, p);
+  const rahmenUmwandlung = rahmenVoll(f, d.angaben, p);
+  // Nie unter dem Rahmen frei von Sozialabgaben — auch wenn eine bestehende bAV den steuerfreien schon fuellt.
+  const maxUmwandlung = Math.max(rahmenUmwandlung, steuerRahmenVoll(f, d.angaben, p));
   return {
     maxUmwandlung,
     maxNetto: nettoBei(f, d, maxUmwandlung, p),
+    rahmenUmwandlung,
+    rahmenNetto: nettoBei(f, d, rahmenUmwandlung, p),
     rahmenMonat: (SV_FREI_QUOTE * p.bbgRvJahr) / 12,
+    steuerRahmenMonat: (STEUER_FREI_QUOTE * p.bbgRvJahr) / 12,
   };
 }
 
 /**
  * Die Umwandlung, die netto genau `netto` kostet — Bisektion wie `suche` im
  * Loesungsvergleich: Der Netto-Aufwand steigt mit der Umwandlung. Auf Cent,
- * hoechstens bis `max`, dem vollen Rahmen.
+ * hoechstens bis `max`, dem Ende des Reglers (steuerfreier Rahmen).
  */
 export function umwandlungFuerNetto(
-  f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P, max = rahmenVoll(f, d.angaben, p),
+  f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P, max = steuerRahmenVoll(f, d.angaben, p),
 ): number {
   if (netto <= 0 || max <= 0) return 0;
   if (nettoBei(f, d, max, p) <= netto) return max;

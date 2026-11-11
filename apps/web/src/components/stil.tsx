@@ -167,14 +167,25 @@ export function Hinweise({ titel, punkte }: { titel?: string; punkte: readonly R
 }
 
 /** Eine Zahl mit Etikett — flach auf weisser Karte, oder als die eine Akzentkarte. */
-export function WertKarte({ titel, wert, unten, akzent = false }: { titel: string; wert: string; unten: string; akzent?: boolean }) {
+export function WertKarte({ titel, wert, unten, akzent = false, gross = false }: {
+  titel: string; wert: string; unten: string; akzent?: boolean;
+  /**
+   * Die Zahlen, um die es geht, gross — etwa unter dem Regler der
+   * Mitarbeiterberatung. Drei nebeneinander passen erst ab lg in voller
+   * Groesse; dazwischen (sm) stehen sie eng und deshalb kleiner.
+   */
+  gross?: boolean;
+}) {
+  const zahl = akzent
+    ? `ui-titel leading-none ${gross ? 'text-[44px] sm:text-[36px] lg:text-[56px]' : 'text-[40px]'}`
+    : `font-medium leading-tight ${gross ? 'text-[34px] sm:text-[28px] lg:text-[44px]' : 'text-[28px]'}`;
   return (
-    <div className={`p-5 sm:p-6 ${akzent ? AKZENT : 'ui-karte text-ui-tinte'}`}>
-      <p className={`text-sm ${akzent ? '' : 'text-ui-schiefer'}`}>{titel}</p>
-      <p className={`mt-1 tabular-nums ${akzent ? 'ui-titel text-[40px] leading-none' : 'text-[28px] font-medium leading-tight'}`}>
+    <div className={`${gross ? 'p-6 sm:p-5 lg:p-8' : 'p-5 sm:p-6'} ${akzent ? AKZENT : 'ui-karte text-ui-tinte'}`}>
+      <p className={`${gross ? 'text-base' : 'text-sm'} ${akzent ? '' : 'text-ui-schiefer'}`}>{titel}</p>
+      <p className={`mt-1 tabular-nums ${zahl}`}>
         {akzent ? <Hervor>{wert}</Hervor> : wert}
       </p>
-      <p className={`mt-2 text-xs ${akzent ? '' : 'text-ui-schiefer'}`}>{unten}</p>
+      <p className={`mt-2 ${gross ? 'text-sm' : 'text-xs'} ${akzent ? '' : 'text-ui-schiefer'}`}>{unten}</p>
     </div>
   );
 }

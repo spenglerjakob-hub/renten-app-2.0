@@ -23,6 +23,11 @@ export interface UebersichtZeile {
    * Mitarbeiter verriete sie, wie viel Abgaben auf sein Gehalt fallen.
    */
   belastung: ArbeitgeberBelastung;
+  /**
+   * Der gesetzliche Zuschuss liegt ueber der Regel der Firma — eingerechnet
+   * ist er, nicht die Regel (§ 1a Abs. 1a BetrAVG). Markiert in der Tabelle.
+   */
+  aufgestockt: boolean;
   /** TT.MM.JJJJ oder leer */
   beginn: string;
 }
@@ -64,13 +69,14 @@ export function uebersichtZeilen(firma: Firma, beratungen: readonly Beratung[]):
     .map((b): UebersichtZeile => {
       const name = b.mitarbeiter || b.daten.angaben.name || 'Ohne Namen';
       if (b.status !== 'teilnahme') {
-        return { name, status: b.status, umwandlungMonat: 0, arbeitgeberMonat: 0, gesamtMonat: 0, belastung: KEINE_BELASTUNG, beginn: '' };
+        return { name, status: b.status, umwandlungMonat: 0, arbeitgeberMonat: 0, gesamtMonat: 0, belastung: KEINE_BELASTUNG, aufgestockt: false, beginn: '' };
       }
       const r = beitragsRechnung(firma.angebot, b.daten);
       return {
         name, status: 'teilnahme',
         umwandlungMonat: r.umwandlungMonat, arbeitgeberMonat: r.arbeitgeberMonat, gesamtMonat: r.gesamtMonat,
         belastung: r.arbeitgeberBelastung,
+        aufgestockt: r.mindestzuschuss?.aufgestockt ?? false,
         beginn: b.daten.entscheidung.beginn,
       };
     })
@@ -127,6 +133,10 @@ export function durchdringung(summen: UebersichtSummen, belegschaft: number): Du
     quote: n > 0 ? summen.teilnahmen / n : null,
   };
 }
+
+/** Die Fussnote zur Markierung in der Tabelle — am Bildschirm und im Druck. */
+export const AUFGESTOCKT_TEXT = '* Gesetzlicher Mindestzuschuss (§ 1a Abs. 1a BetrAVG): 15 % der Umwandlung, soweit der Arbeitgeber '
+  + 'Sozialabgaben spart — mehr, als die Regel der Firma ergäbe. Eingerechnet ist der gesetzliche Zuschuss.';
 
 /** „43 %“ — ganze Prozent; null: „—“. */
 export const quoteText = (q: number | null) => (q === null ? '—' : `${Math.round(q * 100).toLocaleString('de-DE')} %`);

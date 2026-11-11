@@ -15,10 +15,10 @@ import {
 } from './rechnung';
 import {
   KLASSE_ROEMISCH, MODELL_NAME, STEUERKLASSE_OPTIONEN, fazitText, festePunkte, firmenHinweise, gehaelterText, lohnsteuerHinweis,
-  nettolohnGrundlage, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
+  mindestzuschussText, nettolohnGrundlage, regelFuerVereinbarung, regelText, traegerText, vertragName, WEG_NAME,
 } from './texte';
 import {
-  STATUS_TEXT, anzahlText, belastungsZeilen, durchdringung, durchdringungText, quoteText, satzText,
+  AUFGESTOCKT_TEXT, STATUS_TEXT, anzahlText, belastungsZeilen, durchdringung, durchdringungText, quoteText, satzText,
   type UebersichtSummen, type UebersichtZeile,
 } from './uebersicht-daten';
 
@@ -318,6 +318,9 @@ export function Protokoll({ firma, logo, daten, r, leistung, auftritt, luecke, k
         {r.hebel > 0 && (
           <p className="mt-1">Je 1 € netto fließen {r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 2 })} € in die Vorsorge.</p>
         )}
+        {r.mindestzuschuss && (
+          <p className="mt-1">Gesetzlicher Mindestzuschuss (§ 1a Abs. 1a BetrAVG) eingehalten: {mindestzuschussText(r.mindestzuschuss, firma.angebot.modell)}</p>
+        )}
         {r.hinweise.map((h) => <p key={h} className="mt-1 text-[9pt] text-ui-schiefer">{h}</p>)}
         <p className="mt-1">
           Netto im Monat: {euroGenau(abrechnung.netto.ohne)} ohne, {euroGenau(abrechnung.netto.mit)} mit Betriebsrente — Eigenbeteiligung{' '}
@@ -531,6 +534,7 @@ export function Gespraechsunterlagen({ firma, logo, daten, r, leistung, auftritt
           Sie wandeln <strong>{euroGenau(r.umwandlungMonat)}</strong> brutto im Monat um, Ihr Arbeitgeber gibt{' '}
           {euroGenau(r.arbeitgeberMonat)} dazu — in Ihre Vorsorge fließen <strong>{euroGenau(r.gesamtMonat)}</strong>. Netto kostet
           Sie das <strong>{euroGenau(r.nettoAufwandMonat)}</strong> im Monat.
+          {r.mindestzuschuss?.aufgestockt ? ` ${mindestzuschussText(r.mindestzuschuss, angebot.modell)}` : ''}
         </p>
         <div className="mt-3 break-inside-avoid">
           <p className="font-medium">Probeabrechnung: Ihr Monat ohne und mit Betriebsrente</p>
@@ -867,7 +871,7 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
               <td className={zelle}>{z.name}</td>
               <td className={zelle}>{STATUS_TEXT[z.status]}</td>
               <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.umwandlungMonat) : ''}</td>
-              <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.arbeitgeberMonat) : ''}</td>
+              <td className={zahl}>{z.status === 'teilnahme' ? `${euroGenau(z.arbeitgeberMonat)}${z.aufgestockt ? '*' : ''}` : ''}</td>
               <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.gesamtMonat) : ''}</td>
               <td className={zelle}>{z.beginn}</td>
             </tr>
@@ -890,6 +894,8 @@ export function UebersichtDruck({ firma, logo, zeilen, summen, auftritt }: {
           </tr>
         </tfoot>
       </table>
+
+      {zeilen.some((z) => z.aufgestockt) && <p className="mt-1 text-[8.5pt] leading-snug text-ui-schiefer">{AUFGESTOCKT_TEXT}</p>}
 
       {summen.teilnahmen + summen.verzichte + summen.offen > 0 && (
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,13rem)] gap-8 break-inside-avoid text-[9.5pt]">

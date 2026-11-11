@@ -1,7 +1,7 @@
 import type { LegalParameters } from '../params/types.js';
 import type { KinderStatus } from '../social/kv-pv.js';
 import { entgeltpunkteJahr } from '../pension/grv.js';
-import { SV_FREI_QUOTE } from './vertrags-tuev.js';
+import { STEUER_FREI_QUOTE, SV_FREI_QUOTE } from './vertrags-tuev.js';
 import {
   matchingModell, zuschussModell, festbetragModell,
   optimaleUmwandlung, zuschussVollAusschoepfen, festbetragVollAusschoepfen,
@@ -26,7 +26,11 @@ import {
  * („Der Zuschuss senkt Ihre Kosten …“), hier geht es um den Mitarbeiter.
  */
 
-/** Das Modell der Firma — wie es auf der Arbeitgeber-Seite eingestellt wurde. */
+/**
+ * Das Modell der Firma — wie es auf der Arbeitgeber-Seite eingestellt wurde.
+ * Beim Zuschuss heisst `deckelMonat` 0: ohne Deckel — so steht es im Angebot
+ * der Firma und in der Vereinbarung.
+ */
 export type FirmenModell =
   | { art: 'zuschuss'; quote: number; deckelMonat: number }
   | { art: 'festbetrag'; festbetragMonat: number; mindestUmwandlungMonat: number }
@@ -84,6 +88,26 @@ export interface ArbeitgeberBelastung {
   nettoKostenMonat: number;
 }
 
+/**
+ * Die Pruefung des gesetzlichen Zuschusses (§ 1a Abs. 1a BetrAVG): 15 % der
+ * Umwandlung, soweit der Arbeitgeber durch sie Sozialabgaben spart. Die
+ * Modelle zahlen ihn immer mindestens; hier steht, ob die Regel der Firma
+ * dafuer reicht oder aufgestockt wird — etwa ein Festbetrag von 50 €, sobald
+ * 15 % der Umwandlung mehr ergeben.
+ */
+export interface Mindestzuschuss {
+  /** 15 % der Umwandlung */
+  quoteMonat: number;
+  /** Was der Arbeitgeber auf die Umwandlung an Sozialabgaben spart — bis dahin reicht die Pflicht („soweit“) */
+  ersparnisMonat: number;
+  /** Der gesetzliche Zuschuss: 15 %, hoechstens die Ersparnis */
+  mindestMonat: number;
+  /** Was die Regel der Firma allein ergaebe — beim Matching mit enthaltenem Zuschuss das Matching */
+  regelMonat: number;
+  /** Die Regel bleibt unter dem gesetzlichen Zuschuss: gezahlt wird er, nicht die Regel */
+  aufgestockt: boolean;
+}
+
 export interface MitarbeiterBav {
   umwandlungMonat: number;
   svErsparnisMonat: number;
@@ -105,6 +129,8 @@ export interface MitarbeiterBav {
   hebel: number;
   /** Was der Beitrag den Arbeitgeber netto kostet — mit den Saetzen seiner Firma */
   arbeitgeberBelastung: ArbeitgeberBelastung;
+  /** Null ohne Umwandlung und bei Umwandlung in die Unterstuetzungskasse — dort gibt es keinen gesetzlichen Zuschuss */
+  mindestzuschuss: Mindestzuschuss | null;
   hinweise: string[];
 }
 
@@ -113,6 +139,17 @@ const euro = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 /** Eine bestehende bAV belegt die Rahmen — wie der Bestand auf den Arbeitgeber-Seiten, ohne VL. */
 const bisher = (bavBestandMonat: number): BisherigeLeistungen | undefined =>
   bavBestandMonat > 0 ? { vlMonat: 0, vlUmgang: 'anrechnen', bavBestandMonat } : undefined;
+
+/** Der Deckel fuers Rechnen: 0 heisst ohne Deckel. */
+const deckel = (deckelMonat: number) => (deckelMonat > 0 ? deckelMonat : Number.POSITIVE_INFINITY);
+
+/** Was die Regel der Firma fuer eine Umwandlung allein ergaebe — ohne den gesetzlichen Zuschuss als Untergrenze. */
+function regelMonat(modell: FirmenModell, u: number, pflichtMonat: number): number {
+  if (modell.art === 'zuschuss') return Math.min(Math.max(0, modell.quote) * u, deckel(modell.deckelMonat));
+  if (modell.art === 'festbetrag') return u + 0.005 >= modell.mindestUmwandlungMonat ? Math.max(0, modell.festbetragMonat) : 0;
+  // Matching: Ist der Zuschuss enthalten, ist das Matching die ganze Regel; sonst kommt er obendrauf.
+  return Math.max(0, modell.matchingMonat) + (modell.zuschussImMatching ? 0 : pflichtMonat);
+}
 
 const kern = (m: MitarbeiterEingaben, firma?: FirmenSaetze) => ({
   jahresbrutto: Math.max(0, m.jahresbrutto),
@@ -146,7 +183,7 @@ export function bavMitarbeiter(
   /** Nur fuer `arbeitgeberBelastung` — die Seite des Mitarbeiters bleibt gleich */
   firma?: FirmenSaetze,
 ): MitarbeiterBav {
-  let r: Omit<MitarbeiterBav, 'hinweise'>;
+  let r: Omit<MitarbeiterBav, 'hinweise' | 'mindestzuschuss'>;
   if (modell.art === 'matching') {
     const x = matchingModell(
       { ...kern(m, firma), weg: modell.weg, matchingMonat: modell.matchingMonat, zuschussImMatching: modell.zuschussImMatching },
@@ -171,7 +208,7 @@ export function bavMitarbeiter(
     };
   } else {
     const x = modell.art === 'zuschuss'
-      ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: modell.deckelMonat }, steuerOpt, p)
+      ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: deckel(modell.deckelMonat) }, steuerOpt, p)
       : festbetragModell({ ...kern(m, firma), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
     r = {
       ...x.mitarbeiter,
@@ -186,7 +223,30 @@ export function bavMitarbeiter(
       arbeitgeberBelastung: belastung(x.arbeitgeber.zuschussMonat, x.arbeitgeber),
     };
   }
-  return { ...r, hinweise: mitarbeiterHinweise(modell, m, r, p) };
+  const mit = { ...r, mindestzuschuss: mindestzuschussPruefen(modell, r) };
+  return { ...mit, hinweise: mitarbeiterHinweise(modell, m, mit, p) };
+}
+
+/**
+ * Reicht die Regel der Firma fuer den gesetzlichen Zuschuss? Gerechnet ist er
+ * schon — die Modelle zahlen mindestens ihn (`pflichtzuschussMonat`); hier
+ * wird es sichtbar.
+ */
+function mindestzuschussPruefen(
+  modell: FirmenModell,
+  r: Omit<MitarbeiterBav, 'hinweise' | 'mindestzuschuss'>,
+): Mindestzuschuss | null {
+  const u = r.umwandlungMonat;
+  if (u <= 0.005 || (modell.art === 'matching' && modell.weg === 'ukasse')) return null;
+  const mindest = r.pflichtzuschussMonat;
+  const regel = regelMonat(modell, u, mindest);
+  return {
+    quoteMonat: 0.15 * u,
+    ersparnisMonat: r.arbeitgeberBelastung.svErsparnisMonat,
+    mindestMonat: mindest,
+    regelMonat: regel,
+    aufgestockt: regel + 0.005 < mindest,
+  };
 }
 
 /** Hinweise, die den MITARBEITER angehen — aus den Zahlen, nicht aus den Texten der Modelle. */
@@ -199,7 +259,9 @@ function mitarbeiterHinweise(
   const h: string[] = [];
   const u = r.umwandlungMonat;
   if (u <= 0) return h;
-  if (modell.art === 'zuschuss' && modell.quote * u > modell.deckelMonat + 0.005) {
+  // Ob der gesetzliche Zuschuss die Regel uebersteigt, zeigt die Pruefung (`mindestzuschuss`) — dann
+  // waere „gedeckelt“ irrefuehrend: Der Arbeitgeber zahlt mehr als den Deckel.
+  if (modell.art === 'zuschuss' && modell.deckelMonat > 0 && modell.quote * u > modell.deckelMonat + 0.005 && !r.mindestzuschuss?.aufgestockt) {
     h.push(
       `Der Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
       + 'jeder weitere Euro Umwandlung wird nicht mehr bezuschusst.',
@@ -252,12 +314,55 @@ export function bavRahmenVoll(
   };
   if (modell.art === 'matching') return optimaleUmwandlung(modell.weg, e, bundesland, p);
   if (modell.art === 'zuschuss') {
-    return zuschussVollAusschoepfen({ ...e, quote: modell.quote, deckelMonat: modell.deckelMonat }, bundesland, p);
+    return zuschussVollAusschoepfen({ ...e, quote: modell.quote, deckelMonat: deckel(modell.deckelMonat) }, bundesland, p);
   }
   return festbetragVollAusschoepfen(
     { ...e, festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat },
     bundesland, p,
   );
+}
+
+/**
+ * Die Umwandlung, mit der der Gesamtbeitrag den steuerfreien Rahmen genau
+ * fuellt: 8 % der BBG (§ 3 Nr. 63 EStG) — Monat, auf Cent abgerundet.
+ * Gezaehlt wird der Vertrag, in den der Mitarbeiter umwandelt: die
+ * Direktversicherung mit dem Beitrag des Arbeitgebers dorthin (eine
+ * bestehende bAV belegt den Rahmen zuerst), beim Matching mit Umwandlung in
+ * die Unterstuetzungskasse diese mit dem Matching. Dort ist die Umwandlung
+ * zwar ohne Grenze steuerfrei; die Beratung rechnet trotzdem bis 8 %.
+ *
+ * Ueber den 4 % (`bavRahmenVoll`) fallen auf die Umwandlung Sozialabgaben
+ * an, bis hier bleibt sie steuerfrei. Der Gesamtbeitrag waechst mit der
+ * Umwandlung (der Arbeitgeberbeitrag faellt nie, wenn sie steigt) — deshalb
+ * genuegt eine Bisektion.
+ */
+export function bavSteuerRahmenVoll(
+  modell: FirmenModell,
+  m: Omit<MitarbeiterEingaben, 'umwandlungMonat'>,
+  bundesland: string,
+  p: LegalParameters,
+): number {
+  const ukasse = modell.art === 'matching' && modell.weg === 'ukasse';
+  const bestand = ukasse ? 0 : Math.max(0, m.bavBestandMonat);
+  const grenze = Math.max(0, (STEUER_FREI_QUOTE * p.bbgRvJahr) / 12 - bestand);
+  // Die Steuer des Mitarbeiters aendert am Gesamtbeitrag nichts.
+  const steuer: MatchingSteuer = { verheiratet: false, bundesland, kirchensteuerpflichtig: false };
+  const gesamt = (u: number) => {
+    const v = bavMitarbeiter(modell, { ...m, umwandlungMonat: u }, steuer, p).vertraege.find((x) => x.weg === (ukasse ? 'ukasse' : 'direkt'));
+    return v ? v.beitragMonat : u;
+  };
+  let lo = 0, hi = grenze;
+  for (let i = 0; i < 50; i++) {
+    const mitte = (lo + hi) / 2;
+    if (gesamt(mitte) > grenze) hi = mitte; else lo = mitte;
+  }
+  // Auf Cent: Die Bisektion endet knapp unter der Grenze (575,9999… statt 576) —
+  // abgerundet stuenden am Ende des Reglers 675,99 € statt 676 €. Der naechste
+  // Cent gilt, solange der Gesamtbeitrag nach Rundung des Arbeitgeberbeitrags
+  // auf Cent (wie in der Lohnabrechnung) im Rahmen bleibt: unter einem halben
+  // Cent darueber.
+  const naechster = Math.round(lo * 100) / 100;
+  return gesamt(naechster) < grenze + 0.005 - 1e-9 ? naechster : Math.floor(lo * 100) / 100;
 }
 
 /**

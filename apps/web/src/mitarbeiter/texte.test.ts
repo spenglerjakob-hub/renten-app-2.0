@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { firmenAngebotSchema, type FirmenModellDaten } from '@renten/schema';
-import { euroText, fazitText, festePunkte, firmenHinweise, regelFuerVereinbarung, regelKern, regelText, traegerText, vertragName } from './texte';
+import {
+  euroText, fazitText, festePunkte, firmenHinweise, mindestzuschussText, regelFuerVereinbarung, regelKern, regelText, reglerErklaerung,
+  traegerText, vertragName,
+} from './texte';
 import type { KennzahlenErgebnis, KennzahlenWeg } from './rechnung';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
@@ -117,5 +120,84 @@ describe('regelKern', () => {
       { art: 'matching', weg: 'ukasse', matchingMonat: 80, zuschussImMatching: false },
     ];
     for (const m of modelle) expect(regelText(m)).toContain(regelKern(m));
+  });
+});
+
+
+/** Geschuetzte Leerzeichen (vor €) wie normale lesen. */
+const n = (s: string) => s.replace(/\u00a0/g, ' ');
+
+describe('Gesetzlicher Mindestzuschuss in Worten', () => {
+  const FEST: FirmenModellDaten = { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 };
+  const z = (quote: number, ersparnis: number, mindest: number, regel: number) =>
+    ({ quoteMonat: quote, ersparnisMonat: ersparnis, mindestMonat: mindest, regelMonat: regel, aufgestockt: regel + 0.005 < mindest });
+
+  it('Festbetrag deckt die 15 %', () => {
+    expect(n(mindestzuschussText(z(43.2, 61.2, 43.2, 50), FEST)))
+      .toBe('15 % Ihrer Umwandlung sind 43,20 €. Ihr Arbeitgeber gibt 50 € — der Zuschuss ist darin enthalten.');
+  });
+
+  it('15 % über dem Festbetrag: aufgestockt', () => {
+    expect(n(mindestzuschussText(z(54, 60, 54, 50), FEST)))
+      .toBe('15 % Ihrer Umwandlung sind 54 € — mehr als der Festbetrag von 50 €. Ihr Arbeitgeber zahlt deshalb 54 €.');
+  });
+
+  it('über dem Rahmen: geschuldet ist der Zuschuss, soweit der Arbeitgeber Sozialabgaben spart', () => {
+    expect(n(mindestzuschussText(z(90, 59.01, 59.01, 50), FEST))).toBe(
+      '15 % Ihrer Umwandlung wären 90 €; geschuldet ist der Zuschuss, soweit Ihr Arbeitgeber Sozialabgaben spart: 59,01 € '
+      + '— mehr als der Festbetrag von 50 €. Ihr Arbeitgeber zahlt deshalb 59,01 €.',
+    );
+    // Deckt die Regel auch den begrenzten Zuschuss, steht das so da
+    expect(n(mindestzuschussText(z(90, 59.01, 59.01, 100), { art: 'zuschuss', quote: 0.5, deckelMonat: 100 }))).toBe(
+      '15 % Ihrer Umwandlung wären 90 €; geschuldet ist der Zuschuss, soweit Ihr Arbeitgeber Sozialabgaben spart: 59,01 €. '
+      + 'Ihr Arbeitgeber gibt 100 € — der Zuschuss ist darin enthalten.',
+    );
+  });
+
+  it('Festbetrag erst ab der Mindestumwandlung', () => {
+    expect(n(mindestzuschussText(z(6, 8.5, 6, 0), FEST)))
+      .toBe('Den Festbetrag gibt es ab 50 € Umwandlung. Bis dahin zahlt Ihr Arbeitgeber den gesetzlichen Zuschuss: 15 % Ihrer Umwandlung sind 6 €.');
+  });
+
+  it('Zuschuss unter 15 %, Deckel darunter, Matching mit und ohne enthaltenen Zuschuss', () => {
+    expect(n(mindestzuschussText(z(30, 42, 30, 20), { art: 'zuschuss', quote: 0.1, deckelMonat: 0 })))
+      .toBe('15 % Ihrer Umwandlung sind 30 € — mehr als 10 % Ihres Beitrags (20 €). Ihr Arbeitgeber zahlt deshalb 30 €.');
+    expect(n(mindestzuschussText(z(45, 63, 45, 30), { art: 'zuschuss', quote: 0.5, deckelMonat: 30 })))
+      .toBe('15 % Ihrer Umwandlung sind 45 € — mehr als der Deckel von 30 €. Ihr Arbeitgeber zahlt deshalb 45 €.');
+    expect(n(mindestzuschussText(z(30, 42, 30, 20), { art: 'matching', weg: 'dv', matchingMonat: 20, zuschussImMatching: true }))).toBe(
+      '15 % Ihrer Umwandlung sind 30 € — mehr als das Matching von 20 €. Ihr Arbeitgeber zahlt deshalb 30 € in Ihre '
+      + 'Direktversicherung; in die Unterstützungskasse fließt dann nichts.',
+    );
+    expect(n(mindestzuschussText(z(22.5, 31, 22.5, 100), { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: true })))
+      .toBe('15 % Ihrer Umwandlung sind 22,50 €. Der Zuschuss ist im Matching von 100 € enthalten und fließt in Ihre Direktversicherung.');
+    expect(n(mindestzuschussText(z(22.5, 31, 22.5, 122.5), { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: false })))
+      .toBe('15 % Ihrer Umwandlung sind 22,50 €. Der Zuschuss fließt zusätzlich zum Matching in Ihre Direktversicherung.');
+  });
+});
+
+describe('Was der Regler abdeckt', () => {
+  const g = { rahmenUmwandlung: 288, maxUmwandlung: 617.4, rahmenMonat: 338, steuerRahmenMonat: 676 };
+
+  it('bis zur Markierung frei von Sozialabgaben, bis zum Ende steuerfrei', () => {
+    expect(n(reglerErklaerung(g, { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 }))).toBe(
+      'Bis zur Markierung bleibt Ihre Umwandlung frei von Sozialabgaben: 4 % der Beitragsbemessungsgrenze, 338 € im Monat '
+      + 'für Umwandlung und Arbeitgeberbeitrag zusammen — bei Ihnen bis 288 € Umwandlung. Darüber sparen Sie nur noch Steuern; '
+      + 'der Regler reicht bis 676 € Gesamtbeitrag (8 %), so viel bleibt steuerfrei.',
+    );
+  });
+
+  it('Matching: Direktversicherung oder Unterstützungskasse', () => {
+    const dv = n(reglerErklaerung(g, { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: false }));
+    expect(dv).toContain('für Umwandlung und gesetzlichen Zuschuss zusammen');
+    expect(dv).toContain('bis 676 € in Ihrer Direktversicherung (8 %)');
+    expect(dv).toContain('kommt obendrauf');
+    expect(n(reglerErklaerung(g, { art: 'matching', weg: 'ukasse', matchingMonat: 100, zuschussImMatching: false })))
+      .toContain('bis 676 € für Umwandlung und Matching zusammen (8 %)');
+  });
+
+  it('Rahmen frei von Sozialabgaben schon voll — nur noch steuerfrei; beides voll', () => {
+    const m: FirmenModellDaten = { art: 'zuschuss', quote: 0.5, deckelMonat: 100 };
+    expect(n(reglerErklaerung({ ...g, rahmenUmwandlung: 0 }, m))).toMatch(/^Der Rahmen frei von Sozialabgaben ist schon voll.*nur Steuern/);
+    expect(n(reglerErklaerung({ ...g, rahmenUmwandlung: 0, maxUmwandlung: 0 }, m))).toMatch(/^Der steuerfreie Rahmen ist schon voll/);
   });
 });

@@ -217,23 +217,66 @@ describe('Netto-Regler', () => {
     expect(umwandlungFuerNetto(firma, d, 0)).toBe(0);
   });
 
-  it('Grenze: der Rahmen frei von Sozialabgaben — 4 % der BBG mit dem Arbeitgeberbeitrag', () => {
+  it('Markierung: der Rahmen frei von Sozialabgaben — 4 % der BBG mit dem Arbeitgeberbeitrag', () => {
     const d = anna();
     const g = reglerGrenzen(firma, d);
-    expect(g.maxUmwandlung).toBeCloseTo(rahmenVoll(firma, d.angaben), 6);
+    expect(g.rahmenUmwandlung).toBeCloseTo(rahmenVoll(firma, d.angaben), 6);
     expect(g.rahmenMonat).toBeCloseTo((0.04 * P.bbgRvJahr) / 12, 9);
     // Zuschuss 50 % bis 100 €: Umwandlung und Zuschuss füllen den Rahmen genau
-    const r = beitragsRechnung(firma, { ...d, umwandlungMonat: g.maxUmwandlung });
+    const r = beitragsRechnung(firma, { ...d, umwandlungMonat: g.rahmenUmwandlung });
     expect(r.gesamtMonat).toBeCloseTo(g.rahmenMonat, 0);
     expect(r.svPflichtigMonat).toBeCloseTo(0, 6);
-    expect(g.maxNetto).toBeCloseTo(r.nettoAufwandMonat, 9);
-    // Mehr netto, als der Rahmen hergibt: der volle Rahmen, nicht mehr
+    expect(g.rahmenNetto).toBeCloseTo(r.nettoAufwandMonat, 9);
+  });
+
+  it('Ende: 8 % der BBG Gesamtbeitrag — steuerfrei, darüber hinaus mit Sozialabgaben', () => {
+    const d = anna();
+    const g = reglerGrenzen(firma, d);
+    expect(g.steuerRahmenMonat).toBeCloseTo((0.08 * P.bbgRvJahr) / 12, 9);
+    const ende = beitragsRechnung(firma, { ...d, umwandlungMonat: g.maxUmwandlung });
+    expect(ende.gesamtMonat).toBeCloseTo(g.steuerRahmenMonat, 1);
+    expect(ende.gesamtMonat).toBeLessThanOrEqual(g.steuerRahmenMonat + 1e-9);
+    expect(ende.steuerpflichtigMonat).toBeCloseTo(0, 2);
+    expect(ende.svPflichtigMonat).toBeGreaterThan(0);
+    expect(g.maxNetto).toBeCloseTo(ende.nettoAufwandMonat, 9);
+    expect(g.maxUmwandlung).toBeGreaterThan(g.rahmenUmwandlung);
+    expect(g.maxNetto).toBeGreaterThan(g.rahmenNetto);
+    // Mehr netto, als der Regler hergibt: das Ende, nicht mehr
+    expect(umwandlungFuerNetto(firma, d, g.maxNetto + 500, P, g.maxUmwandlung)).toBe(g.maxUmwandlung);
     expect(umwandlungFuerNetto(firma, d, g.maxNetto + 500)).toBe(g.maxUmwandlung);
   });
 
-  it('Unterstützungskasse: Die Umwandlung allein füllt den Rahmen', () => {
+  it('netto → brutto auch über der Markierung, auf den Cent', () => {
+    const d = anna();
+    const g = reglerGrenzen(firma, d);
+    for (const netto of [g.rahmenNetto + 20, (g.rahmenNetto + g.maxNetto) / 2, g.maxNetto - 5]) {
+      const u = umwandlungFuerNetto(firma, d, netto, P, g.maxUmwandlung);
+      expect(u).toBeGreaterThan(g.rahmenUmwandlung);
+      expect(beitragsRechnung(firma, { ...d, umwandlungMonat: u }).nettoAufwandMonat).toBeCloseTo(netto, 1);
+    }
+  });
+
+  it('Festbetrag 50 €: Über der Markierung zahlt der Arbeitgeber mindestens den gesetzlichen Zuschuss', () => {
+    const fest = firmenAngebotSchema.parse({ modell: { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 } });
+    const d = beratung();
+    const g = reglerGrenzen(fest, d);
+    const ende = beitragsRechnung(fest, { ...d, umwandlungMonat: g.maxUmwandlung });
+    expect(ende.mindestzuschuss!.aufgestockt).toBe(true);
+    expect(ende.arbeitgeberMonat).toBeGreaterThan(50);
+    expect(ende.arbeitgeberMonat).toBeCloseTo(ende.mindestzuschuss!.mindestMonat, 6);
+    expect(ende.gesamtMonat).toBeCloseTo(g.steuerRahmenMonat, 1);
+  });
+
+  it('Unterstützungskasse: Markierung bei der Umwandlung allein, Ende mit dem Matching zusammen', () => {
     const uk = firmenAngebotSchema.parse({ modell: { art: 'matching', weg: 'ukasse', matchingMonat: 100 } });
-    expect(reglerGrenzen(uk, anna()).maxUmwandlung).toBeCloseTo(Math.floor(((0.04 * P.bbgRvJahr) / 12) * 100) / 100, 6);
+    const g = reglerGrenzen(uk, anna());
+    expect(g.rahmenUmwandlung).toBeCloseTo(Math.floor(((0.04 * P.bbgRvJahr) / 12) * 100) / 100, 6);
+    expect(g.maxUmwandlung).toBeCloseTo((0.08 * P.bbgRvJahr) / 12 - 100, 1);
+  });
+
+  it('Zuschuss „ohne Deckel“ (0): 50 % der Umwandlung, wie das Angebot sagt', () => {
+    const ohne = firmenAngebotSchema.parse({ modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 0 } });
+    expect(beitragsRechnung(ohne, beratung({}, 300)).arbeitgeberMonat).toBeCloseTo(150, 6);
   });
 });
 
