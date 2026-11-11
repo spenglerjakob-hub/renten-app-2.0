@@ -1,6 +1,6 @@
 import { GEHAELTER_IM_JAHR, type FirmenAngebot, type FirmenModellDaten, type SteuerklasseBeratung } from '@renten/schema';
-import type { MitarbeiterVertrag } from '@renten/engine';
-import type { KennzahlenErgebnis } from './rechnung';
+import type { Mindestzuschuss, MitarbeiterVertrag } from '@renten/engine';
+import type { KennzahlenErgebnis, ReglerGrenzen } from './rechnung';
 
 /**
  * Die Saetze der Mitarbeiterberatung — einmal hier, damit Bildschirm,
@@ -123,6 +123,68 @@ export function regelFuerVereinbarung(m: FirmenModellDaten): string {
   return m.zuschussImMatching
     ? `${kern}, einschließlich des Zuschusses nach § 1a Abs. 1a BetrAVG zur Direktversicherung.`
     : `${kern} und dazu den Zuschuss nach § 1a Abs. 1a BetrAVG in die Direktversicherung.`;
+}
+
+/**
+ * Die Pruefung des gesetzlichen Zuschusses in Worten (§ 1a Abs. 1a BetrAVG):
+ * 15 % der Umwandlung, soweit der Arbeitgeber dadurch Sozialabgaben spart.
+ * Gerechnet ist er immer (`bavMitarbeiter` zahlt mindestens ihn) — hier
+ * steht, ob die Regel der Firma dafuer reicht oder er sie uebersteigt, etwa
+ * ein Festbetrag von 50 € ab rund 334 € Umwandlung. Schritt 4 und Protokoll.
+ */
+export function mindestzuschussText(z: Mindestzuschuss, m: FirmenModellDaten): string {
+  const mindest = euroText(z.mindestMonat);
+  // „soweit“: Ueber dem Rahmen frei von Sozialabgaben spart der Arbeitgeber nichts mehr dazu.
+  const begrenzt = z.quoteMonat > z.ersparnisMonat + 0.005 && z.mindestMonat < z.quoteMonat - 0.005;
+  const pflicht = begrenzt
+    ? `15 % Ihrer Umwandlung wären ${euroText(z.quoteMonat)}; geschuldet ist der Zuschuss, soweit Ihr Arbeitgeber Sozialabgaben spart: ${mindest}`
+    : `15 % Ihrer Umwandlung sind ${euroText(z.quoteMonat)}`;
+  const regel = euroText(z.regelMonat);
+
+  if (z.aufgestockt && z.regelMonat <= 0.005) {
+    const vorab = m.art === 'festbetrag' ? `Den Festbetrag gibt es ab ${euroText(m.mindestUmwandlungMonat)} Umwandlung. Bis dahin zahlt ` : 'Ihr Arbeitgeber zahlt ';
+    return `${vorab}${m.art === 'festbetrag' ? 'Ihr Arbeitgeber ' : ''}den gesetzlichen Zuschuss: ${pflicht}.`;
+  }
+  if (z.aufgestockt) {
+    const u = z.quoteMonat / 0.15;
+    const name = m.art === 'festbetrag' ? `der Festbetrag von ${regel}`
+      : m.art === 'matching' ? `das Matching von ${regel}`
+      : m.deckelMonat > 0 && m.quote * u > m.deckelMonat + 0.005 ? `der Deckel von ${regel}`
+      : `${prozentText(m.quote)} Ihres Beitrags (${regel})`;
+    const wohin = m.art === 'matching' ? ' in Ihre Direktversicherung; in die Unterstützungskasse fließt dann nichts' : '';
+    return `${pflicht} — mehr als ${name}. Ihr Arbeitgeber zahlt deshalb ${mindest}${wohin}.`;
+  }
+  if (m.art === 'matching') {
+    return m.zuschussImMatching
+      ? `${pflicht}. Der Zuschuss ist im Matching von ${euroText(m.matchingMonat)} enthalten und fließt in Ihre Direktversicherung.`
+      : `${pflicht}. Der Zuschuss fließt zusätzlich zum Matching in Ihre Direktversicherung.`;
+  }
+  return `${pflicht}. Ihr Arbeitgeber gibt ${regel} — der Zuschuss ist darin enthalten.`;
+}
+
+/**
+ * Was der Regler in Schritt 4 abdeckt: bis zur Markierung frei von
+ * Sozialabgaben (4 % der BBG), bis zum Ende steuerfrei (8 %).
+ */
+export function reglerErklaerung(g: Pick<ReglerGrenzen, 'rahmenUmwandlung' | 'maxUmwandlung' | 'rahmenMonat' | 'steuerRahmenMonat'>, m: FirmenModellDaten): string {
+  const ukasse = m.art === 'matching' && m.weg === 'ukasse';
+  const mit = m.art !== 'matching' ? ' für Umwandlung und Arbeitgeberbeitrag zusammen'
+    : m.weg === 'dv' ? ' für Umwandlung und gesetzlichen Zuschuss zusammen' : '';
+  const ende = m.art !== 'matching' ? `${euroText(g.steuerRahmenMonat)} Gesamtbeitrag`
+    : ukasse ? `${euroText(g.steuerRahmenMonat)} für Umwandlung und Matching zusammen`
+    : `${euroText(g.steuerRahmenMonat)} in Ihrer Direktversicherung`;
+  const obendrauf = m.art === 'matching' && m.weg === 'dv' ? ' Der Beitrag des Arbeitgebers in die Unterstützungskasse kommt obendrauf.' : '';
+  if (g.maxUmwandlung < 0.005) {
+    return 'Der steuerfreie Rahmen ist schon voll — durch den Beitrag des Arbeitgebers oder eine bestehende Betriebsrente.';
+  }
+  if (g.rahmenUmwandlung < 0.005) {
+    return 'Der Rahmen frei von Sozialabgaben ist schon voll — durch den Beitrag des Arbeitgebers oder eine bestehende '
+      + `Betriebsrente. Ihre Umwandlung spart deshalb nur Steuern; der Regler reicht bis ${ende} (8 % der `
+      + `Beitragsbemessungsgrenze), so viel bleibt steuerfrei.${obendrauf}`;
+  }
+  return `Bis zur Markierung bleibt Ihre Umwandlung frei von Sozialabgaben: 4 % der Beitragsbemessungsgrenze, `
+    + `${euroText(g.rahmenMonat)} im Monat${mit} — bei Ihnen bis ${euroText(g.rahmenUmwandlung)} Umwandlung. Darüber sparen Sie `
+    + `nur noch Steuern; der Regler reicht bis ${ende} (8 %), so viel bleibt steuerfrei.${obendrauf}`;
 }
 
 /** Die eigenen Hinweise der Firma, je Zeile einer. */

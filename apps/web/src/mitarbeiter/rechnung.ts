@@ -1,6 +1,6 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
-  renteOderKapital, schaetzeEntgeltpunkte, SV_FREI_QUOTE,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
+  renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE, SV_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
 } from '@renten/engine';
@@ -89,6 +89,11 @@ export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalPar
 /** „Rahmen voll nutzen“: die Umwandlung, mit der der beitragsfreie Rahmen genau voll ist. */
 export function rahmenVoll(f: FirmenAngebot, a: BeratungAngaben, p: LegalParameters = P): number {
   return bavRahmenVoll(f.modell as FirmenModell, eingabenVon(a, 0), bundeslandVon(a, f), p);
+}
+
+/** Das Ende des Reglers: die Umwandlung, mit der der Gesamtbeitrag den steuerfreien Rahmen (8 % der BBG) genau fuellt. */
+export function steuerRahmenVoll(f: FirmenAngebot, a: BeratungAngaben, p: LegalParameters = P): number {
+  return bavSteuerRahmenVoll(f.modell as FirmenModell, eingabenVon(a, 0), bundeslandVon(a, f), p);
 }
 
 /** Rentenbeginn als TT.MM.JJJJ: der eingetragene oder die Regelaltersgrenze. Null ohne Geburtsdatum. */
@@ -507,35 +512,48 @@ const nettoBei = (f: FirmenAngebot, d: BeratungDaten, u: number, p: LegalParamet
 
 export interface ReglerGrenzen {
   /**
-   * Hoechstens so viel Umwandlung: bis der Rahmen voll ist, der frei von
-   * Sozialabgaben bleibt — 4 % der BBG, Beitraege des Arbeitgebers in den
-   * Vertrag zaehlen mit (`rahmenVoll`, wie „Rahmen voll“ auf den
-   * Arbeitgeber-Seiten). Darueber fielen auf die Umwandlung Sozialabgaben an;
-   * fuer den Mitarbeiter lohnt sie sich dann kaum.
+   * Hoechstens so viel Umwandlung: bis der Gesamtbeitrag 8 % der BBG
+   * erreicht — so viel ist steuerfrei (`steuerRahmenVoll`, 2026: 676 €).
    */
   maxUmwandlung: number;
-  /** Der Netto-Aufwand dafuer */
+  /** Der Netto-Aufwand dafuer — das Ende des Reglers */
   maxNetto: number;
-  /** Der Rahmen im Monat: 4 % der BBG */
+  /**
+   * Bis hier bleibt die Umwandlung frei von Sozialabgaben: 4 % der BBG,
+   * Beitraege des Arbeitgebers in den Vertrag zaehlen mit (`rahmenVoll`, wie
+   * „Rahmen voll“ auf den Arbeitgeber-Seiten). Darueber sparen Mitarbeiter
+   * nur noch Steuer — die Markierung auf dem Regler.
+   */
+  rahmenUmwandlung: number;
+  /** Der Netto-Aufwand bis zur Markierung */
+  rahmenNetto: number;
+  /** 4 % der BBG im Monat */
   rahmenMonat: number;
+  /** 8 % der BBG im Monat — der Gesamtbeitrag am Ende des Reglers */
+  steuerRahmenMonat: number;
 }
 
 export function reglerGrenzen(f: FirmenAngebot, d: BeratungDaten, p: LegalParameters = P): ReglerGrenzen {
-  const maxUmwandlung = rahmenVoll(f, d.angaben, p);
+  const rahmenUmwandlung = rahmenVoll(f, d.angaben, p);
+  // Nie unter dem Rahmen frei von Sozialabgaben — auch wenn eine bestehende bAV den steuerfreien schon fuellt.
+  const maxUmwandlung = Math.max(rahmenUmwandlung, steuerRahmenVoll(f, d.angaben, p));
   return {
     maxUmwandlung,
     maxNetto: nettoBei(f, d, maxUmwandlung, p),
+    rahmenUmwandlung,
+    rahmenNetto: nettoBei(f, d, rahmenUmwandlung, p),
     rahmenMonat: (SV_FREI_QUOTE * p.bbgRvJahr) / 12,
+    steuerRahmenMonat: (STEUER_FREI_QUOTE * p.bbgRvJahr) / 12,
   };
 }
 
 /**
  * Die Umwandlung, die netto genau `netto` kostet — Bisektion wie `suche` im
  * Loesungsvergleich: Der Netto-Aufwand steigt mit der Umwandlung. Auf Cent,
- * hoechstens bis `max`, dem vollen Rahmen.
+ * hoechstens bis `max`, dem Ende des Reglers (steuerfreier Rahmen).
  */
 export function umwandlungFuerNetto(
-  f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P, max = rahmenVoll(f, d.angaben, p),
+  f: FirmenAngebot, d: BeratungDaten, netto: number, p: LegalParameters = P, max = steuerRahmenVoll(f, d.angaben, p),
 ): number {
   if (netto <= 0 || max <= 0) return 0;
   if (nettoBei(f, d, max, p) <= netto) return max;
@@ -547,6 +565,60 @@ export function umwandlungFuerNetto(
     else hoch = mitte;
   }
   return Math.round(hoch * 100) / 100;
+}
+
+/** Der Netto-Regler springt in 5 €. */
+export const REGLER_SCHRITT = 5;
+
+/**
+ * Die Stufen des Netto-Reglers, aufsteigend: alle 5 € netto, dazu die
+ * Markierung (Rahmen frei von Sozialabgaben, 338 € gesamt) und das Ende
+ * (steuerfreier Rahmen, 676 € gesamt) — auch wenn sie zwischen zwei Fuenfern
+ * liegen. Ein Fuenfer naeher als ein halber Schritt an Markierung oder Ende
+ * faellt weg: Dort rastet der Regler so sicher ein wie auf jeder Stufe, und
+ * kein Schritt schrumpft auf 1 oder 2 €.
+ */
+export function reglerStufen(ende: number, marke: number | null, schritt = REGLER_SCHRITT): number[] {
+  const mitMarke = marke !== null && marke > 0 && marke < ende;
+  const besondere = mitMarke ? [marke, ende] : [ende];
+  const stufen: number[] = [];
+  for (let x = 0; x < ende; x += schritt) {
+    // 0 bleibt immer: der Anfang des Reglers
+    if (x === 0 || !besondere.some((b) => b !== x && Math.abs(b - x) < schritt / 2)) stufen.push(x);
+  }
+  for (const b of besondere) if (!stufen.includes(b)) stufen.push(b);
+  return stufen.sort((a, b) => a - b);
+}
+
+/**
+ * Die Stufe zum Wert unter dem Finger. Die Markierung zieht etwas staerker
+ * an als die Fuenfer — einrasten soll man dort leicht.
+ */
+export function einrasten(stufen: readonly number[], roh: number, marke: number | null = null): number {
+  const abstand = (s: number) => Math.abs(s - roh) * (s === marke ? 0.5 : 1);
+  let beste = stufen[0] ?? 0;
+  for (const s of stufen) if (abstand(s) <= abstand(beste)) beste = s;
+  return beste;
+}
+
+/**
+ * Von `wert` aus um `schritte` Stufen weiter (negativ: zurueck), fuer
+ * Pfeil-, Bild- und Pos1/Ende-Tasten. Liegt `wert` zwischen zwei Stufen (der
+ * Betrag war genau eingegeben), ist die naechste Stufe in der Richtung die erste.
+ */
+export function stufeWeiter(stufen: readonly number[], wert: number, schritte: number): number {
+  const letzte = stufen.length - 1;
+  if (letzte < 0 || schritte === 0) return wert;
+  let k: number;
+  if (schritte > 0) {
+    const i = stufen.findIndex((s) => s > wert + 1e-9);
+    k = i < 0 ? letzte : Math.min(letzte, i + schritte - 1);
+  } else {
+    let j = -1;
+    stufen.forEach((s, x) => { if (s < wert - 1e-9) j = x; });
+    k = j < 0 ? 0 : Math.max(0, j + schritte + 1);
+  }
+  return stufen[k] ?? wert;
 }
 
 /* --------------------------------------------------------------------------

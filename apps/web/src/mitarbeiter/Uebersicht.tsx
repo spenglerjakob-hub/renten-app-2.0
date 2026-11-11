@@ -9,8 +9,8 @@ import { UmlagenErklaerung } from '../arbeitgeber/bausteine';
 import { StatusChip, useBeraterAuftritt, useDrucken } from './bausteine';
 import { UebersichtDruck } from './druck';
 import {
-  anzahlText, belastungsZeilen, csvDateiname, durchdringung, durchdringungText, quoteText, satzText, uebersichtCsv, uebersichtSummen,
-  uebersichtZeilen, type BelastungsZeile, type Durchdringung,
+  AUFGESTOCKT_TEXT, anzahlText, belastungsZeilen, csvDateiname, durchdringung, durchdringungText, quoteText, satzText, uebersichtCsv,
+  uebersichtSummen, uebersichtZeilen, type BelastungsZeile, type Durchdringung,
 } from './uebersicht-daten';
 
 /**
@@ -103,7 +103,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
                 </div>
                 {z.status === 'teilnahme' && (
                   <p className="mt-0.5 text-xs tabular-nums text-ui-schiefer">
-                    {euroGenau(z.umwandlungMonat)} + {euroGenau(z.arbeitgeberMonat)} Arbeitgeber = {euroGenau(z.gesamtMonat)}
+                    {euroGenau(z.umwandlungMonat)} + {euroGenau(z.arbeitgeberMonat)}{z.aufgestockt ? '*' : ''} Arbeitgeber = {euroGenau(z.gesamtMonat)}
                     {z.beginn ? `, ab ${z.beginn}` : ''}
                   </p>
                 )}
@@ -129,7 +129,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
                     <td className={`${zelle} break-words font-medium text-ui-tinte`}>{z.name}</td>
                     <td className={zelle}><StatusChip status={z.status} /></td>
                     <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.umwandlungMonat) : '—'}</td>
-                    <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.arbeitgeberMonat) : '—'}</td>
+                    <td className={zahl}>{z.status === 'teilnahme' ? `${euroGenau(z.arbeitgeberMonat)}${z.aufgestockt ? '*' : ''}` : '—'}</td>
                     <td className={zahl}>{z.status === 'teilnahme' ? euroGenau(z.gesamtMonat) : '—'}</td>
                     <td className={`${zelle} tabular-nums`}>{z.beginn || (z.status === 'teilnahme' ? 'offen' : '')}</td>
                   </tr>
@@ -146,6 +146,8 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
               </tfoot>
             </table>
           </div>
+
+          {zeilen.some((z) => z.aufgestockt) && <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">{AUFGESTOCKT_TEXT}</p>}
 
           {/* Unter den Summen: was der Arbeitgeber netto traegt — und rechts, wie viele mitmachen. */}
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">

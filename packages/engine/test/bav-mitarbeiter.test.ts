@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  bavMitarbeiter, bavRahmenVoll, grvMinderung, type FirmenModell, type MitarbeiterEingaben,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung, type FirmenModell, type MitarbeiterEingaben,
 } from '../src/analyse/bav-mitarbeiter.js';
 import {
   zuschussModell, festbetragModell, matchingModell, zuschussVollAusschoepfen, festbetragVollAusschoepfen,
@@ -140,6 +140,154 @@ describe('Netto-Belastung des Arbeitgebers', () => {
     expect(r.arbeitgeberBelastung.steuerersparnisMonat).toBeLessThan(0);
     expect(r.arbeitgeberBelastung.nettoKostenMonat).toBeLessThan(0);
     expect(r.arbeitgeberBelastung.nettoKostenMonat).toBeGreaterThan(r.arbeitgeberBelastung.kostenVorSteuerMonat);
+  });
+});
+
+describe('Zuschussmodell mit Deckel 0: ohne Deckel', () => {
+  const OHNE: FirmenModell = { art: 'zuschuss', quote: 0.5, deckelMonat: 0 };
+
+  it('der Zuschuss wächst mit der Umwandlung, kein Hinweis auf einen Deckel', () => {
+    const r = bavMitarbeiter(OHNE, ma({ umwandlungMonat: 200 }), steuer, p);
+    expect(r.arbeitgeberMonat).toBeCloseTo(100, 6);
+    expect(r.hinweise.some((h) => h.includes('gedeckelt'))).toBe(false);
+    expect(r.mindestzuschuss).toMatchObject({ regelMonat: 100, aufgestockt: false });
+  });
+
+  it('Rahmen voll: Umwandlung und 50 % füllen die 4 % genau', () => {
+    const u = bavRahmenVoll(OHNE, ma(), 'Nordrhein-Westfalen', p);
+    expect(u * 1.5).toBeCloseTo(svGrenze, 1);
+  });
+
+  it('ein Deckel über 0 gilt weiter', () => {
+    expect(bavMitarbeiter({ art: 'zuschuss', quote: 0.5, deckelMonat: 60 }, ma({ umwandlungMonat: 200 }), steuer, p).arbeitgeberMonat).toBeCloseTo(60, 6);
+  });
+});
+
+describe('Gesetzlicher Mindestzuschuss (§ 1a Abs. 1a BetrAVG)', () => {
+  it('im Rahmen deckt der Festbetrag von 50 € die 15 % — nichts aufgestockt', () => {
+    const r = bavMitarbeiter(FESTBETRAG, ma({ umwandlungMonat: 288 }), steuer, p);
+    expect(r.mindestzuschuss).toMatchObject({ regelMonat: 50, aufgestockt: false });
+    expect(r.mindestzuschuss!.quoteMonat).toBeCloseTo(43.2, 6);
+    expect(r.arbeitgeberMonat).toBeCloseTo(50, 6);
+  });
+
+  it('sind 15 % mehr als der Festbetrag, zahlt der Arbeitgeber den gesetzlichen Zuschuss', () => {
+    const r = bavMitarbeiter(FESTBETRAG, ma({ umwandlungMonat: 360 }), steuer, p);
+    const z = r.mindestzuschuss!;
+    expect(z.aufgestockt).toBe(true);
+    expect(z.quoteMonat).toBeCloseTo(54, 6);
+    expect(r.arbeitgeberMonat).toBeCloseTo(54, 2);
+    expect(z.mindestMonat).toBeCloseTo(r.arbeitgeberMonat, 6);
+    expect(z.regelMonat).toBe(50);
+  });
+
+  it('„soweit er Sozialabgaben spart“: über dem Rahmen bleibt der Zuschuss bei der Ersparnis', () => {
+    const r = bavMitarbeiter(FESTBETRAG, ma({ umwandlungMonat: 600 }), steuer, p);
+    const z = r.mindestzuschuss!;
+    expect(z.quoteMonat).toBeCloseTo(90, 6);
+    expect(z.mindestMonat).toBeLessThan(z.quoteMonat);
+    expect(z.mindestMonat).toBeCloseTo(z.ersparnisMonat, 1);
+    expect(r.arbeitgeberMonat).toBeCloseTo(z.mindestMonat, 6);
+  });
+
+  it('nie unter dem gesetzlichen Zuschuss — über alle Modelle und Beträge bis zum steuerfreien Rahmen', () => {
+    const modelle: FirmenModell[] = [
+      ZUSCHUSS, FESTBETRAG, MATCHING,
+      { art: 'zuschuss', quote: 0.1, deckelMonat: 0 },
+      { art: 'zuschuss', quote: 0.5, deckelMonat: 30 },
+      { art: 'matching', weg: 'dv', matchingMonat: 30, zuschussImMatching: true },
+    ];
+    for (const modell of modelle) {
+      for (let u = 25; u <= 625; u += 25) {
+        const r = bavMitarbeiter(modell, ma({ umwandlungMonat: u }), steuer, p);
+        const z = r.mindestzuschuss!;
+        const dv = r.vertraege.find((v) => v.weg === 'direkt')!;
+        expect(dv.arbeitgeberMonat).toBeGreaterThanOrEqual(Math.min(z.quoteMonat, z.ersparnisMonat) - 0.05);
+        expect(r.arbeitgeberMonat).toBeGreaterThanOrEqual(z.regelMonat - 0.005);
+        expect(z.aufgestockt).toBe(z.regelMonat + 0.005 < z.mindestMonat);
+      }
+    }
+  });
+
+  it('Zuschuss unter 15 % und Matching mit enthaltenem Zuschuss werden aufgestockt', () => {
+    const zehn = bavMitarbeiter({ art: 'zuschuss', quote: 0.1, deckelMonat: 0 }, ma({ umwandlungMonat: 200 }), steuer, p);
+    expect(zehn.mindestzuschuss).toMatchObject({ regelMonat: 20, aufgestockt: true });
+    expect(zehn.arbeitgeberMonat).toBeCloseTo(30, 6);
+
+    const m = bavMitarbeiter({ art: 'matching', weg: 'dv', matchingMonat: 20, zuschussImMatching: true }, ma({ umwandlungMonat: 200 }), steuer, p);
+    expect(m.mindestzuschuss).toMatchObject({ regelMonat: 20, aufgestockt: true });
+    expect(m.vertraege.map((v) => v.weg)).toEqual(['direkt']);
+    expect(m.arbeitgeberMonat).toBeCloseTo(30, 6);
+  });
+
+  it('Festbetrag unter der Mindestumwandlung: nur der gesetzliche Zuschuss', () => {
+    const r = bavMitarbeiter(FESTBETRAG, ma({ umwandlungMonat: 40 }), steuer, p);
+    expect(r.mindestzuschuss).toMatchObject({ regelMonat: 0, aufgestockt: true });
+    expect(r.arbeitgeberMonat).toBeCloseTo(6, 2);
+  });
+
+  it('gedeckelter Zuschuss unter dem gesetzlichen: kein Hinweis „gedeckelt“ — der Arbeitgeber zahlt mehr als den Deckel', () => {
+    const r = bavMitarbeiter({ art: 'zuschuss', quote: 0.5, deckelMonat: 30 }, ma({ umwandlungMonat: 300 }), steuer, p);
+    expect(r.mindestzuschuss!.aufgestockt).toBe(true);
+    expect(r.arbeitgeberMonat).toBeGreaterThan(30);
+    expect(r.hinweise.some((h) => h.includes('gedeckelt'))).toBe(false);
+    // Bleibt der Deckel über dem gesetzlichen Zuschuss, gilt der Hinweis weiter
+    expect(bavMitarbeiter(ZUSCHUSS, ma({ umwandlungMonat: 300 }), steuer, p).hinweise.some((h) => h.includes('gedeckelt'))).toBe(true);
+  });
+
+  it('ohne Umwandlung und bei Umwandlung in die Unterstützungskasse: keine Prüfung', () => {
+    expect(bavMitarbeiter(ZUSCHUSS, ma({ umwandlungMonat: 0 }), steuer, p).mindestzuschuss).toBeNull();
+    expect(bavMitarbeiter({ ...MATCHING, weg: 'ukasse' } as FirmenModell, ma(), steuer, p).mindestzuschuss).toBeNull();
+  });
+});
+
+describe('Steuerfreier Rahmen: Gesamtbeitrag bis 8 % der BBG', () => {
+  const grenze8 = (0.08 * p.bbgRvJahr) / 12;
+
+  it('2026 sind das 676 € im Monat', () => {
+    expect(grenze8).toBeCloseTo(676, 6);
+  });
+
+  it('Festbetrag und Zuschuss: Umwandlung und Arbeitgeberbeitrag füllen die 8 % genau', () => {
+    for (const modell of [FESTBETRAG, ZUSCHUSS, { art: 'zuschuss', quote: 0.5, deckelMonat: 0 } as FirmenModell]) {
+      const u = bavSteuerRahmenVoll(modell, ma(), 'Nordrhein-Westfalen', p);
+      const r = bavMitarbeiter(modell, ma({ umwandlungMonat: u }), steuer, p);
+      // Auf Cent gerundet im Rahmen — ein Cent mehr Umwandlung, und der Gesamtbeitrag laege darueber
+      expect(r.gesamtMonat).toBeLessThan(grenze8 + 0.005);
+      expect(bavMitarbeiter(modell, ma({ umwandlungMonat: u + 0.01 }), steuer, p).gesamtMonat).toBeGreaterThan(grenze8 + 0.005 - 1e-6);
+      expect(r.gesamtMonat).toBeCloseTo(grenze8, 1);
+      expect(r.steuerpflichtigMonat).toBeCloseTo(0, 2);
+      expect(r.svPflichtigMonat).toBeGreaterThan(0); // über den 4 % fallen Sozialabgaben an
+      expect(u).toBeGreaterThan(bavRahmenVoll(modell, ma(), 'Nordrhein-Westfalen', p));
+    }
+  });
+
+  it('am Ende genau 676 €, nicht 675,99 €: Deckel 100 € — 576 € Umwandlung', () => {
+    const u = bavSteuerRahmenVoll(ZUSCHUSS, ma(), 'Nordrhein-Westfalen', p);
+    expect(u).toBe(576);
+    expect(bavMitarbeiter(ZUSCHUSS, ma({ umwandlungMonat: u }), steuer, p).gesamtMonat).toBe(676);
+    // 50 % ohne Deckel: 450,67 € brachten 676,005 € — auf Cent 676,01 €, also 450,66 €
+    expect(bavSteuerRahmenVoll({ art: 'zuschuss', quote: 0.5, deckelMonat: 0 }, ma(), 'Nordrhein-Westfalen', p)).toBe(450.66);
+  });
+
+  it('Matching in die Direktversicherung: zählt die Direktversicherung, das Matching kommt obendrauf', () => {
+    const u = bavSteuerRahmenVoll(MATCHING, ma(), 'Nordrhein-Westfalen', p);
+    const r = bavMitarbeiter(MATCHING, ma({ umwandlungMonat: u }), steuer, p);
+    expect(r.vertraege.find((v) => v.weg === 'direkt')!.beitragMonat).toBeCloseTo(grenze8, 1);
+    expect(r.gesamtMonat).toBeCloseTo(grenze8 + 100, 1);
+  });
+
+  it('Umwandlung in die Unterstützungskasse: Umwandlung und Matching zusammen', () => {
+    const uk = { ...MATCHING, weg: 'ukasse' } as FirmenModell;
+    const u = bavSteuerRahmenVoll(uk, ma(), 'Nordrhein-Westfalen', p);
+    expect(u).toBeCloseTo(grenze8 - 100, 1);
+  });
+
+  it('eine bestehende Betriebsrente belegt den Rahmen zuerst', () => {
+    const mit = ma({ bavBestandMonat: 100 });
+    const u = bavSteuerRahmenVoll(FESTBETRAG, mit, 'Nordrhein-Westfalen', p);
+    const r = bavMitarbeiter(FESTBETRAG, { ...mit, umwandlungMonat: u }, steuer, p);
+    expect(r.gesamtMonat).toBeCloseTo(grenze8 - 100, 1);
   });
 });
 
