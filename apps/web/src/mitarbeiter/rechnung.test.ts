@@ -4,7 +4,7 @@ import { RENTENZIELE, beratungDatenSchema, firmenAngebotSchema, type BeratungDat
 import {
   HOCHRECHNUNG_FEST, P, RENTENANPASSUNG, kapitalNach, spaeterBeginnen, basisProjektion, automatischerBeginn, beginnDatum, beginnVon, hochrechnungJeVertrag, beitragsRechnung, grvVon, hochrechnung, kennzahlenRechnung, leistungsRechnung,
   laufendesJahresbrutto, lueckeMitBetriebsrente, monateDerUmwandlung, monatsgehalt, nettolohnHeute, probeabrechnung, rahmenVoll, reglerGrenzen, steuerVon, szenarioAusBeratung,
-  umwandlungFuerNetto, versorgungslueckeRechnung, type HochrechnungAnnahmen,
+  umwandlungFuerNetto, versorgungslueckeRechnung, einrasten, reglerStufen, stufeWeiter, type HochrechnungAnnahmen,
 } from './rechnung';
 
 const firma = firmenAngebotSchema.parse({ bundesland: 'Bayern', modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } });
@@ -277,6 +277,70 @@ describe('Netto-Regler', () => {
   it('Zuschuss „ohne Deckel“ (0): 50 % der Umwandlung, wie das Angebot sagt', () => {
     const ohne = firmenAngebotSchema.parse({ modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 0 } });
     expect(beitragsRechnung(ohne, beratung({}, 300)).arbeitgeberMonat).toBeCloseTo(150, 6);
+  });
+});
+
+describe('Netto-Regler: Stufen von 5 €, Markierung und Ende dazwischen', () => {
+  it('alle 5 €, dazu Markierung und Ende — die Markierung ersetzt den Fünfer daneben', () => {
+    const s = reglerStufen(369, 131);
+    expect(s.slice(0, 4)).toEqual([0, 5, 10, 15]);
+    expect(s).toContain(131);
+    expect(s).not.toContain(130);
+    expect(s.slice(-3)).toEqual([360, 365, 369]);
+    expect(s.filter((x) => x !== 131 && x !== 369).every((x) => x % 5 === 0)).toBe(true);
+    expect(new Set(s).size).toBe(s.length);
+    // Kein Schritt unter einem halben oder über anderthalb Fünfern
+    const schritte = s.slice(1).map((x, i) => x - (s[i] ?? 0));
+    expect(Math.min(...schritte)).toBeGreaterThanOrEqual(2.5);
+    expect(Math.max(...schritte)).toBeLessThanOrEqual(7.5);
+  });
+
+  it('Markierung und Ende auf einem Fünfer: nichts doppelt', () => {
+    expect(reglerStufen(370, 130)).toEqual(Array.from({ length: 75 }, (_, i) => i * 5));
+  });
+
+  it('ein Fünfer dicht vor dem Ende fällt weg (366: kein Schritt von 1 €)', () => {
+    expect(reglerStufen(366, null).slice(-2)).toEqual([360, 366]);
+    expect(reglerStufen(368, null).slice(-2)).toEqual([365, 368]);
+  });
+
+  it('ohne Markierung, Markierung am Ende oder bei 0: nur Fünfer und Ende', () => {
+    expect(reglerStufen(12, null)).toEqual([0, 5, 12]);
+    expect(reglerStufen(12, 12)).toEqual([0, 5, 12]);
+    expect(reglerStufen(12, 0)).toEqual([0, 5, 12]);
+    expect(reglerStufen(1, null)).toEqual([0, 1]);
+  });
+
+  it('Ziehen: nächste Stufe; die Markierung zieht stärker an', () => {
+    const s = reglerStufen(369, 131);
+    expect(einrasten(s, 0, 131)).toBe(0);
+    expect(einrasten(s, 2, 131)).toBe(0);
+    expect(einrasten(s, 3, 131)).toBe(5);
+    expect(einrasten(s, 82, 131)).toBe(80);
+    expect(einrasten(s, 83, 131)).toBe(85);
+    // 127 liegt näher an 125 — die Markierung gewinnt trotzdem
+    for (const roh of [128, 129, 130, 131, 132, 133]) expect(einrasten(s, roh, 131)).toBe(131);
+    expect(einrasten(s, 126, 131)).toBe(125);
+    expect(einrasten(s, 134, 131)).toBe(135);
+    expect(einrasten(s, 367, 131)).toBe(369);
+    expect(einrasten(s, 369, 131)).toBe(369);
+  });
+
+  it('Tasten: eine Stufe weiter, von einem genau eingegebenen Betrag zur nächsten in der Richtung', () => {
+    const s = reglerStufen(369, 131);
+    expect(stufeWeiter(s, 82, 1)).toBe(85);
+    expect(stufeWeiter(s, 82, -1)).toBe(80);
+    expect(stufeWeiter(s, 85, 1)).toBe(90);
+    expect(stufeWeiter(s, 125, 1)).toBe(131);
+    expect(stufeWeiter(s, 131, 1)).toBe(135);
+    expect(stufeWeiter(s, 135, -1)).toBe(131);
+    expect(stufeWeiter(s, 365, 1)).toBe(369);
+    expect(stufeWeiter(s, 369, 1)).toBe(369);
+    expect(stufeWeiter(s, 0, -1)).toBe(0);
+    expect(stufeWeiter(s, 0, 10)).toBe(50);
+    expect(stufeWeiter(s, 20, -10)).toBe(0);
+    expect(stufeWeiter(s, 82, Infinity)).toBe(369);
+    expect(stufeWeiter(s, 82, -Infinity)).toBe(0);
   });
 });
 

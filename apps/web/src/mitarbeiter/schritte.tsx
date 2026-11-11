@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import {
@@ -27,7 +27,7 @@ import { AnteilsRing } from '../components/AnteilsRing';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
-  probeabrechnung, reglerGrenzen, rentenbeginnVon, spaeterBeginnen, umwandlungFuerNetto,
+  einrasten, probeabrechnung, reglerGrenzen, reglerStufen, rentenbeginnVon, spaeterBeginnen, stufeWeiter, umwandlungFuerNetto,
   type AuszahlungsWerte, type BelastungsTreppe, type Hochrechnung, type KennzahlenErgebnis, type KennzahlenWeg, type Leistung,
   type LueckeMitBetriebsrente, type Probeabrechnung, type SpaeterZeile, type Versorgungsluecke,
 } from './rechnung';
@@ -428,6 +428,11 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
  * Steuer, darueber nur noch Steuer. Kompakt, damit die drei Zahlen darunter
  * den Blick bekommen. Den genauen Bruttobetrag kann man darunter eintippen.
  */
+/** Tasten am Netto-Regler: so viele Stufen weiter (Pos1/Ende: ganz an den Anfang/das Ende). */
+const TASTEN_STUFEN: Record<string, number | undefined> = {
+  ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 10, PageDown: -10, Home: -Infinity, End: Infinity,
+};
+
 function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
   const [genau, setGenau] = useState(false);
   // Die Grenzen haengen an den Angaben, nicht am Betrag — beim Ziehen am Regler nicht jedes Mal neu.
@@ -453,6 +458,14 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
   const markeBeschriften = !ohneRahmen && markeAnteil > 0.15 && markeAnteil < 0.72;
   const markeLinks = `calc(11px + (100% - 22px) * ${markeAnteil})`;
 
+  // Stufen von 5 € netto, dazu die Markierung und das Ende. Ziehen rastet auf der naechsten Stufe ein;
+  // Tasten (und Bildschirmleser, die den Wert um 1 aendern) gehen Stufe fuer Stufe — mit `step` 5 waeren
+  // Markierung und Ende, die meist zwischen zwei Fuenfern liegen, gar nicht erreichbar.
+  const stufen = useMemo(() => reglerStufen(ende, ohneRahmen ? null : marke), [ende, marke, ohneRahmen]);
+  const wert = Math.min(netto, ende);
+  const ziehen = useRef(false);
+  const zuStufe = (n: number) => { if (n !== wert) setzeNetto(n); };
+
   return (
     <Karte>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
@@ -471,11 +484,25 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
       ) : (
         <>
           <div className="mt-4">
-            <input type="range" min={0} max={ende} step={1} value={Math.min(netto, ende)} disabled={ohneRegler}
-              onChange={(e) => setzeNetto(Number(e.target.value))}
+            <input type="range" min={0} max={ende} step={1} value={wert} disabled={ohneRegler}
+              onPointerDown={() => { ziehen.current = true; }}
+              onPointerUp={() => { ziehen.current = false; }}
+              onPointerCancel={() => { ziehen.current = false; }}
+              onBlur={() => { ziehen.current = false; }}
+              onKeyDown={(e) => {
+                const schritte = TASTEN_STUFEN[e.key];
+                if (schritte === undefined) return;
+                e.preventDefault();
+                ziehen.current = false;
+                zuStufe(stufeWeiter(stufen, wert, schritte));
+              }}
+              onChange={(e) => {
+                const roh = Number(e.target.value);
+                zuStufe(ziehen.current ? einrasten(stufen, roh, ohneRahmen ? null : marke) : stufeWeiter(stufen, wert, roh > wert ? 1 : -1));
+              }}
               aria-label="Netto-Aufwand im Monat"
               aria-valuetext={`${netto} Euro netto, ${Math.round(r.umwandlungMonat)} Euro Umwandlung brutto`}
-              style={{ '--anteil': `${(Math.min(netto, ende) / ende) * 100}%` } as CSSProperties}
+              style={{ '--anteil': `${(wert / ende) * 100}%` } as CSSProperties}
               className="ui-regler block w-full" />
           </div>
           {/* Unter der Spur: die Markierung des Rahmens frei von Sozialabgaben, darunter die Enden */}

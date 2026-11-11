@@ -567,6 +567,60 @@ export function umwandlungFuerNetto(
   return Math.round(hoch * 100) / 100;
 }
 
+/** Der Netto-Regler springt in 5 €. */
+export const REGLER_SCHRITT = 5;
+
+/**
+ * Die Stufen des Netto-Reglers, aufsteigend: alle 5 € netto, dazu die
+ * Markierung (Rahmen frei von Sozialabgaben, 338 € gesamt) und das Ende
+ * (steuerfreier Rahmen, 676 € gesamt) — auch wenn sie zwischen zwei Fuenfern
+ * liegen. Ein Fuenfer naeher als ein halber Schritt an Markierung oder Ende
+ * faellt weg: Dort rastet der Regler so sicher ein wie auf jeder Stufe, und
+ * kein Schritt schrumpft auf 1 oder 2 €.
+ */
+export function reglerStufen(ende: number, marke: number | null, schritt = REGLER_SCHRITT): number[] {
+  const mitMarke = marke !== null && marke > 0 && marke < ende;
+  const besondere = mitMarke ? [marke, ende] : [ende];
+  const stufen: number[] = [];
+  for (let x = 0; x < ende; x += schritt) {
+    // 0 bleibt immer: der Anfang des Reglers
+    if (x === 0 || !besondere.some((b) => b !== x && Math.abs(b - x) < schritt / 2)) stufen.push(x);
+  }
+  for (const b of besondere) if (!stufen.includes(b)) stufen.push(b);
+  return stufen.sort((a, b) => a - b);
+}
+
+/**
+ * Die Stufe zum Wert unter dem Finger. Die Markierung zieht etwas staerker
+ * an als die Fuenfer — einrasten soll man dort leicht.
+ */
+export function einrasten(stufen: readonly number[], roh: number, marke: number | null = null): number {
+  const abstand = (s: number) => Math.abs(s - roh) * (s === marke ? 0.5 : 1);
+  let beste = stufen[0] ?? 0;
+  for (const s of stufen) if (abstand(s) <= abstand(beste)) beste = s;
+  return beste;
+}
+
+/**
+ * Von `wert` aus um `schritte` Stufen weiter (negativ: zurueck), fuer
+ * Pfeil-, Bild- und Pos1/Ende-Tasten. Liegt `wert` zwischen zwei Stufen (der
+ * Betrag war genau eingegeben), ist die naechste Stufe in der Richtung die erste.
+ */
+export function stufeWeiter(stufen: readonly number[], wert: number, schritte: number): number {
+  const letzte = stufen.length - 1;
+  if (letzte < 0 || schritte === 0) return wert;
+  let k: number;
+  if (schritte > 0) {
+    const i = stufen.findIndex((s) => s > wert + 1e-9);
+    k = i < 0 ? letzte : Math.min(letzte, i + schritte - 1);
+  } else {
+    let j = -1;
+    stufen.forEach((s, x) => { if (s < wert - 1e-9) j = x; });
+    k = j < 0 ? 0 : Math.max(0, j + schritte + 1);
+  }
+  return stufen[k] ?? wert;
+}
+
 /* --------------------------------------------------------------------------
  * PROBEABRECHNUNG — der Monat ohne und mit Betriebsrente.
  * ------------------------------------------------------------------------ */
