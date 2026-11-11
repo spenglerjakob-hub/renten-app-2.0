@@ -21,7 +21,7 @@
  * ist; die Antwort enthaelt keinen Inhalt.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import nodemailer from 'npm:nodemailer@6.9.16';
+import nodemailer from 'npm:nodemailer@10.2.1';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

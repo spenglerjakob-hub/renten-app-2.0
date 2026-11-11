@@ -70,7 +70,8 @@ export const PARAMETER_2024: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
-  basiszins: 0.0253,
+  // BMF-Schreiben vom 5.1.2024: Basiszins zum 2.1.2024 (§ 18 Abs. 4 InvStG)
+  basiszins: 0.0229,
   avd: avdStandard,
 };
 
@@ -95,6 +96,7 @@ export const PARAMETER_2025: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
+  // BMF-Schreiben vom 10.1.2025: Basiszins zum 2.1.2025 (§ 18 Abs. 4 InvStG)
   basiszins: 0.0253,
   avd: avdStandard,
 };
@@ -120,7 +122,8 @@ export const PARAMETER_2026: LegalParameters = {
   avSatzGesamt: 0.026,
   riester: riesterStandard,
   abgeltungsteuersatz: 0.25,
-  basiszins: 0.0253,
+  // BMF-Schreiben vom 13.1.2026: Basiszins zum 2.1.2026 (§ 18 Abs. 4 InvStG)
+  basiszins: 0.032,
   avd: avdStandard,
 };
 
