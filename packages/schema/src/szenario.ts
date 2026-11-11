@@ -35,7 +35,7 @@ function istKalendarischGueltig(s: string): boolean {
 
 const datumString = z
   .string()
-  .refine(istKalendarischGueltig, 'Kein gueltiges Datum (erwartet TT.MM.JJJJ oder JJJJ-MM-TT)');
+  .refine(istKalendarischGueltig, 'Kein gültiges Datum (erwartet TT.MM.JJJJ oder JJJJ-MM-TT)');
 
 
 /**

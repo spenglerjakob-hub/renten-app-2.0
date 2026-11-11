@@ -140,12 +140,17 @@ const euro = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 const bisher = (bavBestandMonat: number): BisherigeLeistungen | undefined =>
   bavBestandMonat > 0 ? { vlMonat: 0, vlUmgang: 'anrechnen', bavBestandMonat } : undefined;
 
-/** Der Deckel fuers Rechnen: 0 heisst ohne Deckel. */
-const deckel = (deckelMonat: number) => (deckelMonat > 0 ? deckelMonat : Number.POSITIVE_INFINITY);
+/**
+ * Der Deckel des Zuschussmodells fuers Rechnen: 0 heisst OHNE Deckel — so
+ * steht es an den Feldern („0: ohne Deckel“), auf der Zuschussmodell-Seite wie
+ * im Angebot der Firma. `zuschussModell` selbst nimmt den Deckel woertlich;
+ * wer aus einer Eingabe rechnet, geht ueber diese Funktion.
+ */
+export const zuschussDeckel = (deckelMonat: number) => (deckelMonat > 0 ? deckelMonat : Number.POSITIVE_INFINITY);
 
 /** Was die Regel der Firma fuer eine Umwandlung allein ergaebe — ohne den gesetzlichen Zuschuss als Untergrenze. */
 function regelMonat(modell: FirmenModell, u: number, pflichtMonat: number): number {
-  if (modell.art === 'zuschuss') return Math.min(Math.max(0, modell.quote) * u, deckel(modell.deckelMonat));
+  if (modell.art === 'zuschuss') return Math.min(Math.max(0, modell.quote) * u, zuschussDeckel(modell.deckelMonat));
   if (modell.art === 'festbetrag') return u + 0.005 >= modell.mindestUmwandlungMonat ? Math.max(0, modell.festbetragMonat) : 0;
   // Matching: Ist der Zuschuss enthalten, ist das Matching die ganze Regel; sonst kommt er obendrauf.
   return Math.max(0, modell.matchingMonat) + (modell.zuschussImMatching ? 0 : pflichtMonat);
@@ -208,7 +213,7 @@ export function bavMitarbeiter(
     };
   } else {
     const x = modell.art === 'zuschuss'
-      ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: deckel(modell.deckelMonat) }, steuerOpt, p)
+      ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat) }, steuerOpt, p)
       : festbetragModell({ ...kern(m, firma), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
     r = {
       ...x.mitarbeiter,
@@ -314,7 +319,7 @@ export function bavRahmenVoll(
   };
   if (modell.art === 'matching') return optimaleUmwandlung(modell.weg, e, bundesland, p);
   if (modell.art === 'zuschuss') {
-    return zuschussVollAusschoepfen({ ...e, quote: modell.quote, deckelMonat: deckel(modell.deckelMonat) }, bundesland, p);
+    return zuschussVollAusschoepfen({ ...e, quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat) }, bundesland, p);
   }
   return festbetragVollAusschoepfen(
     { ...e, festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat },

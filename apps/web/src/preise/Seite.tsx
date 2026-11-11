@@ -13,6 +13,7 @@ import {
 import {
   EINLEITUNG, FELD_LABEL, Hinweise, KNOPF, KNOPF_ZWEIT, LINK, Titel, Zahl,
 } from '../components/stil';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /**
  * Die Preisseite (/preise).
@@ -258,7 +259,7 @@ export function Seite() {
           <p className={`mt-2 ${EINLEITUNG}`}>
             Preis je Nutzer und {zeitraum} — der Preis der erreichten Staffel gilt für alle Nutzer im Büro.
           </p>
-          <div className="ui-karte mt-5 overflow-x-auto">
+          <ScrollBereich name="Tabelle: Mengenrabatt" klasse="ui-karte mt-5">
             <table className="w-full text-left text-sm">
               <thead className="text-sm text-ui-schiefer">
                 <tr>
@@ -288,7 +289,7 @@ export function Seite() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollBereich>
         </section>
 
         <section aria-labelledby="fragen" className="max-w-3xl">

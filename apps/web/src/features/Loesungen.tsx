@@ -15,6 +15,8 @@ import {
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
+import { mitTrennstellen } from '../lib/trennstellen';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /**
  * LOESUNGEN — die vierte Etappe der Beratung; die angenommenen Angebote
@@ -273,8 +275,12 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
       <header className="flex items-start justify-between gap-2 px-5 pt-5">
         <div className="min-w-0">
           <span className="text-xs text-ui-schiefer">Schicht {x.schicht}</span>
-          {/* Mit Silbentrennung: „(Entgeltumwandlung)“ passt in vier Spalten sonst nicht in die Karte. */}
-          <h4 className="mt-0.5 break-words text-base font-medium leading-snug text-ui-tinte hyphens-auto">{x.titel}</h4>
+          {/*
+            Mit Silbentrennung: „(Entgeltumwandlung)“ passt in vier Spalten sonst nicht in die Karte.
+            Die weichen Trennstellen dazu, weil `hyphens-auto` am Woerterbuch des Browsers haengt —
+            ohne es braeche das Wort ohne Strich mitten durch.
+          */}
+          <h4 className="mt-0.5 break-words text-base font-medium leading-snug text-ui-tinte hyphens-auto">{mitTrennstellen(x.titel)}</h4>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {guenstigste && (
@@ -685,7 +691,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
 
   return (
     <div className="ui-karte mt-6 overflow-hidden">
-      <div className="overflow-x-auto">
+      <ScrollBereich name="Tabelle: Angebote im Vergleich">
         <table className="w-full min-w-[480px] text-xs sm:text-sm">
           <thead>
             <tr className="border-b border-ui-linie bg-ui-innen text-left">
@@ -731,7 +737,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
             )))}
           </tbody>
         </table>
-      </div>
+      </ScrollBereich>
       {(positionen.some(ohneAufwand) || positionen.some((p) => !p.rente && !p.kapital)) && (
         <div className="space-y-1.5 border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte">
           {positionen.some(ohneAufwand) && <p>{ohneEigenaufwandText(t)}</p>}

@@ -164,8 +164,8 @@ export function schaetzeEntgeltpunkte(
     entgeltpunkte: ep,
     monatsrenteHeutigeKaufkraft: ep * p.rentenwert,
     hinweis:
-      'Schaetzung in heutiger Kaufkraft. Unterstellt, dass das Gehalt mit dem ' +
-      'Durchschnittsentgelt Schritt haelt. Kindererziehungs- und Ausbildungszeiten ' +
-      'sind nicht beruecksichtigt — die Renteninformation der DRV ist genauer.',
+      'Schätzung in heutiger Kaufkraft. Unterstellt, dass das Gehalt mit dem ' +
+      'Durchschnittsentgelt Schritt hält. Kindererziehungs- und Ausbildungszeiten ' +
+      'sind nicht berücksichtigt — die Renteninformation der DRV ist genauer.',
   };
 }

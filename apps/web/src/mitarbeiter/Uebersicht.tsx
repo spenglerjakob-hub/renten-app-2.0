@@ -12,6 +12,7 @@ import {
   AUFGESTOCKT_TEXT, anzahlText, belastungsZeilen, csvDateiname, durchdringung, durchdringungText, quoteText, satzText, uebersichtCsv,
   uebersichtSummen, uebersichtZeilen, type BelastungsZeile, type Durchdringung,
 } from './uebersicht-daten';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /**
  * Die Uebersicht fuer den Arbeitgeber: am Bildschirm, gedruckt (als PDF)
@@ -111,7 +112,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
             ))}
           </ul>
 
-          <div className="mt-4 hidden overflow-x-auto sm:block">
+          <ScrollBereich name="Tabelle: Mitarbeiter" klasse="mt-4 hidden sm:block">
             <table className="w-full min-w-[34rem] border-collapse text-sm">
               <thead>
                 <tr className="text-left text-xs text-ui-schiefer">
@@ -145,7 +146,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </ScrollBereich>
 
           {zeilen.some((z) => z.aufgestockt) && <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">{AUFGESTOCKT_TEXT}</p>}
 

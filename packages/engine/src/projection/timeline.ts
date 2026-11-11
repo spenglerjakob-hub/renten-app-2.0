@@ -255,7 +255,7 @@ export function projiziere(eingabe: Szenario): ProjektionsErgebnis {
       zeilen: [], ruhestandsjahr: jetzt.jahr, freibetraege: [], planer: null, depots: [],
       kapitalauszahlungen: [], verrentungen: [], avd: [], vertragsHinweise: [],
       rechtsstand: rechtsstandInfo(jetzt.jahr, { indexRate: s.annahmen.tarifIndex }),
-      hinweise: ['Kein gueltiges Geburts- oder Rentenbeginndatum erfasst.'],
+      hinweise: ['Kein gültiges Geburts- oder Rentenbeginndatum erfasst.'],
     };
   }
 

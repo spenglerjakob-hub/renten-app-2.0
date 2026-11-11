@@ -550,7 +550,8 @@ function SchrittEinkommen({ x, personen, setzePerson, upload }: {
 /* --- 3. Krankenversicherung ----------------------------------------------- */
 
 const KASSEN = [
-  { wert: '', text: 'Bitte wählen — oder Satz eintragen' },
+  // Kurz: In der halben Spalte wuerde ein laengerer Text abgeschnitten. Was gilt, wenn die Kasse fehlt, steht am Zusatzbeitrag.
+  { wert: '', text: 'Bitte wählen' },
   ...KRANKENKASSEN.map((k) => ({ wert: k.name, text: k.name })),
 ];
 

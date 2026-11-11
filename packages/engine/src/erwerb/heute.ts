@@ -185,7 +185,7 @@ export function bruttoAusEinkommen(
       kinder: s.haushalt.kinderUnter25,
     });
     if (!b.belegt) {
-      const hinweis = 'Die Besoldung beruht auf einer Naeherung, nicht auf der amtlichen '
+      const hinweis = 'Die Besoldung beruht auf einer Näherung, nicht auf der amtlichen '
         + 'Tabelle des Dienstherrn. Der ausgewiesene Betrag kann um mehrere hundert Euro '
         + 'im Monat abweichen.';
       if (!hinweise.includes(hinweis)) hinweise.push(hinweis);

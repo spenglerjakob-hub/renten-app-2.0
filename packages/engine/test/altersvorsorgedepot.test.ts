@@ -507,12 +507,15 @@ describe('Vergleich: Besteuerung des freien Depots', () => {
         auszahldauer: 18, renditeAuszahlung: 0, zveHeute: 50_000,
         steuersatzImAlter: 0.25,
       },
-      opt, p,
+      // Der Basiszins steht fest (Wert 2025): Er aendert sich jeden Januar, und
+      // je hoeher er ist, desto mehr Gewinn ist beim Rentenbeginn schon ueber
+      // die Vorabpauschale versteuert. Die Schwelle unten soll nicht mitwandern.
+      opt, { ...p, basiszins: 0.0253 },
     );
 
-    // Ueber die Laufzeit sind rund zwei Drittel des Depots Gewinn; die Steuer
-    // muss deutlich ueber dem liegen, was der Gewinnanteil des ersten Jahres
-    // ergaebe (dort ist er am kleinsten).
+    // Beim Rentenbeginn ist rund die Haelfte des Depots noch unversteuerter
+    // Gewinn; die Steuer muss deutlich ueber dem liegen, was der Gewinnanteil
+    // des ersten Jahres ergaebe (dort ist er am kleinsten).
     expect(r.frei.steuerJahr).toBeGreaterThan(0);
     expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeGreaterThan(0.05);
     expect(r.frei.steuerJahr / r.frei.bruttoJahr).toBeLessThan(0.25);

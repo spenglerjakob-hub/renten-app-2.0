@@ -82,7 +82,7 @@ function naeherungstabelle(land: string, jahr: number): Besoldungstabelle {
   }
   return {
     land, jahr, belegt: false,
-    quelle: 'Naeherung (lineare Fortschreibung, kein amtlicher Tabellenwert)',
+    quelle: 'Näherung (lineare Fortschreibung, kein amtlicher Tabellenwert)',
     gruppen,
     familienzuschlag: { stufe1: 150, jeKind: 300 },
   };

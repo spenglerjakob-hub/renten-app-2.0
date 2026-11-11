@@ -907,13 +907,13 @@ export function vertragsTuev(
 
   if (nettoHebel > 0 && nettoHebel < 1) {
     hinweise.push(
-      'Ueber die gesamte Laufzeit kommt weniger heraus, als eingezahlt wurde. ' +
-      'Der Vertrag verliert selbst ohne Beruecksichtigung der Inflation Geld.',
+      'Über die gesamte Laufzeit kommt weniger heraus, als eingezahlt wurde. ' +
+      'Der Vertrag verliert selbst ohne Berücksichtigung der Inflation Geld.',
     );
   }
   if (!istKapital && amortisationsJahre > jahreAuszahlung) {
     hinweise.push(
-      `Die Einzahlungen sind erst nach ${amortisationsJahre.toFixed(0)} Rentenjahren zurueckgeflossen — ` +
+      `Die Einzahlungen sind erst nach ${amortisationsJahre.toFixed(0)} Rentenjahren zurückgeflossen — ` +
       `das liegt hinter der angenommenen Lebenserwartung von ${a.lebenserwartung} Jahren.`,
     );
   }

@@ -3,6 +3,7 @@ import type { ProjektionsErgebnis } from '@renten/engine';
 import { euro } from '../components/Feld';
 import { Karte } from '../components/stil';
 import { useSchmal } from '../components/useSchmal';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /*
  * Die Farben des Diagramms aus den Rollen des Stils: Daten einfarbig
@@ -145,7 +146,7 @@ export function Verlauf({
           `overflow-x-auto` bleibt fuer breitere Schirme, wo die Mindestbreite
           noch gilt; auf dem Telefon gibt es nichts mehr zu schieben.
         */
-        <div className="overflow-x-auto">
+        <ScrollBereich name="Diagramm: Verlauf">
           <svg viewBox={`0 0 ${B} ${H}`} className="h-auto w-full sm:min-w-[600px]" role="img" aria-labelledby={titelId}>
             <title id={titelId}>{zusammenfassung}</title>
             {[0, 0.25, 0.5, 0.75, 1].map((q) => {
@@ -192,7 +193,7 @@ export function Verlauf({
               Alter
             </text>
           </svg>
-        </div>
+        </ScrollBereich>
       )}
 
       <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">{zusammenfassung}</p>

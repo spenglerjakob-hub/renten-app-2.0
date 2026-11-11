@@ -435,7 +435,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
         szenario: r.szenario,
         importMeldung: {
           art: 'ok',
-          texte: r.warnungen.length ? r.warnungen : ['Szenario vollstaendig geladen.'],
+          texte: r.warnungen.length ? r.warnungen : ['Szenario vollständig geladen.'],
         },
       });
     } else {

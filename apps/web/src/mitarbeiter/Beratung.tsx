@@ -4,7 +4,7 @@ import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
-import { Etappen, KNOPF, KNOPF_ZWEIT, LINK } from '../components/stil';
+import { Etappen, KNOPF, KNOPF_ZWEIT, LINK, TIPPFLAECHE } from '../components/stil';
 import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
 import { zeitpunktText } from './unterschrift-daten';
 import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
@@ -104,7 +104,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
   const zurFirma = () => gehe({ firma: firmaId, beratung: null, reiter: 'mitarbeiter' });
   const zurueck = (onClick: () => void) => (
-    <button type="button" onClick={onClick} className={LINK}>
+    <button type="button" onClick={onClick} className={`${LINK} ${TIPPFLAECHE}`}>
       <ArrowLeft className="h-4 w-4" aria-hidden /> {f ? f.name : 'Zur Firma'}
     </button>
   );
@@ -168,7 +168,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <FirmenZeichen name={f.name} logo={logo} />
+        <FirmenZeichen name={f.name} logo={logo} als="h1" />
         <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
       </div>
 

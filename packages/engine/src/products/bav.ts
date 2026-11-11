@@ -36,7 +36,7 @@ export function bavKapitalSteuer(
     return {
       steuer: 0,
       methode: 'steuerfrei',
-      hinweis: 'Pauschalversteuerte Altzusage (§ 40b EStG a. F.): Kapitalleistung steuerfrei. Die KV/PV-Pflicht auf 1/120 ueber 120 Monate bleibt bestehen.',
+      hinweis: 'Pauschalversteuerte Altzusage (§ 40b EStG a. F.): Kapitalleistung steuerfrei. Die KV/PV-Pflicht auf 1/120 über 120 Monate bleibt bestehen.',
     };
   }
 
@@ -48,7 +48,7 @@ export function bavKapitalSteuer(
     return {
       steuer: est * (1 + args.kirchensteuersatz),
       methode: 'fuenftelregelung',
-      hinweis: 'Fuenftelregelung (§ 34 EStG) angewandt — kommt nur bei Direktzusage/Unterstuetzungskasse in Betracht.',
+      hinweis: 'Fünftelregelung (§ 34 EStG) angewandt — kommt nur bei Direktzusage/Unterstützungskasse in Betracht.',
     };
   }
 
@@ -57,7 +57,7 @@ export function bavKapitalSteuer(
   return {
     steuer: est * (1 + args.kirchensteuersatz),
     methode: 'voll',
-    hinweis: 'Volle Besteuerung im Zuflussjahr (§ 22 Nr. 5 EStG). Die Fuenftelregelung wird fuer Direktversicherung, Pensionskasse und Pensionsfonds regelmaessig nicht gewaehrt.',
+    hinweis: 'Volle Besteuerung im Zuflussjahr (§ 22 Nr. 5 EStG). Die Fünftelregelung wird für Direktversicherung, Pensionskasse und Pensionsfonds regelmäßig nicht gewährt.',
   };
 }
 

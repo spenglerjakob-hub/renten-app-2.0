@@ -130,7 +130,7 @@ describe('Projektion', () => {
       personen: [{ ...szenario().personen[0]!, geburtsdatum: '99.99.9999' }],
     }));
     expect(r.zeilen).toHaveLength(0);
-    expect(r.hinweise[0]).toContain('gueltiges');
+    expect(r.hinweise[0]).toContain('gültiges');
   });
 });
 

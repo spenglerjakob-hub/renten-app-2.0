@@ -55,7 +55,12 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
       Beispielwert
       {v.onPruefen && (
         <button type="button" onClick={v.onPruefen}
-          className="rounded-full px-1 text-ui-tinte underline decoration-ui-asche underline-offset-2 hover:decoration-ui-tinte">
+          /*
+            Groessere Tippflaeche (::after), ohne dass die Marke waechst. Nach oben
+            nur bis an das Feld darueber: Wer das Feld antippt, soll nicht aus
+            Versehen einen Beispielwert bestaetigen.
+          */
+          className="relative rounded-full px-1 text-ui-tinte underline decoration-ui-asche underline-offset-2 after:absolute after:-inset-x-2 after:-bottom-2.5 after:-top-1.5 after:content-[''] hover:decoration-ui-tinte">
           Stimmt so
         </button>
       )}
@@ -189,7 +194,7 @@ export function ZahlFeld(props: {
     const n = Number(roh.replace(/\./g, '').replace(',', '.'));
     if (!Number.isFinite(n)) { setFehler('Bitte eine Zahl eingeben'); return; }
     if (n < min) { setFehler(`Mindestens ${min}`); return; }
-    if (n > max) { setFehler(`Hoechstens ${max}`); return; }
+    if (n > max) { setFehler(`Höchstens ${max}`); return; }
     setFehler(null);
     onChange(n);
   };
