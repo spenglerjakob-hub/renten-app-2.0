@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Printer, Wand2 } from 'lucide-react';
 import {
-  zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, parameterFuer, BUNDESLAENDER, betriebUmstieg,
+  zuschussModell, zuschussStaffel, zuschussVollAusschoepfen, zuschussDeckel, parameterFuer, BUNDESLAENDER, betriebUmstieg,
 } from '@renten/engine';
-import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, euroGenau, prozent } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, AuswahlFeld, Schalter, euro, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
 import { EINLEITUNG, Hervor, KNOPF, KNOPF_KLEIN, Titel } from '../components/stil';
 import {
-  Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
+  Kopf, Kasten, Kachel, Bon, Zeile, Notiz, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, Punkte,
   KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_ZEILE, TABELLE_DRUCK, ZELLE, KOPFZELLE, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
@@ -41,12 +41,14 @@ export function Seite() {
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
   const [bisher, setBisher] = useState<BisherigeAngaben>(KEINE_BISHERIGEN);
+  // 0 im Feld heisst ohne Deckel — wie im Angebot der Mitarbeiterberatung, in das „Übernehmen“ die Zahl reicht.
+  const mitDeckel = deckel > 0;
 
   const eingaben = useMemo(() => ({
     jahresbrutto: brutto,
     umwandlungMonat: umwandlung,
     quote,
-    deckelMonat: deckel,
+    deckelMonat: zuschussDeckel(deckel),
     unternehmensSteuersatz: steuersatz,
     umlagenSatz: umlagen,
     privatVersichert: privat,
@@ -67,9 +69,9 @@ export function Seite() {
   const betrieb = useMemo(
     () => betriebUmstieg((e) => {
       const x = zuschussModell(e, steuerOpt, p);
-      return { kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertragMonat, agBeitragMonat: x.arbeitgeber.zuschussMonat, agBeitragMaxMonat: deckel };
+      return { kostenVorSteuerMonat: x.arbeitgeber.kostenVorSteuerMonat, vorsorgeMonat: x.vertragMonat, agBeitragMonat: x.arbeitgeber.zuschussMonat, agBeitragMaxMonat: zuschussDeckel(deckel) };
     }, eingaben, betriebAngaben(bisher, n), steuerOpt, p),
-    [eingaben, bisher, n, steuerOpt],
+    [eingaben, bisher, n, steuerOpt, deckel],
   );
 
   return (
@@ -82,8 +84,8 @@ export function Seite() {
           Betriebsrente mit Arbeitgeberzuschuss: <Hervor>{prozent(quote, 0)} obendrauf</Hervor>
         </Titel>
         <p className={`mt-3 ${EINLEITUNG} print:mt-1 print:text-[10px] print:leading-snug`}>
-          Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie legen {prozent(quote, 0)} davon dazu — höchstens
-          {' '}{euro(deckel)} im Monat. Alles fließt in eine Direktversicherung. Weil Sie auf die Umwandlung
+          Der Mitarbeiter wandelt einen Teil seines Gehalts um, Sie legen {prozent(quote, 0)} davon dazu —{' '}
+          {mitDeckel ? `höchstens ${euro(deckel)} im Monat` : 'ohne Deckel'}. Alles fließt in eine Direktversicherung. Weil Sie auf die Umwandlung
           Sozialabgaben sparen, kostet Sie der Zuschuss nur einen Bruchteil.
         </p>
         <AndereModelle aktuell="/zuschussmodell" />
@@ -91,7 +93,7 @@ export function Seite() {
         <p className="mt-2 hidden text-xs leading-snug text-ui-schiefer print:block print:text-[10px]">
           Annahmen: Bruttogehalt {euro(brutto)} im Jahr, {privat ? `privat versichert (${euro(praemie)} Prämie)` : 'gesetzlich versichert'},
           {' '}{bundesland}, {verheiratet ? 'verheiratet' : 'ledig'}, {kirchensteuer ? 'mit' : 'ohne'} Kirchensteuer. Umwandlung {euro(ma.umwandlungMonat)}, Zuschuss
-          {' '}{prozent(quote, 0)} bis {euro(deckel)}. Unternehmenssteuer {prozent(steuersatz, 0)}
+          {' '}{prozent(quote, 0)} {mitDeckel ? `bis ${euro(deckel)}` : 'ohne Deckel'}. Unternehmenssteuer {prozent(steuersatz, 0)}
           {umlagen > 0 ? `, Umlagen ${prozent(umlagen)}` : ''}. Rechtsstand {p.jahr}.
           {bisherAnnahmen(bisher)}
         </p>
@@ -133,7 +135,7 @@ export function Seite() {
                 label="Zuschuss des Arbeitgebers" wert={quote} onChange={setQuote} min={0} max={100}
                 hilfe="Anteil der Umwandlung. Der gesetzliche Pflichtzuschuss von 15 % ist darin enthalten."
               />
-              <ZahlFeld label="Höchstens im Monat" wert={deckel} onChange={setDeckel} einheit="€" schritt={10} />
+              <ZahlFeld label="Höchstens im Monat" wert={deckel} onChange={setDeckel} einheit="€" schritt={10} hilfe="0: ohne Deckel" />
             </Kasten>
 
             <BisherigeLeistungenFelder wert={bisher} onChange={setBisher} />
@@ -180,23 +182,23 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
+                  <Notiz klasse="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
-                  </p>
+                  </Notiz>
                 )}
               </Bon>
               <Bon titel="Arbeitgeber">
                 <Zeile text={`Zuschuss ${prozent(quote, 0)}${r.gedeckelt ? ' (gedeckelt)' : ''}`} betrag={ag.zuschussMonat} />
-                <p className="pl-3 text-xs text-ui-schiefer print:text-[11px]">
+                <Notiz klasse="pl-3 text-xs text-ui-schiefer print:text-[11px]">
                   davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
-                </p>
+                </Notiz>
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="= Kosten vor Steuern" betrag={ag.kostenVorSteuerMonat} summe />
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
+                <Notiz klasse="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
                   Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht aktiviert (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand — steuerlich zählt nur, was zusätzlich anfällt: Zuschuss minus gesparte Abgaben.
-                </p>
+                </Notiz>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
               </Bon>
             </section>
@@ -245,10 +247,15 @@ export function Seite() {
                   })}
                 </tbody>
               </table>
-              <p className={FUSSNOTE}>
-                Oberhalb des Deckels sinken Ihre Kosten sogar: Der Zuschuss bleibt bei {euro(deckel)}, die gesparten
-                Sozialabgaben wachsen mit jeder weiteren beitragsfreien Umwandlung.
-                <span className="print:hidden"> Zeile antippen übernimmt den Betrag.</span>
+              {/* Ohne Deckel bleibt nur der Bedienhinweis — der steht nicht im Druck. */}
+              <p className={`${FUSSNOTE} ${mitDeckel ? '' : 'print:hidden'}`}>
+                {mitDeckel && (
+                  <>
+                    Oberhalb des Deckels sinken Ihre Kosten sogar: Der Zuschuss bleibt bei {euro(deckel)}, die gesparten
+                    Sozialabgaben wachsen mit jeder weiteren beitragsfreien Umwandlung.{' '}
+                  </>
+                )}
+                <span className="print:hidden">Zeile antippen übernimmt den Betrag.</span>
               </p>
             </section>
 
@@ -303,7 +310,7 @@ export function Seite() {
 
               <Nachschlagen titel="In die Versorgungsordnung">
                 <ul className={`grid gap-x-6 gap-y-1 text-sm leading-relaxed text-ui-tinte sm:grid-cols-2 print:mt-1 print:grid-cols-2 print:gap-y-0.5 print:text-[10px] print:leading-snug ${STRICHE}`}>
-                  <li>Zuschuss {prozent(quote, 0)} der Umwandlung, höchstens {euro(deckel)} im Monat</li>
+                  <li>Zuschuss {prozent(quote, 0)} der Umwandlung, {mitDeckel ? `höchstens ${euro(deckel)} im Monat` : 'ohne Deckel'}</li>
                   <li>Der gesetzliche Zuschuss (§ 1a Abs. 1a BetrAVG) ist darin enthalten</li>
                   <li>Für alle Beschäftigten gleich (Gleichbehandlung)</li>
                   <li>Tarifvorrang prüfen (§ 20 BetrAVG)</li>

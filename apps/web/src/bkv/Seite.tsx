@@ -330,7 +330,7 @@ export function Seite() {
                 <table className={`mt-3 w-full text-sm print:mt-1 ${TABELLE_DRUCK}`}>
                   <thead>
                     <tr className={`text-left ${TABELLE_KOPF}`}>
-                      <th className={`${KOPFZELLE} font-normal`} />
+                      <td className={`${KOPFZELLE} font-normal`} />
                       <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>{SPALTE[aktiv.id]}</th>
                       <th className={`${KOPFZELLE} pl-3 text-right font-normal`}>
                         <span className="sm:hidden">Gehalt</span><span className="hidden sm:inline">Gehaltserhöhung</span>

@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
 import { EINLEITUNG, Hervor, KNOPF, KNOPF_KLEIN, Titel } from '../components/stil';
 import {
-  Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
+  Kopf, Kasten, Kachel, Bon, Zeile, Notiz, GehaltVergleich, UmlagenErklaerung, WechselSpalte, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, KARTE, KARTE_TITEL, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from './bausteine';
@@ -199,9 +199,9 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
+                  <Notiz klasse="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
-                  </p>
+                  </Notiz>
                 )}
               </Bon>
               <Bon titel="Arbeitgeber">
@@ -212,9 +212,9 @@ export function Seite() {
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
+                <Notiz klasse="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
                   Zuwendungen an eine rückgedeckte Unterstützungskasse sind Betriebsausgabe (§ 4d EStG), der Pflichtzuschuss in die Direktversicherung ebenso (§ 4b EStG). Die Umwandlung ist ohnehin Lohnaufwand.
-                </p>
+                </Notiz>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
               </Bon>
             </section>

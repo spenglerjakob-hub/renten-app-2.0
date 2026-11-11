@@ -8,7 +8,7 @@ import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
 import { EINLEITUNG, Hervor, KNOPF, KNOPF_KLEIN, Titel } from '../components/stil';
 import {
-  Kopf, Kasten, Kachel, Bon, Zeile, GehaltVergleich, UmlagenErklaerung, AndereModelle,
+  Kopf, Kasten, Kachel, Bon, Zeile, Notiz, GehaltVergleich, UmlagenErklaerung, AndereModelle,
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, Punkte,
   KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_ZEILE, TABELLE_DRUCK, ZELLE, KOPFZELLE, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
@@ -186,26 +186,26 @@ export function Seite() {
                 <Zeile text="− gesparte Steuer" betrag={ma.steuerersparnisMonat} />
                 <Zeile text="= kostet netto" betrag={ma.nettoAufwandMonat} summe />
                 {ma.svPflichtigMonat > 0.5 && (
-                  <p className="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
+                  <Notiz klasse="pt-1 text-xs font-medium text-ui-tinte print:text-[11px]">
                     Davon {euro(ma.svPflichtigMonat)} beitragspflichtig — siehe Hinweise.
-                  </p>
+                  </Notiz>
                 )}
               </Bon>
               <Bon titel="Arbeitgeber">
                 <Zeile text={r.schwelleErreicht ? 'Festbetrag' : 'Pflichtzuschuss (Schwelle nicht erreicht)'} betrag={ag.zuschussMonat} />
                 {r.schwelleErreicht && (
-                  <p className="pl-3 text-xs text-ui-schiefer print:text-[11px]">
+                  <Notiz klasse="pl-3 text-xs text-ui-schiefer print:text-[11px]">
                     davon {euro(ag.davonPflichtzuschussMonat)} gesetzlicher Pflichtzuschuss
-                  </p>
+                  </Notiz>
                 )}
                 <Zeile text="− gesparte Sozialabgaben" betrag={ag.svErsparnisMonat} />
                 {ag.umlagenErsparnisMonat > 0 && <Zeile text="− gesparte Umlagen" betrag={ag.umlagenErsparnisMonat} />}
                 <Zeile text="= Kosten vor Steuern" betrag={ag.kostenVorSteuerMonat} summe />
                 <Zeile text="− Steuerersparnis (Betriebsausgabe)" betrag={ag.steuerersparnisMonat} />
-                <p className="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
+                <Notiz klasse="pb-1 pl-3 text-xs leading-snug text-ui-schiefer print:pb-0 print:text-[9px]">
                   Beiträge zur Direktversicherung sind sofort abziehbarer Personalaufwand; der Vertrag wird nicht
                   aktiviert (§ 4b EStG).
-                </p>
+                </Notiz>
                 <Zeile text="= kostet netto" betrag={ag.nettoKostenMonat} summe />
               </Bon>
             </section>

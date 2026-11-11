@@ -9,6 +9,7 @@ import { useAnsprache } from '../components/Ansprache';
 import {
   sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /**
  * Der Sparrechner: die Versorgungsluecke rueckwaerts.
@@ -147,7 +148,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <ScrollBereich name="Tabelle: Beitragsdynamik im Vergleich">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
@@ -169,7 +170,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollBereich>
           )}
         </Karte>
 
@@ -199,7 +200,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
                 ))}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <ScrollBereich name="Tabelle: Späterer Beginn im Vergleich">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
@@ -224,7 +225,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollBereich>
             )}
             {/*
               DIE Aussage des ganzen Rechners — der Kernsatz der Etappe, in

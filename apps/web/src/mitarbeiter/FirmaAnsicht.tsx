@@ -6,7 +6,7 @@ import {
 } from '../lib/bav-beratung';
 import { kollegenLaden, kollegenName, type Kollege } from '../lib/bav-gemeinsam';
 import { Dialog } from '../components/Dialog';
-import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, Pillen } from '../components/stil';
+import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, Pillen, TIPPFLAECHE } from '../components/stil';
 import { FirmenZeichen, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
 import { GemeinsamKarte } from './Gemeinsam';
@@ -57,7 +57,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   }, [firmaId]);
 
   const zurueck = (
-    <button type="button" onClick={() => gehe(FIRMEN)} className={LINK}>
+    <button type="button" onClick={() => gehe(FIRMEN)} className={`${LINK} ${TIPPFLAECHE}`}>
       <ArrowLeft className="h-4 w-4" aria-hidden /> Alle Firmen
     </button>
   );
@@ -103,7 +103,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
     <div className="space-y-8">
       {zurueck}
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-        <FirmenZeichen name={firma.name} logo={logo} gross />
+        <FirmenZeichen name={firma.name} logo={logo} gross als="h1" />
         <p className="max-w-md text-sm leading-relaxed text-ui-schiefer">
           <span className={`block ${ETIKETT}`}>{MODELL_NAME[firma.angebot.modell.art]}</span>
           <span className="text-ui-tinte">{regelText(firma.angebot.modell)}</span>

@@ -40,6 +40,7 @@ import { AxaAntrag, AxaVerzicht } from './axa-antrag';
 import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBerater, axaFehlt, istAxaAntrag } from './axa';
 import { unterlageErfassen } from './festschreiben';
 import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzeichner } from './Unterschrift';
+import { ScrollBereich } from '../components/ScrollBereich';
 
 /** Was zum Drucken der Unterlagen gebraucht wird — in der Entscheidung und bei den Unterlagen. */
 interface UnterlagenProps {
@@ -71,7 +72,8 @@ export interface SchrittProps {
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
 const KASSEN = [
-  { wert: '', text: 'Bitte wählen — oder Satz eintragen' },
+  // Kurz: In der halben Spalte wuerde ein laengerer Text abgeschnitten. Was gilt, wenn die Kasse fehlt, steht am Zusatzbeitrag.
+  { wert: '', text: 'Bitte wählen' },
   ...KRANKENKASSEN.map((k) => ({ wert: k.name, text: k.name })),
 ];
 const JETZT = new Date().getFullYear();
@@ -108,7 +110,8 @@ export function SchrittAngebot({ firma, logo }: SchrittProps) {
         </p>
       </div>
       <div className={`${AKZENT} p-6 sm:p-10`}>
-        <p className="text-sm">Ihr Angebot</p>
+        {/* Ueberschrift, nicht blosser Absatz: Zwischen dem Firmennamen (h1) und den Hinweisen (h3) fehlte sonst eine Ebene. */}
+        <h2 className="text-sm">Ihr Angebot</h2>
         <p className="ui-titel mt-2 max-w-3xl text-balance text-[26px] font-normal leading-[1.25] sm:text-[34px]">
           <RegelMitKern modell={a.modell} />
         </p>
@@ -238,6 +241,7 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
                   setzeA({ krankenkasse: v, ...(k ? { zusatzbeitrag: k.zusatzbeitrag } : {}) });
                 }} />
               <ProzentFeld label="Zusatzbeitrag" wert={a.zusatzbeitrag} max={10} stellen={2}
+                hilfe="Kasse nicht dabei? Satz hier eintragen."
                 onChange={(zusatzbeitrag) => setzeA({ zusatzbeitrag, krankenkasse: '' })} />
             </div>
           ) : (
@@ -469,7 +473,8 @@ function NettoRegler({ firma, daten, setze, r }: SchrittProps) {
   return (
     <Karte>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 className="ui-titel text-balance text-[22px] font-normal leading-tight text-ui-tinte sm:text-[24px]">
+        {/* 24 px auch am Telefon: Das hervorgehobene Wort hat 4,2:1 — das reicht erst ab 24 px (grosse Schrift). */}
+        <h2 className="ui-titel text-balance text-[24px] font-normal leading-tight text-ui-tinte">
           Wie viel möchten Sie <Hervor>netto</Hervor> wandeln?
         </h2>
         {!fehltGehalt && (
@@ -583,7 +588,7 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
       <table className="w-full text-[13px] sm:text-sm">
         <thead>
           <tr className="text-xs text-ui-schiefer">
-            <th className="pb-2 text-left font-normal" />
+            <td className="pb-2 text-left font-normal" />
             <th className="pb-2 pl-2 text-right font-normal">ohne bAV</th>
             <th className="pb-2 pl-2 text-right font-medium text-ui-tinte">mit bAV</th>
           </tr>
@@ -689,12 +694,13 @@ function SpaeterKarte({ zeilen }: { zeilen: SpaeterZeile[] }) {
   return (
     <Karte titel="Später beginnen? Was das kostet" rechts={<Vermerk>geschätzt</Vermerk>}>
       <div className={`${AKZENT} px-5 py-4`}>
-        <p className="ui-titel text-[22px] leading-snug sm:text-[24px]">
+        {/* 24 px auch am Telefon — wie die Ueberschrift am Regler: Der hervorgehobene Betrag braucht grosse Schrift. */}
+        <p className="ui-titel text-[24px] leading-snug">
           Ein Jahr warten spart Ihnen {euro(eins.nettoGespart)} netto — und kostet{' '}
           <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(eins.wenigerKapital)}</Hervor></span> Kapital.
         </p>
       </div>
-      <div className="mt-4 overflow-x-auto">
+      <ScrollBereich name="Tabelle: Später beginnen" klasse="mt-4">
         <table className="w-full min-w-[17rem] text-[13px] tabular-nums sm:text-sm">
           <thead>
             <tr className="whitespace-nowrap text-xs text-ui-schiefer">
@@ -719,7 +725,7 @@ function SpaeterKarte({ zeilen }: { zeilen: SpaeterZeile[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollBereich>
       <p className="mt-3 text-pretty text-xs leading-relaxed text-ui-schiefer">
         Dieselbe beispielhafte Hochrechnung mit gleichem Beitrag und gleicher Rendite, nur später begonnen; Rente brutto.
         Jedes Jahr Warten spart {euro(eins.nettoGespart)} Netto-Aufwand — dafür fehlen im Vertrag auch der Arbeitgeberbeitrag, die
@@ -797,7 +803,7 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
   if (!w) return null;
   return (
     <div className="ui-innen p-4">
-      <h4 className="text-base font-medium text-ui-tinte">{titel}</h4>
+      <h3 className="text-base font-medium text-ui-tinte">{titel}</h3>
       <dl className="mt-2 text-[13px]">
         <Posten text="Rente brutto" wert={euro(w.bruttoMonat)} />
         <Posten text="− Kranken- und Pflegeversicherung" wert={euro(w.kvPvMonat)} />
@@ -816,7 +822,7 @@ function Wertezeile({ titel, w, kk }: { titel: string; w: AuszahlungsWerte | nul
 function BelastungKasten({ treppe }: { treppe: BelastungsTreppe }) {
   return (
     <div className="ui-innen p-4">
-      <h4 className="text-base font-medium text-ui-tinte">Ihre Belastung</h4>
+      <h3 className="text-base font-medium text-ui-tinte">Ihre Belastung</h3>
       <p className="text-xs text-ui-schiefer">Ansparphase, im Monat</p>
       <div className="mt-3 space-y-1.5">
         <GegenueberZeile text="Gesamtbeitrag" wert={euroGenau(treppe.zufluss)} />
@@ -905,11 +911,11 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
       </div>
 
       {wege.length > 1 && (
-        <div className="mt-5 overflow-x-auto">
+        <ScrollBereich name="Tabelle: Auszahlungswege im Vergleich" klasse="mt-5">
           <table className="w-full min-w-[20rem] text-sm">
             <thead>
               <tr className="text-ui-schiefer">
-                <th className="py-2 text-left font-normal" />
+                <td className="py-2 text-left font-normal" />
                 {wege.map((w) => <th key={w.art} className="py-2 pl-2 text-right font-normal">{WEG_TITEL[w.art]}</th>)}
               </tr>
             </thead>
@@ -928,7 +934,7 @@ function KennzahlenKarte({ k, daten, setze, aktuell }: {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollBereich>
       )}
 
       {/* Das Fazit ist die Aussage dieses Schritts — die eine Akzentkarte. */}
@@ -1071,7 +1077,7 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
                 {!ohneGeburt && !l && <p className="text-sm text-ui-schiefer">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
                 {l?.kapital && (
                   <div className="ui-innen p-4">
-                    <h4 className="text-base font-medium text-ui-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h4>
+                    <h3 className="text-base font-medium text-ui-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h3>
                     <dl className="mt-2 text-[13px]">
                       <Posten text="Kapital brutto" wert={euro(l.kapital.brutto)} />
                       <Posten text="− Steuer" wert={euro(l.kapital.steuer)} />

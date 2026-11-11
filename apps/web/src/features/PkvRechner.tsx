@@ -232,7 +232,7 @@ function BetKarte({ bet, n, abAlter }: {
       <table className="w-full overflow-hidden rounded-[8px] border border-ui-linie text-xs tabular-nums">
         <thead className="bg-ui-innen text-xs text-ui-schiefer">
           <tr>
-            <th className="px-2.5 py-1.5 text-left font-medium" />
+            <td className="px-2.5 py-1.5 text-left font-medium" />
             <th className="px-2.5 py-1.5 text-right font-medium">Brutto</th>
             <th className="px-2.5 py-1.5 text-right font-medium text-ui-tinte">
               Netto

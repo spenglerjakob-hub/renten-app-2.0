@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Building2, Check, ClipboardList, Copy, ExternalLink, FileSearch, HandCoins, HeartPulse, LineChart, Scale, Users, X,
 } from 'lucide-react';
@@ -98,6 +98,19 @@ export function Seitenleiste(props: {
 }) {
   const { offen, onSchliessen } = props;
   const schliessenRef = useRef<HTMLButtonElement>(null);
+  const leisteRef = useRef<HTMLElement>(null);
+
+  /*
+    Zugeklappt ist die Leiste nur aus dem Bild geschoben, nicht weg. `inert`
+    nimmt dann alles darin aus der Tab-Reihenfolge und aus dem Vorlesebaum —
+    auch die Links im Fuss und den scrollbaren Bereich selbst, die sonst per
+    Tab im unsichtbaren Menue landeten. Als Eigenschaft gesetzt, nicht als
+    Attribut: React 18 kennt `inert` noch nicht. Vor dem Fokus unten
+    (Layout-Effekt laeuft zuerst), denn in einem inerten Bereich greift kein Fokus.
+  */
+  useLayoutEffect(() => {
+    if (leisteRef.current) leisteRef.current.inert = !offen;
+  }, [offen]);
 
   useEffect(() => {
     if (!offen) return;
@@ -136,6 +149,7 @@ export function Seitenleiste(props: {
         className={`fixed inset-0 z-[60] bg-ui-tinte/40 transition-opacity ${offen ? 'opacity-100' : 'opacity-0'}`}
       />
       <nav
+        ref={leisteRef}
         role="dialog"
         aria-modal="true"
         aria-label="Übersicht"

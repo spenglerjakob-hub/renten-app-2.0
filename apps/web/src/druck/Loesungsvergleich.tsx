@@ -7,6 +7,7 @@ import {
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
 import { useAnsprache } from '../components/Ansprache';
+import { mitTrennstellen } from '../lib/trennstellen';
 
 /**
  * „Lösungen im Vergleich" — die vierte Etappe der Beratung auf Papier.
@@ -40,9 +41,7 @@ const namen = (liste: Loesung[]) => liste.map((l) => MIT_ARTIKEL[l.id]).join(' u
  * "(Entgeltumwandlung)" sind laenger als eine Spalte breit und liefen sonst
  * in die Nachbarspalte.
  */
-const kopfVon = (titel: string) => titel
-  .replace('Altersvorsorgedepot', 'Alters\u00advorsorge\u00addepot')
-  .replace('Entgeltumwandlung', 'Entgelt\u00adumwandlung');
+const kopfVon = mitTrennstellen;
 
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;

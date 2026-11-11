@@ -69,15 +69,23 @@ export function useBeraterAuftritt(): Auftritt | null {
 }
 
 /** Logo und Name einer Firma — in Kopfzeilen und auf dem Bildschirm fuer den Mitarbeiter. */
-export function FirmenZeichen({ name, logo, gross = false }: { name: string; logo: string | null; gross?: boolean }) {
+export function FirmenZeichen({ name, logo, gross = false, als: Name = 'span' }: {
+  name: string; logo: string | null; gross?: boolean;
+  /**
+   * `h1`, wo der Firmenname der Titel der Seite ist (Firma, laufende Beratung):
+   * Ohne Hauptueberschrift fehlt Vorleseprogrammen der Einstieg in die Seite.
+   * Sonst ein blosser Schriftzug. Das Aussehen ist dasselbe.
+   */
+  als?: 'span' | 'h1';
+}) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       {logo && (
         <img src={logo} alt={`Logo ${name}`} className={`${gross ? 'h-14 max-w-[10rem]' : 'h-9 max-w-[7rem]'} shrink-0 object-contain`} />
       )}
-      <span className={`min-w-0 break-words text-ui-tinte ${gross
+      <Name className={`min-w-0 break-words text-ui-tinte ${gross
         ? 'ui-titel text-balance text-[34px] font-normal leading-[1.15] sm:text-[44px]'
-        : 'text-lg font-medium'}`}>{name}</span>
+        : 'text-lg font-medium'}`}>{name}</Name>
     </div>
   );
 }

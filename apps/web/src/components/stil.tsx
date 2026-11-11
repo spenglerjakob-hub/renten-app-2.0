@@ -22,6 +22,15 @@ export const KNOPF_KLEIN_HAUPT = 'inline-flex shrink-0 items-center justify-cent
 export const KNOPF_KLEIN_GEFAHR = 'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:opacity-40';
 /** Textlink mit Pfeil — die leiseste Aktion; unterstrichen erst beim Darueberfahren. */
 export const LINK = 'inline-flex items-center gap-1 text-sm font-medium text-ui-tinte underline-offset-4 hover:underline';
+/**
+ * Groessere Tippflaeche fuer einen kleinen Link oder Knopf: Er sieht aus wie
+ * vorher, laesst sich am Telefon aber treffen (44 px hoch bei einer Textzeile).
+ * Ein unsichtbares Feld um das Element (::after) statt Innenabstand — so
+ * verschiebt sich nichts, und Abstaende, die die Stelle selbst setzt (mt-…),
+ * bleiben, wie sie sind. Nur einsetzen, wo ringsum Platz ist: Das Feld liegt
+ * ueber dem, was daneben steht, und faengt dort die Tipper ab.
+ */
+export const TIPPFLAECHE = "relative after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']";
 /** Die eine Akzentkarte je Ansicht. */
 export const AKZENT = 'ui-akzentkarte';
 /** Ein schwebendes Stueck Produkt (Gehaltszettel, Luecken-Ring) — das Einzige mit grossem Schatten. */
@@ -363,7 +372,14 @@ export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt, of
               onClick={() => onWechsel(i)}
               aria-current={i === aktiv ? 'step' : undefined}
               aria-label={`Schritt ${i + 1}: ${t}${zusatz(i)}`}
-              className="group flex w-full flex-col items-center gap-1"
+              /*
+                Am Telefon ist der Knopf nur die 4 px hohe Linie. Das unsichtbare
+                Feld darum (::after) macht ihn 44 px hoch treffbar, ohne dass die
+                Leiste hoeher wird; es reicht in den Abstand darueber und in die
+                Zeile „Schritt 2 von 7“ darunter. Mit Namen unter den Linien
+                (ab sm) genuegt ein schmaler Rand.
+              */
+              className="group relative flex w-full flex-col items-center gap-1 after:absolute after:-inset-x-0.5 after:-inset-y-5 after:content-[''] sm:after:-inset-y-2"
             >
               <span className={`h-1 w-full rounded-full ${i === aktiv ? 'bg-ui-tinte' : fertig(i) ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
               <span className={`hidden text-xs leading-tight sm:block ${i === aktiv ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>

@@ -114,7 +114,7 @@ export {
   type ModellBasis, type ModellKosten,
 } from './analyse/matching-modell.js';
 export {
-  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung, zuschussDeckel,
   type FirmenModell, type MitarbeiterEingaben, type MitarbeiterBav, type MitarbeiterVertrag,
   type FirmenSaetze, type ArbeitgeberBelastung, type Mindestzuschuss,
 } from './analyse/bav-mitarbeiter.js';

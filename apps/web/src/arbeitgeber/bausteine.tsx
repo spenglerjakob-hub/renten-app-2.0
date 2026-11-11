@@ -226,6 +226,23 @@ export function Zeile({ text, betrag, summe, stark }: { text: string; betrag: nu
   );
 }
 
+/**
+ * Eine Erlaeuterung zwischen den Zeilen einer Aufstellung (Bon).
+ *
+ * Die Aufstellung ist eine Liste aus Begriff und Betrag (<dl>); ein blosser
+ * Absatz darf darin nicht stehen — Vorleseprogramme verlieren sonst die Liste.
+ * Deshalb als eigenes Paar: der Begriff „Hinweis“ nur zum Vorlesen, der Satz
+ * als Beschreibung. Es sieht aus wie der Absatz, der hier vorher stand.
+ */
+export function Notiz({ klasse, children }: { klasse: string; children: ReactNode }) {
+  return (
+    <div className={klasse}>
+      <dt className="sr-only">Hinweis</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
 /** Erlaeuterndes Wort hinter dem Betrag — auf schmalen Bildschirmen weggelassen. */
 export function Zusatz({ children }: { children: ReactNode }) {
   return <span className="hidden font-normal text-ui-schiefer sm:inline">{children}</span>;
@@ -307,7 +324,7 @@ export function GehaltVergleich(props: {
       <table className={`mt-3 w-full text-sm print:mt-1 ${TABELLE_DRUCK}`}>
         <thead>
           <tr className={`text-left ${TABELLE_KOPF}`}>
-            <th className={`${KOPFZELLE} font-normal`} />
+            <td className={`${KOPFZELLE} font-normal`} />
             <th className={`${KOPFZELLE} text-right font-medium text-ui-tinte`}>
               <span className="sm:hidden">Modell</span><span className="hidden sm:inline">{props.modell}</span>
             </th>
@@ -592,7 +609,7 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
       <table className={`mt-1 w-full text-xs sm:text-sm ${TABELLE_DRUCK}`}>
         <thead>
           <tr className={`text-left ${TABELLE_KOPF} print:text-[9px]`}>
-            <th className={`${KOPFZELLE} font-normal`} />
+            <td className={`${KOPFZELLE} font-normal`} />
             <th className={`${KOPFZELLE} text-right font-normal`}><span className="sm:hidden">Anz.</span><span className="hidden sm:inline">Anzahl</span></th>
             <th className={`${KOPFZELLE} pl-2 text-right font-normal sm:pl-3`}>Bisher</th>
             <th className={`${KOPFZELLE} pl-2 text-right font-medium text-ui-tinte sm:pl-3`}>Neu</th>
@@ -632,7 +649,7 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
           <table className={`mt-1 w-full text-sm ${TABELLE_DRUCK}`}>
             <thead>
               <tr className={`text-left ${TABELLE_KOPF} print:text-[9px]`}>
-                <th className={`${KOPFZELLE} font-normal`} />
+                <td className={`${KOPFZELLE} font-normal`} />
                 <th className={`${KOPFZELLE} text-right font-normal`}>Bisher</th>
                 <th className={`${KOPFZELLE} pl-3 text-right font-medium text-ui-tinte`}>Neu</th>
               </tr>
@@ -659,7 +676,7 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
           <p className={FUSSNOTE}>
             Heute bringt ihm die VL {euro(k.vlNettoMitarbeiterMonat)} netto — künftig fließen die vollen {euroGenau(k.vlMonat)} in
             seine Betriebsrente, und Sie sparen die Abgaben. Wandelt er zusätzlich Gehalt um, steigt Ihr Beitrag um den
-            Zuschuss des Modells, höchstens auf {euro(k.mitUmwandlungBisMonat)} im Monat (VL eingerechnet).
+            Zuschuss des Modells{Number.isFinite(k.mitUmwandlungBisMonat) ? `, höchstens auf ${euro(k.mitUmwandlungBisMonat)} im Monat (VL eingerechnet)` : ''}.
             {vlVertrag === 'ruht'
               ? ' Sein bisheriger VL-Vertrag ruht: Das Guthaben bleibt stehen, Beiträge fließen keine mehr.'
               : ` Sein bisheriger VL-Vertrag läuft privat weiter — die ${euroGenau(k.vlMonat)} zahlt er dann selbst aus dem Netto.`}

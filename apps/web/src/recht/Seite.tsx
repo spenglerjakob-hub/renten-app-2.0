@@ -48,7 +48,8 @@ export function Seite({ seite }: { seite: RechtsSeite }) {
             </p>
           </Hinweis>
         )}
-        <article className="ui-karte px-5 py-8 sm:px-12 sm:py-12 [&_strong]:font-medium [&_strong]:text-ui-tinte">
+        {/* Technische Namen (<code>) duerfen umbrechen: „rentenplaner.vertragspruefung.v1“ ist am Telefon breiter als die Zeile. */}
+        <article className="ui-karte px-5 py-8 sm:px-12 sm:py-12 [&_code]:[overflow-wrap:anywhere] [&_strong]:font-medium [&_strong]:text-ui-tinte">
           {seite === 'impressum' ? <Impressum /> : seite === 'datenschutz' ? <Datenschutz /> : <Nutzungsbedingungen />}
         </article>
         <RechtsLinks klasse="justify-center pb-4" />
