@@ -190,7 +190,7 @@ export function importiere(rohJson: string): ImportErgebnis {
   try {
     daten = JSON.parse(rohJson);
   } catch {
-    return { ok: false, fehler: ['Die Datei enthaelt kein gueltiges JSON.'] };
+    return { ok: false, fehler: ['Die Datei enthält kein gültiges JSON.'] };
   }
 
   const warnungen: string[] = [];
@@ -199,7 +199,7 @@ export function importiere(rohJson: string): ImportErgebnis {
   // Prototyp-Format erkennen: flache Struktur ohne schemaVersion
   const istLegacy = obj && typeof obj === 'object' && obj.schemaVersion === undefined;
   const kandidat = istLegacy ? ausLegacyFormat(obj) : daten;
-  if (istLegacy) warnungen.push('Datei im Format des Vorgaengers erkannt und uebernommen.');
+  if (istLegacy) warnungen.push('Datei im Format des Vorgängers erkannt und übernommen.');
 
   const r = szenarioSchema.safeParse(kandidat);
   if (!r.success) {
@@ -221,9 +221,9 @@ export function importiere(rohJson: string): ImportErgebnis {
     }
     if (gekoppelt.annahmen.tarifIndex !== a.tarifIndex) {
       warnungen.push(
-        `Steuertarif-Indexierung an die Rentendynamik angeglichen (${(a.tarifIndex * 100).toLocaleString('de-DE')} % -> ` +
+        `Steuertarif-Indexierung an die Rentendynamik angeglichen (${(a.tarifIndex * 100).toLocaleString('de-DE')} % → ` +
         `${(gekoppelt.annahmen.tarifIndex * 100).toLocaleString('de-DE')} %). ` +
-        'In der Karte "Rechtsstand und Annahmen" laesst sie sich wieder abweichend setzen.',
+        'In der Karte „Rechtsstand und Annahmen“ lässt sie sich wieder abweichend setzen.',
       );
     }
   }
@@ -231,9 +231,9 @@ export function importiere(rohJson: string): ImportErgebnis {
   const fertig = depotStrategieMigrieren(gekoppelt);
   if (fertig !== gekoppelt) {
     warnungen.push(
-      'Wertpapierdepot auf "Kapitalauszahlung" umgestellt (bisher "Nicht einrechnen"). ' +
-      'Die monatlichen Betraege aendern sich dadurch nicht; es wird nur zusaetzlich ' +
-      'ausgewiesen, was netto einmalig ausgezahlt wuerde.',
+      'Wertpapierdepot auf „Kapitalauszahlung“ umgestellt (bisher „Nicht einrechnen“). ' +
+      'Die monatlichen Beträge ändern sich dadurch nicht; es wird nur zusätzlich ' +
+      'ausgewiesen, was netto einmalig ausgezahlt würde.',
     );
   }
 

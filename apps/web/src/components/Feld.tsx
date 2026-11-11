@@ -189,7 +189,7 @@ export function ZahlFeld(props: {
     const n = Number(roh.replace(/\./g, '').replace(',', '.'));
     if (!Number.isFinite(n)) { setFehler('Bitte eine Zahl eingeben'); return; }
     if (n < min) { setFehler(`Mindestens ${min}`); return; }
-    if (n > max) { setFehler(`Hoechstens ${max}`); return; }
+    if (n > max) { setFehler(`Höchstens ${max}`); return; }
     setFehler(null);
     onChange(n);
   };

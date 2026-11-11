@@ -119,7 +119,7 @@ function basisParameter(jahr: number, fs: Fortschreibung): LegalParameters {
   if (exakt) return exakt;
 
   const fruehestes = BELEGTE_JAHRE[0]!;
-  if (jahr < fruehestes.jahr) return { ...fruehestes, jahr, extrapoliert: true, quelle: `Rechtsstand ${fruehestes.jahr} rueckwirkend angewandt` };
+  if (jahr < fruehestes.jahr) return { ...fruehestes, jahr, extrapoliert: true, quelle: `Rechtsstand ${fruehestes.jahr} rückwirkend angewandt` };
 
   return skaliere(BASISJAHR, jahr, fs.indexRate);
 }

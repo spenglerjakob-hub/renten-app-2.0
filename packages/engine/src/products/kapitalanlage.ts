@@ -159,7 +159,7 @@ export function kapitalversicherungErtrag(args: {
 }): { ertrag: number; steuerpflichtigerAnteil: number; halbeinkuenfte: boolean; begruendung: string } {
   const ertrag = Math.max(0, args.auszahlung - args.eingezahlteBeitraege);
   if (args.altvertragVor2005) {
-    return { ertrag, steuerpflichtigerAnteil: 0, halbeinkuenfte: false, begruendung: 'Altvertrag vor 2005: Ertraege steuerfrei (12 Jahre Laufzeit unterstellt)' };
+    return { ertrag, steuerpflichtigerAnteil: 0, halbeinkuenfte: false, begruendung: 'Altvertrag vor 2005: Erträge steuerfrei (12 Jahre Laufzeit unterstellt)' };
   }
 
   const laufzeit = args.auszahlungsJahr - args.vertragsbeginnJahr;
@@ -174,13 +174,13 @@ export function kapitalversicherungErtrag(args: {
       ertrag,
       steuerpflichtigerAnteil: ertrag * teilfrei,
       halbeinkuenfte: false,
-      begruendung: `12/${mindestalter}-Regel nicht erfuellt (Laufzeit ${laufzeit} Jahre, Alter ${Math.floor(args.alterBeiAuszahlung)}): voller Ertrag steuerpflichtig`,
+      begruendung: `12/${mindestalter}-Regel nicht erfüllt (Laufzeit ${laufzeit} Jahre, Alter ${Math.floor(args.alterBeiAuszahlung)}): voller Ertrag steuerpflichtig`,
     };
   }
   return {
     ertrag,
     steuerpflichtigerAnteil: ertrag * 0.5 * teilfrei,
     halbeinkuenfte: true,
-    begruendung: `12/${mindestalter}-Regel erfuellt: halber Ertrag mit persoenlichem Steuersatz`,
+    begruendung: `12/${mindestalter}-Regel erfüllt: halber Ertrag mit persönlichem Steuersatz`,
   };
 }
