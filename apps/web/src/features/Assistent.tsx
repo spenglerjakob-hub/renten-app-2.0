@@ -1,17 +1,21 @@
 import type { ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react';
+import { Check, FileText } from 'lucide-react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { Basisdaten, type BasisTeil } from './Basisdaten';
 import { useSzenario } from '../store/szenario';
 import { eintragVon, offenePfade, relevant } from './vorbelegung';
 import type { FallSchrittId } from './fortschritt';
-import { Etappen, KNOPF, KNOPF_ZWEIT } from '../components/stil';
+import { KNOPF_ZWEIT } from '../components/stil';
+import { Stuecke, type Stueck } from '../components/Ablauf';
+import { einkommenSatz, haushaltSatz, personenSatz, vertraegeSatz, zielSatz } from './daten-ergebnis';
 import { useAnsprache } from '../components/Ansprache';
 import type { AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * DER ASSISTENT fuer die erste Etappe: dieselben Angaben wie im Formular,
- * aber einzeln abgefragt — mit der Unterlage, in der die Zahl steht.
+ * aber einzeln abgefragt — mit der Unterlage, in der die Zahl steht. Ein
+ * Schritt ist offen; die davor stehen darueber als Zeilen mit dem, was
+ * eingetragen ist.
  *
  * Er schreibt in denselben Speicher wie das Formular und der Rechner. Es gibt
  * also nichts zu „uebernehmen": Wer mitten im Assistenten auf das Formular
@@ -154,46 +158,45 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
   const offen = offenePfade(szenario).filter((p) => relevant(szenario, p));
   const vertraegeOffen = offen.includes('vertraege');
   /*
-    Keine Haken nach Position mehr: Ein Schritt, an dem man vorbeigeklickt
-    hat, ist nicht erledigt. Was erledigt ist, zeigt die Fortschrittsleiste
-    oben; hier markiert ein Punkt, wo noch Beispielwerte stehen.
+    Kein Haken nach Position: Ein Schritt, an dem man vorbeigeklickt hat, ist
+    nicht erledigt. Stehen noch Beispielwerte darin (bei den Vertraegen: noch
+    nichts erfasst), traegt seine Zeile einen leeren Kreis und sagt es dazu.
   */
   const beispielOffen = (x: AssistentSchritt) => (x.teil === 'vertraege'
     ? vertraegeOffen
     : offen.some((p) => PFADE_JE_TEIL[x.teil](p) && eintragVon(p)?.art === 'beispiel'));
   const geheZu = (n: number) => onSchritt(Math.max(0, Math.min(SCHRITTE.length - 1, n)));
-  const s = SCHRITTE[i] ?? SCHRITTE[0]!;
-  const letzter = i === SCHRITTE.length - 1;
+  const heute = new Date();
+  const ergebnisVon: Record<AssistentSchritt['teil'], () => string> = {
+    haushalt: () => haushaltSatz(szenario),
+    personen: () => personenSatz(szenario, heute),
+    einkommen: () => einkommenSatz(szenario),
+    vertraege: () => vertraegeSatz(szenario, vertraegeOffen),
+    ziel: () => zielSatz(szenario),
+  };
 
   /*
-    Wie die Schritte der Mitarbeiterberatung: duenne Linien, ein leerer
-    Kreis, wo noch Beispielwerte stehen (bei den Vertraegen: noch nichts
-    erfasst), darunter der Schritt und am Ende „Zurueck“ und „Weiter“ unter
-    einer Haarlinie. Die Linien stehen IN der Karte: Ueber ihr stuende eine
-    zweite Leiste, die genauso aussieht wie die Etappen der Seite.
+    VON OBEN NACH UNTEN (`components/Ablauf`): Ein Schritt ist offen, die
+    davor stehen darueber als Zeilen mit dem, was eingetragen ist — ein Klick
+    oeffnet sie wieder. Die Linien-Leiste und „Zurueck“ entfallen damit: Die
+    Zeilen sind beides.
   */
-  return (
-    <section aria-labelledby="assistent-titel" className="ui-karte p-5 sm:p-7">
-      <Etappen
-        schritte={SCHRITTE.map((x) => x.titel(t))}
-        aktiv={i}
-        onWechsel={geheZu}
-        beschriftung="Schritte des Assistenten"
-        erledigt={() => false}
-        offen={(n) => beispielOffen(SCHRITTE[n]!)}
-        offenText={(n) => (SCHRITTE[n]!.teil === 'vertraege' ? 'noch nicht erfasst' : 'Beispielwerte offen')}
-      />
-
-      <div className="mt-6 sm:mt-8">
-        <h3 id="assistent-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{s.titel(t)}</h3>
+  const stuecke: Stueck[] = SCHRITTE.map((x, n) => ({
+    id: x.teil,
+    titel: x.titel(t),
+    ergebnis: ergebnisVon[x.teil](),
+    fehlt: beispielOffen(x) ? (x.teil === 'vertraege' ? 'noch nicht erfasst' : 'Beispielwerte offen') : undefined,
+    inhalt: (
+      <div className="ui-karte p-5 sm:p-7">
+        <h3 className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{x.titel(t)}</h3>
         {/* Die Unterlage als leiser Satz unter dem Titel — wie die Hilfetexte der Beratung, kein gelber Kasten. */}
         <p className="mt-2 flex max-w-3xl gap-2.5 text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
           <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span><span className="font-medium text-ui-tinte">Das {t.w('brauchst du', 'braucht ihr')}: </span>{s.unterlage(t)}</span>
+          <span><span className="font-medium text-ui-tinte">Das {t.w('brauchst du', 'braucht ihr')}: </span>{x.unterlage(t)}</span>
         </p>
 
         <div className="mt-6">
-          {s.teil === 'vertraege'
+          {x.teil === 'vertraege'
             ? (
               <>
                 {/*
@@ -204,7 +207,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
                 {szenario.vertraege.length === 0 && (vertraegeOffen ? (
                   <button
                     type="button"
-                    onClick={() => { pruefen('vertraege'); geheZu(i + 1); }}
+                    onClick={() => { pruefen('vertraege'); geheZu(n + 1); }}
                     className={`mb-5 ${KNOPF_ZWEIT}`}
                   >
                     <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
@@ -215,21 +218,20 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
                 {vertraege}
               </>
             )
-            : <Basisdaten teil={s.teil} ergebnis={ergebnis} onEhepartnerDialog={onEhepartnerDialog} />}
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-ui-linie pt-6">
-          {i > 0 ? (
-            <button type="button" onClick={() => geheZu(i - 1)} className={KNOPF_ZWEIT}>
-              <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
-            </button>
-          ) : <span />}
-          <button type="button" onClick={() => (letzter ? onFertig() : geheZu(i + 1))} className={`ml-auto ${KNOPF}`}>
-            {letzter ? 'Fertig — zum Ergebnis' : `Weiter: ${SCHRITTE[i + 1]!.titel(t)}`}
-            <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
-          </button>
+            : <Basisdaten teil={x.teil} ergebnis={ergebnis} onEhepartnerDialog={onEhepartnerDialog} />}
         </div>
       </div>
-    </section>
+    ),
+  }));
+
+  return (
+    <Stuecke
+      kennung="daten"
+      beschriftung="Schritte der Angaben"
+      stuecke={stuecke}
+      offen={(SCHRITTE[i] ?? SCHRITTE[0]!).teil}
+      onOeffnen={(id) => geheZu(SCHRITTE.findIndex((x) => x.teil === id))}
+      weiter={{ text: 'Fertig — zum Ergebnis', onClick: onFertig }}
+    />
   );
 }

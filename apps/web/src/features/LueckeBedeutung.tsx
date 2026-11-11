@@ -27,7 +27,8 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
   nettoHeute?: number;
   /** Steht die Kopfzahl schon in heutigem Geld, nennt die Karte den nominalen Betrag */
   kaufkraftHeute: boolean;
-  onSparen: () => void;
+  /** Der eigene Knopf zum Sparrechner — entfaellt, wo „Weiter“ darunter ohnehin dorthin fuehrt */
+  onSparen?: () => void;
   klasse?: string;
 }) {
   const szenario = useSzenario((x) => x.szenario);
@@ -76,10 +77,11 @@ export function LueckeBedeutung({ zeile, kaufkraftHeute, onSparen, klasse = '', 
         {SPARZIEL_VORGABE.auszahldauer} Jahren Auszahlung. Anpassen lässt sich das im Sparrechner.
       </p>
 
-      {/* Der zweite Knopf: Die Hauptaktion der Etappe ist „Weiter“ am Ende — sie fuehrt ebenfalls dorthin. */}
-      <button type="button" onClick={onSparen} className={`mt-5 w-full print:hidden ${KNOPF_ZWEIT}`}>
-        Wie schließe ich die Lücke? <ArrowRight className="h-4 w-4" aria-hidden />
-      </button>
+      {onSparen && (
+        <button type="button" onClick={onSparen} className={`mt-5 w-full print:hidden ${KNOPF_ZWEIT}`}>
+          Wie schließe ich die Lücke? <ArrowRight className="h-4 w-4" aria-hidden />
+        </button>
+      )}
     </section>
   );
 }

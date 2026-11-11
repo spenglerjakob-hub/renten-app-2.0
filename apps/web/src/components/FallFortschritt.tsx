@@ -3,14 +3,14 @@ import { ArrowRight, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { FallSchritt, FallSchrittId } from '../features/fortschritt';
 
 /**
- * Die Leiste „Fall erfasst: 3 von 6“ unter der Etappen-Navigation.
+ * Die Leiste „Fall erfasst: 3 von 6“ ueber den Etappen der Beratung.
  *
  * Bewusst schlicht: ein Zaehler, ein schmaler Balken, die Schritte. Keine
  * Animation, kein „fast geschafft“ — Profis wollen wissen, was fehlt, nicht
  * angefeuert werden. Offene Schritte sind Knoepfe und fuehren an die Stelle.
  *
  * Eingeklappt auf eine Zeile — auf jedem Geraet. Die sechs Schritte als
- * Pillen standen sonst als dritte Leiste zwischen Etappen-Navigation und
+ * Pillen standen sonst als weitere Leiste zwischen Kopf und
  * erstem Eingabefeld. Offene Schritte gestrichelt wie ein Beispielwert,
  * erledigte mit Haken — ohne Ampelfarben. Sichtbar bleibt der naechste offene Schritt als
  * Sprung; die ganze Liste klappt auf Wunsch auf.

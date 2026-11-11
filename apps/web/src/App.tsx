@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
@@ -43,7 +43,7 @@ import { useAuth } from './store/auth';
 import { aboSichtbar, aboZusatz, rueckmeldungFaellig, useZugang, wirksam } from './store/zugang';
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
-import { Loesungen } from './features/Loesungen';
+import { Angebote, Loesungen } from './features/Loesungen';
 import { Abschluss } from './features/Abschluss';
 import { Antragsangaben } from './features/Antragsangaben';
 import { Antraege } from './features/Antraege';
@@ -59,12 +59,18 @@ import { Logo } from './components/Logo';
 import { KaufkraftSchalter } from './components/KaufkraftSchalter';
 import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seitenleiste';
 import { Dialog } from './components/Dialog';
-import { JourneyLeiste, JourneyWeiter, type Etappe } from './components/JourneyLeiste';
+import {
+  AblaufGeber, EtappenZaehler, EtappenZeile, SPALTE, Stuecke, insBild, type Stueck,
+} from './components/Ablauf';
+import { erreichteEtappen, type StueckeStand } from './components/ablauf-logik';
+import { datenSatz } from './features/daten-ergebnis';
+import { sparzielRechnen, SPARZIEL_VORGABE } from './features/sparziel-berechnung';
+import { kaufkraft } from './features/kaufkraft';
 import { RechtsLinks } from './components/RechtsLinks';
 import { fallNameAus, personName, personNameAus } from './features/personen';
 import { AnspracheGeben } from './components/Ansprache';
 import { vornamen, woerter, type Ansprache } from './lib/ansprache';
-import { AkkordeonKarte, euro } from './components/Feld';
+import { AkkordeonKarte, euro, prozent } from './components/Feld';
 import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
 
 type Reiter = 's1' | 's2' | 's3' | 'planer';
@@ -79,15 +85,24 @@ const REITER: { id: Reiter; text: string }[] = [
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
 
-/** Die fuenf Etappen der Beratung — siehe `JourneyLeiste`. */
+/**
+ * Die fuenf Etappen der Beratung — von oben nach unten (`components/Ablauf`).
+ *
+ * Im Gespraech fuehrt der Berater den Kunden durch eine Geschichte: erst wer
+ * er ist und was er will, dann wo er steht, dann was es kostet, dann womit.
+ * Eine Etappe ist offen; was dahinter liegt, steht darueber als Zeile mit
+ * ihrem Ergebnis und oeffnet sich mit einem Klick wieder.
+ */
 type Schritt = 'daten' | 'ergebnis' | 'sparen' | 'loesungen' | 'abschluss';
-const ETAPPEN: readonly Etappe<Schritt>[] = [
-  { id: 'daten', text: 'Daten & Ziel', kurz: 'Daten & Ziel' },
-  { id: 'ergebnis', text: 'Ergebnis', kurz: 'Ergebnis' },
-  { id: 'sparen', text: 'Sparrechner', kurz: 'Sparen' },
-  { id: 'loesungen', text: 'Vertrags-TÜV & Lösungen', kurz: 'TÜV & Lösungen' },
-  { id: 'abschluss', text: 'Abschluss', kurz: 'Abschluss' },
+const ETAPPEN: readonly { id: Schritt; text: string }[] = [
+  { id: 'daten', text: 'Daten & Ziel' },
+  { id: 'ergebnis', text: 'Ergebnis' },
+  { id: 'sparen', text: 'Sparrechner' },
+  { id: 'loesungen', text: 'Vertrags-TÜV & Lösungen' },
+  { id: 'abschluss', text: 'Abschluss' },
 ];
+const ETAPPEN_IDS = ETAPPEN.map((e) => e.id);
+const etappeNr = (id: Schritt) => ETAPPEN_IDS.indexOf(id);
 
 /*
   Die zuletzt offene Etappe — eine Bequemlichkeit je Geraet, nichts, was
@@ -133,7 +148,7 @@ function StartKarte({ symbol, titel, text, marke, onClick }: {
 /**
  * Der Einstieg einer Etappe wie eine Seite der Beratung: der Titel gross, in
  * Inter Tight, darunter ein Satz, worum es geht. Die Nummer steht in der
- * Etappenleiste darueber, nicht mehr im Titel.
+ * Zeile darueber („Ergebnis · Abschnitt 2 von 5“), nicht im Titel.
  */
 function EtappenKopf({ titel, text }: { titel: React.ReactNode; text: string }) {
   return (
@@ -305,12 +320,45 @@ export default function App() {
   const [checkOffen, setCheckOffen] = useState(false);
   const [leisteOffen, setLeisteOffen] = useState(false);
   const [schritt, setSchritt] = useState<Schritt>(ladeEtappe);
+  /*
+    WIE WEIT DIE BERATUNG GEKOMMEN IST: Alle Etappen bis dorthin stehen als
+    Zeilen da, auch wenn man eine fruehere wieder oeffnet. Nur im
+    Arbeitsspeicher — nach dem Neuladen gilt die gemerkte offene Etappe und,
+    was der Fall selbst hergibt (`weit` weiter unten).
+  */
+  const [besucht, setBesucht] = useState(() => etappeNr(ladeEtappe()));
+  // Welche Etappen wirklich offen waren — ein Sprung ueber die Seitenleiste laesst die dazwischen aus.
+  const [gesehen, setGesehen] = useState<ReadonlySet<Schritt>>(() => new Set([ladeEtappe()]));
+  // Zaehlt jeden Sprung — auch den auf die schon offene Etappe: Dann kommt sie wieder ins Bild.
+  const [sprung, setSprung] = useState(0);
   const geheZu = useCallback((s: Schritt) => {
     setSchritt(s);
+    setBesucht((n) => Math.max(n, etappeNr(s)));
+    setGesehen((alt) => (alt.has(s) ? alt : new Set(alt).add(s)));
+    setSprung((n) => n + 1);
     try { localStorage.setItem(SPEICHER_ETAPPE, s); } catch { /* Speicher gesperrt */ }
-    window.scrollTo({ top: 0 });
   }, []);
-  const [tuevReiter, setTuevReiter] = useState<'loesungen' | 'tuev'>('loesungen');
+  /*
+    Die offene Etappe kommt nach einem Sprung an den oberen Rand, mit der
+    Zeile davor darueber, und bekommt den Fokus — der Knopf, der hierher
+    gefuehrt hat, ist dann oft nicht mehr da. Hat sich ein Stueck darin schon
+    selbst geholt (die Fortschrittsleiste springt an einen Schritt der
+    Angaben), bleibt es dabei.
+  */
+  const offeneEtappe = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => {
+    const el = offeneEtappe.current;
+    if (sprung === 0 || !el) return;
+    if (el !== document.activeElement && el.contains(document.activeElement)) return;
+    insBild(el);
+    el.focus({ preventScroll: true });
+  }, [sprung]);
+  // Wo die Stuecke jeder Etappe stehen — ueber den Etappenwechsel hinweg (`AblaufGeber`).
+  const [stueckeStand, setStueckeStand] = useState<Record<string, StueckeStand>>({});
+  const merkeStuecke = useCallback(
+    (kennung: string, stand: StueckeStand) => setStueckeStand((alt) => ({ ...alt, [kennung]: stand })),
+    [],
+  );
   const [eingabeArt, setEingabeArtRoh] = useState<'assistent' | 'formular'>(() => {
     try { return localStorage.getItem(SPEICHER_EINGABE) === 'formular' ? 'formular' : 'assistent'; } catch { return 'assistent'; }
   });
@@ -536,11 +584,32 @@ export default function App() {
   useEffect(() => {
     if (schritt === 'ergebnis' && ergebnis) ausgewertet();
   }, [schritt, ergebnis, ausgewertet]);
-  const etappeErledigt = (id: Schritt) => (id === 'daten'
-    ? datenErledigt(fallSchritte)
-    : id === 'abschluss'
-      ? mitHaushalt.loesungen.length > 0
-      : id === 'ergebnis' && fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt));
+  /*
+    Ist eine Etappe WIRKLICH erledigt? Nur dann steht in ihrer Zeile ein
+    Haken, sonst ihre Nummer — kein Fortschritt, den es nicht gab. Der
+    Sparrechner ist zum Ansehen da: erledigt, wenn er offen war.
+    Die Loesungen sind es, sobald ein Angebot erfasst ist.
+  */
+  const etappeErledigt = (id: Schritt) => {
+    switch (id) {
+      case 'daten': return datenErledigt(fallSchritte);
+      case 'ergebnis': return fallSchritte.some((x) => x.id === 'auswertung' && x.erledigt);
+      case 'sparen': return gesehen.has(id);
+      case 'loesungen': return szenario.loesungen.angebote.length > 0;
+      case 'abschluss': return mitHaushalt.loesungen.length > 0;
+    }
+  };
+  /*
+    Ein geladener Plan zeigt, wie weit er ist: mit angenommenen Loesungen alle
+    Etappen, mit Angeboten bis zu den Loesungen, mit angesehenem Ergebnis bis
+    dorthin. Ein frischer Fall beginnt mit der ersten Etappe allein.
+  */
+  const weit = Math.max(
+    besucht,
+    mitHaushalt.loesungen.length > 0 ? etappeNr('abschluss')
+      : szenario.loesungen.angebote.length > 0 ? etappeNr('loesungen')
+        : etappeErledigt('ergebnis') ? etappeNr('ergebnis') : 0,
+  );
   /** Ein offener Schritt der Leiste fuehrt an die Stelle, an der etwas fehlt. */
   const springeZu = (id: FallSchrittId) => {
     if (id === 'auswertung') { geheZu('ergebnis'); return; }
@@ -685,9 +754,10 @@ export default function App() {
     Loesungen — sonst stuende dort eine andere Luecke als im Titel darueber.
     Dasselbe Jahr, also derselbe Kaufkraftfaktor.
   */
-  const leisteMit = schritt === 'abschluss' && mitAnsicht && ergebnisMit && echteZeile
+  const zeileMit = mitAnsicht && ergebnisMit && echteZeile
     ? ergebnisMit.zeilen.find((z) => z.jahr === zeile.jahr) ?? null
     : null;
+  const leisteMit = schritt === 'abschluss' ? zeileMit : null;
   const leiste = leisteMit ?? zeile;
   const leisteLuecke = versorgungsluecke(leiste);
   // Das heutige Haushaltsnetto — die Bezugsgroesse fuer Sparrate und Beitraege.
@@ -878,6 +948,230 @@ export default function App() {
       Berechnung läuft …
     </p>
   );
+
+  /* ---------- DER ABLAUF: die Zeilen der Etappen und die Stuecke der offenen ---------- */
+
+  // Dieselbe Rechnung wie „Was die Luecke bedeutet“ und der Sparrechner mit seinen Vorgaben.
+  const sparziel = useMemo(
+    () => (echteZeile ? sparzielRechnen(szenario, echteZeile, SPARZIEL_VORGABE) : null),
+    [szenario, echteZeile],
+  );
+
+  // Solange gerechnet wird, besteht eine Etappe aus diesem einen Stueck — „Weiter“ bleibt erreichbar.
+  const wartet: Stueck[] = [{ id: 'rechnet', titel: 'Berechnung', inhalt: rechnetText }];
+
+  /** Die Etappe in einem Satz — fuer ihre Zeile, sobald sie nicht mehr offen ist. */
+  const etappeErgebnis = (id: Schritt): string | undefined => {
+    switch (id) {
+      case 'daten': return datenSatz(szenario, new Date());
+      case 'ergebnis':
+        if (!echteZeile) return undefined;
+        return luecke > 0 ? `Lücke ${euro(luecke * faktor)} im Monat` : 'Ziel gedeckt';
+      case 'sparen': {
+        if (!echteZeile) return undefined;
+        if (luecke <= 0) return 'Keine Lücke zu schließen';
+        // Der Beitrag aus dem Sparrechner; war er noch nicht offen, der mit seinen Vorgaben.
+        const rate = sparrate ?? sparziel?.gewaehlt.startbeitrag ?? null;
+        return rate === null ? undefined : `${euro(rate)} im Monat schließen die Lücke`;
+      }
+      case 'loesungen': {
+        const n = ansichtSzenario.loesungen.angebote.length;
+        const angenommen = mitAnsicht?.loesungen.length ?? 0;
+        if (n === 0) return 'Noch kein Angebot erfasst';
+        return `${n === 1 ? '1 Angebot' : `${n} Angebote`}${angenommen > 0 ? `, ${angenommen} angenommen` : ''}`;
+      }
+      case 'abschluss':
+        if (!mitAnsicht) return 'Noch keine Lösung angenommen';
+        if (!zeileMit) return undefined;
+        return versorgungsluecke(zeileMit) > 0
+          ? `Mit den gewählten Lösungen noch ${euro(versorgungsluecke(zeileMit) * faktor)} Lücke`
+          : 'Mit den gewählten Lösungen ist das Ziel gedeckt';
+    }
+  };
+  // Was den Angaben noch fehlt — steht in der Zeile der ersten Etappe, mit leerem Kreis statt Haken.
+  const beispieleOffen = fallSchritte
+    .filter((x) => x.id === 'mandant' || x.id === 'einkuenfte' || x.id === 'ziel')
+    .reduce((n, x) => n + x.offen.length, 0);
+  const datenFehlt = [
+    beispieleOffen === 1 ? '1 Beispielwert offen' : beispieleOffen > 1 ? `${beispieleOffen} Beispielwerte offen` : '',
+    fallSchritte.some((x) => x.id === 'vertraege' && !x.erledigt) ? 'Verträge noch nicht erfasst' : '',
+  ].filter(Boolean).join(', ') || undefined;
+
+  // „Weiter“ am Ende des Wegs einer Etappe fuehrt zur naechsten — mit der Frage, die sie beantwortet.
+  const naechsteEtappe = ETAPPEN[etappeNr(schritt) + 1];
+  const weiterEtappe = naechsteEtappe && {
+    text: schritt === 'daten' ? 'Zum Ergebnis'
+      : schritt === 'ergebnis' && luecke > 0 ? 'Was kostet es, die Lücke zu schließen?'
+        : schritt === 'sparen' ? 'Womit? Lösungen vergleichen'
+          : <>Weiter: {naechsteEtappe.text}</>,
+    onClick: () => geheZu(naechsteEtappe.id),
+  };
+  /** Zu den Angeboten — aus dem Abschluss („Ändern“) und nach „Als Angebot erfassen“. */
+  const zeigeStueck = (kennung: string, id: string) => setStueckeStand(
+    (alt) => ({ ...alt, [kennung]: { offen: id, weit: alt[kennung]?.weit ?? null } }),
+  );
+  const zuDenAngeboten = () => { zeigeStueck('loesungen', 'angebote'); geheZu('loesungen'); };
+
+  /*
+    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, woher das Netto kommt,
+    was die Preissteigerung daraus macht, was zu tun waere — das fuehrt zum
+    Sparrechner. Steuer und Rechtsstand sind Nachschlagen: Vertiefungen.
+  */
+  const kk = kaufkraft(zeile);
+  const ergebnisStuecke: Stueck[] = !ergebnis ? [] : [
+    {
+      id: 'luecke',
+      titel: luecke > 0 ? `${t.Dein('e')} Lücke` : `${t.Dein()} Ziel`,
+      ergebnis: luecke > 0
+        ? `Netto ${euro(zeile.nettoMonat * faktor)} von ${euro(zeile.zielNettoMonat * faktor)} Ziel`
+        : `Netto ${euro(zeile.nettoMonat * faktor)} — das Ziel von ${euro(zeile.zielNettoMonat * faktor)} ist gedeckt`,
+      // Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz.
+      inhalt: <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} breit />,
+    },
+    {
+      id: 'netto',
+      titel: `Woher ${t.dein()} Netto kommt`,
+      ergebnis: `${euro((zeile.bruttoGesamt / 12) * faktor)} brutto, ${euro(zeile.nettoMonat * faktor)} netto im Monat`,
+      inhalt: (
+        <div className="flex flex-col gap-5 sm:gap-6">
+          {/* Zwei Ansichten derselben Zahlen — als Pillen wie die Reiter der Beratung.
+              Die Huelle haelt sie so breit wie ihr Inhalt; die Spalte zoege sie sonst auf volle Breite. */}
+          <div>
+          <Pillen
+            reiter={[
+              { id: 'kassenbon' as const, inhalt: <span className="inline-flex items-center gap-1.5"><List className="h-4 w-4" aria-hidden /> Kassenbon</span> },
+              { id: 'verlauf' as const, inhalt: <span className="inline-flex items-center gap-1.5"><TrendingUp className="h-4 w-4" aria-hidden /> Verlauf</span> },
+            ]}
+            aktiv={ansicht}
+            onWechsel={setAnsicht}
+            beschriftung="Aufstellung oder Verlauf"
+            kennung={(id) => ({ reiter: `ansicht-reiter-${id}`, bereich: `ansicht-${id}` })}
+          />
+          </div>
+
+          {/*
+            Der Schalter „Nominal | Kaufkraft heute“ steht im Titel und
+            in der Fussleiste; der Kassenbon nennt nur, in welchem Geld
+            er rechnet — ein dritter Schalter waere einer zu viel.
+          */}
+          <div id="ansicht-kassenbon" role="tabpanel" aria-labelledby="ansicht-reiter-kassenbon"
+            className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
+            <Kassenbon
+              ergebnis={ergebnis}
+              zeile={zeile}
+              szenario={ansichtSzenario}
+              kaufkraftHeute={kaufkraftHeute}
+              person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+            />
+          </div>
+          <div id="ansicht-verlauf" role="tabpanel" aria-labelledby="ansicht-reiter-verlauf"
+            className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
+            <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
+          </div>
+        </div>
+      ),
+    },
+    ...(kk ? [{
+      id: 'kaufkraft',
+      titel: 'Kaufkraft bis zum Rentenbeginn',
+      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
+      inhalt: (
+        <KaufkraftKarte
+          zeile={zeile}
+          inflation={szenario.annahmen.inflation}
+          standard={offenePfade(szenario).includes('annahmen.inflation')}
+        />
+      ),
+    }] : []),
+    // Die Bruecke zum Sparrechner — „Weiter“ darunter fuehrt dorthin. Ohne Luecke oder Sparzeit entfaellt sie.
+    ...(sparziel ? [{
+      id: 'bedeutung',
+      titel: `Was die Lücke für ${t.dich} bedeutet`,
+      ergebnis: `${euro(sparziel.gewaehlt.startbeitrag)} Sparrate ab heute`,
+      inhalt: <LueckeBedeutung zeile={zeile} kaufkraftHeute={kaufkraftHeute} nettoHeute={nettoHeute} />,
+    }] : []),
+    {
+      id: 'steuer',
+      vertiefung: true,
+      titel: 'Steuer & Krankenversicherung',
+      ergebnis: `Steuer ${euro((zeile.steuerGesamt / 12) * faktor)}, Kranken- und Pflegeversicherung ${euro((zeile.kvPvGesamt / 12) * faktor)} im Monat`,
+      inhalt: (
+        <div className="flex flex-col gap-5 sm:gap-6">
+          <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} anfangsOffen />
+          {/*
+            Die Praemie im Ruhestand ist fuer einen privat Versicherten
+            oft der groesste einzelne Posten der Luecke. Bei gesetzlich
+            Versicherten faellt der Block stillschweigend weg.
+          */}
+          <PkvRechner zeile={zeile} anfangsOffen />
+        </div>
+      ),
+    },
+    {
+      id: 'recht',
+      vertiefung: true,
+      titel: 'Rechtsstand & Annahmen',
+      ergebnis: `Rentenanpassung ${prozent(szenario.annahmen.rentendynamik)}, Inflation ${prozent(szenario.annahmen.inflation)}`,
+      inhalt: (
+        <Rechtsstand
+          ergebnis={ergebnis}
+          tarifIndex={szenario.annahmen.tarifIndex}
+          rentendynamik={szenario.annahmen.rentendynamik}
+          inflation={szenario.annahmen.inflation}
+        />
+      ),
+    },
+  ];
+
+  /*
+    VERTRAGS-TUEV & LOESUNGEN IN STUECKEN. Auf dem Weg: was jede Schicht aus
+    dem Beitrag macht, dann die Angebote dazu — dort wird angenommen. Die
+    Pruefung bestehender Vertraege ist die Vertiefung auf Wunsch.
+  */
+  const loesungenStand = ansichtSzenario.loesungen;
+  const angeboteZahl = loesungenStand.angebote.length;
+  const angenommenZahl = mitAnsicht?.loesungen.length ?? 0;
+  const loesungenStuecke: Stueck[] = [
+    {
+      id: 'vergleich',
+      titel: 'Lösungen vergleichen',
+      ergebnis: loesungenStand.vorgabe === 'brutto'
+        ? `${euro(loesungenStand.bruttoMonat)} Beitrag im Monat, in jeder Schicht`
+        : `${euro(loesungenStand.nettoMonat)} netto im Monat, in jeder Schicht`,
+      breit: true,
+      inhalt: (
+        <Loesungen
+          zeile={ergebnis ? zeile : null}
+          szenario={ansichtSzenario}
+          sparrate={sparrate}
+          nettoHeute={nettoHeute}
+          // Das erfasste Angebot wartet bei den Angeboten auf die Rente des Anbieters.
+          onErfasst={() => zeigeStueck('loesungen', 'angebote')}
+        />
+      ),
+    },
+    {
+      id: 'angebote',
+      titel: 'Angebote vergleichen',
+      ergebnis: angeboteZahl === 0
+        ? 'Noch kein Angebot erfasst'
+        : `${angeboteZahl === 1 ? '1 Angebot' : `${angeboteZahl} Angebote`}${angenommenZahl > 0 ? `, ${angenommenZahl} angenommen` : ''}`,
+      breit: true,
+      // „Lösungen annehmen“ im Stueck fuehrt zum Abschluss — ein zweites „Weiter“ darunter waere eines zu viel.
+      ohneWeiter: true,
+      inhalt: <Angebote szenario={ansichtSzenario} nettoHeute={nettoHeute} onAnnehmen={() => geheZu('abschluss')} />,
+    },
+    {
+      id: 'tuev',
+      vertiefung: true,
+      titel: 'Bestehende Verträge prüfen',
+      ergebnis: ansichtSzenario.vertraege.length === 0
+        ? 'Keine Verträge erfasst'
+        : ansichtSzenario.vertraege.length === 1 ? '1 Vertrag' : `${ansichtSzenario.vertraege.length} Verträge`,
+      breit: true,
+      inhalt: <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />,
+    },
+  ];
 
   return (
     /*
@@ -1125,20 +1419,19 @@ export default function App() {
             )}
           </Band>
         )}
-        {/* Etappenleiste und Fortschritt dicht beieinander — beide sagen, wo der Fall steht. */}
-        <div className="space-y-3">
-          <JourneyLeiste etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} erledigt={etappeErledigt} />
+        {/* Was dem Fall noch fehlt — in der Spalte des Ablaufs, ueber seinen Etappen. */}
+        <div className={SPALTE}>
           <FallFortschritt schritte={fallSchritte} onSprung={springeZu} />
         </div>
 
         {fehler && (
-          <div role="alert" className={`px-4 py-3 ${FEHLER}`}>
+          <div role="alert" className={`${SPALTE} px-4 py-3 ${FEHLER}`}>
             Die Berechnung ist fehlgeschlagen: {fehler}
           </div>
         )}
 
         {hinweise.length > 0 && schritt !== 'daten' && (
-          <div role="status" className="ui-innen flex gap-2.5 px-4 py-3 text-sm leading-relaxed text-ui-tinte">
+          <div role="status" className={`${SPALTE} ui-innen flex gap-2.5 px-4 py-3 text-sm leading-relaxed text-ui-tinte`}>
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden />
             <ul className="space-y-1">
               {hinweise.map((h, i) => <li key={i}>{h}</li>)}
@@ -1146,60 +1439,90 @@ export default function App() {
           </div>
         )}
 
+        {/*
+          DER ABLAUF VON OBEN NACH UNTEN: Jede erreichte Etappe steht als Zeile
+          mit ihrem Ergebnis da, die offene an ihrer Stelle dazwischen. Darin
+          geht es Stueck fuer Stueck weiter (`Stuecke`).
+        */}
+        <AblaufGeber stand={stueckeStand} onStand={merkeStuecke} weiter={weiterEtappe} durch={etappeNr(schritt) < weit}>
+        <ol aria-label="Ablauf der Beratung" className="space-y-3">
+          {erreichteEtappen(ETAPPEN_IDS, schritt, weit).map((id) => {
+            const nr = etappeNr(id) + 1;
+            const name = ETAPPEN[nr - 1]!.text;
+            if (id !== schritt) {
+              return (
+                <li key={id} className={SPALTE}>
+                  <EtappenZeile
+                    nr={nr}
+                    name={name}
+                    ergebnis={etappeErgebnis(id)}
+                    erledigt={etappeErledigt(id)}
+                    fehlt={id === 'daten' ? datenFehlt : undefined}
+                    onOeffnen={() => geheZu(id)}
+                  />
+                </li>
+              );
+            }
+            return (
+              // Luft nach unten: Die Zeilen spaeterer Etappen gehoeren nicht zu den Stuecken dieser.
+              <li key={id} ref={offeneEtappe} tabIndex={-1} className="pb-6 pt-3 focus:outline-none sm:pb-8 sm:pt-4">
+                <div className={`${SPALTE} mb-3`}>
+                  <EtappenZaehler nr={nr} von={ETAPPEN.length} name={name} />
+                </div>
+                <div className="space-y-6 sm:space-y-8">
+
         {/* ---------- 1. DATEN & ZIEL ---------- */}
         {schritt === 'daten' && (
           <>
-            <EtappenKopf
-              titel={<>{t.Dein('e')} Daten und <Hervor>{t.dein()} Ziel</Hervor></>}
-              text={`Wer ${t.du} ${t.w('bist', 'seid')}, was ${t.du} ${t.w('verdienst', 'verdient')}, was schon an Vorsorge da ist — und mit wie viel Geld im Monat ${t.du} im Ruhestand leben ${t.w('möchtest', 'möchtet')}.`}
-            />
-            {/*
-              LINKS die Angaben zur Person, RECHTS die Vertraege — auf weissen
-              Karten wie die Angaben der Mitarbeiterberatung.
-            */}
-            {/*
-              VORSORGE-CHECK am Anfang der Angaben — von dort kommen Faelle
-              oft: die Angaben, die ein Kunde ueber seinen Link geschickt hat.
-              In beiden Eingabearten. Das Konto steht im Kopf (oben rechts,
-              wo man es sucht) — als Karte hier war es eine Ebene mehr vor
-              dem ersten Eingabefeld.
-            */}
-            {checkMoeglich && (
-              <div className="grid gap-3 sm:grid-cols-2 print:hidden">
-                <StartKarte
-                  symbol={<Inbox className="h-5 w-5" aria-hidden />}
-                  titel="Vorsorge-Check an Kunden senden"
-                  text="Persönlicher Link — die Angaben landen bei Ihnen"
-                  marke={eingangMarke}
-                  onClick={() => setCheckOffen(true)}
-                />
-              </div>
-            )}
+            <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+              <EtappenKopf
+                titel={<>{t.Dein('e')} Daten und <Hervor>{t.dein()} Ziel</Hervor></>}
+                text={`Wer ${t.du} ${t.w('bist', 'seid')}, was ${t.du} ${t.w('verdienst', 'verdient')}, was schon an Vorsorge da ist — und mit wie viel Geld im Monat ${t.du} im Ruhestand leben ${t.w('möchtest', 'möchtet')}.`}
+              />
+              {/*
+                VORSORGE-CHECK am Anfang der Angaben — von dort kommen Faelle
+                oft: die Angaben, die ein Kunde ueber seinen Link geschickt hat.
+                In beiden Eingabearten. Das Konto steht im Kopf (oben rechts,
+                wo man es sucht) — als Karte hier war es eine Ebene mehr vor
+                dem ersten Eingabefeld.
+              */}
+              {checkMoeglich && (
+                <div className="grid gap-3 sm:grid-cols-2 print:hidden">
+                  <StartKarte
+                    symbol={<Inbox className="h-5 w-5" aria-hidden />}
+                    titel="Vorsorge-Check an Kunden senden"
+                    text="Persönlicher Link — die Angaben landen bei Ihnen"
+                    marke={eingangMarke}
+                    onClick={() => setCheckOffen(true)}
+                  />
+                </div>
+              )}
 
-            {/*
-              ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
-              nennt die Unterlage, das Formular zeigt alles auf einen Blick.
-              Beide schreiben in denselben Speicher — umschalten verliert nichts.
-              Als Pillen wie der Kaufkraft-Schalter; am Telefon kuerzer, sonst
-              passen beide nicht nebeneinander.
-            */}
-            <div role="group" aria-label="Art der Eingabe"
-              className="inline-flex max-w-full gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 text-sm font-medium print:hidden">
-              {([['assistent', 'Schritt für Schritt', 'Schritt für Schritt'], ['formular', 'Alle Angaben auf einen Blick', 'Auf einen Blick']] as const).map(([id, text, kurz]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setEingabeArt(id)}
-                  aria-pressed={eingabeArt === id}
-                  // Derselbe Name auf jedem Geraet; die Kurzform am Telefon ist ein Teil davon.
-                  aria-label={text}
-                  className={`rounded-full px-3 py-1.5 transition-colors sm:px-4 ${
-                    eingabeArt === id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
-                  }`}
-                >
-                  <span className="sm:hidden">{kurz}</span><span className="hidden sm:inline">{text}</span>
-                </button>
-              ))}
+              {/*
+                ZWEI WEGE ZU DENSELBEN ANGABEN: der Assistent fragt einzeln und
+                nennt die Unterlage, das Formular zeigt alles auf einen Blick.
+                Beide schreiben in denselben Speicher — umschalten verliert nichts.
+                Als Pillen wie der Kaufkraft-Schalter; am Telefon kuerzer, sonst
+                passen beide nicht nebeneinander.
+              */}
+              <div role="group" aria-label="Art der Eingabe"
+                className="inline-flex max-w-full gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 text-sm font-medium print:hidden">
+                {([['assistent', 'Schritt für Schritt', 'Schritt für Schritt'], ['formular', 'Alle Angaben auf einen Blick', 'Auf einen Blick']] as const).map(([id, text, kurz]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setEingabeArt(id)}
+                    aria-pressed={eingabeArt === id}
+                    // Derselbe Name auf jedem Geraet; die Kurzform am Telefon ist ein Teil davon.
+                    aria-label={text}
+                    className={`rounded-full px-3 py-1.5 transition-colors sm:px-4 ${
+                      eingabeArt === id ? 'bg-ui-dunkel text-white' : 'text-ui-schiefer hover:text-ui-tinte'
+                    }`}
+                  >
+                    <span className="sm:hidden">{kurz}</span><span className="hidden sm:inline">{text}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {eingabeArt === 'assistent' ? (
@@ -1212,38 +1535,51 @@ export default function App() {
                 onSchritt={assistentZu}
               />
             ) : (
-            <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
-              <div id="eingaben" className="scroll-mt-28 lg:col-span-6">
-                <AkkordeonKarte
-                  titel="Allgemeine Daten & Ziel"
-                  offen={basisOffen}
-                  onUmschalten={() => setBasisOffen((v) => !v)}
-                  symbol={<User className="h-4 w-4 text-ui-schiefer" aria-hidden />}
-                >
-                  <Basisdaten
-                    ergebnis={ergebnis ?? null}
-                    onEhepartnerDialog={() => setEhepartnerDialog(true)}
-                    onAssistent={() => setEingabeArt('assistent')}
-                  />
-                </AkkordeonKarte>
-              </div>
+              /*
+                ALLE ANGABEN AUF EINEN BLICK — die Ansicht fuer den, der den
+                Fall kennt: LINKS die Angaben zur Person, RECHTS die Vertraege,
+                ueber die ganze Breite. Ein einziges Stueck; „Weiter“ darunter
+                fuehrt zum Ergebnis.
+              */
+              <Stuecke
+                kennung="daten-formular"
+                beschriftung="Alle Angaben"
+                stuecke={[{
+                  id: 'formular',
+                  titel: 'Alle Angaben auf einen Blick',
+                  breit: true,
+                  inhalt: (
+                    <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
+                      <div id="eingaben" className="scroll-mt-28 lg:col-span-6">
+                        <AkkordeonKarte
+                          titel="Allgemeine Daten & Ziel"
+                          offen={basisOffen}
+                          onUmschalten={() => setBasisOffen((v) => !v)}
+                          symbol={<User className="h-4 w-4 text-ui-schiefer" aria-hidden />}
+                        >
+                          <Basisdaten
+                            ergebnis={ergebnis ?? null}
+                            onEhepartnerDialog={() => setEhepartnerDialog(true)}
+                            onAssistent={() => setEingabeArt('assistent')}
+                          />
+                        </AkkordeonKarte>
+                      </div>
 
-              <div className="lg:col-span-6">
-                <Karte titel="Bestehende Vorsorge">
-                  {/* Wie im Assistenten: „keine Vertraege“ ist eine Antwort, die man geben muss. */}
-                  {szenario.vertraege.length === 0 && offenePfade(szenario).includes('vertraege') && (
-                    <button type="button" onClick={() => pruefen('vertraege')} className={`mb-5 ${KNOPF_ZWEIT}`}>
-                      <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
-                    </button>
-                  )}
-                  {schichten}
-                </Karte>
-              </div>
-            </div>
-            )}
-            {/* Im Assistenten fuehrt dessen eigener letzter Knopf weiter. */}
-            {eingabeArt === 'formular' && (
-              <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Zum Ergebnis" />
+                      <div className="lg:col-span-6">
+                        <Karte titel="Bestehende Vorsorge">
+                          {/* Wie im Assistenten: „keine Vertraege“ ist eine Antwort, die man geben muss. */}
+                          {szenario.vertraege.length === 0 && offenePfade(szenario).includes('vertraege') && (
+                            <button type="button" onClick={() => pruefen('vertraege')} className={`mb-5 ${KNOPF_ZWEIT}`}>
+                              <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
+                            </button>
+                          )}
+                          {schichten}
+                        </Karte>
+                      </div>
+                    </div>
+                  ),
+                }]}
+              />
             )}
           </>
         )}
@@ -1251,210 +1587,117 @@ export default function App() {
         {/* ---------- 2. ERGEBNIS ---------- */}
         {schritt === 'ergebnis' && (
           <>
-            {/*
-              DER EINSTIEG WIE IN SCHRITT 3 DER BERATUNG: die Luecke als
-              Aussage im Titel, daneben der Schalter fuer das Geld, in dem
-              gerechnet wird. Ohne Ergebnis der ruhige Titel.
-            */}
-            {ergebnis
-              ? <ErgebnisKopf zeile={zeile} kaufkraftHeute={kaufkraftHeute} onKaufkraftHeute={setKaufkraftHeute} />
-              : (
-                <EtappenKopf
-                  titel={`${t.Dein()} Ergebnis`}
-                  text={`Was ${t.dir} im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu ${t.dein('em')} Ziel ist.`}
-                />
+            <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+              {/*
+                DER EINSTIEG WIE IN SCHRITT 3 DER BERATUNG: die Luecke als
+                Aussage im Titel, daneben der Schalter fuer das Geld, in dem
+                gerechnet wird. Ohne Ergebnis der ruhige Titel.
+              */}
+              {ergebnis
+                ? <ErgebnisKopf zeile={zeile} kaufkraftHeute={kaufkraftHeute} onKaufkraftHeute={setKaufkraftHeute} />
+                : (
+                  <EtappenKopf
+                    titel={`${t.Dein()} Ergebnis`}
+                    text={`Was ${t.dir} im Ruhestand netto bleibt — nach Steuern und Krankenversicherung — und wie groß die Lücke zu ${t.dein('em')} Ziel ist.`}
+                  />
+                )}
+              {/* Was die Zahlen darunter bestimmt — wessen Fall, welches Jahr — steht vor ihnen. */}
+              {(paarUmschalter || jahrRegler) && (
+                <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
+                  {paarUmschalter}
+                  {jahrRegler}
+                </div>
               )}
-            {/* Was die Zahlen darunter bestimmt — wessen Fall, welches Jahr — steht vor ihnen. */}
-            {(paarUmschalter || jahrRegler) && (
-              <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
-                {paarUmschalter}
-                {jahrRegler}
-              </div>
-            )}
-            {beispielHinweis}
-            {ergebnis ? (
-              <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
-                {/* flex + gap statt space-y: Ein ausgeblendetes Kind bekaeme
-                    sonst trotzdem seinen Abstand, und die Spalten begannen
-                    nicht auf einer Hoehe. */}
-                <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
-                  {/* Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz. */}
-                  <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} />
-                  {/*
-                    DIE ZAHLEN FUER DAS GESPRAECH: links unter dem Ring, was die
-                    Luecke bedeutet; rechts die Aufstellung (Kassenbon oder
-                    Verlauf) und darunter Luecke und Kaufkraftverlust in Euro
-                    — so stehen beide Spalten ungefaehr gleich hoch. Nicht
-                    mitlaufend (sticky): Die Karten sind hoeher als der
-                    Bildschirm.
-                  */}
-                  <LueckeBedeutung
-                    zeile={zeile}
-                    kaufkraftHeute={kaufkraftHeute}
-                    onSparen={() => geheZu('sparen')}
-                    nettoHeute={nettoHeute}
-                  />
-                  <SteuerEngine ergebnis={ergebnis} zeile={zeile} faktor={faktor} />
-                  {/*
-                    Die Praemie im Ruhestand ist fuer einen privat Versicherten
-                    oft der groesste einzelne Posten der Luecke. Bei gesetzlich
-                    Versicherten faellt der Block stillschweigend weg.
-                  */}
-                  <PkvRechner zeile={zeile} />
-                </div>
-                <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-7">
-                  {/* Zwei Ansichten derselben Zahlen — als Pillen wie die Reiter der Beratung.
-                      Die Huelle haelt sie so breit wie ihr Inhalt; die Spalte zoege sie sonst auf volle Breite. */}
-                  <div>
-                  <Pillen
-                    reiter={[
-                      { id: 'kassenbon' as const, inhalt: <span className="inline-flex items-center gap-1.5"><List className="h-4 w-4" aria-hidden /> Kassenbon</span> },
-                      { id: 'verlauf' as const, inhalt: <span className="inline-flex items-center gap-1.5"><TrendingUp className="h-4 w-4" aria-hidden /> Verlauf</span> },
-                    ]}
-                    aktiv={ansicht}
-                    onWechsel={setAnsicht}
-                    beschriftung="Aufstellung oder Verlauf"
-                    kennung={(id) => ({ reiter: `ansicht-reiter-${id}`, bereich: `ansicht-${id}` })}
-                  />
-                  </div>
-
-                  {/*
-                    Der Schalter „Nominal | Kaufkraft heute“ steht im Titel und
-                    in der Fussleiste; der Kassenbon nennt nur, in welchem Geld
-                    er rechnet — ein dritter Schalter waere einer zu viel.
-                  */}
-                  <div id="ansicht-kassenbon" role="tabpanel" aria-labelledby="ansicht-reiter-kassenbon"
-                    className={ansicht === 'kassenbon' ? 'block' : 'hidden'}>
-                    <Kassenbon
-                      ergebnis={ergebnis}
-                      zeile={zeile}
-                      szenario={ansichtSzenario}
-                      kaufkraftHeute={kaufkraftHeute}
-                      person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
-                    />
-                  </div>
-                  <div id="ansicht-verlauf" role="tabpanel" aria-labelledby="ansicht-reiter-verlauf"
-                    className={ansicht === 'verlauf' ? 'block' : 'hidden'}>
-                    <Verlauf ergebnis={ergebnis} kaufkraftHeute={kaufkraftHeute} />
-                  </div>
-
-                  <KaufkraftKarte
-                    zeile={zeile}
-                    inflation={szenario.annahmen.inflation}
-                    standard={offenePfade(szenario).includes('annahmen.inflation')}
-                  />
-                  <Rechtsstand
-                    ergebnis={ergebnis}
-                    tarifIndex={szenario.annahmen.tarifIndex}
-                    rentendynamik={szenario.annahmen.rentendynamik}
-                    inflation={szenario.annahmen.inflation}
-                  />
-                </div>
-              </div>
-            ) : rechnetText}
-            <JourneyWeiter
-              etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu}
-              weiterText={luecke > 0 ? 'Was kostet es, die Lücke zu schließen?' : undefined}
-            />
+              {beispielHinweis}
+            </div>
+            {/* Eins nach dem anderen: die Luecke, woher das Netto kommt, die Kaufkraft, was zu tun waere. */}
+            <Stuecke kennung="ergebnis" beschriftung="Stücke des Ergebnisses" stuecke={ergebnis ? ergebnisStuecke : wartet} />
           </>
         )}
 
         {/* ---------- 3. SPARRECHNER ---------- */}
         {schritt === 'sparen' && (
           <>
-            {/*
-              Der Titel sagt, was der Sparrechner darunter ausrechnet: den
-              Beitrag ab heute — er folgt seinen Annahmen. Ohne Luecke oder
-              Ergebnis der ruhige Titel.
-            */}
-            <EtappenKopf
-              titel={ergebnis && luecke > 0 && sparrate !== null
-                ? <>{t.anrede('mit')} <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(sparrate)}</Hervor></span> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke</>
-                : 'Die Lücke schließen'}
-              text={`Wie viel ${t.du} ab heute monatlich zurücklegen ${t.w('müsstest', 'müsstet')}, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten.`}
-            />
-            {paarUmschalter}
-            {beispielHinweis}
+            <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+              {/*
+                Der Titel sagt, was der Sparrechner darunter ausrechnet: den
+                Beitrag ab heute — er folgt seinen Annahmen. Ohne Luecke oder
+                Ergebnis der ruhige Titel.
+              */}
+              <EtappenKopf
+                titel={ergebnis && luecke > 0 && sparrate !== null
+                  ? <>{t.anrede('mit')} <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(sparrate)}</Hervor></span> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke</>
+                  : 'Die Lücke schließen'}
+                text={`Wie viel ${t.du} ab heute monatlich zurücklegen ${t.w('müsstest', 'müsstet')}, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten.`}
+              />
+              {paarUmschalter}
+              {beispielHinweis}
+            </div>
             {ergebnis
               ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
-              : rechnetText}
-            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} weiterText="Womit? Lösungen vergleichen" />
+              : <Stuecke kennung="sparen" beschriftung="Stücke des Sparrechners" stuecke={wartet} />}
           </>
         )}
 
         {/* ---------- 4. VERTRAGS-TUEV & LOESUNGEN ---------- */}
         {schritt === 'loesungen' && (
           <>
-            <EtappenKopf
-              titel="Vertrags-TÜV & Lösungen"
-              text={`Was bestehende Verträge wirklich leisten — und was aus jedem Euro wird, den ${t.du} neu in die Altersvorsorge ${t.w('steckst', 'steckt')}.`}
-            />
-            {paarUmschalter}
-            {beispielHinweis}
+            <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+              <EtappenKopf
+                titel="Vertrags-TÜV & Lösungen"
+                text={`Was aus jedem Euro wird, den ${t.du} neu in die Altersvorsorge ${t.w('steckst', 'steckt')} — und was bestehende Verträge wirklich leisten.`}
+              />
+              {paarUmschalter}
+              {beispielHinweis}
+            </div>
             {/*
               ZWEI FRAGEN in dieser Etappe: Womit schliesse ich die Luecke
-              (neue Loesungen und Angebote) — und taugt, was ich schon habe
-              (bestehende Vertraege)? Die erste ist die der Beratung, die
-              zweite die Pruefung auf Wunsch.
+              (neue Loesungen, dann die Angebote dazu) — und taugt, was ich
+              schon habe (bestehende Vertraege)? Die erste ist der Weg der
+              Beratung, die zweite die Pruefung auf Wunsch: eine Vertiefung.
             */}
-            {/* Als Pillen wie die Reiter der Beratung; der Bereich darunter ohne eigene Breite. */}
-            <Pillen
-              // Am Telefon kurz — die langen Namen braechen die Pillen in zwei Reihen.
-              reiter={[
-                { id: 'loesungen' as const, inhalt: <><span className="sm:hidden">Lösungen</span><span className="hidden sm:inline">Lösungen & Angebote</span></> },
-                { id: 'tuev' as const, inhalt: <><span className="sm:hidden">Verträge prüfen</span><span className="hidden sm:inline">Bestehende Verträge prüfen</span></> },
-              ]}
-              aktiv={tuevReiter}
-              onWechsel={setTuevReiter}
-              beschriftung="Lösungen oder bestehende Verträge"
-              kennung={(id) => ({ reiter: `tuev-reiter-${id}`, bereich: 'tuev-bereich' })}
-            />
-            <div id="tuev-bereich" role="tabpanel" aria-labelledby={`tuev-reiter-${tuevReiter}`}>
-              {tuevReiter === 'loesungen'
-                ? (
-                  <Loesungen
-                    zeile={ergebnis ? zeile : null}
-                    szenario={ansichtSzenario}
-                    sparrate={sparrate}
-                    nettoHeute={nettoHeute}
-                    onAnnehmen={() => geheZu('abschluss')}
-                  />
-                )
-                : <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />}
-            </div>
-            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
+            <Stuecke kennung="loesungen" beschriftung="Stücke der Lösungen" stuecke={loesungenStuecke} />
           </>
         )}
 
         {/* ---------- 5. ABSCHLUSS ---------- */}
         {schritt === 'abschluss' && (
-          <>
-            <Abschluss
-              mit={mitAnsicht}
-              positionen={positionenMit}
-              ergebnisMit={ergebnisMit}
-              vorher={ergebnis ? zeile : null}
-              kaufkraftHeute={kaufkraftHeute}
-              onKaufkraftHeute={setKaufkraftHeute}
-              person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
-              inhaberName={paar && !einzeln ? nameVon : undefined}
-              vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
-              onZuLoesungen={() => { setTuevReiter('loesungen'); geheZu('loesungen'); }}
-            />
-            {/* Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt. */}
-            {mitHaushalt.loesungen.length > 0 && (
-              <Antragsangaben
-                antragId={szenario.loesungen.antrag}
-                loesungen={antragLoesungen}
-                kundeVorschlag={kundeVorschlag}
-                angemeldet={checkMoeglich}
-                onKonto={() => setKontoOffen(true)}
-                berater={beraterZeile}
-              />
-            )}
-            <JourneyWeiter etappen={ETAPPEN} aktiv={schritt} onWechsel={geheZu} />
-          </>
+          <Abschluss
+            mit={mitAnsicht}
+            positionen={positionenMit}
+            ergebnisMit={ergebnisMit}
+            vorher={ergebnis ? zeile : null}
+            kaufkraftHeute={kaufkraftHeute}
+            onKaufkraftHeute={setKaufkraftHeute}
+            person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
+            inhaberName={paar && !einzeln ? nameVon : undefined}
+            vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
+            onZuLoesungen={zuDenAngeboten}
+            // Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt.
+            danach={mitHaushalt.loesungen.length > 0 ? [{
+              id: 'antrag',
+              titel: 'Angaben für den Antrag',
+              ergebnis: szenario.loesungen.antrag ? 'Antrag angelegt' : 'Noch nicht angelegt',
+              inhalt: (
+                <Antragsangaben
+                  antragId={szenario.loesungen.antrag}
+                  loesungen={antragLoesungen}
+                  kundeVorschlag={kundeVorschlag}
+                  angemeldet={checkMoeglich}
+                  onKonto={() => setKontoOffen(true)}
+                  berater={beraterZeile}
+                />
+              ),
+            }] : []}
+          />
         )}
+
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        </AblaufGeber>
 
         {/* Nur waehrend gerechnet wird. „berechnet in 6 ms“ war ein Hinweis
             fuer Entwickler — fuer Berater Rauschen unter jeder Seite. */}
@@ -1547,7 +1790,7 @@ export default function App() {
           durch Tinte, nicht durch Rot oder Gruen; „Gedeckt“ steht in
           derselben Kachel.
         */
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-ui-linie bg-ui-karte shadow-[0_-4px_16px_rgba(0,0,0,0.05)] print:hidden">
+        <aside aria-label="Zielbedarf, Netto und Versorgungslücke" className="fixed bottom-0 left-0 right-0 z-50 border-t border-ui-linie bg-ui-karte shadow-[0_-4px_16px_rgba(0,0,0,0.05)] print:hidden">
           {/*
             Die Rechenzeichen "−" und "=" entfallen auf dem Telefon. Sie
             erklaeren einen Zusammenhang, den die drei Zahlen von links nach
@@ -1577,7 +1820,7 @@ export default function App() {
               <KaufkraftSchalter wert={kaufkraftHeute} onChange={setKaufkraftHeute} klasse="hidden md:ml-auto md:inline-flex" />
             </div>
           </div>
-        </div>
+        </aside>
       )}
     </div>
     </AnspracheGeben>

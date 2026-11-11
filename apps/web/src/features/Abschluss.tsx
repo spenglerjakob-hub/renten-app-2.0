@@ -5,6 +5,7 @@ import { useAnsprache } from '../components/Ansprache';
 import { euro } from '../components/Feld';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { EINLEITUNG, Hervor, KNOPF_ZWEIT, LINK, Posten, Titel } from '../components/stil';
+import { SPALTE, Stuecke, type Stueck } from '../components/Ablauf';
 import { ErgebnisRing } from './ErgebnisKern';
 import { Kassenbon, NEU_TEXT } from './Kassenbon';
 import {
@@ -17,9 +18,11 @@ import {
  *
  * Gerechnet ist es in `mitAngenommenen`: alle angenommenen Angebote
  * gemeinsam zu den bestehenden Vertraegen, nicht jedes fuer sich wie im
- * Vergleich. Gezeigt wie die Etappe „Ergebnis“ — der Ring links, der
- * Kassenbon rechts —, dazu vorher und nachher und die gewaehlten Loesungen.
- * Was neu dazugekommen ist, traegt die Marke „Neu – bisher nicht enthalten“.
+ * Vergleich. Gezeigt in Stuecken wie die Etappe „Ergebnis“
+ * (`components/Ablauf`): erst der Ring mit vorher und nachher, dann die
+ * gewaehlten Loesungen, am Ende die Angaben fuer den Antrag. Der Kassenbon
+ * ist eine Vertiefung. Was neu dazugekommen ist, traegt die Marke
+ * „Neu – bisher nicht enthalten“.
  */
 
 const zeileIm = (e: ProjektionsErgebnis, jahr: number) =>
@@ -30,6 +33,7 @@ const deckung = (z: Jahreszeile) => (z.zielNettoMonat > 0 ? Math.min(100, Math.r
 
 export function Abschluss({
   mit, positionen, ergebnisMit, vorher, kaufkraftHeute, onKaufkraftHeute, person, inhaberName, vorspann, onZuLoesungen,
+  danach = [],
 }: {
   /** Die angenommenen Loesungen der Ansicht (`ansichtMitAngenommenen`) — null, wenn dort nichts angenommen ist */
   mit: MitAngenommenen | null;
@@ -47,6 +51,8 @@ export function Abschluss({
   /** Umschalter und Beispielhinweis der Etappe — unter dem Titel */
   vorspann?: ReactNode;
   onZuLoesungen: () => void;
+  /** Weitere Stuecke am Ende des Wegs — die Angaben fuer den Antrag */
+  danach?: readonly Stueck[];
 }) {
   const zeileMit = ergebnisMit && vorher ? zeileIm(ergebnisMit, vorher.jahr) : null;
   const f = zeileMit && kaufkraftHeute ? 1 / zeileMit.kaufkraftfaktor : 1;
@@ -57,75 +63,104 @@ export function Abschluss({
   if (!mit) {
     return (
       <>
-        <div>
-          <Titel gross als="h2">{t.Dein()} Ergebnis mit den gewählten Lösungen</Titel>
-          <p className={`mt-3 ${EINLEITUNG}`}>
-            Hier steht {t.dein()} Ergebnis noch einmal — mit den Lösungen, {angenommen}.
-          </p>
+        <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+          <div>
+            <Titel gross als="h2">{t.Dein()} Ergebnis mit den gewählten Lösungen</Titel>
+            <p className={`mt-3 ${EINLEITUNG}`}>
+              Hier steht {t.dein()} Ergebnis noch einmal — mit den Lösungen, {angenommen}.
+            </p>
+          </div>
+          {vorspann}
+          <div className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
+            <p>
+              {person ? `Für ${person} ist noch keine Lösung angenommen.` : 'Noch ist keine Lösung angenommen.'}{' '}
+              Dazu in „Vertrags-TÜV & Lösungen“ bei den Angeboten das Häkchen „Annehmen“ setzen.
+            </p>
+            <button type="button" onClick={onZuLoesungen} className={`mt-4 ${KNOPF_ZWEIT}`}>
+              Zu den Angeboten <ArrowRight className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
-        {vorspann}
-        <div className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          <p>
-            {person ? `Für ${person} ist noch keine Lösung angenommen.` : 'Noch ist keine Lösung angenommen.'}{' '}
-            Dazu in „Vertrags-TÜV & Lösungen“ bei den Angeboten das Häkchen „Annehmen“ setzen.
-          </p>
-          <button type="button" onClick={onZuLoesungen} className={`mt-4 ${KNOPF_ZWEIT}`}>
-            Zu den Angeboten <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
+        {/* In der Einzelbetrachtung kann der Haushalt trotzdem etwas angenommen haben — der Antrag gehoert zum Plan. */}
+        {danach.length > 0 && <Stuecke kennung="abschluss" beschriftung="Stücke des Abschlusses" stuecke={danach} />}
       </>
     );
   }
 
+  const stuecke: Stueck[] = zeileMit && vorher && ergebnisMit ? [
+    {
+      id: 'ergebnis',
+      titel: `${t.Dein()} Ergebnis mit den Lösungen`,
+      ergebnis: lueckeMit > 0
+        ? `Noch ${euro(lueckeMit * f)} Lücke, Ziel zu ${deckung(zeileMit)} % erreicht`
+        : `Netto ${euro(zeileMit.nettoMonat * f)} — das Ziel ist gedeckt`,
+      inhalt: (
+        <div className="flex flex-col gap-5 sm:gap-6">
+          {/* Blau im Ring: was die gewaehlten Loesungen dazubringen — gegen das Ergebnis ohne sie. */}
+          <ErgebnisRing zeile={zeileMit} vorher={vorher} kaufkraftHeute={kaufkraftHeute} breit />
+          <VorherNachher vorher={vorher} nachher={zeileMit} kaufkraftHeute={kaufkraftHeute} ergebnisMit={ergebnisMit} neu={mit.neu} />
+        </div>
+      ),
+    },
+    {
+      id: 'gewaehlt',
+      titel: `${t.Dein('e')} gewählten Lösungen`,
+      ergebnis: mit.loesungen.length === 1 ? '1 Lösung' : `${mit.loesungen.length} Lösungen`,
+      inhalt: (
+        <GewaehlteLoesungen
+          mit={mit}
+          positionen={positionen}
+          inhaberName={inhaberName}
+          onZuLoesungen={onZuLoesungen}
+        />
+      ),
+    },
+    ...danach,
+    {
+      id: 'netto',
+      vertiefung: true,
+      titel: `Woher ${t.dein()} Netto jetzt kommt`,
+      ergebnis: `${euro(zeileMit.nettoMonat * f)} netto im Monat`,
+      inhalt: (
+        <Kassenbon
+          ergebnis={ergebnisMit}
+          zeile={zeileMit}
+          szenario={mit.szenario}
+          kaufkraftHeute={kaufkraftHeute}
+          person={person}
+          neu={mit.neu}
+        />
+      ),
+    },
+  ] : [
+    { id: 'rechnet', titel: 'Berechnung', inhalt: <p className="ui-karte px-4 py-8 text-center text-sm text-ui-schiefer">Berechnung läuft …</p> },
+    ...danach,
+  ];
+
   return (
     <>
-      <div>
-        <Titel gross als="h2">
-          {/* Der Kernsatz mit dem Vornamen vorn: „Max, mit den gewählten Lösungen fehlen dir noch …“ */}
-          {!zeileMit
-            ? `${t.Dein()} Ergebnis mit den gewählten Lösungen`
-            : lueckeMit > 0
-              ? <>{t.anrede('mit')} den gewählten Lösungen fehlen {t.dir} noch <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeMit * f)}</Hervor></span> im Monat</>
-              : <>{t.anrede('mit')} den gewählten Lösungen ist {t.dein()} Ziel <Hervor>gedeckt</Hervor></>}
-        </Titel>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <p className={`${EINLEITUNG} min-w-0 flex-1 basis-72`}>
-            {t.Dein()} Ergebnis noch einmal, jetzt mit den Lösungen, {angenommen} — gemeinsam
-            gerechnet, mit der Steuer auf alle Renten zusammen. Was dazugekommen ist, trägt die Marke
-            „{NEU_TEXT}“.
-          </p>
-          <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} />
+      <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+        <div>
+          <Titel gross als="h2">
+            {/* Der Kernsatz mit dem Vornamen vorn: „Max, mit den gewählten Lösungen fehlen dir noch …“ */}
+            {!zeileMit
+              ? `${t.Dein()} Ergebnis mit den gewählten Lösungen`
+              : lueckeMit > 0
+                ? <>{t.anrede('mit')} den gewählten Lösungen fehlen {t.dir} noch <span className="whitespace-nowrap tabular-nums"><Hervor>{euro(lueckeMit * f)}</Hervor></span> im Monat</>
+                : <>{t.anrede('mit')} den gewählten Lösungen ist {t.dein()} Ziel <Hervor>gedeckt</Hervor></>}
+          </Titel>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <p className={`${EINLEITUNG} min-w-0 flex-1 basis-72`}>
+              {t.Dein()} Ergebnis noch einmal, jetzt mit den Lösungen, {angenommen} — gemeinsam
+              gerechnet, mit der Steuer auf alle Renten zusammen. Was dazugekommen ist, trägt die Marke
+              „{NEU_TEXT}“.
+            </p>
+            <KaufkraftSchalter wert={kaufkraftHeute} onChange={onKaufkraftHeute} />
+          </div>
         </div>
+        {vorspann}
       </div>
-      {vorspann}
-      {zeileMit && vorher && ergebnisMit ? (
-        <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
-          <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
-            {/* Blau im Ring: was die gewaehlten Loesungen dazubringen — gegen das Ergebnis ohne sie. */}
-            <ErgebnisRing zeile={zeileMit} vorher={vorher} kaufkraftHeute={kaufkraftHeute} />
-            <VorherNachher vorher={vorher} nachher={zeileMit} kaufkraftHeute={kaufkraftHeute} ergebnisMit={ergebnisMit} neu={mit.neu} />
-          </div>
-          {/* Rechts die Aufstellung und darunter, was gewaehlt ist — so stehen beide Spalten etwa gleich hoch. */}
-          <div className="flex flex-col gap-5 sm:gap-6 lg:col-span-7">
-            <Kassenbon
-              ergebnis={ergebnisMit}
-              zeile={zeileMit}
-              szenario={mit.szenario}
-              kaufkraftHeute={kaufkraftHeute}
-              person={person}
-              neu={mit.neu}
-            />
-            <GewaehlteLoesungen
-              mit={mit}
-              positionen={positionen}
-              inhaberName={inhaberName}
-              onZuLoesungen={onZuLoesungen}
-            />
-          </div>
-        </div>
-      ) : (
-        <p className="ui-karte px-4 py-8 text-center text-sm text-ui-schiefer">Berechnung läuft …</p>
-      )}
+      <Stuecke kennung="abschluss" beschriftung="Stücke des Abschlusses" stuecke={stuecke} />
     </>
   );
 }

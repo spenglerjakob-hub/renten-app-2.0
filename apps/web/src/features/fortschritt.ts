@@ -85,7 +85,7 @@ export function fallFortschritt(
   ];
 }
 
-/** Sind die Angaben der ersten Etappe vollstaendig? Fuer den Haken in der Etappen-Leiste. */
+/** Sind die Angaben der ersten Etappe vollstaendig? Fuer den Haken in der Zeile der Etappe. */
 export function datenErledigt(schritte: readonly FallSchritt[]): boolean {
   return schritte
     .filter((x) => x.id === 'mandant' || x.id === 'einkuenfte' || x.id === 'vertraege' || x.id === 'ziel')

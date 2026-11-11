@@ -72,11 +72,13 @@ export function ErgebnisKopf({ zeile, kaufkraftHeute, onKaufkraftHeute }: {
  * Mit `vorher` (Etappe „Abschluss“) ist der Teil blau, den die gewaehlten Loesungen
  * dazubringen, und unter dem Netto steht „davon … neu durch die Lösungen“.
  */
-export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
+export function ErgebnisRing({ zeile, kaufkraftHeute, vorher, breit = false }: {
   zeile: Jahreszeile;
   kaufkraftHeute: boolean;
   /** Dieselbe Zeile ohne die gewaehlten Loesungen — im selben Jahr */
   vorher?: Jahreszeile;
+  /** Als eigenes Stueck ueber die Spalte des Ablaufs: ab mittlerer Breite der Ring links, die Zahlen daneben */
+  breit?: boolean;
 }) {
   const { f, g, luecke, deckung } = betraege(zeile, kaufkraftHeute);
   const ziel = zeile.zielNettoMonat * f;
@@ -90,9 +92,9 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher }: {
     : undefined;
   return (
     <section aria-label="Ziel, Netto und Lücke" className={`${SCHWEBEND} p-5 sm:p-7`}>
-      {/* Der Ring oben, die Zahlen darunter nebeneinander: In der schmalen Spalte des
-          Ergebnisses braechen sie neben dem Ring um. */}
-      <div className="flex flex-col items-center gap-6">
+      {/* Der Ring oben, die Zahlen darunter nebeneinander: In einer schmalen Spalte
+          braechen sie neben dem Ring um. Als breites Stueck steht der Ring links. */}
+      <div className={`flex flex-col items-center gap-6 ${breit ? 'md:flex-row md:gap-10' : ''}`}>
         <LueckenRing
           ganz={ziel} gedeckt={Math.min(netto, ziel)} luecke={luecke * f}
           gedecktProzent={Math.min(100, deckung)} lueckeProzent={Math.max(0, 100 - deckung)} texte={{ ganz: 'Ziel', mitte: `${t.Dein()} Ziel`, gedeckt: 'Netto im Ruhestand' }}
