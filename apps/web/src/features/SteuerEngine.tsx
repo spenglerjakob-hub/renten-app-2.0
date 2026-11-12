@@ -23,13 +23,15 @@ function Kachel({ titel, wert, erklaerung }: { titel: string; wert: string; erkl
  * einklappbare Karte wie die anderen, die Zahlen einfarbig.
  */
 export function SteuerEngine({
-  ergebnis, zeile, faktor,
+  ergebnis, zeile, faktor, anfangsOffen = false,
 }: {
   ergebnis: ProjektionsErgebnis;
   zeile: Jahreszeile;
   faktor: number;
+  /** Als eigenes Stueck des Ablaufs steht die Karte gleich offen da — sie wurde ja eben geoeffnet */
+  anfangsOffen?: boolean;
 }) {
-  const [offen, setOffen] = useState(false);
+  const [offen, setOffen] = useState(anfangsOffen);
   const t = useAnsprache();
   // Der Selektor darf NICHTS erzeugen: `personen` ist eine stabile Referenz,
   // ein neues Array bei jedem Aufruf hielte zustand fuer eine Aenderung und

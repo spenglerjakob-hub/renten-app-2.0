@@ -44,7 +44,7 @@ const LOESUNG_TEXT: Record<LoesungId, string> = {
 const zahl = (n: number, stellen = 2) =>
   n.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen });
 
-export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehmen }: {
+export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onErfasst }: {
   zeile: Jahreszeile | null;
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
   nettoHeute?: number;
@@ -52,8 +52,8 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehme
   szenario: SzenarioParsed;
   /** Der Startbeitrag aus dem Sparrechner, falls es eine Luecke gibt */
   sparrate: number | null;
-  /** „Lösungen annehmen“ — weiter zur Etappe „Abschluss“ */
-  onAnnehmen?: () => void;
+  /** Ein Angebot ist erfasst — weiter zu den Angeboten, dort wird die Rente des Anbieters eingetragen */
+  onErfasst?: () => void;
 }) {
   const t = useAnsprache();
   const l = szenario.loesungen;
@@ -84,118 +84,117 @@ export function Loesungen({ zeile, szenario, sparrate, nettoHeute = 0, onAnnehme
       : { agZuschussArt: art });
   };
 
-  const erfassen = (x: Loesung) => angebotHinzufuegen({
-    loesung: x.id,
-    name: '',
-    inhaber: 'A',
-    beitragMonat: Math.round(x.eigenbeitragMonat),
-    agZuschussMonat: Math.round(x.agZuschussMonat * 100) / 100,
-    dynamik: 0,
-    renteMonat: 0,
-    kapital: 0,
-  });
+  const erfassen = (x: Loesung) => {
+    angebotHinzufuegen({
+      loesung: x.id,
+      name: '',
+      inhaber: 'A',
+      beitragMonat: Math.round(x.eigenbeitragMonat),
+      agZuschussMonat: Math.round(x.agZuschussMonat * 100) / 100,
+      dynamik: 0,
+      renteMonat: 0,
+      kapital: 0,
+    });
+    onErfasst?.();
+  };
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <section aria-labelledby="loesungen-titel">
-        {/* Die Frage des Abschnitts als Titel in Inter Tight, der Betrag darin hervorgehoben. */}
-        <div className="mb-6">
-          <Titel als="h2" id="loesungen-titel" klasse="flex items-center gap-3">
-            <Scale className="h-6 w-6 shrink-0 text-ui-schiefer" aria-hidden />
-            <span>
-              {brutto
-                ? <>Was kosten <Hervor>{euro(betrag)}</Hervor> Beitrag im Monat netto?</>
-                : <>Was wird aus <Hervor>{euro(betrag)}</Hervor> netto im Monat?</>}
-            </span>
-          </Titel>
-          <p className={`mt-2 ${EINLEITUNG}`}>
+    <section aria-labelledby="loesungen-titel">
+      {/* Die Frage des Abschnitts als Titel in Inter Tight, der Betrag darin hervorgehoben. */}
+      <div className="mb-6">
+        <Titel als="h2" id="loesungen-titel" klasse="flex items-center gap-3">
+          <Scale className="h-6 w-6 shrink-0 text-ui-schiefer" aria-hidden />
+          <span>
             {brutto
-              ? `Derselbe Beitrag in jeder Schicht — und was er ${t.dich} nach Steuer- und Abgabenersparnis wirklich `
-                + `kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
-                + 'Steuersatz, nicht mit einem Durchschnitt.'
-              : `Je Schicht der Beitrag, der ${t.dich} nach Steuer- und Abgabenersparnis genau diesen Betrag kostet — `
-                + `und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
-                + 'Steuersatz, nicht mit einem Durchschnitt.'}
-          </p>
-        </div>
-
-        {/*
-          Der Schalter steht ueber den Feldern, nicht in der ersten Spalte: So
-          beginnen alle Felder auf einer Hoehe. Hilfetexte stehen darunter und
-          verschieben nichts.
-        */}
-        <div className="ui-karte mb-6 p-5 sm:p-7">
-          <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <ZahlFeld
-                label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
-                wert={betrag}
-                onChange={(n) => setzeLoesungen(brutto ? { bruttoMonat: n } : { nettoMonat: n })}
-                einheit="€"
-                schritt={25}
-                max={10_000}
-                hilfe={brutto ? 'Bei der Betriebsrente die Bruttoumwandlung, beim Altersvorsorgedepot der Eigenbeitrag.' : undefined}
-              />
-              {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - betrag) > 0.5 && (
-                <button
-                  type="button"
-                  onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
-                  className={`mt-1.5 text-left ${LINK} text-xs`}
-                >
-                  Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
-                </button>
-              )}
-            </div>
-            {bav && (
-              <ZahlFeld
-                label="Arbeitgeberzuschuss zur bAV"
-                wert={festbetrag ? l.agZuschussFestMonat : Math.round(l.agZuschussQuote * 1000) / 10}
-                onChange={(n) => setzeLoesungen(festbetrag
-                  ? { agZuschussFestMonat: n }
-                  : { agZuschussQuote: Math.max(0.15, n / 100) })}
-                min={festbetrag ? 0 : 15}
-                max={festbetrag ? 5_000 : 100}
-                einheitWahl={{ optionen: ZUSCHUSS_EINHEITEN, aktiv: l.agZuschussArt, onWechsel: zuschussArtWechseln }}
-                hilfe={festbetrag
-                  ? 'Fester Betrag im Monat. Mindestens gilt der gesetzliche Zuschuss: 15 % der Umwandlung, '
-                    + 'soweit der Arbeitgeber Abgaben spart.'
-                  : 'Mindestens die gesetzlichen 15 %. Bei einem Zuschussmodell etwa 50 %.'}
-              />
-            )}
-            <ZahlFeld
-              label="Lebenserwartung (für die Angebote)"
-              wert={l.lebenserwartung}
-              onChange={(n) => setzeLoesungen({ lebenserwartung: n })}
-              min={60}
-              max={120}
-              einheit="J."
-              stufen
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
-          {loesungen.map((x) => (
-            <LoesungsKarte
-              key={x.id}
-              x={x}
-              brutto={brutto}
-              bester={auszeichnung.meiste.includes(x.id)}
-              guenstigste={auszeichnung.guenstigste.includes(x.id)}
-              onErfassen={() => erfassen(x)}
-              nettoHeute={nettoHeute}
-            />
-          ))}
-        </div>
-        <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
-          Das ist die Einzahlseite. Was im Alter davon netto ankommt, hängt am Angebot — an der Rente,
-          die der Anbieter nennt, und an Steuer und Krankenversicherung. Das rechnet der Vergleich darunter.
+              ? <>Was kosten <Hervor>{euro(betrag)}</Hervor> Beitrag im Monat netto?</>
+              : <>Was wird aus <Hervor>{euro(betrag)}</Hervor> netto im Monat?</>}
+          </span>
+        </Titel>
+        <p className={`mt-2 ${EINLEITUNG}`}>
+          {brutto
+            ? `Derselbe Beitrag in jeder Schicht — und was er ${t.dich} nach Steuer- und Abgabenersparnis wirklich `
+              + `kostet. Dazu, was im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
+              + 'Steuersatz, nicht mit einem Durchschnitt.'
+            : `Je Schicht der Beitrag, der ${t.dich} nach Steuer- und Abgabenersparnis genau diesen Betrag kostet — `
+              + `und was dann im Vertrag landet: mit Zulagen, Arbeitgeberzuschuss und ${t.dein('em')} persönlichen `
+              + 'Steuersatz, nicht mit einem Durchschnitt.'}
         </p>
-      </section>
+      </div>
 
-      <Angebote szenario={szenario} nettoHeute={nettoHeute} onAnnehmen={onAnnehmen} />
-    </div>
+      {/*
+        Der Schalter steht ueber den Feldern, nicht in der ersten Spalte: So
+        beginnen alle Felder auf einer Hoehe. Hilfetexte stehen darunter und
+        verschieben nichts.
+      */}
+      <div className="ui-karte mb-6 p-5 sm:p-7">
+        <VorgabeSchalter wert={l.vorgabe} onWechsel={(v) => setzeLoesungen({ vorgabe: v })} />
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <ZahlFeld
+              label={brutto ? 'Brutto-Beitrag im Monat' : 'Netto-Aufwand im Monat'}
+              wert={betrag}
+              onChange={(n) => setzeLoesungen(brutto ? { bruttoMonat: n } : { nettoMonat: n })}
+              einheit="€"
+              schritt={25}
+              max={10_000}
+              hilfe={brutto ? 'Bei der Betriebsrente die Bruttoumwandlung, beim Altersvorsorgedepot der Eigenbeitrag.' : undefined}
+            />
+            {sparrate !== null && sparrate > 0.5 && Math.abs(sparrate - betrag) > 0.5 && (
+              <button
+                type="button"
+                onClick={() => setzeLoesungen(brutto ? { bruttoMonat: Math.round(sparrate) } : { nettoMonat: Math.round(sparrate) })}
+                className={`mt-1.5 text-left ${LINK} text-xs`}
+              >
+                Sparrate aus dem Sparrechner übernehmen ({euro(sparrate)})
+              </button>
+            )}
+          </div>
+          {bav && (
+            <ZahlFeld
+              label="Arbeitgeberzuschuss zur bAV"
+              wert={festbetrag ? l.agZuschussFestMonat : Math.round(l.agZuschussQuote * 1000) / 10}
+              onChange={(n) => setzeLoesungen(festbetrag
+                ? { agZuschussFestMonat: n }
+                : { agZuschussQuote: Math.max(0.15, n / 100) })}
+              min={festbetrag ? 0 : 15}
+              max={festbetrag ? 5_000 : 100}
+              einheitWahl={{ optionen: ZUSCHUSS_EINHEITEN, aktiv: l.agZuschussArt, onWechsel: zuschussArtWechseln }}
+              hilfe={festbetrag
+                ? 'Fester Betrag im Monat. Mindestens gilt der gesetzliche Zuschuss: 15 % der Umwandlung, '
+                  + 'soweit der Arbeitgeber Abgaben spart.'
+                : 'Mindestens die gesetzlichen 15 %. Bei einem Zuschussmodell etwa 50 %.'}
+            />
+          )}
+          <ZahlFeld
+            label="Lebenserwartung (für die Angebote)"
+            wert={l.lebenserwartung}
+            onChange={(n) => setzeLoesungen({ lebenserwartung: n })}
+            min={60}
+            max={120}
+            einheit="J."
+            stufen
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
+        {loesungen.map((x) => (
+          <LoesungsKarte
+            key={x.id}
+            x={x}
+            brutto={brutto}
+            bester={auszeichnung.meiste.includes(x.id)}
+            guenstigste={auszeichnung.guenstigste.includes(x.id)}
+            onErfassen={() => erfassen(x)}
+            nettoHeute={nettoHeute}
+          />
+        ))}
+      </div>
+      <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
+        Das ist die Einzahlseite. Was im Alter davon netto ankommt, hängt am Angebot — an der Rente,
+        die der Anbieter nennt, und an Steuer und Krankenversicherung. Das rechnet der Vergleich der Angebote.
+      </p>
+    </section>
   );
 }
 
@@ -280,7 +279,7 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
             Die weichen Trennstellen dazu, weil `hyphens-auto` am Woerterbuch des Browsers haengt —
             ohne es braeche das Wort ohne Strich mitten durch.
           */}
-          <h4 className="mt-0.5 break-words text-base font-medium leading-snug text-ui-tinte hyphens-auto">{mitTrennstellen(x.titel)}</h4>
+          <h3 className="mt-0.5 break-words text-base font-medium leading-snug text-ui-tinte hyphens-auto">{mitTrennstellen(x.titel)}</h3>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {guenstigste && (
@@ -372,8 +371,17 @@ function LoesungsKarte({ x, brutto, bester, guenstigste, onErfassen, nettoHeute 
 
 /* ---------------------------------------------------------------------- */
 
-function Angebote({ szenario, nettoHeute, onAnnehmen }: {
-  szenario: SzenarioParsed; nettoHeute: number; onAnnehmen?: () => void;
+/**
+ * Die Angebote zu den Loesungen: was der Anbieter nennt, gegen das, was es
+ * netto kostet — mit dem Haekchen „Annehmen“ und dem Knopf zum Abschluss.
+ * Ein eigenes Stueck der Etappe, nach dem Vergleich der Loesungen.
+ */
+export function Angebote({ szenario, nettoHeute = 0, onAnnehmen }: {
+  szenario: SzenarioParsed;
+  /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
+  nettoHeute?: number;
+  /** „Lösungen annehmen“ — weiter zur Etappe „Abschluss“ */
+  onAnnehmen?: () => void;
 }) {
   const angebote = szenario.loesungen.angebote;
   const t = useAnsprache();
@@ -399,7 +407,7 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
         <div>
           <Titel als="h2" id="angebote-titel">Angebote vergleichen</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            Mit den Beiträgen oben Angebote einholen und die Rente eintragen, die der Anbieter
+            Mit den Beiträgen aus dem Vergleich Angebote einholen und die Rente eintragen, die der Anbieter
             zum Rentenbeginn nennt — und, wo es sie gibt, die Kapitalabfindung. Gerechnet wird wie im
             Vertrags-TÜV: was das Angebot {t.dich} netto kostet, gegen das, was im Alter nach Steuer und
             Krankenversicherung ankommt.
@@ -421,8 +429,8 @@ function Angebote({ szenario, nettoHeute, onAnnehmen }: {
 
       {angebote.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
-          Noch kein Angebot erfasst. Über „Angebot mit diesem Beitrag erfassen“ oben lässt sich der
-          Beitrag einer Lösung als Ausgangspunkt übernehmen.
+          Noch kein Angebot erfasst. Über „Angebot mit diesem Beitrag erfassen“ im Vergleich der
+          Lösungen lässt sich der Beitrag einer Lösung als Ausgangspunkt übernehmen.
         </p>
       ) : (
         <>

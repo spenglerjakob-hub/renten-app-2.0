@@ -230,9 +230,8 @@ export function Seite() {
           <VertragsTuev
             ergebnis={ergebnis}
             szenario={szenario}
-            mitFoerdercheck={false}
             automatischGeprueft
-            mitEinkommen={hatEigene}
+            einkommen={hatEigene ? 'feld' : 'ohne'}
           />
 
           {/* Weiter in den Rechner — oder von vorn mit dem naechsten Kunden. */}

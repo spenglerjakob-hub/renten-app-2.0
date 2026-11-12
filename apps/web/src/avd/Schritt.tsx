@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ruhig } from '../lib/bewegung';
 
-/** Bewegung reduzieren? Dann ohne Animation, ohne sanftes Scrollen und ohne Wartezeiten. */
-export function ruhig(): boolean {
-  return typeof window !== 'undefined'
-    && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
-}
+export { ruhig };
 
 /**
  * EIN SCHRITT DER GEFUEHRTEN EINGABE — er blendet weich ein, statt hart zu

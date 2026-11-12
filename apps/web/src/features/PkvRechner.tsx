@@ -15,13 +15,17 @@ import { useAnsprache } from '../components/Ansprache';
  * alle Jahrzehnte. Diese Ansicht zeigt, was daraus tatsaechlich wird — und
  * die Stufe bei 61, an der der gesetzliche Zuschlag wegfaellt (§ 149 VAG).
  */
-export function PkvRechner({ zeile }: { zeile: Jahreszeile }) {
+export function PkvRechner({ zeile, anfangsOffen = false }: {
+  zeile: Jahreszeile;
+  /** Als Teil eines eben geoeffneten Stuecks steht die Karte gleich offen da */
+  anfangsOffen?: boolean;
+}) {
   const szenario = useSzenario((x) => x.szenario);
   const schmal = useSchmal();
   // Der Vertrag gehoert einer Person — sie per „du“; das Ziel dem Haushalt
   const t = useAnsprache();
   const e = t.einzeln;
-  const [offen, setOffen] = useState(false);
+  const [offen, setOffen] = useState(anfangsOffen);
 
   const r = useMemo(
     () => pkvRechnen(szenario, zeile),

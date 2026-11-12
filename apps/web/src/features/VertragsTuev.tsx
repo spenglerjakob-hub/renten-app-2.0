@@ -8,7 +8,6 @@ import {
 import { kenntKapitalwahl, kinderpoliceText, monatJahr } from './vertragsarten';
 import { EinkommenFelder } from './EinkommenFelder';
 import { personNameAus } from './personen';
-import { Foerdercheck } from './Foerdercheck';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, AkkordeonKarte, euro, euroGenau,
@@ -167,20 +166,23 @@ function WegZeile({ text, rente, kapital, hervor }: {
  * rechnet: was er netto wirklich kostet gegen das, was netto ankommt.
  */
 export function VertragsTuev({
-  ergebnis, szenario, mitFoerdercheck = true, automatischGeprueft = false, mitEinkommen = true,
+  ergebnis, szenario, automatischGeprueft = false, einkommen = 'feld',
 }: {
   ergebnis: ProjektionsErgebnis | null;
   szenario: SzenarioParsed;
-  /** Der Foerdercheck am Ende — die Vertragspruefung zeigt nur die Vertraege */
-  mitFoerdercheck?: boolean;
   /**
    * Jeder Vertrag steht in der Pruefung, ohne Auswahl: Die Vertragspruefung
    * legt die Eintraege selbst an. Dann gibt es weder die Auswahl oben noch
    * das Entfernen am Eintrag — entfernt wird der Vertrag selbst.
    */
   automatischGeprueft?: boolean;
-  /** Der Einkommensblock — entfaellt, wenn nur Kinderpolicen geprueft werden */
-  mitEinkommen?: boolean;
+  /**
+   * Woher das Einkommen kommt, mit dem gerechnet wird: aus dem Block hier
+   * (`feld`, die Vertragspruefung), aus den Angaben der ersten Etappe
+   * (`angaben`, der Rechner — dort stuenden dieselben Felder sonst zweimal)
+   * oder gar nicht (`ohne`, wenn nur Kinderpolicen geprueft werden).
+   */
+  einkommen?: 'feld' | 'angaben' | 'ohne';
 }) {
   const tuev = useSzenario((x) => x.szenario.tuev);
   const vertraege = useSzenario((x) => x.szenario.vertraege);
@@ -232,11 +234,17 @@ export function VertragsTuev({
         <div>
           <Titel als="h2">Vertrags-TÜV</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
-            {mitEinkommen ? (
+            {einkommen === 'feld' ? (
               <>
                 Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} tatsächlichen
                 Einkommen — es steht gleich darunter und lässt sich dort ändern — und mit der
                 Steuer, die genau dieser Vertrag auslöst, nicht mit einem Durchschnittssatz.
+              </>
+            ) : einkommen === 'angaben' ? (
+              <>
+                Hier stehen {a.dein('e')} Verträge nebeneinander. Gerechnet wird mit {a.dein('em')} Einkommen
+                aus den Angaben und mit der Steuer, die genau dieser Vertrag auslöst, nicht mit einem
+                Durchschnittssatz.
               </>
             ) : (
               <>
@@ -287,7 +295,7 @@ export function VertragsTuev({
         `print:hidden`, weil das Gutachten die Angaben auf seinem eigenen
         Blatt fuehrt.
       */}
-      {mitEinkommen && <div className="print:hidden">
+      {einkommen === 'feld' && <div className="print:hidden">
         <AkkordeonKarte
           titel={szenario.einkommenGetrennt
             ? `Einkommen (Ausgangsbasis) — ${personNameAus(szenario.personen, 'A')}`
@@ -1053,13 +1061,6 @@ export function VertragsTuev({
         </div>
       )}
 
-      {/*
-        Der Foerdercheck schliesst diesen Bereich ab: erst was die Vertraege
-        leisten, dann was an Foerderung liegen bleibt. Er steht AUSSERHALB der
-        Liste, weil er nicht an der Auswahl haengt — auch wer noch keinen
-        Vertrag zur Pruefung gewaehlt hat, soll seinen freien Rahmen sehen.
-      */}
-      {mitFoerdercheck && <Foerdercheck zeile={zeile ?? null} />}
     </section>
   );
 }

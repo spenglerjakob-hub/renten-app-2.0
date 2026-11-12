@@ -200,22 +200,17 @@ export function Kassenbon({
       </div>
 
       {/*
-        Wie viel des Ziels gedeckt ist — gestapelt nach Schicht. Gleiche
-        Machart wie in der Schnellrechnung: Satz, schmaler Balken, Legende.
+        Wie viel des Ziels gedeckt ist — gestapelt nach Schicht: schmaler
+        Balken, Legende. Der Satz dazu („Dein Netto deckt 56 %“) steht schon
+        unter dem Ring, im Stueck davor; hier sagt ihn nur der Vorlesetext.
       */}
       <div className="mt-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-ui-tinte/80">
-          <span>
-            {luecke > 0
-              ? <>{t.Dein()} Netto deckt <strong className="font-medium tabular-nums text-ui-tinte">{deckung} %</strong> {t.dein('es')} Ziels</>
-              : <strong className="font-medium text-ui-tinte">Ziel erreicht</strong>}
-          </span>
-          {luecke > 0 && (
-            <span className="text-ui-schiefer">{t.dir} fehlen <strong className="font-medium tabular-nums text-ui-tinte">{100 - deckung} %</strong></span>
-          )}
-        </div>
         {/* Die Luecke als Stein hinter den Schichten — wie im Ring. */}
-        <div className="mt-2 flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-ui-luecke">
+        <div
+          role="img"
+          aria-label={luecke > 0 ? `Das Netto deckt ${deckung} % des Ziels, es fehlen ${100 - deckung} %` : 'Das Ziel ist erreicht'}
+          className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-ui-luecke"
+        >
           {nachSchicht.map(({ schicht, netto }) =>
             netto <= 0 ? null : (
               <div
