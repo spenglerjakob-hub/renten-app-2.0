@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { versorgungsluecke, type Jahreszeile, type ProjektionsErgebnis } from '@renten/engine';
 import { useAnsprache } from '../components/Ansprache';
-import { euro } from '../components/Feld';
+import { euro, prozent } from '../components/Feld';
+import { useSzenario } from '../store/szenario';
+import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 import { KaufkraftSchalter } from '../components/KaufkraftSchalter';
 import { EINLEITUNG, Hervor, KNOPF_ZWEIT, LINK, Posten, Titel } from '../components/stil';
 import { SPALTE, Stuecke, type Stueck } from '../components/Ablauf';
@@ -33,7 +35,7 @@ const deckung = (z: Jahreszeile) => (z.zielNettoMonat > 0 ? Math.min(100, Math.r
 
 export function Abschluss({
   mit, positionen, ergebnisMit, vorher, kaufkraftHeute, onKaufkraftHeute, person, inhaberName, vorspann, onZuLoesungen,
-  danach = [],
+  onWeitereLoesung, danach = [],
 }: {
   /** Die angenommenen Loesungen der Ansicht (`ansichtMitAngenommenen`) — null, wenn dort nichts angenommen ist */
   mit: MitAngenommenen | null;
@@ -51,7 +53,9 @@ export function Abschluss({
   /** Umschalter und Beispielhinweis der Etappe — unter dem Titel */
   vorspann?: ReactNode;
   onZuLoesungen: () => void;
-  /** Weitere Stuecke am Ende des Wegs — die Angaben fuer den Antrag */
+  /** Zum Vergleich der Loesungen — fuer den Teil der Luecke, der offen bleibt */
+  onWeitereLoesung?: () => void;
+  /** Weitere Stuecke am Ende des Wegs — die Angaben fuer den Antrag, „Zum Mitnehmen“ */
   danach?: readonly Stueck[];
 }) {
   const zeileMit = ergebnisMit && vorher ? zeileIm(ergebnisMit, vorher.jahr) : null;
@@ -59,6 +63,17 @@ export function Abschluss({
   const lueckeMit = zeileMit ? versorgungsluecke(zeileMit) : 0;
   const t = useAnsprache();
   const angenommen = `die ${t.du} angenommen ${t.w('hast', 'habt')}`;
+  /*
+    WAS DEN REST SCHLOESSE: Bleibt mit den Loesungen eine Luecke, steht dabei,
+    was sie noch kostet — dieselbe Rechnung wie im Sparrechner mit seinen
+    Vorgaben, nur fuer den Rest. Sonst endete die Beratung mit „dir fehlen
+    noch …“ und ohne naechsten Schritt.
+  */
+  const szenario = useSzenario((x) => x.szenario);
+  const rest = useMemo(
+    () => (zeileMit && lueckeMit > 0 ? sparzielRechnen(szenario, zeileMit, SPARZIEL_VORGABE) : null),
+    [szenario, zeileMit, lueckeMit],
+  );
 
   if (!mit) {
     return (
@@ -99,6 +114,22 @@ export function Abschluss({
           {/* Blau im Ring: was die gewaehlten Loesungen dazubringen — gegen das Ergebnis ohne sie. */}
           <ErgebnisRing zeile={zeileMit} vorher={vorher} kaufkraftHeute={kaufkraftHeute} breit />
           <VorherNachher vorher={vorher} nachher={zeileMit} kaufkraftHeute={kaufkraftHeute} ergebnisMit={ergebnisMit} neu={mit.neu} />
+          {rest && (
+            <div className="ui-innen flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4 sm:px-5">
+              <p className="min-w-0 flex-1 basis-72 text-sm leading-relaxed text-ui-tinte">
+                Um auch den Rest der Lücke zu schließen, {t.w('bräuchtest du', 'bräuchtet ihr')} weitere{' '}
+                <strong className="whitespace-nowrap font-medium tabular-nums">{euro(rest.gewaehlt.startbeitrag)} im Monat</strong>
+                <span className="text-ui-schiefer">
+                  {' '}— gerechnet wie im Sparrechner, mit {prozent(SPARZIEL_VORGABE.rendite)} Rendite nach Kosten und ohne Förderung.
+                </span>
+              </p>
+              {onWeitereLoesung && (
+                <button type="button" onClick={onWeitereLoesung} className={`shrink-0 print:hidden ${KNOPF_ZWEIT}`}>
+                  Weitere Lösung vergleichen <ArrowRight className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ),
     },

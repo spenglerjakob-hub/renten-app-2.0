@@ -32,18 +32,14 @@ interface AssistentSchritt {
   teil: BasisTeil | 'vertraege';
 }
 
+/*
+  DIE REIHENFOLGE: erst die Person — wer du bist, wann du in Rente gehst, was
+  die Rentenversicherung nennt (und ob es einen Ehepartner gibt) —, dann der
+  Haushalt mit der Krankenversicherung, das Einkommen, die bestehende
+  Vorsorge, zuletzt das Ziel: Es misst sich am Einkommen davor. Das Formular
+  „auf einen Blick“ hat dieselbe Reihenfolge.
+*/
 const SCHRITTE: AssistentSchritt[] = [
-  {
-    titel: () => 'Haushalt & Krankenversicherung',
-    teil: 'haushalt',
-    unterlage: (t) => (
-      <>
-        Gesetzlich versichert: der <strong>Name {t.dein('er')} Krankenkasse</strong> — den Zusatzbeitrag kennt
-        der Rechner. Privat versichert: {t.dein('e')} <strong>Beitragsrechnung</strong>. Bei Kindern genügt das
-        Geburtsjahr; es entscheidet über Pflegeversicherung, Kinderfreibetrag und Zulagen.
-      </>
-    ),
-  },
   {
     titel: (t) => t.w('Du & deine gesetzliche Rente', 'Ihr beide & eure gesetzliche Rente'),
     teil: 'personen',
@@ -54,6 +50,17 @@ const SCHRITTE: AssistentSchritt[] = [
         <em>„Höhe Ihrer künftigen Regelaltersrente“</em>. Beamte: die <strong>Versorgungsauskunft</strong>{' '}
         mit dem Ruhegehaltssatz. Keine Renteninformation zur Hand? Der Rentenschätzer rechnet aus
         {' '}{t.dein('em')} Einkommen.
+      </>
+    ),
+  },
+  {
+    titel: () => 'Haushalt & Krankenversicherung',
+    teil: 'haushalt',
+    unterlage: (t) => (
+      <>
+        Gesetzlich versichert: der <strong>Name {t.dein('er')} Krankenkasse</strong> — den Zusatzbeitrag kennt
+        der Rechner. Privat versichert: {t.dein('e')} <strong>Beitragsrechnung</strong>. Bei Kindern genügt das
+        Geburtsjahr; es entscheidet über Pflegeversicherung, Kinderfreibetrag und Zulagen.
       </>
     ),
   },

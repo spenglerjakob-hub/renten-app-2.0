@@ -16,11 +16,9 @@ import { EINLEITUNG, Hervor, Kernsatz, SCHWEBEND, Titel, Zahl } from '../compone
 /** Was gezeigt wird: nominal oder in heutiger Kaufkraft, je nach Schalter. */
 function betraege(zeile: Jahreszeile, kaufkraftHeute: boolean) {
   const f = kaufkraftHeute ? 1 / zeile.kaufkraftfaktor : 1;
-  // Die andere Lesart fuer die Fussnote: wer heute sieht, liest dort nominal, und umgekehrt.
-  const g = kaufkraftHeute ? 1 : 1 / zeile.kaufkraftfaktor;
   const luecke = versorgungsluecke(zeile);
   const deckung = zeile.zielNettoMonat > 0 ? Math.round((zeile.nettoMonat / zeile.zielNettoMonat) * 100) : 0;
-  return { f, g, luecke, deckung };
+  return { f, luecke, deckung };
 }
 
 /**
@@ -80,7 +78,7 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher, breit = false }: {
   /** Als eigenes Stueck ueber die Spalte des Ablaufs: ab mittlerer Breite der Ring links, die Zahlen daneben */
   breit?: boolean;
 }) {
-  const { f, g, luecke, deckung } = betraege(zeile, kaufkraftHeute);
+  const { f, luecke, deckung } = betraege(zeile, kaufkraftHeute);
   const ziel = zeile.zielNettoMonat * f;
   const netto = zeile.nettoMonat * f;
   const teil = vorher ? neuerTeil(zeile, vorher) : null;
@@ -124,10 +122,6 @@ export function ErgebnisRing({ zeile, kaufkraftHeute, vorher, breit = false }: {
           ? <>{t.Dein()} Netto deckt <Hervor>{deckung} %</Hervor> {t.dein('es')} Ziels.</>
           : <>{t.Dein()} Netto erreicht <Hervor>{deckung} %</Hervor> {t.dein('es')} Ziels.</>}
       </Kernsatz>
-      <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-        {kaufkraftHeute ? `Im Geld des Jahres ${zeile.jahr}` : 'In heutiger Kaufkraft'}: Netto {euro(zeile.nettoMonat * g)} und
-        Ziel {euro(zeile.zielNettoMonat * g)} im Monat{luecke > 0 ? `, Lücke ${euro(luecke * g)}` : ''}.
-      </p>
     </section>
   );
 }

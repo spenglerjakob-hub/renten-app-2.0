@@ -83,6 +83,30 @@ function wartestufen(jahreBisRente: number): number[] {
 }
 
 /**
+ * Das Kapital, das bei Rentenbeginn noetig ist, um `nettoMonat` zu zahlen.
+ * Die Entnahme muss mit der Inflation wachsen, sonst deckt sie die Luecke
+ * nur im ersten Jahr.
+ */
+function kapitalFuer(
+  szenario: SzenarioParsed,
+  eingaben: SparzielEingaben,
+  p: ReturnType<typeof parameterFuer>,
+  nettoMonat: number,
+): number {
+  return benoetigtesKapital(
+    {
+      zielNettoMonat: nettoMonat,
+      dauerJahre: eingaben.auszahldauer,
+      rendite: eingaben.rendite,
+      dynamik: szenario.annahmen.inflation,
+      kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
+      bundesland: szenario.haushalt.bundesland,
+    },
+    p,
+  );
+}
+
+/**
  * Gibt `null` zurueck, wenn es nichts zu schliessen gibt — dann entfaellt die
  * Seite, statt eine Null-Empfehlung zu drucken.
  */
@@ -103,19 +127,7 @@ export function sparzielRechnen(
     zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
   });
 
-  // Die Entnahme muss mit der Inflation wachsen, sonst deckt sie die Luecke
-  // nur im ersten Jahr.
-  const zielkapital = benoetigtesKapital(
-    {
-      zielNettoMonat: luecke,
-      dauerJahre: eingaben.auszahldauer,
-      rendite: eingaben.rendite,
-      dynamik: szenario.annahmen.inflation,
-      kirchensteuerpflichtig: szenario.haushalt.kirchensteuer,
-      bundesland: szenario.haushalt.bundesland,
-    },
-    p,
-  );
+  const zielkapital = kapitalFuer(szenario, eingaben, p, luecke);
 
   const fuer = (dynamik: number) => benoetigteSparrate({
     zielkapital, jahre: jahreBisRente, rendite: eingaben.rendite, dynamik,
@@ -157,5 +169,69 @@ export function sparzielRechnen(
       mehrProMonat: Math.max(0, einJahr.startbeitrag - heute.startbeitrag),
       mehrGesamt: Math.max(0, einJahr.summeBeitraege - heute.summeBeitraege),
     },
+  };
+}
+
+/** Was ein Wunschbeitrag von der Luecke schliesst. */
+export interface Wunschbeitrag {
+  /** Der Beitrag, der die ganze Luecke schloesse — der Startbeitrag des Sparrechners */
+  noetig: number;
+  /** Der Teil der Luecke im Monat, den der Wunschbeitrag deckt — Betrag des Rentenjahres */
+  gedecktMonat: number;
+  /** Derselbe Teil in heutiger Kaufkraft */
+  gedecktHeute: number;
+  /** Was offen bleibt, Betrag des Rentenjahres */
+  restMonat: number;
+  /** Anteil der Luecke, 0 bis 1 — mehr als geschlossen ist geschlossen */
+  anteil: number;
+}
+
+/**
+ * DIE RECHNUNG DES SPARRECHNERS RUECKWAERTS: nicht „was kostet die Luecke“,
+ * sondern „was schliesst der Betrag, den ich zuruecklegen will“.
+ *
+ * Mit denselben Annahmen wie die Rechnung darueber: Der Beitrag baut einen
+ * Teil des Zielkapitals auf (die Sparrate ist dem Kapital proportional), und
+ * gesucht ist die Monatsrente, die dieses Kapital traegt. Das laeuft nicht
+ * einfach im Dreisatz — die Abgeltungsteuer laesst den Sparerpauschbetrag
+ * frei, ein kleines Kapital wird also milder besteuert —, deshalb per
+ * Halbierung ueber dieselbe Funktion `benoetigtesKapital`.
+ *
+ * `null`, wenn es nichts zu schliessen gibt (wie `sparzielRechnen`).
+ */
+export function wunschbeitragRechnen(
+  szenario: SzenarioParsed,
+  zeile: Jahreszeile,
+  eingaben: SparzielEingaben,
+  beitragMonat: number,
+): Wunschbeitrag | null {
+  const r = sparzielRechnen(szenario, zeile, eingaben);
+  if (!r) return null;
+  const noetig = r.gewaehlt.startbeitrag;
+  const beitrag = Math.max(0, beitragMonat);
+  let gedecktMonat: number;
+  if (noetig <= 0 || beitrag >= noetig) {
+    gedecktMonat = r.luecke;
+  } else if (beitrag === 0) {
+    gedecktMonat = 0;
+  } else {
+    const p = parameterFuer(zeile.jahr, {
+      indexRate: szenario.annahmen.tarifIndex,
+      zusatzbeitrag: szenario.haushalt.zusatzbeitrag,
+    });
+    const kapital = r.zielkapital * (beitrag / noetig);
+    let [unten, oben] = [0, r.luecke];
+    for (let i = 0; i < 40; i++) {
+      const mitte = (unten + oben) / 2;
+      if (kapitalFuer(szenario, eingaben, p, mitte) > kapital) oben = mitte; else unten = mitte;
+    }
+    gedecktMonat = (unten + oben) / 2;
+  }
+  return {
+    noetig,
+    gedecktMonat,
+    gedecktHeute: gedecktMonat / zeile.kaufkraftfaktor,
+    restMonat: Math.max(0, r.luecke - gedecktMonat),
+    anteil: r.luecke > 0 ? Math.min(1, gedecktMonat / r.luecke) : 1,
   };
 }

@@ -15,11 +15,11 @@ import { useAnsprache } from '../components/Ansprache';
  * eine Basisrente. Beides steht im Gesetz und in den Angaben — es wurde nur
  * nie gegenübergestellt.
  *
- * ER STEHT UNTER DEM VERTRAGS-TÜV und nicht mehr in der Ergebnisspalte: Es
- * geht um Verträge und ihre Förderrahmen, und die laufenden Beiträge, gegen
- * die hier gerechnet wird, werden im TÜV erfasst. Der Hinweis „zu diesem
- * Vertrag ist kein Beitrag erfasst" findet sein Eingabefeld dadurch
- * unmittelbar über sich statt zwei Bildschirmlängen entfernt.
+ * EIN EIGENES STUECK VOR DEN LOESUNGEN, nach dem Vertrags-TÜV: Welche
+ * Förderung liegen bleibt, ist das Argument für die Lösungen danach — im
+ * Gutachten steht die Seite seit jeher an dieser Stelle. Die laufenden
+ * Beiträge, gegen die hier gerechnet wird, werden im TÜV erfasst, dem
+ * Stück davor.
  *
  * Ohne Befund rendert der Block nichts. Ein Kasten, der „alles in Ordnung"
  * meldet, kostet Platz und sagt nichts.
@@ -38,22 +38,17 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
   if (befunde.length === 0) return null;
 
   return (
-    <section aria-labelledby="foerdercheck-titel" className="pt-2 print:hidden">
-      {/*
-        Derselbe Kopf-Aufbau wie beim Vertrags-TÜV, eine Stufe kleiner: Der
-        Block ist ein Teil dieses Bereichs, nicht ein zweiter daneben — ohne
-        eigene Farbe, die Foerderung steht in den Zahlen.
-      */}
+    <section aria-labelledby="foerdercheck-titel" className="print:hidden">
+      {/* Derselbe Kopf-Aufbau wie beim Vertrags-TÜV — ohne eigene Farbe, die Foerderung steht in den Zahlen. */}
       <div className="mb-5 flex items-start gap-3">
         <Gift className="mt-1 h-5 w-5 shrink-0 text-ui-schiefer" aria-hidden />
         <div>
-          <h3 id="foerdercheck-titel" className="ui-titel text-[22px] font-normal leading-snug text-ui-tinte sm:text-[26px]">
+          <h2 id="foerdercheck-titel" className="ui-titel text-[22px] font-normal leading-snug text-ui-tinte sm:text-[26px]">
             Fördercheck
-          </h3>
+          </h2>
           <p className={`mt-1 ${EINLEITUNG}`}>
-            Oben steht, was {t.dein('e')} Verträge leisten. Hier steht, welche Förderung {t.du} heute nicht
-            {' '}{t.w('ausschöpfst', 'ausschöpft')} — und was ein geförderter Beitrag {t.dich} nach Steuern und Abgaben
-            tatsächlich kostet.
+            Welche Förderung {t.du} heute nicht {t.w('ausschöpfst', 'ausschöpft')} — und was ein geförderter
+            Beitrag {t.dich} nach Steuern und Abgaben tatsächlich kostet.
           </p>
         </div>
       </div>
@@ -84,7 +79,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
               sich nicht in eine Schlagzahl fassen.
             */}
             <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-ui-linie px-5 py-4 sm:px-6">
-              <h4 className="min-w-0 break-words text-base font-medium text-ui-tinte hyphens-auto">{b.titel}</h4>
+              <h3 className="min-w-0 break-words text-base font-medium text-ui-tinte hyphens-auto">{b.titel}</h3>
               {b.foerderArt === 'zulage' ? (
                 <span className="shrink-0 text-right">
                   <span className="block text-2xl font-medium leading-none tabular-nums text-ui-tinte">
@@ -218,7 +213,7 @@ export function Foerdercheck({ zeile }: { zeile: Jahreszeile | null }) {
         */
         <p className="ui-innen mt-5 px-4 py-3 text-xs leading-relaxed text-ui-schiefer">
           Zu {ohneBeitrag === 1 ? 'einem geförderten Vertrag' : `${ohneBeitrag} geförderten Verträgen`}{' '}
-          ist kein laufender Beitrag erfasst. Er gehört oben in die Prüfung — sonst
+          ist kein laufender Beitrag erfasst. Er gehört in die Prüfung der bestehenden Verträge — sonst
           erscheint hier mehr freier Rahmen, als {t.du} tatsächlich {t.w('hast', 'habt')}.
         </p>
       )}

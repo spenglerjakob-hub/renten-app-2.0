@@ -3,11 +3,11 @@ import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
-import { anteilAmNetto } from './bezug';
-import { Hervor, Karte, Kernsatz, SCHWEBEND } from '../components/stil';
+import { anteilAmNetto, anteilAnLuecke } from './bezug';
+import { Hervor, Karte, Kernsatz, Posten, Regler, SCHWEBEND } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 import {
-  sparzielRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
+  sparzielRechnen, wunschbeitragRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
 } from './sparziel-berechnung';
 import { ScrollBereich } from '../components/ScrollBereich';
 import { Stuecke, type Stueck } from '../components/Ablauf';
@@ -21,8 +21,10 @@ import { Stuecke, type Stueck } from '../components/Ablauf';
  * Beitragsdynamik, weil ein Vertrag mit 3 % Steigerung heute deutlich
  * weniger kostet als einer ohne.
  *
- * In drei Stuecken (`components/Ablauf`): was die Luecke kostet (mit den
- * Annahmen darunter), was die Beitragsdynamik aendert, was Warten kostet.
+ * In vier Stuecken (`components/Ablauf`): was die Luecke kostet (mit den
+ * Annahmen darunter), was die Beitragsdynamik aendert, was Warten kostet —
+ * und zuletzt die Frage, mit der es in die Loesungen geht: Was willst du
+ * zuruecklegen, und wie viel der Luecke schliesst das?
  */
 export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
   zeile: Jahreszeile;
@@ -43,6 +45,19 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
 
   const startbeitrag = r?.gewaehlt.startbeitrag ?? null;
   useEffect(() => { onStartbeitrag?.(startbeitrag); }, [startbeitrag, onStartbeitrag]);
+
+  /*
+    DER WUNSCHBEITRAG ist der Netto-Aufwand der Loesungen: Was hier gewaehlt
+    wird, steht im Vergleich danach als „Was wird aus … € netto im Monat?“.
+    Ein Speicher, keine zweite Zahl.
+  */
+  const wunsch = szenario.loesungen.nettoMonat;
+  const setzeLoesungen = useSzenario((x) => x.setzeLoesungen);
+  const setzeWunsch = (n: number) => setzeLoesungen({ nettoMonat: Math.max(0, n), vorgabe: 'netto' });
+  const w = useMemo(
+    () => wunschbeitragRechnen(szenario, zeile, eingaben, wunsch),
+    [szenario, zeile, eingaben, wunsch],
+  );
 
   const setze = (teil: Partial<SparzielEingaben>) =>
     setEingaben((x) => ({ ...x, ...teil }));
@@ -135,13 +150,10 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
                 hilfe="Über wie viele Jahre das Kapital reichen soll."
               />
             </div>
-            <p className="mt-6 border-t border-ui-linie pt-5 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-              Bei <strong>{prozent(eingaben.rendite)}</strong> Rendite nach Kosten und{' '}
-              <strong>{prozent(eingaben.dynamik)}</strong> Beitragsdynamik {t.w('beginnst du', 'beginnt ihr')} mit{' '}
-              <strong>{euro(r.gewaehlt.startbeitrag)}</strong> und {t.w('zahlst', 'zahlt')} im letzten Sparjahr{' '}
-              <strong>{euro(r.gewaehlt.endbeitrag)}</strong>. Die Rechnung unterstellt, dass die
-              Entnahme später mit {prozent(szenario.annahmen.inflation)} Inflation mitwächst, und
-              zieht die Abgeltungsteuer auf den Ertragsanteil bereits ab. Sie nennt eine
+            {/* Der Startbeitrag steht darueber schon im Titel und in der Kachel — hier nur, was die Rechnung unterstellt. */}
+            <p className="mt-6 border-t border-ui-linie pt-5 text-xs leading-relaxed text-ui-schiefer">
+              Die Rechnung unterstellt, dass die Entnahme später mit {prozent(szenario.annahmen.inflation)} Inflation
+              mitwächst, und zieht die Abgeltungsteuer auf den Ertragsanteil bereits ab. Sie nennt eine
               Größenordnung, kein Produkt.
             </p>
           </Karte>
@@ -276,6 +288,79 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
             Erträge der frühen Jahre. Gleiche Rendite und gleiches Ziel unterstellt.
           </p>
         </Karte>
+      ),
+    }] : []),
+    /*
+      DIE BRUECKE ZU DEN LOESUNGEN. Bis hierher steht, was die ganze Luecke
+      kostet — oft mehr, als jemand zuruecklegen will. Hier waehlt der Kunde
+      seinen Betrag und sieht, wie viel der Luecke er schliesst; mit diesem
+      Betrag rechnet der Vergleich der Loesungen weiter.
+    */
+    ...(w ? [{
+      id: 'wunsch',
+      titel: `Was ${t.w('willst du', 'wollt ihr')} zurücklegen?`,
+      ergebnis: w.anteil >= 0.995
+        ? `${euro(wunsch)} im Monat schließen die Lücke ganz`
+        : `${euro(wunsch)} im Monat schließen ${anteilAnLuecke(w.anteil)} der Lücke`,
+      inhalt: (
+        <section aria-labelledby="wunsch-titel" className={`${SCHWEBEND} p-5 sm:p-7`}>
+          <h3 id="wunsch-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
+            Was {t.w('willst du', 'wollt ihr')} zurücklegen?
+          </h3>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
+            Die ganze Lücke kostet {euro(w.noetig)} im Monat. Es muss nicht alles auf einmal sein: Mit dem
+            Betrag, den {t.du} hier {t.w('wählst', 'wählt')}, geht es in den Vergleich der Lösungen.
+          </p>
+
+          <div className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-center">
+            <ZahlFeld
+              label={`${t.Dein()} Beitrag im Monat`}
+              wert={wunsch}
+              onChange={setzeWunsch}
+              einheit="€"
+              schritt={25}
+              max={10_000}
+            />
+            {/* Bis zum vollen Beitrag, aufgerundet — mehr laesst sich im Feld eintragen. */}
+            <Regler
+              wert={wunsch}
+              max={Math.max(100, Math.ceil(w.noetig / 50) * 50)}
+              schritt={5}
+              onChange={setzeWunsch}
+              beschriftung="Beitrag im Monat"
+              wertText={`${wunsch} Euro im Monat`}
+              klasse="sm:mt-5"
+            />
+          </div>
+
+          <Kernsatz klasse="mt-6">
+            {w.anteil >= 0.995
+              ? <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke <Hervor>ganz</Hervor>.</>
+              : <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} <Hervor>{anteilAnLuecke(w.anteil)}</Hervor> der Lücke.</>}
+          </Kernsatz>
+
+          {/* Der Anteil als Balken — geschlossen in Tinte, offen im Stein der Luecke. */}
+          <div
+            role="img"
+            aria-label={`${Math.round(w.anteil * 100)} % der Lücke geschlossen`}
+            className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-ui-luecke"
+          >
+            <div className="h-full rounded-full bg-ui-tinte transition-all duration-500" style={{ width: `${w.anteil * 100}%` }} />
+          </div>
+          <dl className="mt-3 text-sm">
+            <Posten text={`Davon geschlossen, im Jahr ${zeile.jahr}`} wert={`${euro(w.gedecktMonat)} im Monat`} />
+            <Posten text="Bleibt offen" wert={`${euro(w.restMonat)} im Monat`} />
+            {anteilAmNetto(wunsch, nettoHeute) && (
+              <Posten text={`Anteil an ${t.dein('em')} heutigen Netto`} wert={anteilAmNetto(wunsch, nettoHeute)} />
+            )}
+          </dl>
+          <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
+            Gerechnet wie die Lücke darüber: {prozent(eingaben.rendite)} Rendite nach Kosten,{' '}
+            {eingaben.dynamik > 0 ? `${prozent(eingaben.dynamik)} Beitragsdynamik` : 'gleichbleibender Beitrag'}, ohne
+            Förderung. Mit Zulagen, Steuerersparnis oder dem Zuschuss des Arbeitgebers reicht derselbe Aufwand
+            weiter — das zeigt der Vergleich der Lösungen.
+          </p>
+        </section>
       ),
     }] : []),
   ];

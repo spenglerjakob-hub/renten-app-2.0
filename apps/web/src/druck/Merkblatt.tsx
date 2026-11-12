@@ -10,7 +10,8 @@ import type { AnspracheWoerter } from '../lib/ansprache';
  * die am Kuehlschrank landet.
  */
 
-const checkliste = (t: AnspracheWoerter): { was: string; warum: string }[] => [
+/** Was in den naechsten Wochen zu erledigen ist — auch im letzten Stueck der Beratung (`features/ZumMitnehmen`). */
+export const checkliste = (t: AnspracheWoerter): { was: string; warum: string }[] => [
   {
     was: 'Renteninformation der Deutschen Rentenversicherung prüfen',
     warum: 'Sie kommt jährlich ab 27 und nach 5 Beitragsjahren. Der Betrag darin ist der '

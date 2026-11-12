@@ -5,7 +5,7 @@ import {
   PanelLeft, Target, BarChart3, SearchCheck, CreditCard, MessageSquare, Check, Palette, ClipboardCheck, ClipboardList,
 } from 'lucide-react';
 import {
-  versorgungsluecke, parseDatum, nurPerson,
+  versorgungsluecke, parseDatum, nurPerson, foerdercheck,
   type Jahreszeile, type PersonId,
 } from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from './store/szenario';
@@ -22,7 +22,6 @@ import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
 import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
-import { LueckeBedeutung } from './features/LueckeBedeutung';
 import { KaufkraftKarte } from './features/KaufkraftKarte';
 import { ErgebnisKopf, ErgebnisRing } from './features/ErgebnisKern';
 import { nettoHeuteMonat } from './features/bezug';
@@ -50,7 +49,11 @@ import { Antraege } from './features/Antraege';
 import { antragLoesungenAus } from './features/antrag-daten';
 import { useAntraege } from './store/antraege';
 import { antragStand } from './lib/antraege';
-import { angenommenePositionen, ansichtMitAngenommenen, mitAngenommenen } from './features/tuev-berechnung';
+import {
+  angenommenePositionen, ansichtMitAngenommenen, foerderBasis, mitAngenommenen,
+} from './features/tuev-berechnung';
+import { Foerdercheck } from './features/Foerdercheck';
+import { ZumMitnehmen } from './features/ZumMitnehmen';
 import { Gutachten, useGutachtenSeiten } from './druck/Gutachten';
 import { ALLES, gewaehlt, type DruckAuswahl } from './druck/druckauswahl';
 import { DruckAuswahlFenster } from './features/DruckAuswahl';
@@ -759,6 +762,14 @@ export default function App() {
     : null;
   const leisteMit = schritt === 'abschluss' ? zeileMit : null;
   const leiste = leisteMit ?? zeile;
+  /*
+    IM STUECK MIT DEM RING entfaellt die Fussleiste: Ziel, Netto und Luecke
+    stehen dort schon im Titel und im Ring — ein drittes Mal am unteren Rand
+    waere eines zu viel. Ab dem naechsten Stueck haelt sie die drei Zahlen im
+    Blick.
+  */
+  const ringOffen = (schritt === 'ergebnis' && Boolean(ergebnis) && (stueckeStand.ergebnis?.offen ?? 'luecke') === 'luecke')
+    || (schritt === 'abschluss' && Boolean(zeileMit) && (stueckeStand.abschluss?.offen ?? 'ergebnis') === 'ergebnis');
   const leisteLuecke = versorgungsluecke(leiste);
   // Das heutige Haushaltsnetto — die Bezugsgroesse fuer Sparrate und Beitraege.
   const nettoHeute = nettoHeuteMonat(ergebnis);
@@ -951,7 +962,12 @@ export default function App() {
 
   /* ---------- DER ABLAUF: die Zeilen der Etappen und die Stuecke der offenen ---------- */
 
-  // Dieselbe Rechnung wie „Was die Luecke bedeutet“ und der Sparrechner mit seinen Vorgaben.
+  // Hat der Foerdercheck etwas zu sagen? Nur dann ist er ein Stueck der Loesungen.
+  const foerderBefunde = useMemo(() => {
+    const b = foerderBasis(szenario, echteZeile ?? null);
+    return foerdercheck(b.kontext, b.steuerOpt, b.p).length;
+  }, [szenario, echteZeile]);
+  // Dieselbe Rechnung wie der Sparrechner mit seinen Vorgaben — fuer dessen Zeile, solange er noch nicht offen war.
   const sparziel = useMemo(
     () => (echteZeile ? sparzielRechnen(szenario, echteZeile, SPARZIEL_VORGABE) : null),
     [szenario, echteZeile],
@@ -1013,9 +1029,12 @@ export default function App() {
   const zuDenAngeboten = () => { zeigeStueck('loesungen', 'angebote'); geheZu('loesungen'); };
 
   /*
-    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, woher das Netto kommt,
-    was die Preissteigerung daraus macht, was zu tun waere — das fuehrt zum
-    Sparrechner. Steuer und Rechtsstand sind Nachschlagen: Vertiefungen.
+    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, gleich danach die
+    Kaufkraft — sie erklaert, warum aus dem eingetragenen Ziel im Ring ein
+    hoeherer Betrag geworden ist —, dann woher das Netto kommt. „Weiter“
+    fuehrt von dort zum Sparrechner: Was die Luecke kostet, steht dort und
+    nicht mehr schon hier. Steuer und Rechtsstand sind Nachschlagen:
+    Vertiefungen.
   */
   const kk = kaufkraft(zeile);
   const ergebnisStuecke: Stueck[] = !ergebnis ? [] : [
@@ -1028,6 +1047,18 @@ export default function App() {
       // Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz.
       inhalt: <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} breit />,
     },
+    ...(kk ? [{
+      id: 'kaufkraft',
+      titel: 'Kaufkraft bis zum Rentenbeginn',
+      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
+      inhalt: (
+        <KaufkraftKarte
+          zeile={zeile}
+          inflation={szenario.annahmen.inflation}
+          standard={offenePfade(szenario).includes('annahmen.inflation')}
+        />
+      ),
+    }] : []),
     {
       id: 'netto',
       titel: `Woher ${t.dein()} Netto kommt`,
@@ -1071,25 +1102,6 @@ export default function App() {
         </div>
       ),
     },
-    ...(kk ? [{
-      id: 'kaufkraft',
-      titel: 'Kaufkraft bis zum Rentenbeginn',
-      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
-      inhalt: (
-        <KaufkraftKarte
-          zeile={zeile}
-          inflation={szenario.annahmen.inflation}
-          standard={offenePfade(szenario).includes('annahmen.inflation')}
-        />
-      ),
-    }] : []),
-    // Die Bruecke zum Sparrechner — „Weiter“ darunter fuehrt dorthin. Ohne Luecke oder Sparzeit entfaellt sie.
-    ...(sparziel ? [{
-      id: 'bedeutung',
-      titel: `Was die Lücke für ${t.dich} bedeutet`,
-      ergebnis: `${euro(sparziel.gewaehlt.startbeitrag)} Sparrate ab heute`,
-      inhalt: <LueckeBedeutung zeile={zeile} kaufkraftHeute={kaufkraftHeute} nettoHeute={nettoHeute} />,
-    }] : []),
     {
       id: 'steuer',
       vertiefung: true,
@@ -1124,14 +1136,31 @@ export default function App() {
   ];
 
   /*
-    VERTRAGS-TUEV & LOESUNGEN IN STUECKEN. Auf dem Weg: was jede Schicht aus
-    dem Beitrag macht, dann die Angebote dazu — dort wird angenommen. Die
-    Pruefung bestehender Vertraege ist die Vertiefung auf Wunsch.
+    VERTRAGS-TUEV & LOESUNGEN IN STUECKEN — in der Reihenfolge des Gespraechs:
+    erst was schon da ist (der TÜV, nur wenn es Vertraege gibt), dann welche
+    Foerderung liegen bleibt (nur mit Befund), dann was jede Schicht aus dem
+    Beitrag macht, zuletzt die Angebote — dort wird angenommen.
   */
   const loesungenStand = ansichtSzenario.loesungen;
   const angeboteZahl = loesungenStand.angebote.length;
   const angenommenZahl = mitAnsicht?.loesungen.length ?? 0;
+  const vertraegeZahl = ansichtSzenario.vertraege.length;
+  const geprueftZahl = ansichtSzenario.tuev.filter((x) => ansichtSzenario.vertraege.some((v) => v.id === x.vertragId)).length;
   const loesungenStuecke: Stueck[] = [
+    ...(vertraegeZahl > 0 ? [{
+      id: 'tuev',
+      titel: 'Bestehende Verträge prüfen',
+      ergebnis: `${vertraegeZahl === 1 ? '1 Vertrag' : `${vertraegeZahl} Verträge`}, ${geprueftZahl} geprüft`,
+      breit: true,
+      // Das Einkommen steht in den Angaben — hier stuenden dieselben Felder ein zweites Mal.
+      inhalt: <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} einkommen="angaben" />,
+    }] : []),
+    ...(foerderBefunde > 0 ? [{
+      id: 'foerderung',
+      titel: `Förderung, die ${t.du} nicht ${t.w('nutzt', 'nutzt')}`,
+      ergebnis: foerderBefunde === 1 ? 'Eine Förderung nicht ausgeschöpft' : `${foerderBefunde} Förderungen nicht ausgeschöpft`,
+      inhalt: <Foerdercheck zeile={echteZeile ?? null} />,
+    }] : []),
     {
       id: 'vergleich',
       titel: 'Lösungen vergleichen',
@@ -1160,16 +1189,6 @@ export default function App() {
       // „Lösungen annehmen“ im Stueck fuehrt zum Abschluss — ein zweites „Weiter“ darunter waere eines zu viel.
       ohneWeiter: true,
       inhalt: <Angebote szenario={ansichtSzenario} nettoHeute={nettoHeute} onAnnehmen={() => geheZu('abschluss')} />,
-    },
-    {
-      id: 'tuev',
-      vertiefung: true,
-      titel: 'Bestehende Verträge prüfen',
-      ergebnis: ansichtSzenario.vertraege.length === 0
-        ? 'Keine Verträge erfasst'
-        : ansichtSzenario.vertraege.length === 1 ? '1 Vertrag' : `${ansichtSzenario.vertraege.length} Verträge`,
-      breit: true,
-      inhalt: <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} />,
     },
   ];
 
@@ -1642,20 +1661,17 @@ export default function App() {
         {/* ---------- 4. VERTRAGS-TUEV & LOESUNGEN ---------- */}
         {schritt === 'loesungen' && (
           <>
-            <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
-              <EtappenKopf
-                titel="Vertrags-TÜV & Lösungen"
-                text={`Was aus jedem Euro wird, den ${t.du} neu in die Altersvorsorge ${t.w('steckst', 'steckt')} — und was bestehende Verträge wirklich leisten.`}
-              />
-              {paarUmschalter}
-              {beispielHinweis}
-            </div>
             {/*
-              ZWEI FRAGEN in dieser Etappe: Womit schliesse ich die Luecke
-              (neue Loesungen, dann die Angebote dazu) — und taugt, was ich
-              schon habe (bestehende Vertraege)? Die erste ist der Weg der
-              Beratung, die zweite die Pruefung auf Wunsch: eine Vertiefung.
+              KEIN EIGENER TITEL: Jedes Stueck dieser Etappe bringt seine Frage
+              als Titel mit („Was wird aus 100 € netto im Monat?“) — „Vertrags-TÜV
+              & Lösungen“ steht schon in der Zeile darueber.
             */}
+            {(paarUmschalter || beispielHinweis) && (
+              <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+                {paarUmschalter}
+                {beispielHinweis}
+              </div>
+            )}
             <Stuecke kennung="loesungen" beschriftung="Stücke der Lösungen" stuecke={loesungenStuecke} />
           </>
         )}
@@ -1673,22 +1689,32 @@ export default function App() {
             inhaberName={paar && !einzeln ? nameVon : undefined}
             vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
             onZuLoesungen={zuDenAngeboten}
-            // Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt.
-            danach={mitHaushalt.loesungen.length > 0 ? [{
-              id: 'antrag',
-              titel: 'Angaben für den Antrag',
-              ergebnis: szenario.loesungen.antrag ? 'Antrag angelegt' : 'Noch nicht angelegt',
-              inhalt: (
-                <Antragsangaben
-                  antragId={szenario.loesungen.antrag}
-                  loesungen={antragLoesungen}
-                  kundeVorschlag={kundeVorschlag}
-                  angemeldet={checkMoeglich}
-                  onKonto={() => setKontoOffen(true)}
-                  berater={beraterZeile}
-                />
-              ),
-            }] : []}
+            onWeitereLoesung={() => { zeigeStueck('loesungen', 'vergleich'); geheZu('loesungen'); }}
+            danach={[
+              // Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt.
+              ...(mitHaushalt.loesungen.length > 0 ? [{
+                id: 'antrag',
+                titel: 'Angaben für den Antrag',
+                ergebnis: szenario.loesungen.antrag ? 'Antrag angelegt' : 'Noch nicht angelegt',
+                inhalt: (
+                  <Antragsangaben
+                    antragId={szenario.loesungen.antrag}
+                    loesungen={antragLoesungen}
+                    kundeVorschlag={kundeVorschlag}
+                    angemeldet={checkMoeglich}
+                    onKonto={() => setKontoOffen(true)}
+                    berater={beraterZeile}
+                  />
+                ),
+              }] : []),
+              // Das Ende der Beratung: Gutachten, Plan, was als Naechstes zu tun ist — auch ohne angenommene Loesung.
+              {
+                id: 'mitnehmen',
+                titel: 'Zum Mitnehmen',
+                ergebnis: 'Gutachten, Plan und Checkliste',
+                inhalt: <ZumMitnehmen onDrucken={() => setDruckOffen(true)} onSpeichern={() => setKontoOffen(true)} />,
+              },
+            ]}
           />
         )}
 
@@ -1783,7 +1809,7 @@ export default function App() {
         rechnenden Etappen bleibt sie, dort sagt `beispielHinweis`, womit
         gerechnet wird.
       */}
-      {zeile && !(schritt === 'daten' && offeneBeispielTexte.length > 0) && (
+      {zeile && !(schritt === 'daten' && offeneBeispielTexte.length > 0) && !ringOffen && (
         /*
           Hell wie die Karten, mit Haarlinie und einem leichten Schatten nach
           oben. Die Luecke steht als einzige Kachel dunkel — hervorgehoben

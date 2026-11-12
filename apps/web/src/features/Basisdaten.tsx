@@ -128,98 +128,162 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
       ))}
 
       {/*
-        Das Zielnetto steht VOR dem Haushaltsraster und in einem eigenen
-        Kasten. Es war bisher eines von fuenf gleichrangigen Feldern —
-        dabei misst sich alles Weitere an dieser Zahl: der Bedarf, die
-        Versorgungsluecke, die noetige Sparrate, das ganze Gutachten.
+        Person B nur zeigen, solange sie auch gerechnet wird. Der Rechenkern
+        filtert seit jeher genauso (timeline.ts, projiziere); die Karte blieb
+        aber stehen, wenn man auf "Single" zurueckschaltete — mit Feldern, die
+        nichts mehr bewirkten. Geloescht wird nichts: schaltet man wieder auf
+        "Verheiratet", sind alle Eingaben von Person B noch da.
       */}
-      {/*
-        Im Formular in der Innenflaeche, damit es aus dem Raster faellt; im
-        Assistenten ist der Schritt selbst das Ziel — dort ohne Kasten und
-        ohne zweiten Titel.
-      */}
-      {zeige('ziel') && <section className={einklappbar ? 'ui-innen p-4 sm:p-5' : ''}>
-        {einklappbar && (
-          <h3 className="mb-3 flex items-center gap-2 text-base font-medium text-ui-tinte">
-            <Target className="h-4 w-4 text-ui-schiefer" aria-hidden /> {t.Dein()} Ziel
-          </h3>
-        )}
-        {/*
-          BEI PAAREN ZWEI FELDER, darunter die Summe.
+      {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
+        <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {!ohneNamen && (
+              <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
+                onChange={(teile) => setzePerson(p.id, mitName(teile))} />
+            )}
+            <AuswahlFeld label="Versorgungsart" wert={p.art}
+              onChange={(v) => setzePerson(p.id, { art: v })}
+              optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
+            <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
+              onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
+              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld."
+              vorbelegt={marke(`personen.${p.id}.geburtsdatum`)} />
+            <DatumFeld
+              label="Rentenbeginn"
+              wert={p.rentenbeginn}
+              onChange={(v) => setzePerson(p.id, { rentenbeginn: v })}
+              vorbelegt={marke(`personen.${p.id}.rentenbeginn`)}
+              hilfe={
+                p.rentenbeginnManuell
+                  ? 'Von Hand gesetzt.'
+                  : `Automatisch: Regelaltersgrenze ${regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.`
+              }
+              zusatz={p.rentenbeginnManuell ? (
+                <button
+                  type="button"
+                  onClick={() => rentenbeginnZuruecksetzen(p.id)}
+                  className="mt-1 flex items-center gap-1 text-xs font-medium text-ui-tinte underline-offset-2 hover:underline"
+                >
+                  <RotateCcw className="h-3 w-3" aria-hidden /> Auf Regelaltersgrenze zurücksetzen
+                </button>
+              ) : null}
+            />
+            {p.art === 'grv' ? (
+              <>
+                <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
+                  onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
+                  hilfe="Wert aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“."
+                  vorbelegt={marke(`personen.${p.id}.grvBruttoHeute`)} />
+                <Rentenschaetzer personId={p.id} />
+              </>
+            ) : (
+              <>
+                <AuswahlFeld label="End-Besoldungsgruppe" wert={p.besoldungsgruppe}
+                  onChange={(v) => setzePerson(p.id, { besoldungsgruppe: v })}
+                  optionen={BESOLDUNGSGRUPPEN.map((g) => ({ wert: g as string, text: g }))} />
+                <ZahlFeld label="Ruhegehaltssatz" wert={p.ruhegehaltssatz}
+                  onChange={(n) => setzePerson(p.id, { ruhegehaltssatz: n })} max={71.75} einheit="%"
+                  hilfe="Maximal 71,75 % (§ 14 BeamtVG)." />
+              </>
+            )}
+          </div>
 
-          Erfasst wird, welchen Anteil am gemeinsamen Ziel jeder beansprucht;
-          das Haushaltsziel ist ihr Ergebnis und kein Eingabefeld mehr. Eine
-          Zahl, die man nicht aendern kann, soll auch nicht wie ein Feld
-          aussehen — deshalb steht sie darunter als Zeile und nicht als
-          gesperrtes Eingabefeld.
+          {/*
+            ABWEICHEND VERSICHERT — nur bei Paaren, und nur auf Wunsch.
 
-          Alleinstehende sehen unveraendert das eine Feld: Ein Anteil an
-          nichts waere dort nur eine Rechenstufe ohne Aussage.
-        */}
-        {paar ? (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {gerechnetePersonen.map((p) => (
-                <ZahlFeld
-                  key={p.id}
-                  label={`Zielnetto ${personName(p)}`}
-                  wert={Math.round(p.zielAnteilHeute ?? s.haushalt.zielNettoHeute / 2)}
-                  onChange={(n) => setzeZielAnteil(p.id, n)}
-                  einheit="€"
-                  vorbelegt={marke('haushalt.zielNettoHeute')}
-                />
-              ))}
+            Der Regelfall ist, dass beide gleich versichert sind; dann steht
+            die Angabe einmal oben und nicht zweimal hier. Wer abweicht, ist
+            aber kein Randfall: Beamter und Angestellte, Selbststaendiger und
+            Arbeitnehmerin. Fuer die war bis hierher gar kein Platz.
+          */}
+          {s.haushalt.verheiratet && (
+            <div className="mt-3 border-t border-ui-linie pt-3">
+              <Schalter
+                label="Abweichend krankenversichert"
+                wert={p.kvStatus !== undefined}
+                onChange={(b) => setzePerson(p.id, b
+                  ? { kvStatus: s.haushalt.kvStatus }
+                  : { kvStatus: undefined, kvErwerb: undefined, zusatzbeitrag: undefined,
+                      krankenkasse: undefined, pkv: undefined })}
+              />
+              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+                {p.kvStatus !== undefined
+                  ? 'Eigener Status, eigene Kasse, eigener Beitrag — unabhängig vom Haushalt.'
+                  : `Versichert wie der Haushalt: ${KV_TEXT[s.haushalt.kvStatus]}.`}
+              </p>
+
+              {p.kvStatus !== undefined && (
+                <>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <AuswahlFeld
+                      label="Krankenversicherung im Ruhestand"
+                      wert={p.kvStatus}
+                      onChange={(v) => setzePerson(p.id, { kvStatus: v })}
+                      optionen={[
+                        { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
+                        { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
+                        { wert: 'pkv', text: 'Privat versichert' },
+                      ]}
+                    />
+                    {p.kvStatus !== 'pkv' && KRANKENKASSEN.length > 0 && (
+                      <AuswahlFeld
+                        label="Krankenkasse"
+                        wert={p.krankenkasse ?? ''}
+                        onChange={(name) => {
+                          const k = kasseNach(name);
+                          setzePerson(p.id, k
+                            ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
+                            : { krankenkasse: undefined });
+                        }}
+                        hilfe={KASSEN_STAND}
+                        optionen={[
+                          { wert: '', text: 'Wie der Haushalt' },
+                          ...KRANKENKASSEN.map((k) => ({
+                            wert: k.name, text: `${k.name} — ${prozent(k.zusatzbeitrag, 2)}`,
+                          })),
+                        ]}
+                      />
+                    )}
+                  </div>
+                  {p.kvStatus === 'pkv' && (
+                    <PkvFelder
+                      titel={`Private Krankenversicherung von ${personName(p)}`}
+                      wert={p.pkv ?? s.haushalt.pkv}
+                      onChange={(neu) => setzePerson(p.id, { pkv: neu })}
+                    />
+                  )}
+                </>
+              )}
             </div>
-            {/* Die Summe unter einer Linie in Tinte, wie in den Aufstellungen der Beratung. */}
-            <dl className="mt-3 text-sm">
-              <Posten summe text="Haushaltsziel gesamt" wert={euro(s.haushalt.zielNettoHeute)} />
-            </dl>
-          </>
-        ) : (
-          <ZahlFeld
-            label="Zielnetto im Alter (Kaufkraft heute)"
-            wert={s.haushalt.zielNettoHeute}
-            onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
-            einheit="€"
-            gross
-            vorbelegt={marke('haushalt.zielNettoHeute')}
-          />
-        )}
-        {zielAnteil !== null && (
-          <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}{' '}
-            heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
-          </p>
-        )}
-        {/*
-          Ein Vorschlag, kein Automatismus: Wer ihn uebernimmt, hat das Ziel
-          bewusst gesetzt. Bei Paaren entfaellt er — dort ist das Ziel die
-          Summe zweier Anteile, und welcher Anteil wie gross sein soll, sagt
-          keine Faustregel.
-        */}
-        {!paar && zielVorschlag !== null && zielVorschlag > 0 && zielVorschlag !== s.haushalt.zielNettoHeute && (
-          <button
-            type="button"
-            onClick={() => setzeHaushalt({ zielNettoHeute: zielVorschlag })}
-            className="mt-3 inline-flex items-center rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-left text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden"
-          >
-            Faustregel {prozent(FAUSTREGEL_ZIEL, 0)} des heutigen Nettos: {euro(zielVorschlag)} übernehmen
-          </button>
-        )}
-        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-          An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
-          die nötig wäre, um sie zu schließen.
-          {paar && (
-            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>; in
-              der Einzelbetrachtung gilt jeder <strong>unverändert</strong> als Ziel der
-              jeweiligen Person.</>
           )}
-        </p>
-      </section>}
+        </Abschnitt>
+      ))}
+
+      {/*
+        VERHEIRATET steht bei den Personen, nicht mehr im Haushalt: Die
+        Angaben beginnen mit der Person, und dieser Schalter entscheidet,
+        ob es eine zweite gibt. Frueher stand hier nur der Hinweis, ihn
+        „oben“ zu setzen.
+      */}
+      {zeige('personen') && (
+        <div>
+          <Schalter label="Verheiratet (Splittingtarif)" wert={s.haushalt.verheiratet}
+            onChange={(b) => {
+              setzeHaushalt({ verheiratet: b });
+              if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
+            }}
+            vorbelegt={marke('haushalt.verheiratet')} />
+          {!s.haushalt.verheiratet && (
+            <p className="mt-1 text-xs text-ui-schiefer">
+              Mit Ehepartner fragt der Planer auch dessen Angaben ab.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Einklappbar: Der Block wird einmal ausgefuellt und danach selten
           wieder angefasst — offen kostet er jedes Mal eine halbe
-          Bildschirmlaenge auf dem Weg zu den Personen darunter. */}
+          Bildschirmlaenge auf dem Weg zum Einkommen und zum Ziel darunter. */}
       {zeige('haushalt') && <Abschnitt titel="Haushalt" einklappbar={einklappbar}>
         <div className="grid gap-3 sm:grid-cols-2">
           {/* Kurze Beschriftung: Die lange brach um, und das Feld stand tiefer als sein Nachbar. */}
@@ -370,12 +434,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
           </div>
         )}
         <div className="mt-3 flex flex-wrap gap-4">
-          <Schalter label="Verheiratet (Splittingtarif)" wert={s.haushalt.verheiratet}
-            onChange={(b) => {
-              setzeHaushalt({ verheiratet: b });
-              if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
-            }}
-            vorbelegt={marke('haushalt.verheiratet')} />
           <Schalter label="Kirchensteuerpflichtig" wert={s.haushalt.kirchensteuer}
             onChange={(b) => setzeHaushalt({ kirchensteuer: b })}
             vorbelegt={marke('haushalt.kirchensteuer')} />
@@ -395,7 +453,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
       {/*
         Einklappbar wie der Haushalt darueber, und aus demselben Grund: Die
         Bloecke werden einmal ausgefuellt und danach selten wieder angefasst,
-        stehen aber jedes Mal zwischen dem Ziel oben und den Vertraegen unten.
+        stehen aber jedes Mal zwischen den Personen oben und dem Ziel unten.
         Offen als Vorgabe — wer Platz will, klappt zu.
 
         ACHTUNG beim Aendern: Der Schalter „Einkommen je Partner getrennt
@@ -434,142 +492,96 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
       )}
 
       {/*
-        Person B nur zeigen, solange sie auch gerechnet wird. Der Rechenkern
-        filtert seit jeher genauso (timeline.ts, projiziere); die Karte blieb
-        aber stehen, wenn man auf "Single" zurueckschaltete — mit Feldern, die
-        nichts mehr bewirkten. Geloescht wird nichts: schaltet man wieder auf
-        "Verheiratet", sind alle Eingaben von Person B noch da.
+        Das Zielnetto steht AM ENDE und in einem eigenen Kasten — in
+        derselben Reihenfolge wie Schritt fuer Schritt: erst wer, dann der
+        Haushalt, das Einkommen, zuletzt das Ziel. Dort hat es seine
+        Bezugsgroesse: Der Anteil am heutigen Netto und die Faustregel
+        brauchen das Einkommen darueber. An dieser Zahl misst sich alles
+        Weitere: der Bedarf, die Versorgungsluecke, die noetige Sparrate.
       */}
-      {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
-        <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {!ohneNamen && (
-              <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
-                onChange={(teile) => setzePerson(p.id, mitName(teile))} />
-            )}
-            <AuswahlFeld label="Versorgungsart" wert={p.art}
-              onChange={(v) => setzePerson(p.id, { art: v })}
-              optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
-            <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
-              onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
-              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld."
-              vorbelegt={marke(`personen.${p.id}.geburtsdatum`)} />
-            <DatumFeld
-              label="Rentenbeginn"
-              wert={p.rentenbeginn}
-              onChange={(v) => setzePerson(p.id, { rentenbeginn: v })}
-              vorbelegt={marke(`personen.${p.id}.rentenbeginn`)}
-              hilfe={
-                p.rentenbeginnManuell
-                  ? 'Von Hand gesetzt.'
-                  : `Automatisch: Regelaltersgrenze ${regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.`
-              }
-              zusatz={p.rentenbeginnManuell ? (
-                <button
-                  type="button"
-                  onClick={() => rentenbeginnZuruecksetzen(p.id)}
-                  className="mt-1 flex items-center gap-1 text-xs font-medium text-ui-tinte underline-offset-2 hover:underline"
-                >
-                  <RotateCcw className="h-3 w-3" aria-hidden /> Auf Regelaltersgrenze zurücksetzen
-                </button>
-              ) : null}
-            />
-            {p.art === 'grv' ? (
-              <>
-                <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
-                  onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
-                  hilfe="Wert aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“."
-                  vorbelegt={marke(`personen.${p.id}.grvBruttoHeute`)} />
-                <Rentenschaetzer personId={p.id} />
-              </>
-            ) : (
-              <>
-                <AuswahlFeld label="End-Besoldungsgruppe" wert={p.besoldungsgruppe}
-                  onChange={(v) => setzePerson(p.id, { besoldungsgruppe: v })}
-                  optionen={BESOLDUNGSGRUPPEN.map((g) => ({ wert: g as string, text: g }))} />
-                <ZahlFeld label="Ruhegehaltssatz" wert={p.ruhegehaltssatz}
-                  onChange={(n) => setzePerson(p.id, { ruhegehaltssatz: n })} max={71.75} einheit="%"
-                  hilfe="Maximal 71,75 % (§ 14 BeamtVG)." />
-              </>
-            )}
-          </div>
+      {/*
+        Im Formular in der Innenflaeche, damit es aus dem Raster faellt; im
+        Assistenten ist der Schritt selbst das Ziel — dort ohne Kasten und
+        ohne zweiten Titel.
+      */}
+      {zeige('ziel') && <section className={einklappbar ? 'ui-innen p-4 sm:p-5' : ''}>
+        {einklappbar && (
+          <h3 className="mb-3 flex items-center gap-2 text-base font-medium text-ui-tinte">
+            <Target className="h-4 w-4 text-ui-schiefer" aria-hidden /> {t.Dein()} Ziel
+          </h3>
+        )}
+        {/*
+          BEI PAAREN ZWEI FELDER, darunter die Summe.
 
-          {/*
-            ABWEICHEND VERSICHERT — nur bei Paaren, und nur auf Wunsch.
+          Erfasst wird, welchen Anteil am gemeinsamen Ziel jeder beansprucht;
+          das Haushaltsziel ist ihr Ergebnis und kein Eingabefeld mehr. Eine
+          Zahl, die man nicht aendern kann, soll auch nicht wie ein Feld
+          aussehen — deshalb steht sie darunter als Zeile und nicht als
+          gesperrtes Eingabefeld.
 
-            Der Regelfall ist, dass beide gleich versichert sind; dann steht
-            die Angabe einmal oben und nicht zweimal hier. Wer abweicht, ist
-            aber kein Randfall: Beamter und Angestellte, Selbststaendiger und
-            Arbeitnehmerin. Fuer die war bis hierher gar kein Platz.
-          */}
-          {s.haushalt.verheiratet && (
-            <div className="mt-3 border-t border-ui-linie pt-3">
-              <Schalter
-                label="Abweichend krankenversichert"
-                wert={p.kvStatus !== undefined}
-                onChange={(b) => setzePerson(p.id, b
-                  ? { kvStatus: s.haushalt.kvStatus }
-                  : { kvStatus: undefined, kvErwerb: undefined, zusatzbeitrag: undefined,
-                      krankenkasse: undefined, pkv: undefined })}
-              />
-              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                {p.kvStatus !== undefined
-                  ? 'Eigener Status, eigene Kasse, eigener Beitrag — unabhängig vom Haushalt.'
-                  : `Versichert wie der Haushalt: ${KV_TEXT[s.haushalt.kvStatus]}.`}
-              </p>
-
-              {p.kvStatus !== undefined && (
-                <>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <AuswahlFeld
-                      label="Krankenversicherung im Ruhestand"
-                      wert={p.kvStatus}
-                      onChange={(v) => setzePerson(p.id, { kvStatus: v })}
-                      optionen={[
-                        { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
-                        { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
-                        { wert: 'pkv', text: 'Privat versichert' },
-                      ]}
-                    />
-                    {p.kvStatus !== 'pkv' && KRANKENKASSEN.length > 0 && (
-                      <AuswahlFeld
-                        label="Krankenkasse"
-                        wert={p.krankenkasse ?? ''}
-                        onChange={(name) => {
-                          const k = kasseNach(name);
-                          setzePerson(p.id, k
-                            ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
-                            : { krankenkasse: undefined });
-                        }}
-                        hilfe={KASSEN_STAND}
-                        optionen={[
-                          { wert: '', text: 'Wie der Haushalt' },
-                          ...KRANKENKASSEN.map((k) => ({
-                            wert: k.name, text: `${k.name} — ${prozent(k.zusatzbeitrag, 2)}`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  </div>
-                  {p.kvStatus === 'pkv' && (
-                    <PkvFelder
-                      titel={`Private Krankenversicherung von ${personName(p)}`}
-                      wert={p.pkv ?? s.haushalt.pkv}
-                      onChange={(neu) => setzePerson(p.id, { pkv: neu })}
-                    />
-                  )}
-                </>
-              )}
+          Alleinstehende sehen unveraendert das eine Feld: Ein Anteil an
+          nichts waere dort nur eine Rechenstufe ohne Aussage.
+        */}
+        {paar ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {gerechnetePersonen.map((p) => (
+                <ZahlFeld
+                  key={p.id}
+                  label={`Zielnetto ${personName(p)}`}
+                  wert={Math.round(p.zielAnteilHeute ?? s.haushalt.zielNettoHeute / 2)}
+                  onChange={(n) => setzeZielAnteil(p.id, n)}
+                  einheit="€"
+                  vorbelegt={marke('haushalt.zielNettoHeute')}
+                />
+              ))}
             </div>
+            {/* Die Summe unter einer Linie in Tinte, wie in den Aufstellungen der Beratung. */}
+            <dl className="mt-3 text-sm">
+              <Posten summe text="Haushaltsziel gesamt" wert={euro(s.haushalt.zielNettoHeute)} />
+            </dl>
+          </>
+        ) : (
+          <ZahlFeld
+            label="Zielnetto im Alter (Kaufkraft heute)"
+            wert={s.haushalt.zielNettoHeute}
+            onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
+            einheit="€"
+            gross
+            vorbelegt={marke('haushalt.zielNettoHeute')}
+          />
+        )}
+        {zielAnteil !== null && (
+          <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+            Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}{' '}
+            heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
+          </p>
+        )}
+        {/*
+          Ein Vorschlag, kein Automatismus: Wer ihn uebernimmt, hat das Ziel
+          bewusst gesetzt. Bei Paaren entfaellt er — dort ist das Ziel die
+          Summe zweier Anteile, und welcher Anteil wie gross sein soll, sagt
+          keine Faustregel.
+        */}
+        {!paar && zielVorschlag !== null && zielVorschlag > 0 && zielVorschlag !== s.haushalt.zielNettoHeute && (
+          <button
+            type="button"
+            onClick={() => setzeHaushalt({ zielNettoHeute: zielVorschlag })}
+            className="mt-3 inline-flex items-center rounded-full border border-ui-zweit-rand bg-ui-karte px-3 py-1.5 text-left text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden"
+          >
+            Faustregel {prozent(FAUSTREGEL_ZIEL, 0)} des heutigen Nettos: {euro(zielVorschlag)} übernehmen
+          </button>
+        )}
+        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
+          An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
+          die nötig wäre, um sie zu schließen.
+          {paar && (
+            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>; in
+              der Einzelbetrachtung gilt jeder <strong>unverändert</strong> als Ziel der
+              jeweiligen Person.</>
           )}
-        </Abschnitt>
-      ))}
-
-      {zeige('personen') && !s.haushalt.verheiratet && (
-        <p className="text-xs text-ui-schiefer">
-          Für einen zweiten Haushaltspartner oben &bdquo;Verheiratet&ldquo; aktivieren.
         </p>
-      )}
+      </section>}
     </div>
   );
 }
