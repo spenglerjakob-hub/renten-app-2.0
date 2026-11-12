@@ -22,7 +22,12 @@ export interface SparzielEingaben {
 }
 
 export const SPARZIEL_VORGABE: SparzielEingaben = {
-  rendite: 0.05,
+  /*
+    6 % NACH KOSTEN — die Vorgabe fuer Bildschirm und Gutachten. Sie gilt fuer
+    die Sparzeit und fuer die Zeit der Entnahme; wer vorsichtiger rechnen
+    will, aendert sie im Sparrechner unter „Annahmen“.
+  */
+  rendite: 0.06,
   /*
     OHNE Beitragsdynamik. Sie war mit 3 % vorbelegt und liess die noetige
     Startrate kleiner aussehen, als sie ist — wer nicht jedes Jahr erhoeht,

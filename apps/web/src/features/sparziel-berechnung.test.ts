@@ -11,6 +11,20 @@ const zeile = (luecke = 1500): Jahreszeile => ({
   kaufkraftfaktor: 1.67,
 }) as unknown as Jahreszeile;
 
+describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
+  it('6 % Rendite nach Kosten, kein steigender Beitrag, 25 Jahre Auszahlung', () => {
+    expect(SPARZIEL_VORGABE).toEqual({ rendite: 0.06, dynamik: 0, auszahldauer: 25 });
+  });
+
+  it('eine höhere Rendite senkt Kapital und Beitrag', () => {
+    const s = standardSzenario();
+    const mit5 = sparzielRechnen(s, zeile(), { ...SPARZIEL_VORGABE, rendite: 0.05 })!;
+    const mit6 = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
+    expect(mit6.zielkapital).toBeLessThan(mit5.zielkapital);
+    expect(mit6.gewaehlt.startbeitrag).toBeLessThan(mit5.gewaehlt.startbeitrag);
+  });
+});
+
 describe('wunschbeitragRechnen — was ein Beitrag von der Lücke schließt', () => {
   const s = standardSzenario();
   const voll = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;

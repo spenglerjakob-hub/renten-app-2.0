@@ -988,7 +988,16 @@ export default function App() {
         if (luecke <= 0) return 'Keine Lücke zu schließen';
         // Der Beitrag aus dem Sparrechner; war er noch nicht offen, der mit seinen Vorgaben.
         const rate = sparrate ?? sparziel?.gewaehlt.startbeitrag ?? null;
-        return rate === null ? undefined : `${euro(rate)} im Monat schließen die Lücke`;
+        if (rate === null) return undefined;
+        /*
+          Dazu der eigene Beitrag — sobald er gewaehlt ist: Das Stueck „Was
+          willst du zuruecklegen?“ war offen, oder der Fall ist schon bei den
+          Angeboten. Vorher stuende hier nur die Vorbelegung des Felds.
+        */
+        const gewaehlt = stueckeStand.sparen?.weit === 'wunsch'
+          || szenario.loesungen.angebote.length > 0 || mitHaushalt.loesungen.length > 0;
+        return `${euro(rate)} im Monat schließen die Lücke${
+          gewaehlt ? ` · ${t.dein()} Beitrag: ${euro(szenario.loesungen.nettoMonat)}` : ''}`;
       }
       case 'loesungen': {
         const n = ansichtSzenario.loesungen.angebote.length;
@@ -1695,7 +1704,8 @@ export default function App() {
               ...(mitHaushalt.loesungen.length > 0 ? [{
                 id: 'antrag',
                 titel: 'Angaben für den Antrag',
-                ergebnis: szenario.loesungen.antrag ? 'Antrag angelegt' : 'Noch nicht angelegt',
+                // Ein Haken nur, wenn der Antrag angelegt ist — sonst der leere Kreis.
+                ...(szenario.loesungen.antrag ? { ergebnis: 'Antrag angelegt' } : { fehlt: 'Noch nicht angelegt' }),
                 inhalt: (
                   <Antragsangaben
                     antragId={szenario.loesungen.antrag}
