@@ -10,8 +10,8 @@ import {
 import { AKZENT, EINLEITUNG, Hervor, KNOPF, KNOPF_ZWEIT, LINK, Titel } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 import {
-  foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, ohneEigenaufwand,
-  ohneEigenaufwandText, type AngebotPosition,
+  foerderBasis, loesungsOptionen, auszeichnungen, angebotPositionen, angebotKenntKapital, besteAngebote, besteAngeboteText,
+  ohneEigenaufwand, ohneEigenaufwandText, type AngebotPosition,
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
@@ -601,22 +601,13 @@ const einzahlung = (p: Position) => p.rente ?? p.kapital;
 /** Rein arbeitgeberfinanziert: gerechnet, aber ohne eigenen Aufwand (`ohneEigenaufwand`). */
 const ohneAufwand = (p: Position) => { const e = einzahlung(p); return e !== null && ohneEigenaufwand(e); };
 
-/**
- * Die hoechste Nettorendite eines Angebots ueber beide Wege. Ohne eigenen
- * Aufwand gibt es keine — ein solches Angebot steht ausser Wertung.
- */
-const besteRenditeVon = (p: Position) => (ohneAufwand(p)
-  ? -Infinity
-  : Math.max(p.rente?.rendite ?? -Infinity, p.kapital?.rendite ?? -Infinity));
-
 function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; nettoHeute: number }) {
   const mitRente = positionen.some((p) => p.rente);
   const mitKapital = positionen.some((p) => p.kapital);
   const t = useAnsprache();
   const mitVergleich = positionen.some((p) => p.breakEven);
-  // Um die beste Rendite konkurrieren nur Angebote mit eigenem Aufwand.
-  const inWertung = positionen.filter((p) => (p.rente || p.kapital) && !ohneAufwand(p));
-  const beste = inWertung.reduce((m, p) => Math.max(m, besteRenditeVon(p)), -Infinity);
+  // „Bestes“ misst die Nettorendite der Rente — das Kapital steht ausser Wertung (`besteAngebote`).
+  const beste = besteAngebote(positionen);
   /** Hebel, Rendite und Amortisation: ohne eigenen Aufwand ein Strich, kein „0,00“. */
   const mitAufwand = (p: Position, w: string) => (ohneAufwand(p) ? null : w);
 
@@ -711,7 +702,7 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
                   {ohneAufwand(p) && (
                     <span className="mt-0.5 block text-xs font-normal leading-tight text-ui-schiefer">rein arbeitgeberfinanziert</span>
                   )}
-                  {inWertung.length > 1 && inWertung.includes(p) && Math.abs(besteRenditeVon(p) - beste) < 1e-9 && (
+                  {beste.ids.includes(p.angebot.id) && (
                     <span className="ui-marke mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium">
                       <Trophy className="h-3 w-3" aria-hidden /> Bestes
                     </span>
@@ -746,8 +737,10 @@ function AngebotsTabelle({ positionen, nettoHeute }: { positionen: Position[]; n
           </tbody>
         </table>
       </ScrollBereich>
-      {(positionen.some(ohneAufwand) || positionen.some((p) => !p.rente && !p.kapital)) && (
+      {(beste.weg !== null || positionen.some(ohneAufwand) || positionen.some((p) => !p.rente && !p.kapital)) && (
         <div className="space-y-1.5 border-t border-ui-linie bg-ui-innen px-4 py-3 text-xs leading-relaxed text-ui-tinte">
+          {/* Woran die Auszeichnung gemessen ist — sonst liest man sie als „in jeder Zeile vorn“. */}
+          {beste.weg !== null && <p>„Bestes“: {besteAngeboteText(beste.weg)}</p>}
           {positionen.some(ohneAufwand) && <p>{ohneEigenaufwandText(t)}</p>}
           {positionen.some((p) => !p.rente && !p.kapital) && (
             <p>
