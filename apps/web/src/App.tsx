@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Download, FolderOpen, Info,
   List, Printer, RotateCcw, Settings, TrendingUp, User, Wallet, Inbox,
@@ -63,9 +63,9 @@ import { KaufkraftSchalter } from './components/KaufkraftSchalter';
 import { Seitenleiste, type Abschnitt, type Werkzeug } from './components/Seitenleiste';
 import { Dialog } from './components/Dialog';
 import {
-  AblaufGeber, EtappenZaehler, EtappenZeile, SPALTE, Stuecke, insBild, type Stueck,
+  AblaufGeber, EtappenAblauf, SPALTE, Stuecke, type Stueck,
 } from './components/Ablauf';
-import { erreichteEtappen, type StueckeStand } from './components/ablauf-logik';
+import type { StueckeStand } from './components/ablauf-logik';
 import { datenSatz } from './features/daten-ergebnis';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './features/sparziel-berechnung';
 import { kaufkraft } from './features/kaufkraft';
@@ -341,21 +341,6 @@ export default function App() {
     setSprung((n) => n + 1);
     try { localStorage.setItem(SPEICHER_ETAPPE, s); } catch { /* Speicher gesperrt */ }
   }, []);
-  /*
-    Die offene Etappe kommt nach einem Sprung an den oberen Rand, mit der
-    Zeile davor darueber, und bekommt den Fokus — der Knopf, der hierher
-    gefuehrt hat, ist dann oft nicht mehr da. Hat sich ein Stueck darin schon
-    selbst geholt (die Fortschrittsleiste springt an einen Schritt der
-    Angaben), bleibt es dabei.
-  */
-  const offeneEtappe = useRef<HTMLLIElement>(null);
-  useLayoutEffect(() => {
-    const el = offeneEtappe.current;
-    if (sprung === 0 || !el) return;
-    if (el !== document.activeElement && el.contains(document.activeElement)) return;
-    insBild(el);
-    el.focus({ preventScroll: true });
-  }, [sprung]);
   // Wo die Stuecke jeder Etappe stehen — ueber den Etappenwechsel hinweg (`AblaufGeber`).
   const [stueckeStand, setStueckeStand] = useState<Record<string, StueckeStand>>({});
   const merkeStuecke = useCallback(
@@ -1473,31 +1458,18 @@ export default function App() {
           geht es Stueck fuer Stueck weiter (`Stuecke`).
         */}
         <AblaufGeber stand={stueckeStand} onStand={merkeStuecke} weiter={weiterEtappe} durch={etappeNr(schritt) < weit}>
-        <ol aria-label="Ablauf der Beratung" className="space-y-3">
-          {erreichteEtappen(ETAPPEN_IDS, schritt, weit).map((id) => {
-            const nr = etappeNr(id) + 1;
-            const name = ETAPPEN[nr - 1]!.text;
-            if (id !== schritt) {
-              return (
-                <li key={id} className={SPALTE}>
-                  <EtappenZeile
-                    nr={nr}
-                    name={name}
-                    ergebnis={etappeErgebnis(id)}
-                    erledigt={etappeErledigt(id)}
-                    fehlt={id === 'daten' ? datenFehlt : undefined}
-                    onOeffnen={() => geheZu(id)}
-                  />
-                </li>
-              );
-            }
-            return (
-              // Luft nach unten: Die Zeilen spaeterer Etappen gehoeren nicht zu den Stuecken dieser.
-              <li key={id} ref={offeneEtappe} tabIndex={-1} className="pb-6 pt-3 focus:outline-none sm:pb-8 sm:pt-4">
-                <div className={`${SPALTE} mb-3`}>
-                  <EtappenZaehler nr={nr} von={ETAPPEN.length} name={name} />
-                </div>
-                <div className="space-y-6 sm:space-y-8">
+        <EtappenAblauf
+          etappen={ETAPPEN.map(({ id, text }) => ({
+            name: text,
+            ergebnis: etappeErgebnis(id),
+            erledigt: etappeErledigt(id),
+            fehlt: id === 'daten' ? datenFehlt : undefined,
+          }))}
+          offen={etappeNr(schritt)}
+          weit={weit}
+          sprung={sprung}
+          onOeffnen={(i) => geheZu(ETAPPEN_IDS[i]!)}
+        >
 
         {/* ---------- 1. DATEN & ZIEL ---------- */}
         {schritt === 'daten' && (
@@ -1728,11 +1700,7 @@ export default function App() {
           />
         )}
 
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+        </EtappenAblauf>
         </AblaufGeber>
 
         {/* Nur waehrend gerechnet wird. „berechnet in 6 ms“ war ein Hinweis

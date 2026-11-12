@@ -1,25 +1,41 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Lock, Save } from 'lucide-react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Lock, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
-import { Etappen, KNOPF, KNOPF_ZWEIT, LINK, TIPPFLAECHE } from '../components/stil';
+import { AblaufGeber, EtappenAblauf, type AblaufEtappe } from '../components/Ablauf';
+import type { StueckeStand } from '../components/ablauf-logik';
+import { KNOPF_ZWEIT, LINK, TIPPFLAECHE } from '../components/stil';
 import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
 import { zeitpunktText } from './unterschrift-daten';
-import { beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung } from './rechnung';
+import {
+  automatischerBeginn, beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung,
+} from './rechnung';
 import {
   SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung, SchrittUnterlagen,
 } from './schritte';
+import {
+  angabenZeile, angebotSatz, entscheidungZeile, leistungZeile, lueckeZeile, rechnungZeile, unterlagenZeile,
+} from './zeilen';
 import type { Ort } from './ort';
 
 export const SCHRITTE = [
   'Angebot', 'Ihre Angaben', 'Versorgungslücke', 'Ihre Rechnung', 'Leistung im Alter', 'Entscheidung', 'Unterlagen',
 ] as const;
 
+/** Unter diesem Namen merkt sich der Ablauf, wo die Stuecke eines Schritts stehen (`Stuecke` in `schritte.tsx`). */
+export const KENNUNGEN = ['angebot', 'angaben', 'luecke', 'rechnung', 'leistung', 'entscheidung', 'unterlagen'] as const;
+
 /**
  * Eine Beratung: sieben Schritte fuer den geteilten Bildschirm. „Versorgungsluecke“
  * kam als dritter dazu (Datenversion 2; `beratungLesen` hebt aeltere Daten an).
+ *
+ * VON OBEN NACH UNTEN (`components/Ablauf.tsx`), wie die Ruhestandsplanung:
+ * Jeder erreichte Schritt steht als Zeile mit seinem Ergebnis da, der offene
+ * an seiner Stelle dazwischen — darin geht es Stueck fuer Stueck weiter. Was
+ * noch nicht dran war, steht nicht da; „Springen zu“ im Kopf fuehrt den
+ * Berater trotzdem an jeden Schritt, etwa wenn er eine Beratung fortsetzt.
  *
  * Gerechnet wird bei jeder Eingabe neu (`rechnung.ts`), gespeichert beim
  * Wechsel des Schritts, mit „Speichern“ und beim Verlassen der Beratung —
@@ -31,7 +47,8 @@ export const SCHRITTE = [
  * UNTERSCHRIEBEN (Unterschrift.tsx): Mit der ersten Unterschrift sind die
  * Unterlagen festgeschrieben und die Beratung ist gesperrt — die Schritte 1
  * bis 6 nur noch zum Ansehen, gespeichert wird nichts mehr (die Datenbank
- * wiese es ab). Wer die Unterschriften aufhebt, kann wieder aendern.
+ * wiese es ab). Wer die Unterschriften aufhebt, kann wieder aendern. Gesperrt
+ * ist der Inhalt der Stuecke; ihre Zeilen und „Weiter“ bleiben bedienbar.
  */
 export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string; beratungId: string; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
@@ -49,9 +66,25 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   gesperrtRef.current = gesperrt;
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
   const auftritt = useBeraterAuftritt();
+  /*
+    WIE WEIT DIE BERATUNG GEKOMMEN IST: Alle Schritte bis dorthin stehen als
+    Zeilen da, auch wenn man einen frueheren wieder oeffnet. Nur im
+    Arbeitsspeicher — beim Oeffnen gilt der gemerkte offene Schritt und, was
+    die Beratung selbst hergibt (`weit` weiter unten).
+  */
+  const [besucht, setBesucht] = useState(0);
+  // Zaehlt jeden Sprung — auch den auf den schon offenen Schritt: Dann kommt er wieder ins Bild.
+  const [sprung, setSprung] = useState(0);
+  // Wo die Stuecke jedes Schritts stehen — ueber den Wechsel des Schritts hinweg (`AblaufGeber`).
+  const [stueckeStand, setStueckeStand] = useState<Record<string, StueckeStand>>({});
+  const merkeStuecke = useCallback(
+    (kennung: string, stand: StueckeStand) => setStueckeStand((alt) => ({ ...alt, [kennung]: stand })),
+    [],
+  );
 
   useEffect(() => {
     let aktiv = true;
+    setStueckeStand({});
     void Promise.all([firmaLaden(firmaId), beratungLaden(beratungId), unterlagenLaden(beratungId)]).then(([f, b, u]) => {
       if (!aktiv) return;
       setFirma(f);
@@ -61,6 +94,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       setBeratung(passt);
       if (passt && typeof passt === 'object') {
         setDaten(passt.daten);
+        setBesucht(passt.daten.schritt);
         gespeichertRef.current = JSON.stringify(passt.daten);
         setGespeichert(gespeichertRef.current);
       }
@@ -87,20 +121,33 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const f = firma && typeof firma === 'object' ? firma : null;
   const r = useMemo(() => (f && daten ? beitragsRechnung(f.angebot, daten) : null), [f, daten]);
   const schritt = daten?.schritt ?? 0;
-  // Die Projektionen nur dort, wo sie gebraucht werden — Entscheidung und Unterlagen (Schritt 6 und 7) drucken alles.
+  /*
+    Eine Beratung, die man wieder oeffnet, zeigt, wie weit sie ist: mit
+    Unterschrift alle Schritte, mit einer Entscheidung bis dorthin. Sonst
+    beginnt sie beim gemerkten Schritt.
+  */
+  const weit = Math.max(besucht, schritt, gesperrt ? 6 : daten && daten.entscheidung.status !== 'offen' ? 5 : 0);
+  /*
+    Die Projektionen erst, wenn die Beratung bei ihrem Schritt angekommen ist —
+    dann aber dauerhaft: Die Zeile des Schritts nennt ihr Ergebnis, auch wenn
+    ein frueherer offen ist. Entscheidung und Unterlagen (Schritt 6 und 7)
+    drucken alles.
+  */
+  const mitLuecke = weit >= 2;
+  const mitLeistung = weit >= 4;
   const leistung = useMemo(() => {
-    if (!f || !aufgeschoben || schritt < 4) return null;
+    if (!f || !aufgeschoben || !mitLeistung) return null;
     return leistungsRechnung(f.angebot, aufgeschoben, beitragsRechnung(f.angebot, aufgeschoben));
-  }, [f, aufgeschoben, schritt]);
+  }, [f, aufgeschoben, mitLeistung]);
   const kennzahlen = useMemo(
     () => (f && aufgeschoben && leistung ? kennzahlenRechnung(f.angebot, aufgeschoben, leistung) : null),
     [f, aufgeschoben, leistung],
   );
   // Fuer den Schritt selbst, fuer den Anteil, den die Betriebsrente schliesst (Leistung im Alter), und fuer die Unterlagen
   const luecke = useMemo(() => {
-    if (!f || !aufgeschoben || (schritt !== 2 && schritt < 4)) return null;
+    if (!f || !aufgeschoben || !mitLuecke) return null;
     return versorgungslueckeRechnung(f.angebot, aufgeschoben);
-  }, [f, aufgeschoben, schritt]);
+  }, [f, aufgeschoben, mitLuecke]);
 
   const zurFirma = () => gehe({ firma: firmaId, beratung: null, reiter: 'mitarbeiter' });
   const zurueck = (onClick: () => void) => (
@@ -138,14 +185,44 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   // Erst gespeichert, dann zur Liste. Klappt das Speichern nicht, bleibt man hier — die Meldung steht oben.
   const fertig = () => (geaendert ? void sichern(daten).then((ok) => { if (ok) zurFirma(); }) : zurFirma());
   const setze = (fn: (d: BeratungDaten) => BeratungDaten) => { if (!gesperrt) setDaten((d) => (d ? fn(d) : d)); };
-  const geheZu = (i: number) => {
-    const d = { ...daten, schritt: Math.max(0, Math.min(SCHRITTE.length - 1, i)) };
+  /** @param stueck Das Stueck, das im Schritt offen sein soll — etwa das mit dem Feld, das noch fehlt */
+  const geheZu = (i: number, stueck?: string) => {
+    const ziel = Math.max(0, Math.min(SCHRITTE.length - 1, i));
+    const d = { ...daten, schritt: ziel };
     setDaten(d);
     void sichern(d);
-    window.scrollTo({ top: 0 });
+    setBesucht((n) => Math.max(n, ziel));
+    if (stueck) {
+      const kennung = KENNUNGEN[ziel]!;
+      setStueckeStand((alt) => ({ ...alt, [kennung]: { offen: stueck, weit: alt[kennung]?.weit ?? null } }));
+    }
+    setSprung((n) => n + 1);
   };
 
-  const props = { firma: f, logo, daten, setze, r, leistung, geheZu };
+  const props = { firma: f, logo, daten, setze, r, leistung, geheZu, gesperrt };
+
+  // Jeder Schritt in einem Satz — fuer seine Zeile, sobald er nicht mehr offen ist.
+  const heute = new Date();
+  const zeilen = [
+    { ergebnis: angebotSatz(f.angebot) },
+    angabenZeile(daten.angaben, heute),
+    lueckeZeile(luecke),
+    rechnungZeile(r),
+    leistungZeile(leistung, r, daten),
+    entscheidungZeile(daten, r, automatischerBeginn(f.angebot)),
+    unterlagenZeile(unterlagen),
+  ];
+  // Ein Haken nur fuer wirklich Erledigtes: „Noch offen“ und „Noch nicht unterschrieben“ tragen die Nummer.
+  const erledigt = [
+    true, true, luecke !== null, true, true, daten.entscheidung.status !== 'offen', gesperrt,
+  ];
+  const etappen: AblaufEtappe[] = SCHRITTE.map((name, i) => ({
+    name, ...zeilen[i], erledigt: erledigt[i]! && !zeilen[i]!.fehlt,
+  }));
+  // „Weiter“ am Ende des Wegs eines Schritts fuehrt zum naechsten — am Ende der Beratung zur Liste.
+  const weiter = schritt < SCHRITTE.length - 1
+    ? { text: <>Weiter: {SCHRITTE[schritt + 1]}</>, onClick: () => geheZu(schritt + 1) }
+    : { text: 'Fertig — zur Mitarbeiterliste', onClick: fertig };
 
   return (
     <div className="space-y-6">
@@ -167,12 +244,25 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <FirmenZeichen name={f.name} logo={logo} als="h1" />
-        <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <p className="text-sm text-ui-schiefer">{daten.angaben.name || 'Neue Beratung'}</p>
+          {/*
+            Fuer den Berater: an jeden Schritt, ohne den Weg dorthin zu gehen. Die
+            Auswahl zeigt immer ihre Aufschrift — wo man steht, sagt der Ablauf darunter.
+          */}
+          <select
+            aria-label="Zu einem Schritt springen"
+            value=""
+            onChange={(e) => { if (e.target.value !== '') geheZu(Number(e.target.value)); }}
+            className="ui-feld max-w-full py-2 pl-2 pr-8 text-sm text-ui-tinte"
+          >
+            <option value="" disabled hidden>Springen zu …</option>
+            {SCHRITTE.map((name, i) => <option key={name} value={i}>{i + 1} · {name}</option>)}
+          </select>
+        </div>
       </div>
-
-      <Etappen schritte={SCHRITTE} aktiv={schritt} onWechsel={geheZu} beschriftung="Schritte der Beratung" />
 
       {gesperrt && schritt < 6 && (
         <div role="note" className="ui-innen flex flex-wrap items-center gap-3 p-4">
@@ -187,35 +277,20 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         </div>
       )}
 
-      {/* Gesperrt: alles nur zum Ansehen — ein deaktiviertes fieldset sperrt jedes Feld und jeden Knopf darin. */}
-      {schritt < 6 ? (
-        <fieldset disabled={gesperrt} className="min-w-0">
+      <AblaufGeber stand={stueckeStand} onStand={merkeStuecke} weiter={weiter} durch={schritt < weit}>
+        <EtappenAblauf etappen={etappen} offen={schritt} weit={weit} sprung={sprung} onOeffnen={geheZu} wort="Schritt">
           {schritt === 0 && <SchrittAngebot {...props} />}
           {schritt === 1 && <SchrittAngaben {...props} />}
           {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
           {schritt === 3 && <SchrittRechnung {...props} />}
           {schritt === 4 && <SchrittLeistung {...props} kennzahlen={kennzahlen} luecke={luecke} aktuell={aufgeschoben === daten} />}
           {schritt === 5 && <SchrittEntscheidung {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen} />}
-        </fieldset>
-      ) : (
-        <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen}
-          beratungId={beratungId} unterlagen={unterlagen} aktualisieren={aktualisieren} aktuell={aufgeschoben === daten} />
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ui-linie pt-6">
-        <button type="button" onClick={() => geheZu(schritt - 1)} disabled={schritt === 0} className={KNOPF_ZWEIT}>
-          <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
-        </button>
-        {schritt < SCHRITTE.length - 1 ? (
-          <button type="button" onClick={() => geheZu(schritt + 1)} className={KNOPF}>
-            Weiter: {SCHRITTE[schritt + 1]} <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
-        ) : (
-          <button type="button" onClick={fertig} className={KNOPF}>
-            Fertig — zur Mitarbeiterliste
-          </button>
-        )}
-      </div>
+          {schritt === 6 && (
+            <SchrittUnterlagen {...props} auftritt={auftritt} sichern={sichern} luecke={luecke} kennzahlen={kennzahlen}
+              beratungId={beratungId} unterlagen={unterlagen} aktualisieren={aktualisieren} aktuell={aufgeschoben === daten} />
+          )}
+        </EtappenAblauf>
+      </AblaufGeber>
     </div>
   );
 }
