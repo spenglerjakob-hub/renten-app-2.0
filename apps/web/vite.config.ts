@@ -64,6 +64,8 @@ export default defineConfig({
         arbeitgeber: resolve(hier, 'arbeitgeber.html'),
         zuschuss: resolve(hier, 'zuschussmodell.html'),
         festbetrag: resolve(hier, 'festbetrag.html'),
+        // Der Betriebs-Check — ein Arbeitgebermodell fuer die ganze Belegschaft.
+        betriebsCheck: resolve(hier, 'betriebs-check.html'),
         bkv: resolve(hier, 'bkv.html'),
         impressum: resolve(hier, 'impressum.html'),
         datenschutz: resolve(hier, 'datenschutz.html'),

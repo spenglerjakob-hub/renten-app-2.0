@@ -43,6 +43,8 @@ DirectoryIndex index.html
   RewriteRule ^zuschussmodell/?$ /zuschussmodell.html [NC,L]
   # Und das Festbetragsmodell.
   RewriteRule ^festbetrag/?$ /festbetrag.html [NC,L]
+  # Und der Betriebs-Check: ein Modell fuer die ganze Belegschaft.
+  RewriteRule ^betriebs-check/?$ /betriebs-check.html [NC,L]
   # Und die betriebliche Krankenversicherung.
   RewriteRule ^bkv/?$ /bkv.html [NC,L]
 

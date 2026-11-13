@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Building2, Check, ClipboardList, Copy, ExternalLink, FileSearch, HandCoins, HeartPulse, LineChart, Scale, Users, X,
+  Building2, Check, ClipboardList, Copy, ExternalLink, Factory, FileSearch, HandCoins, HeartPulse, LineChart, Scale, Users, X,
 } from 'lucide-react';
 import { RechtsLinks } from './RechtsLinks';
 
@@ -79,6 +79,10 @@ export const ARBEITGEBER: Seite[] = [
   {
     href: '/arbeitgeber', titel: 'Matching-Modell', text: 'Entgeltumwandlung + Unterstützungskasse',
     symbol: <Building2 className="h-4 w-4" aria-hidden />,
+  },
+  {
+    href: '/betriebs-check', titel: 'Betriebs-Check', text: 'Die ganze Belegschaft, drei Szenarien',
+    symbol: <Factory className="h-4 w-4" aria-hidden />,
   },
   {
     href: '/mitarbeiterberatung', titel: 'bAV-Mitarbeiterberatung', text: 'Jeden Mitarbeiter beraten, mit Unterlagen',

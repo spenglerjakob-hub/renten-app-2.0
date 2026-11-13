@@ -463,16 +463,32 @@ const MODELLE = [
   { href: '/arbeitgeber', text: 'Matching-Modell mit Unterstützungskasse' },
 ] as const;
 
-/** Querverweis auf die jeweils anderen Arbeitgebermodelle — als Textlinks, die leiseste Aktion. */
-export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] }) {
+/** Der Betriebs-Check rechnet ein Modell fuer die ganze Belegschaft — von jeder Modellseite aus erreichbar. */
+const BETRIEBS_CHECK = '/betriebs-check';
+
+/**
+ * Querverweis auf die jeweils anderen Arbeitgebermodelle — als Textlinks, die
+ * leiseste Aktion. Von einem Modell aus fuehrt ausserdem einer zum
+ * Betriebs-Check; dort stehen umgekehrt die drei Modelle.
+ */
+export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] | typeof BETRIEBS_CHECK }) {
+  const imCheck = aktuell === BETRIEBS_CHECK;
   return (
     <p className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm print:hidden">
-      <span className="text-ui-schiefer">Andere Modelle:</span>
+      <span className="text-ui-schiefer">{imCheck ? 'Die Modelle im Einzelnen:' : 'Andere Modelle:'}</span>
       {MODELLE.filter((m) => m.href !== aktuell).map((m) => (
         <a key={m.href} href={m.href} className={LINK}>
           {m.text} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </a>
       ))}
+      {!imCheck && (
+        <>
+          <span className="text-ui-schiefer">Für den ganzen Betrieb:</span>
+          <a href={BETRIEBS_CHECK} className={LINK}>
+            Betriebs-Check mit Ihrer Belegschaft <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        </>
+      )}
     </p>
   );
 }

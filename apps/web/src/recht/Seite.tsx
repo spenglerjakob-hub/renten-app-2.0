@@ -422,11 +422,21 @@ function Datenschutz() {
       <H2>13. Weitere Seiten</H2>
       <P>
         Die Seite zum Altersvorsorgedepot und die Arbeitgeber-Seiten (Zuschuss-, Festbetrag- und Matching-Modell,
-        betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
+        Betriebs-Check, betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
         selbst in Ihr Konto legen: eine Firma, die Sie auf einer Arbeitgeber-Seite anlegen oder deren Logo Sie dort
         ergänzen, und ein Modell, das Sie mit „Für die Mitarbeiter-Beratung übernehmen“ übernehmen (Abschnitt 7).
         Für welche Firma Sie gerade rechnen, merkt sich nur der geöffnete Tab Ihres Browsers, bis Sie ihn schließen.
         „Beratung anfragen“ öffnet Ihr eigenes E-Mail-Programm; was Sie dort absenden, entscheiden Sie selbst.
+      </P>
+      <P>
+        Der Betriebs-Check rechnet mit der Belegschaft eines Betriebs als Gehaltsgruppen: Bezeichnung, Anzahl und
+        Jahresgehalt. Diese Angaben bleiben im Speicher Ihres Browsers auf Ihrem Gerät, getrennt je Firma, bis Sie
+        sie dort mit „Hier löschen“ entfernen oder die Daten Ihres Browsers löschen; in Ihr Konto und an uns werden
+        sie nicht übertragen. Eine eingefügte Lohnliste wird nur im Browser gelesen: Namen und Personalnummern
+        werden nicht übernommen, einzelne Gehälter auf volle 1.000 € gerundet und zu Gruppen zusammengefasst. Bei
+        kleinen Gruppen kann ein Gehalt trotzdem einer Person zuzuordnen sein — ob Sie die Angaben verwenden dürfen,
+        klären Sie mit dem Arbeitgeber. [Einordnung der Gehaltsgruppen als personenbezogene Daten und Hinweis
+        rechtlich prüfen lassen.]
       </P>
 
       <H2>14. Empfänger und Auftragsverarbeiter</H2>
