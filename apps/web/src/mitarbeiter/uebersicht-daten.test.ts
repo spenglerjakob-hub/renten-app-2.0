@@ -93,11 +93,17 @@ describe('Netto-Belastung des Arbeitgebers', () => {
     const b = uebersichtSummen(uebersichtZeilen(mit, liste)).belastung;
     expect(b.beitragMonat).toBeCloseTo(vorgabe.beitragMonat, 9);
     expect(b.svErsparnisMonat).toBeCloseTo(vorgabe.svErsparnisMonat, 9);
-    // Beitragsfrei sind 4 % der BBG, der Zuschuss zaehlt zuerst: Zora ganz, Anna (250 + 100) nur bis zum Rahmen.
+    // Beitragsfrei sind 4 % der BBG, der Zuschuss zaehlt zuerst: Zora ganz, Anna (250 + 100) nur bis zum Rahmen —
+    // 2026 sind das 338 € und Anna liegt darueber, ab 2027 (354 €) passt sie hinein.
     const rahmen = (0.04 * P.bbgRvJahr) / 12;
     expect(b.umlagenErsparnisMonat).toBeCloseTo((150 + Math.min(250, rahmen - 100)) * 0.03, 6);
-    expect(b.umlagenErsparnisMonat).toBeLessThan(400 * 0.03);
+    expect(b.umlagenErsparnisMonat).toBeLessThanOrEqual(400 * 0.03);
     expect(b.steuerersparnisMonat).toBeCloseTo(b.kostenVorSteuerMonat * 0.15, 6);
+    // Wer sicher ueber dem Rahmen liegt, spart die Umlagen nur bis dorthin — in jedem Jahr.
+    const viel = Math.round(rahmen) + 100;
+    const gross = uebersichtSummen(uebersichtZeilen(mit, [beratung('5', 'Gero Gross', 'teilnahme', viel)])).belastung;
+    expect(gross.umlagenErsparnisMonat).toBeCloseTo((rahmen - 100) * 0.03, 6);
+    expect(gross.umlagenErsparnisMonat).toBeLessThan(viel * 0.03);
   });
 
   it('die CSV bleibt, wie sie war — ohne die Belastung', () => {

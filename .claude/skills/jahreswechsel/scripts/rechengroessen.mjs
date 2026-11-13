@@ -101,6 +101,12 @@ if (!Number.isInteger(Z) || Z < 2000 || Z > 2100) {
   process.exit(1);
 }
 const zBelegt = belegte.includes(Z);
+/* Vorab bekannte Werte eines noch nicht belegten Jahres (VORABWERTE in jahre.ts):
+   Sie gelten ab ihrem Jahr statt der fortgeschriebenen. Sobald der Jahrgang
+   belegt ist, gehoeren sie geloescht. */
+const vorabAlle = [...(E.VORABWERTE ?? [])];
+const vorabZ = vorabAlle.find((v) => v.jahr === Z) ?? null;
+const vorabUeberholt = vorabAlle.filter((v) => belegte.includes(v.jahr) || v.jahr <= B);
 /* Verglichen wird das Zieljahr mit dem belegten Jahr davor — oder, solange
    es fehlt, der juengste Jahrgang mit seinem Vorgaenger. */
 const NEU = zBelegt ? Z : B;
@@ -181,6 +187,14 @@ if (!zBelegt) {
   z(`> Ohne Jahrgang ${Z} rechnet die App ab dem 1. Januar ${Z} mit einer **Fortschreibung von ${B}**. Seiten mit Index 0 % `
     + `(Arbeitgeberseiten, bKV, Mitarbeiterberatung) nehmen die Werte von ${B} unverändert, der Rechner schreibt Eurobeträge `
     + `mit dem eingestellten Index fort. Beschriftet wird trotzdem mit „Rechtsstand ${Z}“ (Teil 4).`);
+  if (vorabZ) {
+    z('>');
+    z(`> **Vorabwerte ${Z}** sind hinterlegt (\`VORAB_${Z}\` in jahre.ts): Diese Felder gelten ab dem 1. Januar ${Z} schon mit dem neuen Wert, `
+      + `alles andere bleibt Fortschreibung. Beim Anlegen des vollen Jahrgangs die Werte übernehmen, gegen die amtliche Fassung lesen und die Vorabwerte löschen.`);
+  }
+}
+for (const v of vorabUeberholt) {
+  z(`> **Fehler:** Für ${v.jahr} gibt es noch Vorabwerte, obwohl der Jahrgang belegt ist — \`VORAB_${v.jahr}\` aus jahre.ts löschen.`);
 }
 z();
 
@@ -223,6 +237,32 @@ for (const g of [...Object.keys(GRUPPEN), '?']) {
 }
 for (const pfad of Object.keys(PARAMETER_KATALOG)) {
   if (!felder.some((f) => f.pfad === pfad)) z(`> Katalogeintrag \`${pfad}\` gibt es im Rechtsstand nicht mehr — aus katalog.mjs entfernen.`);
+}
+
+/* Teil 1, Nachtrag — Vorabwerte des Zieljahres */
+
+const vorabFelder = vorabZ ? blaetter(vorabZ.werte) : [];
+if (vorabZ) {
+  z(`### Vorabwerte ${Z} — gelten ab 1. Januar ${Z}, bevor der Jahrgang voll belegt ist`);
+  z(`Hinterlegt in \`VORAB_${Z}\` (packages/engine/src/params/jahre.ts); Herkunft und Verbindlichkeit stehen dort im Kommentar. `
+    + `„${vorabZ.quelle}“.`);
+  z();
+  z(`| Feld | Bedeutung | ${B} | ${Z} vorab | Befund |`);
+  z('|---|---|---|---|---|');
+  for (const f of vorabFelder) {
+    const k = PARAMETER_KATALOG[f.pfad];
+    const einheit = k?.einheit ?? 'zahl';
+    const basis = holen(E.BASISJAHR, f.pfad);
+    const wirkt = holen(pZ, f.pfad);
+    const teile = [];
+    if (!gleich(wirkt, f.wert)) teile.push(`**wirkt nicht** — im Rechtsstand ${Z} steht ${format(wirkt, einheit)}`);
+    if (gleich(basis, f.wert)) teile.push('gleich wie im Basisjahr — als Vorabwert überflüssig');
+    z(`| \`${f.pfad}\` | ${k?.text ?? ''} | ${format(basis, einheit)} | ${format(f.wert, einheit)} | ${teile.join('; ')} |`);
+  }
+  z();
+  const offen = felder.filter((f) => PARAMETER_KATALOG[f.pfad]?.rhythmus === 'jaehrlich' && !vorabFelder.some((v) => v.pfad === f.pfad));
+  z(`Noch ohne Wert für ${Z} (jährliche Felder, weiter fortgeschrieben): ${offen.map((f) => `\`${f.pfad}\``).join(', ') || 'keine'}.`);
+  z();
 }
 
 /* Teil 2 — abgeleitete Werte */
@@ -516,7 +556,9 @@ z();
 const kurz = [
   '## Kurzfassung',
   '',
-  `- Jahrgang ${Z}: ${zBelegt ? 'angelegt' : '**fehlt** — Teil 1 zeigt den Stand von ' + B}`,
+  `- Jahrgang ${Z}: ${zBelegt ? 'angelegt' : '**fehlt** — Teil 1 zeigt den Stand von ' + B}${
+    !zBelegt && vorabZ ? `; Vorabwerte für ${vorabFelder.length} Felder gelten ab 1. Januar ${Z} (Teil 1, am Ende)` : ''}`,
+  ...(vorabUeberholt.length ? [`- **Vorabwerte löschen:** ${vorabUeberholt.map((v) => v.jahr).join(', ')} — der Jahrgang ist belegt`] : []),
   `- Jährliche Werte unverändert gegenüber dem Vorjahr: ${befunde.unveraendert.length ? befunde.unveraendert.join(', ') : 'keine'}`,
   `- Felder ohne Katalogeintrag: ${befunde.ohneKatalog.length ? befunde.ohneKatalog.join(', ') : 'keine'}`,
   `- Fundstellen, die vom Rechtsstand ${Z} abweichen: ${befunde.fundstelleAbweichung.length ? befunde.fundstelleAbweichung.join('; ') : 'keine'}`,

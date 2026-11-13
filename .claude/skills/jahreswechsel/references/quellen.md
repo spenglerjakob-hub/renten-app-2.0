@@ -44,6 +44,7 @@ Fachportale nur zum Gegenprüfen.
 - Bestandsaufnahme Ende Oktober.
 - Umsetzen, sobald Rechengrößenverordnung, Zusatzbeitrag, PAP und Tarif amtlich sind; meist Ende November.
 - Live vor dem 1. Januar.
+- Steht bis dahin nur ein Teil fest, kommt dieser Teil als Vorabwerte in den Code (SKILL.md, Schritt 4a). Rundschreiben von Versicherern und Lohnbüros nennen die Rechengrößen früh und zuverlässig; sie taugen als Vorabwert mit dem Vermerk „vorläufig“, nicht als Beleg für den Jahrgang.
 
 ## 2. Sozialversicherungs-Rechengrößen
 
