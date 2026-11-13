@@ -20,8 +20,10 @@ const NEU = 'neu';
  *
  * Wird erst beim ersten Klick geladen (`UebernehmenKnopf`).
  */
-export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
+export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland, vorauswahl = null }: {
   offen: boolean; onSchliessen: () => void; modell: FirmenModellDaten; bundesland: string;
+  /** Die Firma, fuer die die Seite rechnet — vorgewaehlt, wenn sie unter den eigenen ist */
+  vorauswahl?: string | null;
 }) {
   const [firmen, setFirmen] = useState<Firma[] | 'laedt' | 'fehler'>('laedt');
   const [wahl, setWahl] = useState(NEU);
@@ -36,9 +38,14 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland }: {
     setFertig(null);
     setMeldung(null);
     setFirmen('laedt');
-    void firmenLaden().then((f) => { if (aktiv) setFirmen(Array.isArray(f) ? f.filter((x) => x.eigene) : f); });
+    void firmenLaden().then((f) => {
+      if (!aktiv) return;
+      const eigene = Array.isArray(f) ? f.filter((x) => x.eigene) : f;
+      setFirmen(eigene);
+      setWahl(Array.isArray(eigene) && vorauswahl && eigene.some((x) => x.id === vorauswahl) ? vorauswahl : NEU);
+    });
     return () => { aktiv = false; };
-  }, [offen]);
+  }, [offen, vorauswahl]);
 
   const geprueft = firmenModellSchema.safeParse(modell);
   const liste = Array.isArray(firmen) ? firmen : [];

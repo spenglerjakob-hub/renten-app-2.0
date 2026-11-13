@@ -11,7 +11,12 @@ const UebernehmenDialog = lazy(() => import('./Uebernehmen').then((m) => ({ defa
  * zum Speichern braucht) laedt erst beim ersten Klick — die Seiten bleiben
  * so schlank wie bisher.
  */
-export function UebernehmenKnopf({ modell, bundesland }: { modell: FirmenModellDaten; bundesland: string }) {
+export function UebernehmenKnopf({ modell, bundesland, firmaId = null }: {
+  modell: FirmenModellDaten;
+  bundesland: string;
+  /** Die Firma, fuer die auf der Seite gerechnet wird — im Fenster vorgewaehlt, wenn es eine eigene ist */
+  firmaId?: string | null;
+}) {
   const [offen, setOffen] = useState(false);
   const [geladen, setGeladen] = useState(false);
   return (
@@ -25,7 +30,7 @@ export function UebernehmenKnopf({ modell, bundesland }: { modell: FirmenModellD
       </button>
       {geladen && (
         <Suspense fallback={null}>
-          <UebernehmenDialog offen={offen} onSchliessen={() => setOffen(false)} modell={modell} bundesland={bundesland} />
+          <UebernehmenDialog offen={offen} onSchliessen={() => setOffen(false)} modell={modell} bundesland={bundesland} vorauswahl={firmaId} />
         </Suspense>
       )}
     </>
