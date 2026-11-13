@@ -75,6 +75,13 @@ werden ueber einen einstellbaren Index fortgeschrieben. Jedes Ergebnis weist
 aus, welcher Stand verwendet wurde, und der PDF-Druck erlaeutert die
 Fortschreibungsannahme ausfuehrlich.
 
+Steht vom naechsten Jahr erst ein Teil fest — im Herbst die Rechengroessen der
+Sozialversicherung, noch nicht der Steuertarif —, kommt dieser Teil als
+Vorabwerte in `params/jahre.ts` (`VORABWERTE`). Sie gelten ab ihrem Jahr
+anstelle der fortgeschriebenen Werte, alles andere bleibt Fortschreibung. Mit
+dem vollen Jahrgang werden sie geloescht. Den Ablauf beschreibt der Skill
+`.claude/skills/jahreswechsel`.
+
 Der Einkommensteuertarif wird **nicht** ueber die amtlichen Koeffizienten
 gepflegt, sondern ueber vier Eckwerte je Jahrgang (Grundfreibetrag und drei
 Zonengrenzen). Aus ihnen und den Ankern des Grenzsteuersatzes (14 % / 23,97 %

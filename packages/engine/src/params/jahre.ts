@@ -135,3 +135,90 @@ export const BELEGTE_JAHRE: readonly LegalParameters[] = [
 
 /** Juengster belegter Rechtsstand — Basis jeder Fortschreibung. */
 export const BASISJAHR = PARAMETER_2026;
+
+/**
+ * VORAB BEKANNTE WERTE eines Jahres, dessen Rechtsstand noch nicht vollstaendig ist.
+ *
+ * Im Herbst steht ein Teil des neuen Jahres schon fest — die Rechengroessen
+ * der Sozialversicherung —, der Rest noch nicht: Steuertarif, Lohnsteuer-PAP,
+ * Rentenwert, Basiszins. Einen Jahrgang mit `extrapoliert: false` legt man
+ * erst an, wenn alles amtlich ist; ein halb belegter Jahrgang gaebe sich als
+ * Rechtsstand aus, der er nicht ist.
+ *
+ * Bis dahin stehen die bekannten Werte hier. Die Fortschreibung
+ * (`registry.ts`) nimmt sie AB IHREM JAHR statt der hochgerechneten und
+ * schreibt sie fuer spaetere Jahre von dort aus fort. Alle uebrigen Felder
+ * bleiben Fortschreibung aus dem Basisjahr, das Jahr bleibt `extrapoliert`.
+ * Fuer belegte Jahre und fuer alles vor dem Vorab-Jahr aendert sich nichts —
+ * die Werte gelten also von selbst ab dem 1. Januar.
+ *
+ * Sobald der volle Jahrgang angelegt ist, gehoeren die Vorabwerte des Jahres
+ * GELOESCHT: Sie sind dann im Jahrgang aufgegangen. test/rechtsstand.test.ts
+ * wacht darueber.
+ */
+export interface Vorabwerte {
+  jahr: number;
+  /** Kurz, haengt an `quelle` des fortgeschriebenen Jahres */
+  quelle: string;
+  /** Ein Satz fuer Bildschirm und Gutachten: was schon eingerechnet ist */
+  text: string;
+  werte: {
+    bbgKvJahr?: number;
+    bbgRvJahr?: number;
+    hoechstbetragAltersvorsorge?: number;
+    bezugsgroesseMonat?: number;
+    durchschnittsentgelt?: number;
+    rvSatzGesamt?: number;
+    avSatzGesamt?: number;
+    kv?: Partial<LegalParameters['kv']>;
+    pv?: Partial<LegalParameters['pv']>;
+  };
+}
+
+/**
+ * 2027 — Stand 13.11.2026, VORLAEUFIG.
+ *
+ * Rechengroessen: Sozialversicherungsrechengroessen-Verordnung 2027, vom
+ * Kabinett beschlossen und dem Bundesrat zugeleitet (BR-Drs. 576/26 vom
+ * 07.10.2026); die Zustimmung des Bundesrats steht aus. Werte nach der
+ * Uebersicht „Vorlaeufige Rechengroessen in der Sozialversicherung fuer das
+ * Jahr 2027“ eines Versicherers (November 2026, Quellen dort: bmas.de,
+ * deutsche-rentenversicherung.de). Nach der Verkuendung im Bundesgesetzblatt
+ * gegenlesen.
+ *
+ * Pflegebeitrag fuer Kinderlose: 4,5 % statt 4,2 % — der Zuschlag steigt nach
+ * dem Entwurf des Pflegeneuordnungsgesetzes von 0,6 auf 0,9 Punkte
+ * (Kabinettsbeschluss; Bundestag und Bundesrat stehen aus). Faellt das Gesetz
+ * anders aus, diese Zeile anpassen oder streichen.
+ *
+ * Unveraendert und deshalb nicht aufgefuehrt: RV 18,6 %, AV 2,6 %, KV 14,6 %,
+ * PV 3,6 % (alle laut Uebersicht). Der durchschnittliche Zusatzbeitrag bleibt
+ * nach der Mitteilung des BMG vom 30.10.2026 bei 2,9 % — die Bekanntmachung
+ * im Bundesanzeiger beim Anlegen des Jahrgangs gegenlesen.
+ *
+ * Nicht im Rechtsstand gefuehrt: Versicherungspflichtgrenze 84.150 EUR,
+ * Geringfuegigkeitsgrenze 633 EUR, endgueltiges Durchschnittsentgelt 2025
+ * (49.147 EUR).
+ *
+ * Noch offen fuer den vollen Jahrgang: Steuertarif und Soli-Freigrenze
+ * (Einkommensteuerreformgesetz 2027, noch nicht verabschiedet), Lohnsteuer-PAP,
+ * Rentenwert ab 1. Juli 2027, Basiszins.
+ */
+export const VORAB_2027: Vorabwerte = {
+  jahr: 2027,
+  quelle: 'Rechengrößen der Sozialversicherung 2027 vorläufig eingerechnet',
+  text: 'Für 2027 sind die vorläufigen Rechengrößen der Sozialversicherung schon eingerechnet: '
+    + 'Beitragsbemessungsgrenzen, Bezugsgröße, Durchschnittsentgelt und der Pflegebeitrag für Kinderlose.',
+  werte: {
+    bbgRvJahr: 106_200, // 8.850 EUR im Monat
+    bbgKvJahr: 76_500, // 6.375 EUR im Monat
+    // § 10 Abs. 3 EStG: BBG knappschaftliche RV 130.800 EUR x 24,7 % = 32.307,60 -> aufgerundet
+    hoechstbetragAltersvorsorge: 32_308,
+    bezugsgroesseMonat: 4_130, // 49.560 EUR im Jahr
+    durchschnittsentgelt: 53_452, // vorlaeufig, Anlage 1 SGB VI
+    pv: { kinderloseZuschlag: 0.009 }, // 3,6 % + 0,9 % = 4,5 %
+  },
+};
+
+/** Aufsteigend nach Jahr. Leer, sobald jeder Vorab-Jahrgang voll belegt ist. */
+export const VORABWERTE: readonly Vorabwerte[] = [VORAB_2027];

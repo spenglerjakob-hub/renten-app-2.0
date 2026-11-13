@@ -1,5 +1,5 @@
 import type { LegalParameters } from './types.js';
-import { BELEGTE_JAHRE, BASISJAHR } from './jahre.js';
+import { BELEGTE_JAHRE, BASISJAHR, VORABWERTE, type Vorabwerte } from './jahre.js';
 
 /**
  * Fortschreibungsannahme fuer Jahre jenseits des letzten belegten Rechtsstands.
@@ -93,8 +93,58 @@ function skaliere(basis: LegalParameters, jahr: number, indexRate: number): Lega
 }
 
 /**
+ * Vorabwerte, die fuer `jahr` gelten: nach dem Basisjahr bekannt geworden und
+ * nicht juenger als `jahr`. Aufsteigend — spaetere ueberschreiben fruehere.
+ * Vorabwerte eines inzwischen belegten Jahres zaehlen nicht mehr.
+ */
+function vorabBis(jahr: number): Vorabwerte[] {
+  return VORABWERTE
+    .filter((v) => v.jahr > BASISJAHR.jahr && v.jahr <= jahr)
+    .sort((a, b) => a.jahr - b.jahr);
+}
+
+/**
+ * Legt die Vorabwerte ueber ein fortgeschriebenes Jahr.
+ *
+ * Nur die GENANNTEN Felder wechseln: Sie kommen aus dem Vorab-Jahr und werden
+ * von dort mit demselben Index und denselben Rundungen fortgeschrieben wie
+ * alles andere (`skaliere`). Die uebrigen Felder bleiben, wie sie aus dem
+ * Basisjahr kommen — sonst haetten alle spaeteren Jahre einen anderen
+ * Steuertarif, nur weil eine Beitragsbemessungsgrenze frueher bekannt wurde.
+ */
+function mitVorab(p: LegalParameters, v: Vorabwerte, indexRate: number): LegalParameters {
+  const { kv, pv, ...einfach } = v.werte;
+  const basis: LegalParameters = {
+    ...BASISJAHR,
+    ...einfach,
+    kv: { ...BASISJAHR.kv, ...kv },
+    pv: { ...BASISJAHR.pv, ...pv },
+    jahr: v.jahr,
+  };
+  const ausVorab = skaliere(basis, p.jahr, indexRate);
+  const neu: LegalParameters = {
+    ...p,
+    // Saetze werden nicht fortgeschrieben — sie gelten ab dem Vorab-Jahr unveraendert.
+    kv: { ...p.kv, ...kv },
+    pv: { ...p.pv, ...pv },
+    quelle: `${p.quelle}; ${v.quelle}`,
+  };
+  for (const feld of Object.keys(einfach) as (keyof typeof einfach)[]) neu[feld] = ausVorab[feld];
+  return neu;
+}
+
+/** Ein Jahr jenseits des Basisjahrs: fortgeschrieben, darueber die vorab bekannten Werte. */
+function fortgeschrieben(jahr: number, indexRate: number): LegalParameters {
+  return vorabBis(jahr).reduce(
+    (p, v) => mitVorab(p, v, indexRate),
+    skaliere(BASISJAHR, jahr, indexRate),
+  );
+}
+
+/**
  * Liefert den Parametersatz fuer ein Kalenderjahr.
- * Belegte Jahre werden exakt zurueckgegeben, alles danach fortgeschrieben.
+ * Belegte Jahre werden exakt zurueckgegeben, alles danach fortgeschrieben —
+ * mit den vorab bekannten Werten des Folgejahres, wo es sie gibt (`VORABWERTE`).
  * Jahre VOR dem fruehesten belegten Stand nutzen diesen unveraendert.
  */
 export function parameterFuer(jahr: number, fs: Fortschreibung): LegalParameters {
@@ -121,7 +171,7 @@ function basisParameter(jahr: number, fs: Fortschreibung): LegalParameters {
   const fruehestes = BELEGTE_JAHRE[0]!;
   if (jahr < fruehestes.jahr) return { ...fruehestes, jahr, extrapoliert: true, quelle: `Rechtsstand ${fruehestes.jahr} rückwirkend angewandt` };
 
-  return skaliere(BASISJAHR, jahr, fs.indexRate);
+  return fortgeschrieben(jahr, fs.indexRate);
 }
 
 /** Der gesetzliche Durchschnitt — Vorbelegung fuer die Eingabe. */
@@ -136,6 +186,12 @@ export interface RechtsstandInfo {
   indexRate: number;
   /** Jahre, fuer die fortgeschrieben wurde (leer, wenn alles belegt ist) */
   fortgeschriebenAb: number | null;
+  /**
+   * Vorab bekannte Werte eines noch nicht belegten Jahres, die in der
+   * Fortschreibung schon stecken — je Jahr ein Satz. Leer, wenn es keine gibt
+   * oder die Rechnung nicht so weit reicht.
+   */
+  vorab: { jahr: number; text: string }[];
   text: string;
 }
 
@@ -143,15 +199,19 @@ export function rechtsstandInfo(bisJahr: number, fs: Fortschreibung): Rechtsstan
   const letztes = BASISJAHR.jahr;
   const fortgeschriebenAb = bisJahr > letztes ? letztes + 1 : null;
   const pct = (fs.indexRate * 100).toLocaleString('de-DE', { maximumFractionDigits: 2 });
+  const vorab = vorabBis(bisJahr).map((v) => ({ jahr: v.jahr, text: v.text }));
+  const dazu = vorab.length ? `. ${vorab.map((v) => v.text).join(' ')}` : '';
   return {
     basisjahr: letztes,
     letztesBelegtesJahr: letztes,
     indexRate: fs.indexRate,
     fortgeschriebenAb,
+    vorab,
     text: fortgeschriebenAb
-      ? `Rechtsstand ${letztes}; ab ${fortgeschriebenAb} mit ${pct} % p. a. fortgeschrieben`
+      ? `Rechtsstand ${letztes}; ab ${fortgeschriebenAb} mit ${pct} % p. a. fortgeschrieben${dazu}`
       : `Rechtsstand ${letztes}`,
   };
 }
 
-export { BELEGTE_JAHRE, BASISJAHR };
+export { BELEGTE_JAHRE, BASISJAHR, VORABWERTE };
+export type { Vorabwerte };

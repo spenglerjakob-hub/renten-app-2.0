@@ -35,9 +35,13 @@ function szenario(over: Partial<Szenario> = {}): Szenario {
 describe('Projektion', () => {
   it('liefert eine Zeile je Kalenderjahr bis Alter 100', () => {
     const r = projiziere(szenario());
-    expect(r.zeilen.length).toBeGreaterThanOrEqual(50);
     const jahre = r.zeilen.map((z) => z.jahr);
     expect(new Set(jahre).size).toBe(jahre.length);
+    // Vom laufenden Jahr bis zum 100. Geburtstag (Jahrgang 1975) — wie viele
+    // Zeilen das sind, haengt am heutigen Datum, das Ende nicht.
+    expect(jahre[0]).toBe(new Date().getFullYear());
+    expect(jahre.at(-1)).toBeGreaterThanOrEqual(1975 + 100);
+    expect(jahre.length).toBe(jahre.at(-1)! - jahre[0]! + 1);
   });
 
   it('friert den Rentenfreibetrag als EURO-Betrag ein', () => {

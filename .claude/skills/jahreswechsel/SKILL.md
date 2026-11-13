@@ -61,6 +61,8 @@ Fachportale und Lohnbüros taugen zum Gegenprüfen, nicht als Beleg. Zu jedem We
 
 **Ist ein Wert noch nicht veröffentlicht**, wird er als offen geführt. Für Rentenwert und Basiszins ist das im Herbst der Normalfall, siehe Schritt 4. Ist das Netz gesperrt, den Nutzer um die Werte oder die Dokumente bitten, statt sie aus dem Gedächtnis einzusetzen.
 
+**Steht nur ein Teil des neuen Jahres fest** — typisch im Oktober und November: die Rechengrößen der Sozialversicherung sind beschlossen, Steuertarif und PAP noch nicht —, kommt dieser Teil als **Vorabwerte** in den Code, siehe Schritt 4a. So gelten die bekannten Werte ab dem 1. Januar von selbst, ohne dass ein halb belegter Jahrgang sich als Rechtsstand ausgibt.
+
 ## Schritt 3 — Vorschlag an den Nutzer
 
 Vor jeder Änderung dem Nutzer vorlegen:
@@ -76,6 +78,7 @@ Vor jeder Änderung dem Nutzer vorlegen:
 
 1. **`jahre.ts`:**
    - Neuen Jahrgang `PARAMETER_<Jahr>` anlegen, als Kopie des Vorjahres.
+   - Gibt es `VORAB_<Jahr>` (Schritt 4a): dessen Werte übernehmen, gegen die amtliche Fassung lesen und die Vorabwerte löschen.
    - Werte ersetzen; `quelle` und Kommentare (etwa „Programmablaufplan 2027 (BMF, TT.MM.JJJJ)“) anpassen.
    - In `BELEGTE_JAHRE` aufnehmen und `BASISJAHR` auf den neuen Jahrgang setzen, denn fortgeschrieben wird immer vom Basisjahr aus.
 2. **`packages/engine/src/index.ts`:** `PARAMETER_<Jahr>` exportieren.
@@ -111,6 +114,20 @@ Vor jeder Änderung dem Nutzer vorlegen:
 10. **Ausliefern:**
     - Commit auf den Arbeitszweig der Sitzung. Live geht es erst auf ausdrückliche Anweisung („live schalten“).
     - Rechtzeitig vor dem 1. Januar fertig werden, damit live und Testseite ab Neujahr mit dem neuen Jahrgang rechnen.
+
+## Schritt 4a — Vorabwerte: ein Teil des Jahres steht schon fest
+
+Für den Fall, dass der volle Jahrgang noch nicht angelegt werden kann.
+
+1. **`jahre.ts`:** `VORAB_<Jahr>` anlegen und in `VORABWERTE` aufnehmen.
+   - `werte` nennt nur die Felder, die feststehen. Möglich sind die Grenzen und Größen der Sozialversicherung (`bbgKvJahr`, `bbgRvJahr`, `hoechstbetragAltersvorsorge`, `bezugsgroesseMonat`, `durchschnittsentgelt`) und Beitragssätze (`rvSatzGesamt`, `avSatzGesamt`, `kv.*`, `pv.*`). Der Steuertarif gehört nicht hierher: Er kommt mit dem vollen Jahrgang.
+   - Im Kommentar: Herkunft, Datum, wie verbindlich (Entwurf, Kabinett, verkündet) und was noch offen ist.
+   - `text` ist der Satz, der im Rechner und im Gutachten unter „Rechtsstand“ steht. Er nennt, was eingerechnet ist, und sagt „vorläufig“, solange es das ist.
+2. **Wirkung** (`registry.ts`): Ab dem Vorab-Jahr gelten die genannten Felder mit dem neuen Wert und werden von dort aus fortgeschrieben. Alle anderen Felder bleiben Fortschreibung aus dem Basisjahr, das Jahr bleibt `extrapoliert`. Belegte Jahre ändern sich nicht.
+3. **Tests:** `test/rechtsstand.test.ts` um die neuen Werte ergänzen. Erwartungen in anderen Tests, die sich verschieben, aus dem Rechtsstand ableiten statt als feste Zahl zu führen.
+4. **Sobald der volle Jahrgang angelegt wird (Schritt 4):** die Vorabwerte in den Jahrgang übernehmen, gegen die amtliche Fassung lesen und `VORAB_<Jahr>` **löschen**. Der Wächter-Test in `rechtsstand.test.ts` und der Bericht melden vergessene Vorabwerte.
+
+Der Bericht zeigt die Vorabwerte am Ende von Teil 1, zusammen mit den jährlichen Feldern, die noch keinen Wert für das neue Jahr haben.
 
 ## Schritt 5 — Nachträge im Lauf des Jahres
 

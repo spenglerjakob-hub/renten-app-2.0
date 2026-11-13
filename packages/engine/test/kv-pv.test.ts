@@ -19,6 +19,16 @@ const p = parameterFuer(2026, { indexRate: 0 });
 const kinderlos = { hatKinder: false, kinderUnter25: 0 };
 const mitKindern = { hatKinder: true, kinderUnter25: 3 };
 
+/**
+ * Was ein kinderloser Rentner in der KVdR von seiner gesetzlichen Rente abfuehrt:
+ * den halben Kassenbeitrag und den vollen Pflegebeitrag — aus dem Rechtsstand
+ * des Jahres, damit die Gegenprobe an der Zeitachse einen Jahreswechsel uebersteht.
+ */
+const rentnerSatzKinderlos = (jahr: number) => {
+  const q = parameterFuer(jahr, { indexRate: 0 });
+  return kvSatzVoll(q) / 2 + pvSatzMitglied(kinderlos, q);
+};
+
 const rente = (betrag: number): Beitragspflichtig =>
   ({ id: 'rente', art: 'gesetzlicheRente', monatsbetrag: betrag });
 const versorgung = (betrag: number, id = 'bav'): Beitragspflichtig =>
@@ -275,8 +285,12 @@ describe('Gegenprobe an der Zeitachse', () => {
 
     expect(ruerup.kvPvJahr).toBeCloseTo(0, 6);
     expect(grv.kvPvJahr).toBeCloseTo(z.kvPvGesamt, 6);
-    // 12,95 % der gesetzlichen Rente — nicht 10,17 % von allem.
-    expect(z.kvPvGesamt / grv.bruttoJahr).toBeCloseTo(0.1295, 4);
+    // Halber Kassenbeitrag und voller Pflegebeitrag eines Kinderlosen, allein auf
+    // die gesetzliche Rente — nicht verduennt ueber alles. 2026: 12,95 %; ab 2027
+    // mit 0,9 statt 0,6 Punkten Zuschlag 13,25 %.
+    expect(z.kvPvGesamt / grv.bruttoJahr).toBeCloseTo(rentnerSatzKinderlos(2068), 4);
+    expect(rentnerSatzKinderlos(2026)).toBeCloseTo(0.1295, 10);
+    expect(rentnerSatzKinderlos(2068)).toBeCloseTo(0.1325, 10);
   });
 
   it('die Summe der Posten ergibt weiterhin die Jahreszeile', () => {
@@ -534,9 +548,9 @@ describe('Der 0-EUR-Partner an der Zeitachse', () => {
     const z = imJahr(paarSzenario(0, 'freiwillig'), 2045);
     const b = z.posten.find((x) => x.id === 'person-B')!;
     expect(b.kvPvJahr).toBeCloseTo(0, 6);
-    // Der ganze Beitrag haengt an der Rente von A — 12,95 % davon.
+    // Der ganze Beitrag haengt an der Rente von A — der Satz des kinderlosen Rentners.
     const a = z.posten.find((x) => x.id === 'person-A')!;
-    expect(z.kvPvGesamt / a.bruttoJahr).toBeCloseTo(0.1295, 4);
+    expect(z.kvPvGesamt / a.bruttoJahr).toBeCloseTo(rentnerSatzKinderlos(2045), 4);
   });
 
   it('eine eigene Rente ueber der Grenze kostet wieder', () => {

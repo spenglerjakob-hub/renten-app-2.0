@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { BASISJAHR } from '@renten/engine';
@@ -42,6 +42,8 @@ export function Rechtsstand({
         {r.fortgeschriebenAb && (
           <>; ab {r.fortgeschriebenAb} mit <strong>{prozent(tarifIndex)} p. a.</strong> fortgeschrieben.</>
         )}
+        {/* Was vom naechsten Jahr schon feststeht, bevor der Jahrgang voll belegt ist (VORABWERTE). */}
+        {r.vorab.map((v) => <Fragment key={v.jahr}> {v.text}</Fragment>)}
       </p>
 
       {/* Ausfuehrliche Fassung nur im Druck — deshalb auch in der Schriftstufe
@@ -65,6 +67,14 @@ export function Rechtsstand({
           Grundfreibetrag und die Zonengrenzen des Steuertarifs, die
           Beitragsbemessungsgrenzen, die Bezugsgröße und die Pauschbeträge.
         </p>
+
+        {r.vorab.map((v) => (
+          <p key={v.jahr}>
+            {v.text} Sie gelten ab {v.jahr} anstelle der fortgeschriebenen Werte und werden
+            von dort aus weitergeführt. Vorläufig heißt: von der Bundesregierung beschlossen, aber
+            noch nicht verkündet. Der Steuertarif für {v.jahr} steht noch aus und bleibt fortgeschrieben.
+          </p>
+        ))}
 
         <h3>Warum diese Annahme so viel ausmacht</h3>
 
