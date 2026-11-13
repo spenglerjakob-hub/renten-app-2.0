@@ -12,6 +12,7 @@ import {
   BisherigeLeistungenFelder, UmstiegVergleich, KEINE_BISHERIGEN, Hinweiszeilen, KARTE, KARTE_TITEL, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from './bausteine';
+import { FirmenkundeWahl, firmenWerteSetzer, useFirmenkunde } from './Firmenkunde';
 
 /**
  * Arbeitgeber-Seite „Matching-Modell".
@@ -21,8 +22,9 @@ import {
  * dazu. Die Seite zeigt, was das beide wirklich kostet, was es gegenueber
  * einer Gehaltserhoehung bringt und was in die Versorgungsordnung gehoert.
  *
- * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird
- * gespeichert.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx). Die Rechnung
+ * wird nicht gespeichert; ins Konto geht nur die Firma, fuer die gerechnet
+ * wird (Firmenkunde.tsx).
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });
@@ -44,6 +46,12 @@ export function Seite() {
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
   const [bisher, setBisher] = useState<BisherigeAngaben>(KEINE_BISHERIGEN);
+
+  // Fuer welche Firma gerechnet wird: Name und Logo fuer Kopf und Ausdruck, Sitz, Steuersatz und Umlagen aus ihrem Angebot.
+  const kunde = useFirmenkunde({
+    werte: { bundesland, steuersatz, umlagen },
+    onWerte: firmenWerteSetzer({ bundesland: setBundesland, steuersatz: setSteuersatz, umlagen: setUmlagen }),
+  });
 
   const optimal = () => setUmwandlung(optimaleUmwandlung(
     weg, { jahresbrutto: brutto, privatVersichert: privat, pkvPraemieMonat: privat ? praemie : 0 }, bundesland, p,
@@ -89,7 +97,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
-      <Kopf />
+      <Kopf kunde={kunde.kunde} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         <Titel gross klasse="print:text-xl">
@@ -116,6 +124,8 @@ export function Seite() {
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-2 print:block">
           {/* --- Eingaben ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-4 print:hidden">
+            <FirmenkundeWahl kunde={kunde} />
+
             <Kasten titel="Mitarbeiter">
               <ZahlFeld label="Bruttogehalt im Jahr" wert={brutto} onChange={setBrutto} einheit="€" schritt={1000} />
               <AuswahlFeld
@@ -347,7 +357,8 @@ export function Seite() {
               <button type="button" onClick={() => window.print()} className={KNOPF}>
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
-              <UebernehmenKnopf modell={{ art: 'matching', weg, matchingMonat: matching, zuschussImMatching: weg === 'dv' && inklusive }} bundesland={bundesland} />
+              <UebernehmenKnopf modell={{ art: 'matching', weg, matchingMonat: matching, zuschussImMatching: weg === 'dv' && inklusive }} bundesland={bundesland}
+                firmaId={kunde.firma?.eigene ? kunde.firma.id : null} />
             </div>
             <RechtsLinks />
           </div>

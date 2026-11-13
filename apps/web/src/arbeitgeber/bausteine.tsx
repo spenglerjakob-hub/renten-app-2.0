@@ -1,11 +1,15 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, Info } from 'lucide-react';
 import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
 } from '@renten/engine';
 import { SeitenKopf } from '../components/SeitenKopf';
+import { Logo } from '../components/Logo';
 import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 import { AKZENT, Hervor, KNOPF_KLEIN, LINK } from '../components/stil';
+import { akzentVariablen, auftrittSichtbar, fusszeileCss, kontaktZeile } from '../features/auftritt';
+import { useAuftritt } from '../store/auftritt';
+import { datumText } from './firmenkunde';
 
 /**
  * Bausteine der Arbeitgeber-Seiten (Zuschussmodell, Festbetrag, Matching,
@@ -377,10 +381,78 @@ export function GehaltVergleich(props: {
   );
 }
 
-/** Kopf mit Logo — beide Arbeitgeber-Seiten. */
-export function Kopf() {
+/** Der Firmenkunde, fuer den gerechnet wird — Name und Logo fuer Kopf und Ausdruck. */
+export interface KopfKunde {
+  name: string;
+  /** Das Logo als URL (Object-URL oder data:) — null: keines */
+  logo: string | null;
+}
+
+/**
+ * KOPF DER ARBEITGEBER-SEITEN — am Bildschirm und im Ausdruck verschieden.
+ *
+ * Am Bildschirm die Kopfzeile aller Unterseiten; rechts steht, fuer welche
+ * Firma gerechnet wird, mit ihrem Logo. Das ist der Augenblick im Gespraech:
+ * Der Arbeitgeber sieht sein eigenes Haus auf der Seite.
+ *
+ * Im AUSDRUCK ein Briefkopf: links der Absender — der Auftritt des Beraters
+ * (Logo, Firma, Name, Kontakt), ohne Auftritt wie bisher der Rentenplaner —,
+ * rechts der Empfaenger: „Erstellt am … für“, Name und Logo des Firmenkunden.
+ * Flach gehalten: Seite 1 des Ausdrucks ist knapp bemessen, der Kopf darf
+ * kaum hoeher sein als die Zeile, die er ersetzt. Mit Auftritt traegt jede
+ * Seite ausserdem die Fusszeile des Gutachtens (Kontakt, Seitenzahl).
+ */
+export function Kopf({ kunde = null }: { kunde?: KopfKunde | null }) {
+  const auftritt = useAuftritt((s) => s.auftritt);
+  const status = useAuftritt((s) => s.status);
+  const laden = useAuftritt((s) => s.laden);
+  useEffect(() => { if (status === 'aus') void laden(); }, [status, laden]);
+
+  const a = auftritt && auftrittSichtbar(auftritt) ? auftritt : null;
+  const absender = a ? a.firma.trim() || a.berater.trim() : '';
+  const darunter = a ? [a.firma.trim() ? a.berater.trim() : '', kontaktZeile(a)].filter(Boolean).join(' · ') : '';
+  const logoKlasse = 'max-h-[9mm] max-w-[38mm] shrink-0 object-contain';
+
   return (
-    <SeitenKopf innen="print:max-w-none print:px-0 print:py-1" />
+    <>
+      <SeitenKopf
+        klasse="print:hidden"
+        rechts={kunde && (
+          <span className="flex min-w-0 items-center gap-2.5" data-firmenkunde="">
+            {kunde.logo && <img src={kunde.logo} alt={`Logo ${kunde.name}`} className="h-9 max-w-[7rem] shrink-0 object-contain" />}
+            <span className={`min-w-0 max-w-[16rem] truncate text-sm font-medium text-ui-tinte ${kunde.logo ? 'hidden sm:block' : ''}`}>
+              {kunde.name}
+            </span>
+          </span>
+        )}
+      />
+
+      <header
+        className="hidden items-center justify-between gap-6 border-b border-[color:var(--akzent-linie,rgb(var(--ui-linie)))] pb-1.5 text-ui-tinte print:flex"
+        style={akzentVariablen(a) as CSSProperties}
+        data-briefkopf=""
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          {a?.logo
+            ? <img src={a.logo} alt={absender || 'Logo'} className={logoKlasse} />
+            : !a && <Logo klasse="h-6 w-6" />}
+          <div className="min-w-0">
+            <div className="break-words text-sm font-medium leading-tight">{a ? absender : 'JS-Rentenplaner'}</div>
+            {darunter && <div className="break-words text-[9px] leading-snug text-ui-schiefer">{darunter}</div>}
+          </div>
+        </div>
+        {kunde && (
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0 text-right">
+              <div className="text-[9px] leading-snug text-ui-schiefer">Erstellt am {datumText(new Date())} für</div>
+              <div className="break-words text-sm font-medium leading-tight">{kunde.name}</div>
+            </div>
+            {kunde.logo && <img src={kunde.logo} alt={`Logo ${kunde.name}`} className={logoKlasse} />}
+          </div>
+        )}
+      </header>
+      {a && <style>{fusszeileCss(a)}</style>}
+    </>
   );
 }
 

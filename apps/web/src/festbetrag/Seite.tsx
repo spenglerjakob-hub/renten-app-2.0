@@ -13,6 +13,7 @@ import {
   KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_ZEILE, TABELLE_DRUCK, ZELLE, KOPFZELLE, STRICHE,
   betriebAngaben, bisherAnnahmen, hatBisherige, BetriebJahr, Nachschlagen, type BisherigeAngaben,
 } from '../arbeitgeber/bausteine';
+import { FirmenkundeWahl, firmenWerteSetzer, useFirmenkunde } from '../arbeitgeber/Firmenkunde';
 
 /**
  * Arbeitgeber-Seite „Festbetrag".
@@ -23,7 +24,8 @@ import {
  * darueber hinaus selbst einzahlen koennen. Das ist die Botschaft der Seite,
  * deshalb steht die Gehaltsstaffel „gleich fuer alle" im Mittelpunkt.
  *
- * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird gespeichert.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx). Die Rechnung wird nicht gespeichert;
+ * ins Konto geht nur die Firma, fuer die gerechnet wird (arbeitgeber/Firmenkunde.tsx).
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });
@@ -42,6 +44,12 @@ export function Seite() {
   const [umlagen, setUmlagen] = useState(0);
   const [anzahl, setAnzahl] = useState(1);
   const [bisher, setBisher] = useState<BisherigeAngaben>(KEINE_BISHERIGEN);
+
+  // Fuer welche Firma gerechnet wird: Name und Logo fuer Kopf und Ausdruck, Sitz, Steuersatz und Umlagen aus ihrem Angebot.
+  const kunde = useFirmenkunde({
+    werte: { bundesland, steuersatz, umlagen },
+    onWerte: firmenWerteSetzer({ bundesland: setBundesland, steuersatz: setSteuersatz, umlagen: setUmlagen }),
+  });
 
   const eingaben = useMemo(() => ({
     jahresbrutto: brutto,
@@ -79,7 +87,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
-      <Kopf />
+      <Kopf kunde={kunde.kunde} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         {/* Der Titel als Aussage wie in der Beratung; hervorgehoben, was jeder bekommt. */}
@@ -105,6 +113,8 @@ export function Seite() {
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-2 print:block">
           {/* --- Eingaben ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-4 print:hidden">
+            <FirmenkundeWahl kunde={kunde} />
+
             <Kasten titel="Mitarbeiter">
               <ZahlFeld label="Bruttogehalt im Jahr" wert={brutto} onChange={setBrutto} einheit="€" schritt={1000} />
               <AuswahlFeld
@@ -332,7 +342,8 @@ export function Seite() {
               <button type="button" onClick={() => window.print()} className={KNOPF}>
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
-              <UebernehmenKnopf modell={{ art: 'festbetrag', festbetragMonat: festbetrag, mindestUmwandlungMonat: mindest }} bundesland={bundesland} />
+              <UebernehmenKnopf modell={{ art: 'festbetrag', festbetragMonat: festbetrag, mindestUmwandlungMonat: mindest }} bundesland={bundesland}
+                firmaId={kunde.firma?.eigene ? kunde.firma.id : null} />
             </div>
             <RechtsLinks />
           </div>

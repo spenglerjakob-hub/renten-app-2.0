@@ -9,6 +9,7 @@ import {
   Kopf, Kasten, Kachel, VergleichZeile, Zusatz, Balken, UmlagenErklaerung, Hinweiszeilen, Punkte, Zeile,
   KARTE, KARTE_TITEL, ERKLAERUNG, FUSSNOTE, TABELLE_KOPF, TABELLE_DRUCK, KOPFZELLE,
 } from '../arbeitgeber/bausteine';
+import { FirmenkundeWahl, firmenWerteSetzer, useFirmenkunde } from '../arbeitgeber/Firmenkunde';
 import { EINLEITUNG, Hervor, KNOPF, LINK, Titel } from '../components/stil';
 
 /**
@@ -20,7 +21,8 @@ import { EINLEITUNG, Hervor, KNOPF, LINK, Titel } from '../components/stil';
  * Freigrenze kippt. Die Beitraege haengen vom Tarif ab; die Knoepfe sind
  * Beispielbeitraege eines Budgettarifs, das echte Angebot wird eingetragen.
  *
- * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx), nichts wird gespeichert.
+ * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx). Die Rechnung wird nicht gespeichert;
+ * ins Konto geht nur die Firma, fuer die gerechnet wird (arbeitgeber/Firmenkunde.tsx).
  */
 
 const p = parameterFuer(new Date().getFullYear(), { indexRate: 0 });
@@ -63,6 +65,12 @@ export function Seite() {
   const [satz40, setSatz40] = useState(0.25);
   const [traegtMa40, setTraegtMa40] = useState(false);
 
+  // Fuer welche Firma gerechnet wird: Name und Logo fuer Kopf und Ausdruck, Sitz, Steuersatz und Umlagen aus ihrem Angebot.
+  const kunde = useFirmenkunde({
+    werte: { bundesland, steuersatz, umlagen },
+    onWerte: firmenWerteSetzer({ bundesland: setBundesland, steuersatz: setSteuersatz, umlagen: setUmlagen }),
+  });
+
   const steuerOpt = useMemo(
     () => ({ verheiratet, bundesland, kirchensteuerpflichtig: kirchensteuer }), [verheiratet, bundesland, kirchensteuer],
   );
@@ -101,7 +109,7 @@ export function Seite() {
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
-      <Kopf />
+      <Kopf kunde={kunde.kunde} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 print:max-w-none print:px-0 print:py-2">
         <Titel gross klasse="print:text-xl">
@@ -124,6 +132,8 @@ export function Seite() {
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6 print:mt-2 print:block">
           {/* --- Eingaben ---------------------------------------------------- */}
           <div className="space-y-4 lg:col-span-4 print:hidden">
+            <FirmenkundeWahl kunde={kunde} />
+
             <Kasten titel="bKV-Angebot">
               <ZahlFeld label="Mitarbeiter mit bKV" wert={anzahl} onChange={setAnzahl} min={1} schritt={1} stufen />
               <ZahlFeld
