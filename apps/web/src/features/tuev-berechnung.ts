@@ -1094,6 +1094,51 @@ export const angebotGesamtMonat = (a: { loesung: LoesungsArt; beitragMonat: numb
  */
 export const ohneEigenaufwand = (r: Pick<TuevErgebnis, 'summeEinzahlung'>) => r.summeEinzahlung < 0.005;
 
+/**
+ * WELCHES ANGEBOT „BESTES“ IST — am Bildschirm und im Gutachten dieselbe Regel.
+ *
+ * Gemessen wird die Nettorendite der RENTE. Das Kapital steht ausser Wertung:
+ * Es fliesst in einer Summe zum Rentenbeginn, die Zahlungsreihe ist kuerzer,
+ * und der interne Zinsfuss faellt deshalb fast immer hoeher aus als bei der
+ * Rente desselben Vertrags. Betriebsrente, Riester, Altersvorsorgedepot und
+ * Basisrente kennen keine oder nur eine eingeschraenkte Kapitalauszahlung —
+ * gegen ein Angebot mit Kapital haetten sie sonst nie eine Chance.
+ *
+ * Nur wenn kein Angebot in der Wertung eine Rente nennt, entscheidet die
+ * Nettorendite des Kapitals: Dann vergleichen alle auf derselben Grundlage.
+ * Ohne eigenen Aufwand (rein arbeitgeberfinanziert) gibt es keine Rendite,
+ * und ausgezeichnet wird erst ab zwei Angeboten in der Wertung.
+ */
+export interface BesteAngebote {
+  /** Auf welchem Weg gemessen wurde — null: keine Auszeichnung */
+  weg: 'rente' | 'kapital' | null;
+  /** Die hoechste Nettorendite auf diesem Weg */
+  rendite: number;
+  /** Die ausgezeichneten Angebote — mehrere bei Gleichstand */
+  ids: string[];
+}
+
+export function besteAngebote(positionen: readonly AngebotPosition[]): BesteAngebote {
+  const mitAufwand = positionen.filter((p) => {
+    const e = p.rente ?? p.kapital;
+    return e !== null && !ohneEigenaufwand(e);
+  });
+  const weg = mitAufwand.some((p) => p.rente !== null) ? 'rente' : 'kapital';
+  const inWertung = mitAufwand.flatMap((p) => {
+    const w = p[weg];
+    return w ? [{ id: p.angebot.id, rendite: w.rendite }] : [];
+  });
+  if (inWertung.length < 2) return { weg: null, rendite: -Infinity, ids: [] };
+  const rendite = inWertung.reduce((m, x) => Math.max(m, x.rendite), -Infinity);
+  return { weg, rendite, ids: inWertung.filter((x) => Math.abs(x.rendite - rendite) < 1e-9).map((x) => x.id) };
+}
+
+/** Woran „Bestes“ gemessen ist — der Satz unter dem Vergleich, am Bildschirm und im Gutachten. */
+export const besteAngeboteText = (weg: 'rente' | 'kapital') => (weg === 'rente'
+  ? 'die höchste Nettorendite der Rente. Die Nettorendite des Kapitals zählt dabei nicht: Es wird in einer Summe '
+    + 'ausgezahlt, die Laufzeit ist kürzer, und die Rendite pro Jahr fällt deshalb fast immer höher aus.'
+  : 'die höchste Nettorendite des Kapitals — keines der Angebote nennt eine Rente.');
+
 /** Die Erklaerung dazu — am Bildschirm und im Gutachten derselbe Satz; im Rechner per Du. */
 export const ohneEigenaufwandText = (t: AnspracheWoerter = woerter(SIE)) =>
   `Rein arbeitgeberfinanziert: Den Beitrag trägt allein der Arbeitgeber — ${t.du} `

@@ -4,7 +4,7 @@ import {
 import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react';
 import { KNOPF } from './stil';
 import {
-  nachOeffnen, stueckeLage, STUECKE_ANFANG, type StueckKern, type StueckeStand,
+  erreichteEtappen, nachOeffnen, stueckeLage, STUECKE_ANFANG, type StueckKern, type StueckeStand,
 } from './ablauf-logik';
 
 /**
@@ -15,8 +15,8 @@ import {
  * sich hat, steht darueber als schmale ZEILE mit seinem Ergebnis in einem
  * Satz und oeffnet sich mit einem Klick wieder.
  *
- *  - Etappen (`EtappenZeile`, `EtappenZaehler`): Daten & Ziel, Ergebnis, … Die
- *    Seite setzt sie selbst zusammen.
+ *  - Etappen (`EtappenAblauf`): Daten & Ziel, Ergebnis, … Die Seite nennt sie
+ *    mit ihrem Ergebnis und liefert den Inhalt der offenen.
  *  - Stuecke einer Etappe (`Stuecke`): „Weiter“ zeigt das naechste, das vorige
  *    wird zur Zeile. Am Ende des Wegs fuehrt „Weiter“ zur naechsten Etappe;
  *    darunter stehen die Vertiefungen als Zeilen, die niemand oeffnen muss.
@@ -186,15 +186,21 @@ function Zeile({ zeichen, nr, vorlese, titel, ergebnis, fehlt, gross = false, on
 
 /* ---------- Etappen ---------- */
 
-/** Eine Etappe, die gerade nicht offen ist — als Zeile mit ihrem Ergebnis. */
-export function EtappenZeile({ nr, name, ergebnis, erledigt, fehlt, onOeffnen }: {
-  nr: number;
+/** Eine Etappe in der Liste: ihr Name und — sobald sie zu ist — ihr Ergebnis. */
+export interface AblaufEtappe {
   name: string;
   ergebnis?: ReactNode;
   /** WIRKLICH erledigt — nur dann steht ein Haken, sonst die Nummer */
   erledigt: boolean;
   /** Was noch fehlt („2 Beispielwerte offen“) — dann ein leerer Kreis */
   fehlt?: string;
+}
+
+/** Eine Etappe, die gerade nicht offen ist — als Zeile mit ihrem Ergebnis. */
+export function EtappenZeile({ nr, name, ergebnis, erledigt, fehlt, wort = 'Abschnitt', onOeffnen }: AblaufEtappe & {
+  nr: number;
+  /** Wie die Seite ihre Etappen nennt: „Abschnitt“ im Rechner, „Schritt“ in der Mitarbeiterberatung */
+  wort?: string;
   onOeffnen: () => void;
 }) {
   return (
@@ -202,7 +208,7 @@ export function EtappenZeile({ nr, name, ergebnis, erledigt, fehlt, onOeffnen }:
       gross
       zeichen={fehlt ? 'fehlt' : erledigt ? 'erledigt' : 'nummer'}
       nr={nr}
-      vorlese={`Abschnitt ${nr}: `}
+      vorlese={`${wort} ${nr}: `}
       titel={name}
       ergebnis={ergebnis}
       fehlt={fehlt}
@@ -212,16 +218,64 @@ export function EtappenZeile({ nr, name, ergebnis, erledigt, fehlt, onOeffnen }:
 }
 
 /** Ueber dem Titel der offenen Etappe: welcher Abschnitt das ist und wie viele es gibt. */
-export function EtappenZaehler({ nr, von, name }: { nr: number; von: number; name: string }) {
+export function EtappenZaehler({ nr, von, name, wort = 'Abschnitt' }: { nr: number; von: number; name: string; wort?: string }) {
   return (
     <p className="flex items-center gap-2.5 text-sm text-ui-schiefer">
       <span aria-hidden className={`${KREIS} bg-ui-tinte text-white`}>{nr}</span>
       <span>
         <span className="font-medium text-ui-tinte">{name}</span>
         <span className="mx-1.5" aria-hidden>·</span>
-        Abschnitt {nr} von {von}
+        {wort} {nr} von {von}
       </span>
     </p>
+  );
+}
+
+/**
+ * DIE ETAPPEN EINER BERATUNG: Jede erreichte steht als Zeile mit ihrem
+ * Ergebnis da, die offene an ihrer Stelle dazwischen — `children` ist ihr
+ * Inhalt, in der Regel `Stuecke`. Was noch nicht erreicht ist, steht nicht da.
+ *
+ * Nach einem Sprung (`sprung` zaehlt jeden, auch den auf die schon offene
+ * Etappe) kommt die offene an den oberen Rand, mit der Zeile davor darueber,
+ * und bekommt den Fokus — der Knopf, der hierher gefuehrt hat, ist dann oft
+ * nicht mehr da. Hat sich ein Stueck darin schon selbst geholt, bleibt es dabei.
+ */
+export function EtappenAblauf({ etappen, offen, weit, sprung, onOeffnen, wort, children }: {
+  etappen: readonly AblaufEtappe[];
+  /** Index der offenen Etappe */
+  offen: number;
+  /** Index der weitesten erreichten Etappe */
+  weit: number;
+  sprung: number;
+  onOeffnen: (i: number) => void;
+  wort?: string;
+  children: ReactNode;
+}) {
+  const offene = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => {
+    const el = offene.current;
+    if (sprung === 0 || !el) return;
+    if (el !== document.activeElement && el.contains(document.activeElement)) return;
+    insBild(el);
+    el.focus({ preventScroll: true });
+  }, [sprung]);
+  return (
+    <ol aria-label="Ablauf der Beratung" className="space-y-3">
+      {etappen.slice(0, erreichteEtappen(etappen.length, offen, weit)).map((e, i) => (i !== offen ? (
+        <li key={e.name} className={SPALTE}>
+          <EtappenZeile nr={i + 1} {...e} wort={wort} onOeffnen={() => onOeffnen(i)} />
+        </li>
+      ) : (
+        // Luft nach unten: Die Zeilen spaeterer Etappen gehoeren nicht zu den Stuecken dieser.
+        <li key={e.name} ref={offene} tabIndex={-1} className="pb-6 pt-3 focus:outline-none sm:pb-8 sm:pt-4">
+          <div className={`${SPALTE} mb-3`}>
+            <EtappenZaehler nr={i + 1} von={etappen.length} name={e.name} wort={wort} />
+          </div>
+          <div className="space-y-6 sm:space-y-8">{children}</div>
+        </li>
+      )))}
+    </ol>
   );
 }
 

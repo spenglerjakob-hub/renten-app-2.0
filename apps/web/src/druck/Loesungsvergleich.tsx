@@ -2,7 +2,8 @@ import { Fragment } from 'react';
 import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import {
-  auszeichnungen, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText, type AngebotPosition,
+  auszeichnungen, besteAngebote, besteAngeboteText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText,
+  type AngebotPosition,
 } from '../features/tuev-berechnung';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
@@ -70,20 +71,15 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
   for (let i = 0; i < gerechnet.length; i += JE_TABELLE) gruppen.push(gerechnet.slice(i, i + JE_TABELLE));
   /** Rein arbeitgeberfinanziert: ohne eigenen Aufwand gibt es weder Hebel noch Rendite. */
   const ohneAufwand = (a: AngebotPosition) => ohneEigenaufwand((a.rente ?? a.kapital)!);
-  // Um die beste Rendite konkurrieren nur Angebote mit eigenem Aufwand — wie am Bildschirm.
-  const inWertung = gerechnet.filter((a) => !ohneAufwand(a));
-  /** Die hoechste Nettorendite eines Angebots ueber beide Wege — wie am Bildschirm. */
-  const besteVon = (a: AngebotPosition) => Math.max(a.rente?.rendite ?? -Infinity, a.kapital?.rendite ?? -Infinity);
-  const beste = inWertung.reduce((m, a) => Math.max(m, besteVon(a)), -Infinity);
-  const besteAngebote = inWertung.length > 1 ? inWertung.filter((a) => Math.abs(besteVon(a) - beste) < 1e-9) : [];
-  const stern = (a: AngebotPosition, rendite: number) =>
-    besteAngebote.includes(a) && Math.abs(rendite - beste) < 1e-9 ? ' ★' : '';
+  // Die hoechste Nettorendite der Rente — das Kapital steht ausser Wertung, wie am Bildschirm (`besteAngebote`).
+  const beste = besteAngebote(gerechnet);
+  const besteListe = gerechnet.filter((a) => beste.ids.includes(a.angebot.id));
+  /** Der Stern steht an der Rendite, die gewertet wurde — in der Zeile der Rente (oder, ohne jede Rente, des Kapitals). */
+  const stern = (a: AngebotPosition, weg: 'rente' | 'kapital') => (beste.weg === weg && besteListe.includes(a) ? ' ★' : '');
   /** Hebel, Rendite und Amortisation: ohne eigenen Aufwand ein Strich, kein „0,00“. */
   const mitAufwand = (a: AngebotPosition, w: string) => (ohneAufwand(a) ? '—' : w);
   const angebotName = (a: AngebotPosition) =>
     `${gerechnet.indexOf(a) + 1}. ${a.angebot.name || LOESUNG_KURZ[a.angebot.loesung]}`;
-  /** Auf welchem Weg das Angebot seine beste Rendite erreicht */
-  const weg = (a: AngebotPosition) => (a.rente && Math.abs(a.rente.rendite - beste) < 1e-9 ? 'als Rente' : 'als Kapital');
   const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
 
   const breite = sichtbar.length > 0 ? 64 / sichtbar.length : 64;
@@ -197,15 +193,15 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
             Kapitalabfindung nach Steuer im Zuflussjahr und Krankenversicherung. Die Nettorendite ist der
             interne Zinsfuß aller Netto-Zahlungen bis zur angenommenen Lebenserwartung.
           </Text>
-          {besteAngebote.length > 0 && (
+          {beste.weg !== null && (
             <Ergebnis>
-              Die höchste Nettorendite {besteAngebote.length > 1 ? 'haben' : 'hat'}{' '}
-              {besteAngebote.map((a, i) => (
+              Die höchste Nettorendite {beste.weg === 'rente' ? 'der Rente' : 'des Kapitals'} {besteListe.length > 1 ? 'haben' : 'hat'}{' '}
+              {besteListe.map((a, i) => (
                 <Fragment key={a.angebot.id}>
-                  {i > 0 && ' und '}<strong>{angebotName(a)}</strong> ({weg(a)})
+                  {i > 0 && ' und '}<strong>{angebotName(a)}</strong>
                 </Fragment>
               ))}
-              {' '}mit <strong>{prozent(beste, 2)} p. a.</strong>
+              {' '}mit <strong>{prozent(beste.rendite, 2)} p. a.</strong>
             </Ergebnis>
           )}
           {gruppen.map((g, gi) => (
@@ -216,11 +212,11 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
                     <>
                       {angebotName(a)}
                       {ohneAufwand(a) && <span className="block text-[9px] font-normal text-ui-schiefer">rein arbeitgeberfinanziert</span>}
-                      {besteAngebote.includes(a) && <Abzeichen>★ Höchste Rendite</Abzeichen>}
+                      {besteListe.includes(a) && <Abzeichen>★ Höchste Rendite</Abzeichen>}
                     </>
                   ))]}
                   spalten={[36, ...g.map(() => 64 / g.length)]}
-                  markiert={g.flatMap((a, i) => (besteAngebote.includes(a) ? [i + 1] : []))}
+                  markiert={g.flatMap((a, i) => (besteListe.includes(a) ? [i + 1] : []))}
                 >
                   {(() => {
                     const r = (f: (x: NonNullable<AngebotPosition['rente']>, a: AngebotPosition) => string) =>
@@ -251,7 +247,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
                               ? cent(x.nettoRenteMonat / x.echterAufwandMonat * 100) : '—'))]} />
                             <Zeile zellen={['Netto-Hebel', ...r((x, a) => mitAufwand(a, `${zahl(x.nettoHebel)} ×`))]} />
                             <Zeile fett zellen={['Nettorendite p. a.', ...r((x, a) => mitAufwand(a,
-                              `${prozent(x.rendite, 2)}${stern(a, x.rendite)}`))]} />
+                              `${prozent(x.rendite, 2)}${stern(a, 'rente')}`))]} />
                             <Zeile zellen={['Amortisation ab Rentenbeginn', ...r((x, a) => mitAufwand(a,
                               `${jahre(x.amortisationsJahre)} Jahre`))]} />
                           </>
@@ -264,7 +260,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
                             <Zeile zellen={['− Kranken- und Pflegeversicherung', ...k((x) => euro(x.kvPvKapital))]} />
                             <Zeile fett zellen={['Kapital netto', ...k((x) => euro(x.nettoKapital))]} />
                             <Zeile fett zellen={['Nettorendite p. a.', ...k((x, a) => mitAufwand(a,
-                              `${prozent(x.rendite, 2)}${stern(a, x.rendite)}`))]} />
+                              `${prozent(x.rendite, 2)}${stern(a, 'kapital')}`))]} />
                           </>
                         )}
                         {mitVergleich && (
@@ -278,7 +274,7 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
               </div>
             </Fragment>
           ))}
-          {besteAngebote.length > 0 && <Text>★ die höchste Nettorendite.</Text>}
+          {beste.weg !== null && <Text>★ {besteAngeboteText(beste.weg)}</Text>}
           {gerechnet.some(ohneAufwand) && <Text>{ohneEigenaufwandText(an)}</Text>}
           <Text>
             Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet

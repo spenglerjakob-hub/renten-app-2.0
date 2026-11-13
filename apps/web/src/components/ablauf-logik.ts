@@ -78,10 +78,12 @@ export function nachOeffnen<T extends StueckKern>(
 }
 
 /**
- * Welche Etappen als Zeilen dastehen: alle bis zur weitesten erreichten.
- * Die offene steht an ihrer Stelle dazwischen.
+ * Wie viele Etappen dastehen: alle bis zur weitesten erreichten — die offene
+ * an ihrer Stelle dazwischen, die uebrigen als Zeilen.
+ *
+ * @param offen Index der offenen Etappe
+ * @param weit Index der weitesten erreichten
  */
-export function erreichteEtappen<T extends string>(etappen: readonly T[], offen: T, weit: number): T[] {
-  const bis = Math.max(weit, etappen.indexOf(offen), 0);
-  return etappen.slice(0, bis + 1);
+export function erreichteEtappen(anzahl: number, offen: number, weit: number): number {
+  return Math.min(anzahl, Math.max(weit, offen, 0) + 1);
 }

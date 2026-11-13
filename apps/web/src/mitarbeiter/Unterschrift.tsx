@@ -294,7 +294,8 @@ function LinkZeile({ link }: { link: LinkStand }) {
 }
 
 /** Was vor der ersten Unterschrift noch fehlt — mit dem Schritt, in dem es nachzutragen ist. */
-export interface Luecke { text: string; schritt: number }
+/** Was vor dem Unterschreiben fehlt — mit dem Schritt und, wenn genannt, dem Stueck, in dem das Feld steht. */
+export interface Luecke { text: string; schritt: number; stueck?: string }
 
 /**
  * Die Karte in Schritt 7: Mitarbeiter und Berater unterschreiben, ihr Stand,
@@ -317,7 +318,7 @@ export function UnterschriftenKarte({
   luecken: readonly Luecke[];
   /** Die Rechnung ist auf dem neuesten Stand */
   bereit: boolean;
-  geheZu: (i: number) => void;
+  geheZu: (i: number, stueck?: string) => void;
   onUnterschreiben: (person: UnterschriftPerson, name: string, zug: string) => Promise<true | string>;
   onLinkErstellen: () => Promise<NeuerLink | string>;
   /** Nach dem Aufheben — und zum Nachladen, ob per Link unterschrieben wurde */
@@ -437,7 +438,7 @@ export function UnterschriftenKarte({
           <ul className="mt-1 space-y-1">
             {offeneLuecken.map((l) => (
               <li key={l.text}>
-                — {l.text} <button type="button" onClick={() => geheZu(l.schritt)} className={`${LINK} text-sm`}>zu Schritt {l.schritt + 1} →</button>
+                — {l.text} <button type="button" onClick={() => geheZu(l.schritt, l.stueck)} className={`${LINK} text-sm`}>zu Schritt {l.schritt + 1} →</button>
               </li>
             ))}
           </ul>

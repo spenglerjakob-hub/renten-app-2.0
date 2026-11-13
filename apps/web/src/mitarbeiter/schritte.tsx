@@ -24,6 +24,7 @@ import {
 } from '../components/stil';
 import { LueckenRing, RENTENZIEL_RING } from '../components/LueckenRing';
 import { AnteilsRing } from '../components/AnteilsRing';
+import { Stuecke, type Stueck } from '../components/Ablauf';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
@@ -41,6 +42,11 @@ import { AXA_BELEHRUNG, AXA_ERLAEUTERT, AXA_FRAGEN, AXA_FUSSNOTEN, axaBerater, a
 import { unterlageErfassen } from './festschreiben';
 import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzeichner } from './Unterschrift';
 import { ScrollBereich } from '../components/ScrollBereich';
+import {
+  abrechnungZeile, anbieterSatz, angebotSatz, angebotVertraege, axaZeile, einkommenZeile, entscheidungZeile, grvZeile,
+  hochrechnungZeile, kennzahlenZeile, kvZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile, rechnungZeile, spaeterZeile,
+  unterlagenZeile, vertragZeile, vorsorgeZeile,
+} from './zeilen';
 
 /** Was zum Drucken der Unterlagen gebraucht wird — in der Entscheidung und bei den Unterlagen. */
 interface UnterlagenProps {
@@ -67,8 +73,35 @@ export interface SchrittProps {
   setze: (fn: (d: BeratungDaten) => BeratungDaten) => void;
   r: MitarbeiterBav;
   leistung: Leistung | null;
-  geheZu: (i: number) => void;
+  /** Zu einem Schritt — und dort, wenn genannt, zu einem seiner Stuecke */
+  geheZu: (i: number, stueck?: string) => void;
+  /** Unterschrieben: alles nur noch zum Ansehen */
+  gesperrt: boolean;
 }
+
+/*
+ * JEDER SCHRITT BESTEHT AUS STUECKEN (`components/Ablauf.tsx`): Eins ist
+ * offen, „Weiter“ zeigt das naechste, das vorige wird zur Zeile mit seinem
+ * Ergebnis (`zeilen.ts`). So erklaert der Berater eins nach dem anderen,
+ * statt dass ein Schritt alles auf einmal zeigt.
+ */
+
+/**
+ * Der Inhalt eines Stuecks. Unterschrieben steht er nur noch zum Ansehen da:
+ * Ein deaktiviertes fieldset sperrt jedes Feld und jeden Knopf darin. Die
+ * Zeilen der Stuecke und „Weiter“ liegen ausserhalb und bleiben bedienbar.
+ *
+ * Der Inhalt liegt in einem eigenen Block, nicht direkt im fieldset: Kommt
+ * dort ein Kind dazu oder faellt eines weg (ein Hinweis zum gewaehlten
+ * Betrag), baut Chrome das fieldset neu auf — und bricht damit ab, was
+ * darin gerade gezogen wird, etwa den Regler.
+ */
+function Inhalt({ gesperrt, klasse, children }: { gesperrt: boolean; klasse?: string; children: ReactNode }) {
+  return <fieldset disabled={gesperrt} className="min-w-0"><div className={klasse}>{children}</div></fieldset>;
+}
+
+/** Name der Liste der Stuecke fuer Screenreader. */
+const stueckeVon = (schritt: string) => `Stücke des Schritts „${schritt}“`;
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
 const KASSEN = [
@@ -98,52 +131,66 @@ export function SchrittAngebot({ firma, logo }: SchrittProps) {
     { verheiratet: false, bundesland: a.bundesland, kirchensteuerpflichtig: false },
     P,
   ), [a.modell, a.bundesland]);
-  const vertraege = a.modell.art === 'matching' ? (a.modell.weg === 'dv' ? ['direkt', 'ukasse'] as const : ['ukasse'] as const) : ['direkt'] as const;
 
-  return (
-    <div className="space-y-8">
-      {/* Der Einstieg fuer den Mitarbeiter: grosser Name in Inter Tight, die Regel als Akzentkarte. */}
-      <div>
-        <FirmenZeichen name={firma.name} logo={logo} gross />
-        <p className="mt-4 max-w-3xl whitespace-pre-line text-lg leading-relaxed text-ui-schiefer">
-          {a.begruessung.trim() || `${firma.name} unterstützt Ihre Altersvorsorge mit einer Betriebsrente.`}
-        </p>
-      </div>
-      <div className={`${AKZENT} p-6 sm:p-10`}>
-        {/* Ueberschrift, nicht blosser Absatz: Zwischen dem Firmennamen (h1) und den Hinweisen (h3) fehlte sonst eine Ebene. */}
-        <h2 className="text-sm">Ihr Angebot</h2>
-        <p className="ui-titel mt-2 max-w-3xl text-balance text-[26px] font-normal leading-[1.25] sm:text-[34px]">
-          <RegelMitKern modell={a.modell} />
-        </p>
-        <p className="mt-4 max-w-3xl text-base leading-relaxed">
-        Ein Beispiel: Wandeln Sie <strong>100 €</strong> im Monat um, legt Ihr Arbeitgeber{' '}
-        <strong className="tabular-nums">{euroGenau(bsp.arbeitgeberMonat)}</strong> dazu — in Ihre Vorsorge fließen{' '}
-        <strong className="tabular-nums">{euroGenau(bsp.gesamtMonat)}</strong>. Was Sie das netto kostet, rechnen wir gleich mit Ihren Angaben.
-        </p>
-      </div>
-
-      <Karte>
-        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          {vertraege.map((w) => (
-            <div key={w}>
-              <dt className={ETIKETT}>{vertragName(w, a)}</dt>
-              <dd className="mt-0.5 text-base text-ui-tinte">{traegerText(w, a) || 'Anbieter wird im Gespräch genannt'}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-6 space-y-6">
-          <Hinweise titel={`Was ${firma.name} dazu festgelegt hat`} punkte={firmenHinweise(a)} />
-          <Hinweise titel="Gut zu wissen" punkte={festePunkte(a)} />
+  const stuecke: Stueck[] = [
+    {
+      id: 'angebot',
+      titel: 'Ihr Angebot',
+      ergebnis: angebotSatz(a),
+      inhalt: (
+        <div className="space-y-6 sm:space-y-8">
+          {/* Der Einstieg fuer den Mitarbeiter: grosser Name in Inter Tight, die Regel als Akzentkarte. */}
+          <div>
+            <FirmenZeichen name={firma.name} logo={logo} gross />
+            <p className="mt-4 max-w-3xl whitespace-pre-line text-lg leading-relaxed text-ui-schiefer">
+              {a.begruessung.trim() || `${firma.name} unterstützt Ihre Altersvorsorge mit einer Betriebsrente.`}
+            </p>
+          </div>
+          <div className={`${AKZENT} p-6 sm:p-10`}>
+            {/* Ueberschrift, nicht blosser Absatz: Zwischen dem Firmennamen (h1) und den Hinweisen (h3) fehlte sonst eine Ebene. */}
+            <h2 className="text-sm">Ihr Angebot</h2>
+            <p className="ui-titel mt-2 max-w-3xl text-balance text-[26px] font-normal leading-[1.25] sm:text-[34px]">
+              <RegelMitKern modell={a.modell} />
+            </p>
+            <p className="mt-4 max-w-3xl text-base leading-relaxed">
+              Ein Beispiel: Wandeln Sie <strong>100 €</strong> im Monat um, legt Ihr Arbeitgeber{' '}
+              <strong className="tabular-nums">{euroGenau(bsp.arbeitgeberMonat)}</strong> dazu — in Ihre Vorsorge fließen{' '}
+              <strong className="tabular-nums">{euroGenau(bsp.gesamtMonat)}</strong>. Was Sie das netto kostet, rechnen wir gleich mit Ihren Angaben.
+            </p>
+          </div>
         </div>
-      </Karte>
-    </div>
-  );
+      ),
+    },
+    {
+      id: 'bedingungen',
+      titel: 'Anbieter und Bedingungen',
+      ergebnis: anbieterSatz(a),
+      inhalt: (
+        <Karte titel="Anbieter und Bedingungen">
+          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            {angebotVertraege(a).map((w) => (
+              <div key={w}>
+                <dt className={ETIKETT}>{vertragName(w, a)}</dt>
+                <dd className="mt-0.5 text-base text-ui-tinte">{traegerText(w, a) || 'Anbieter wird im Gespräch genannt'}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-6 space-y-6">
+            <Hinweise titel={`Was ${firma.name} dazu festgelegt hat`} punkte={firmenHinweise(a)} />
+            <Hinweise titel="Gut zu wissen" punkte={festePunkte(a)} />
+          </div>
+        </Karte>
+      ),
+    },
+  ];
+
+  return <Stuecke kennung="angebot" beschriftung={stueckeVon('Angebot')} stuecke={stuecke} />;
 }
 
 /* --- 2. Angaben ------------------------------------------------------------ */
 
-export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
+export function SchrittAngaben({ firma, daten, setze, gesperrt }: SchrittProps) {
   const a = daten.angaben;
   const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
   const regel = rentenbeginnVon({ ...a, rentenbeginn: '' });
@@ -152,116 +199,164 @@ export function SchrittAngaben({ firma, daten, setze }: SchrittProps) {
   const mailFehler = mailVerlassen && a.email.trim() !== '' && !emailGueltig(a.email)
     ? 'Bitte prüfen Sie die Adresse — etwa name@beispiel.de.' : null;
 
-  return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <Karte titel="Zur Person">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <NamenFelder {...namensTeile(a.name, a.vorname, a.nachname)} onChange={(teile) => setzeA(mitName(teile))} />
-          </div>
-          {/* Kontakt fuer Rueckfragen und die Unterlagen per E-Mail. „off“: nicht die eigenen Daten des Beraters vorschlagen. */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld label="E-Mail" typ="email" wert={a.email} onChange={(email) => setzeA({ email })} onBlur={() => setMailVerlassen(true)}
-              fehler={mailFehler} maxLaenge={120} autoComplete="off" />
-            <TextFeld label="Telefon" typ="tel" wert={a.telefon} onChange={(telefon) => setzeA({ telefon })} maxLaenge={40} autoComplete="off" />
-          </div>
-          <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
-          {istAxaAntrag(firma.angebot) && (
-            <TextFeld label="Derzeitige Tätigkeit (für den AXA-Antrag)" wert={a.taetigkeit} onChange={(taetigkeit) => setzeA({ taetigkeit })}
-              maxLaenge={80} />
-          )}
-          <div>
-            <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}
-              hilfe={!regel ? 'Wird aus dem Geburtsdatum berechnet: die Regelaltersgrenze.'
-                : a.rentenbeginn ? 'Eingetragen.' : 'Automatisch: die Regelaltersgrenze aus dem Geburtsdatum. Ändern, wenn die Rente früher oder später beginnt.'} />
-            {regel && a.rentenbeginn && a.rentenbeginn !== regel && (
-              <button type="button" onClick={() => setzeA({ rentenbeginn: '' })} className={`mt-1 ${LINK} text-xs`}>
-                Regelaltersgrenze verwenden ({regel})
-              </button>
-            )}
-          </div>
-        </div>
-      </Karte>
+  // Die Felder stehen ab mittlerer Breite zu zweit nebeneinander — ein einzelnes fuellt eine halbe Zeile.
+  const ZWEI = 'grid gap-3 sm:grid-cols-2';
 
-      <Karte titel="Einkommen und Steuer">
-        <div className="space-y-3">
-          {/* Das Monatsgehalt wie auf der Abrechnung; gespeichert wird das Jahr mit Sonderzahlungen. */}
-          <div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ZahlFeld label="Bruttogehalt im Monat" wert={Math.round(monatsgehalt(a) * 100) / 100} einheit="€" schritt={100}
-                onChange={(m) => setzeA({ jahresbrutto: m * a.gehaelter })} />
-              <AuswahlFeld label="Gehälter im Jahr" wert={String(a.gehaelter)} optionen={GEHAELTER_OPTIONEN}
-                onChange={(v) => setzeA({ gehaelter: Number(v), jahresbrutto: monatsgehalt(a) * Number(v) })} />
-            </div>
-            <p className="mt-1 text-xs text-ui-schiefer">
-              = {euro(a.jahresbrutto)} im Jahr{a.gehaelter > 12 ? ', mit Weihnachts- und Urlaubsgeld' : ''}
-            </p>
-          </div>
-          <AuswahlFeld label="Bundesland" wert={a.bundesland || firma.angebot.bundesland} optionen={LAENDER} onChange={(bundesland) => setzeA({ bundesland })} />
-          {/* „verheiratet“ wird mitgeschrieben — fuer Fassungen, die die Steuerklasse noch nicht kennen */}
-          <AuswahlFeld label="Steuerklasse" wert={String(a.steuerklasse)} optionen={STEUERKLASSE_OPTIONEN}
-            onChange={(v) => { const steuerklasse = steuerklasseAus({ steuerklasse: Number(v), verheiratet: false, partnerBrutto: 0 }); setzeA({ steuerklasse, verheiratet: steuerklasse >= 3 }); }}
-            hilfe="Wie auf der Gehaltsabrechnung. Bei III/V gleicht die Steuererklärung aus." />
-          <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
-          <div>
-            <span className={FELD_LABEL}>Kinder</span>
-            <div className="space-y-2">
-              {a.kinder.map((k, i) => (
-                <div key={i} className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <ZahlFeld label={`Kind ${i + 1}: Geburtsjahr`} wert={k.geburtsjahr} min={1950} max={JETZT}
-                      onChange={(geburtsjahr) => setzeA({ kinder: a.kinder.map((x, j) => (j === i ? { ...x, geburtsjahr: Math.round(geburtsjahr) } : x)) })} />
-                  </div>
-                  <button type="button" aria-label={`Kind ${i + 1} entfernen`} onClick={() => setzeA({ kinder: a.kinder.filter((_, j) => j !== i) })}
-                    className="mb-1 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
+  const stuecke: Stueck[] = [
+    {
+      id: 'person',
+      titel: 'Zur Person',
+      ...personZeile(a, new Date()),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Zur Person">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <NamenFelder {...namensTeile(a.name, a.vorname, a.nachname)} onChange={(teile) => setzeA(mitName(teile))} />
+              </div>
+              {/* Kontakt fuer Rueckfragen und die Unterlagen per E-Mail. „off“: nicht die eigenen Daten des Beraters vorschlagen. */}
+              <div className={ZWEI}>
+                <TextFeld label="E-Mail" typ="email" wert={a.email} onChange={(email) => setzeA({ email })} onBlur={() => setMailVerlassen(true)}
+                  fehler={mailFehler} maxLaenge={120} autoComplete="off" />
+                <TextFeld label="Telefon" typ="tel" wert={a.telefon} onChange={(telefon) => setzeA({ telefon })} maxLaenge={40} autoComplete="off" />
+              </div>
+              <div className={ZWEI}>
+                <DatumFeld label="Geburtsdatum" wert={a.geburtsdatum} onChange={(geburtsdatum) => setzeA({ geburtsdatum })} />
+                <div>
+                  <DatumFeld label="Rentenbeginn" wert={a.rentenbeginn || regel || ''} onChange={(rentenbeginn) => setzeA({ rentenbeginn })}
+                    hilfe={!regel ? 'Wird aus dem Geburtsdatum berechnet: die Regelaltersgrenze.'
+                      : a.rentenbeginn ? 'Eingetragen.' : 'Automatisch: die Regelaltersgrenze aus dem Geburtsdatum. Ändern, wenn die Rente früher oder später beginnt.'} />
+                  {regel && a.rentenbeginn && a.rentenbeginn !== regel && (
+                    <button type="button" onClick={() => setzeA({ rentenbeginn: '' })} className={`mt-1 ${LINK} text-xs`}>
+                      Regelaltersgrenze verwenden ({regel})
+                    </button>
+                  )}
                 </div>
-              ))}
-              {a.kinder.length < 15 && (
-                <button type="button" onClick={() => setzeA({ kinder: [...a.kinder, { geburtsjahr: JETZT - 5 }] })} className={KNOPF_ZWEIT}>
-                  <Plus className="h-4 w-4" aria-hidden /> Kind hinzufügen
-                </button>
+              </div>
+              {istAxaAntrag(firma.angebot) && (
+                <div className={ZWEI}>
+                  <TextFeld label="Derzeitige Tätigkeit (für den AXA-Antrag)" wert={a.taetigkeit} onChange={(taetigkeit) => setzeA({ taetigkeit })}
+                    maxLaenge={80} />
+                </div>
               )}
             </div>
-            <p className="mt-1 text-xs text-ui-schiefer">Kinder senken den Beitrag zur Pflegeversicherung — heute und im Alter.</p>
-          </div>
-        </div>
-      </Karte>
-
-      <Karte titel="Krankenversicherung">
-        <div className="space-y-3">
-          <AuswahlFeld label="Versichert" wert={a.kv} onChange={(kv) => setzeA({ kv })}
-            optionen={[{ wert: 'gesetzlich', text: 'gesetzlich' }, { wert: 'privat', text: 'privat' }]} />
-          {a.kv === 'gesetzlich' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <AuswahlFeld label="Krankenkasse" wert={a.krankenkasse} optionen={KASSEN} hilfe={KASSEN_STAND}
-                onChange={(v) => {
-                  const k = KRANKENKASSEN.find((kk) => kk.name === v);
-                  setzeA({ krankenkasse: v, ...(k ? { zusatzbeitrag: k.zusatzbeitrag } : {}) });
-                }} />
-              <ProzentFeld label="Zusatzbeitrag" wert={a.zusatzbeitrag} max={10} stellen={2}
-                hilfe="Kasse nicht dabei? Satz hier eintragen."
-                onChange={(zusatzbeitrag) => setzeA({ zusatzbeitrag, krankenkasse: '' })} />
+          </Karte>
+        </Inhalt>
+      ),
+    },
+    {
+      id: 'einkommen',
+      titel: 'Einkommen und Steuer',
+      ...einkommenZeile(a),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Einkommen und Steuer">
+            <div className="space-y-3">
+              {/* Das Monatsgehalt wie auf der Abrechnung; gespeichert wird das Jahr mit Sonderzahlungen. */}
+              <div>
+                <div className={ZWEI}>
+                  <ZahlFeld label="Bruttogehalt im Monat" wert={Math.round(monatsgehalt(a) * 100) / 100} einheit="€" schritt={100}
+                    onChange={(m) => setzeA({ jahresbrutto: m * a.gehaelter })} />
+                  <AuswahlFeld label="Gehälter im Jahr" wert={String(a.gehaelter)} optionen={GEHAELTER_OPTIONEN}
+                    onChange={(v) => setzeA({ gehaelter: Number(v), jahresbrutto: monatsgehalt(a) * Number(v) })} />
+                </div>
+                <p className="mt-1 text-xs text-ui-schiefer">
+                  = {euro(a.jahresbrutto)} im Jahr{a.gehaelter > 12 ? ', mit Weihnachts- und Urlaubsgeld' : ''}
+                </p>
+              </div>
+              <div className={ZWEI}>
+                <AuswahlFeld label="Bundesland" wert={a.bundesland || firma.angebot.bundesland} optionen={LAENDER} onChange={(bundesland) => setzeA({ bundesland })} />
+                {/* „verheiratet“ wird mitgeschrieben — fuer Fassungen, die die Steuerklasse noch nicht kennen */}
+                <AuswahlFeld label="Steuerklasse" wert={String(a.steuerklasse)} optionen={STEUERKLASSE_OPTIONEN}
+                  onChange={(v) => { const steuerklasse = steuerklasseAus({ steuerklasse: Number(v), verheiratet: false, partnerBrutto: 0 }); setzeA({ steuerklasse, verheiratet: steuerklasse >= 3 }); }}
+                  hilfe="Wie auf der Gehaltsabrechnung. Bei III/V gleicht die Steuererklärung aus." />
+              </div>
+              <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
+              <div>
+                <span className={FELD_LABEL}>Kinder</span>
+                <div className="space-y-2">
+                  {a.kinder.map((k, i) => (
+                    <div key={i} className="flex items-end gap-2 sm:max-w-sm">
+                      <div className="flex-1">
+                        <ZahlFeld label={`Kind ${i + 1}: Geburtsjahr`} wert={k.geburtsjahr} min={1950} max={JETZT}
+                          onChange={(geburtsjahr) => setzeA({ kinder: a.kinder.map((x, j) => (j === i ? { ...x, geburtsjahr: Math.round(geburtsjahr) } : x)) })} />
+                      </div>
+                      <button type="button" aria-label={`Kind ${i + 1} entfernen`} onClick={() => setzeA({ kinder: a.kinder.filter((_, j) => j !== i) })}
+                        className="mb-1 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700">
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                  {a.kinder.length < 15 && (
+                    <button type="button" onClick={() => setzeA({ kinder: [...a.kinder, { geburtsjahr: JETZT - 5 }] })} className={KNOPF_ZWEIT}>
+                      <Plus className="h-4 w-4" aria-hidden /> Kind hinzufügen
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-ui-schiefer">Kinder senken den Beitrag zur Pflegeversicherung — heute und im Alter.</p>
+              </div>
             </div>
-          ) : (
-            <ZahlFeld label="Beitrag zur privaten Kranken- und Pflegeversicherung im Monat" wert={a.pkvPraemieMonat}
-              onChange={(pkvPraemieMonat) => setzeA({ pkvPraemieMonat })} einheit="€" schritt={10} />
-          )}
-        </div>
-      </Karte>
+          </Karte>
+        </Inhalt>
+      ),
+    },
+    {
+      id: 'kv',
+      titel: 'Krankenversicherung',
+      ...kvZeile(a),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Krankenversicherung">
+            <div className="space-y-3">
+              <div className={ZWEI}>
+                <AuswahlFeld label="Versichert" wert={a.kv} onChange={(kv) => setzeA({ kv })}
+                  optionen={[{ wert: 'gesetzlich', text: 'gesetzlich' }, { wert: 'privat', text: 'privat' }]} />
+              </div>
+              {a.kv === 'gesetzlich' ? (
+                <div className={ZWEI}>
+                  <AuswahlFeld label="Krankenkasse" wert={a.krankenkasse} optionen={KASSEN} hilfe={KASSEN_STAND}
+                    onChange={(v) => {
+                      const k = KRANKENKASSEN.find((kk) => kk.name === v);
+                      setzeA({ krankenkasse: v, ...(k ? { zusatzbeitrag: k.zusatzbeitrag } : {}) });
+                    }} />
+                  <ProzentFeld label="Zusatzbeitrag" wert={a.zusatzbeitrag} max={10} stellen={2}
+                    hilfe="Kasse nicht dabei? Satz hier eintragen."
+                    onChange={(zusatzbeitrag) => setzeA({ zusatzbeitrag, krankenkasse: '' })} />
+                </div>
+              ) : (
+                <div className={ZWEI}>
+                  <ZahlFeld label="Beitrag zur privaten Kranken- und Pflegeversicherung im Monat" wert={a.pkvPraemieMonat}
+                    onChange={(pkvPraemieMonat) => setzeA({ pkvPraemieMonat })} einheit="€" schritt={10} />
+                </div>
+              )}
+            </div>
+          </Karte>
+        </Inhalt>
+      ),
+    },
+    {
+      id: 'vorsorge',
+      titel: 'Bisherige Vorsorge',
+      ...vorsorgeZeile(a),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Bisherige Vorsorge">
+            <div className="space-y-3">
+              <div className={ZWEI}>
+                <ZahlFeld label="Bestehende Betriebsrente: Beitrag im Monat" wert={a.bavBestandMonat} onChange={(bavBestandMonat) => setzeA({ bavBestandMonat })} einheit="€" schritt={10}
+                  hilfe="Direktversicherung oder Pensionskasse, Mitarbeiter und Arbeitgeber zusammen. Sie belegt die Freigrenzen zuerst." />
+              </div>
+              <p className="text-xs leading-relaxed text-ui-schiefer">
+                Die gesetzliche Rente folgt im nächsten Schritt — aus dem Gehalt geschätzt und mit der Renteninformation anpassbar.
+              </p>
+            </div>
+          </Karte>
+        </Inhalt>
+      ),
+    },
+  ];
 
-      <Karte titel="Bisherige Vorsorge">
-        <div className="space-y-3">
-          <ZahlFeld label="Bestehende Betriebsrente: Beitrag im Monat" wert={a.bavBestandMonat} onChange={(bavBestandMonat) => setzeA({ bavBestandMonat })} einheit="€" schritt={10}
-            hilfe="Direktversicherung oder Pensionskasse, Mitarbeiter und Arbeitgeber zusammen. Sie belegt die Freigrenzen zuerst." />
-          <p className="text-xs leading-relaxed text-ui-schiefer">
-            Die gesetzliche Rente folgt im nächsten Schritt — aus dem Gehalt geschätzt und mit der Renteninformation anpassbar.
-          </p>
-        </div>
-      </Karte>
-    </div>
-  );
+  return <Stuecke kennung="angaben" beschriftung={stueckeVon('Ihre Angaben')} stuecke={stuecke} />;
 }
 
 /* --- 3. Versorgungsluecke -------------------------------------------------- */
@@ -287,7 +382,7 @@ function RentenzielWahl({ wert, onWahl, titelId }: { wert: number; onWahl: (ziel
   );
 }
 
-export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & { luecke: Versorgungsluecke | null; aktuell: boolean }) {
+export function SchrittLuecke({ daten, setze, luecke, aktuell, gesperrt }: SchrittProps & { luecke: Versorgungsluecke | null; aktuell: boolean }) {
   const zielTitel = useId();
   const a = daten.angaben;
   const setzeA = (p: Partial<BeratungAngaben>) => setze((d) => ({ ...d, angaben: { ...d.angaben, ...p } }));
@@ -297,82 +392,95 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
 
   if (!rentenbeginn || a.jahresbrutto <= 0) {
     return (
-      <Karte>
-        <p className="text-sm text-ui-tinte">Für die Versorgungslücke fehlen Geburtsdatum und Bruttogehalt (Schritt 2).</p>
-      </Karte>
+      <Stuecke kennung="luecke" beschriftung={stueckeVon('Versorgungslücke')} stuecke={[{
+        id: 'luecke',
+        titel: 'Ihre Versorgungslücke',
+        fehlt: 'Geburtsdatum und Bruttogehalt fehlen',
+        inhalt: (
+          <Karte>
+            <p className="text-sm text-ui-tinte">Für die Versorgungslücke fehlen Geburtsdatum und Bruttogehalt (Schritt 2).</p>
+          </Karte>
+        ),
+      }]} />
     );
   }
   const reicht = luecke !== null && luecke.lueckeMonat < 0.5;
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <Titel als="h2" gross>
-          {reicht
-            ? <>Ihre gesetzliche Rente im Vergleich zum <Hervor>Rentenziel</Hervor></>
-            : <>Ihre gesetzliche Rente <Hervor>reicht nicht aus</Hervor></>}
-        </Titel>
-        <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
-          Im Alter brauchen die meisten etwas weniger Geld als heute: Als Rentenziel gelten meist 70 bis 85 % des heutigen
-          Nettolohns. Was die gesetzliche Rente bis dahin offenlässt, heißt Versorgungslücke. Eine Betriebsrente kann sie
-          verkleinern.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Der Ring als schwebendes Stueck Produkt; die Luecke selbst in der Akzentkarte darunter. Oben die Wahl des Rentenziels. */}
-        <div className={`${SCHWEBEND} self-start p-5 sm:p-7`}>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div>
-              <p id={zielTitel} className="text-sm font-medium text-ui-tinte">Ihr Rentenziel</p>
-              <p className="text-xs tabular-nums text-ui-schiefer">
-                {luecke
-                  ? `${euro(luecke.zielMonat)} im Monat — ${luecke.zielProzent} % von ${euro(luecke.lohn.nettoMonat)} Nettolohn`
-                  : 'ein Anteil am heutigen Nettolohn'}
-              </p>
-            </div>
-            <RentenzielWahl wert={daten.rentenziel} onWahl={(rentenziel) => setze((d) => ({ ...d, rentenziel }))} titelId={zielTitel} />
-          </div>
-          <div className={`mt-6 ${aktuell ? '' : 'opacity-60'}`}>
-            {luecke ? (
-              <>
-                <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
-                  <LueckenRing ganz={luecke.zielMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
-                    gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} texte={RENTENZIEL_RING} />
-                  <dl className="space-y-4">
-                    <Zahl etikett="Netto-Altersrente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} zusatz={`${luecke.renteProzent} %`} />
-                    <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke.lueckeMonat)}
-                      zusatz={`${luecke.lueckeProzent} %`} />
-                  </dl>
-                </div>
-                {luecke.lueckeProzent > 0 && (
-                  <div className={`${AKZENT} mt-6 px-5 py-4`}>
-                    <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
-                      Bis zu Ihrem Rentenziel fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
-                    </p>
-                  </div>
-                )}
-                <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
-                  Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
-                  {luecke.lueckeProzent > 0
-                    ? ` Zum Rentenziel von ${luecke.zielProzent} % fehlen ${luecke.lueckeProzent} %.`
-                    : ` Ihr Rentenziel von ${luecke.zielProzent} % ist damit erreicht.`}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-ui-schiefer">Wird gerechnet …</p>
-            )}
-          </div>
-        </div>
-
-        <Karte titel="Berechnungsgrundlagen">
+  const stuecke: Stueck[] = [
+    {
+      id: 'luecke',
+      titel: 'Ihre Versorgungslücke',
+      ...lueckeZeile(luecke),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt} klasse="space-y-6">
           <div>
-            <ZahlFeld label="Gesetzliche Rente nach heutigem Stand (im Monat)" wert={eingetragen ? a.grvRente : Math.round(schaetzung.monat)}
-              onChange={(grvRente) => setzeA({ grvRente })} einheit="€" schritt={50}
-              hilfe={eingetragen
-                ? 'Eingetragen — etwa aus der Renteninformation.'
-                : 'Aus dem Gehalt geschätzt: Berufsstart mit 22, Gehalt im Verhältnis zum Durchschnitt wie heute. '
-                  + 'Mit dem Wert der Renteninformation überschreiben.'} />
+            <Titel als="h2" gross>
+              {reicht
+                ? <>Ihre gesetzliche Rente im Vergleich zum <Hervor>Rentenziel</Hervor></>
+                : <>Ihre gesetzliche Rente <Hervor>reicht nicht aus</Hervor></>}
+            </Titel>
+            <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
+              Im Alter brauchen die meisten etwas weniger Geld als heute: Als Rentenziel gelten meist 70 bis 85 % des heutigen
+              Nettolohns. Was die gesetzliche Rente bis dahin offenlässt, heißt Versorgungslücke. Eine Betriebsrente kann sie
+              verkleinern.
+            </p>
+          </div>
+
+          {/* Der Ring als schwebendes Stueck Produkt; die Luecke selbst in der Akzentkarte darunter. Oben die Wahl des Rentenziels. */}
+          <div className={`${SCHWEBEND} p-5 sm:p-7`}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div>
+                <p id={zielTitel} className="text-sm font-medium text-ui-tinte">Ihr Rentenziel</p>
+                <p className="text-xs tabular-nums text-ui-schiefer">
+                  {luecke
+                    ? `${euro(luecke.zielMonat)} im Monat — ${luecke.zielProzent} % von ${euro(luecke.lohn.nettoMonat)} Nettolohn`
+                    : 'ein Anteil am heutigen Nettolohn'}
+                </p>
+              </div>
+              <RentenzielWahl wert={daten.rentenziel} onWahl={(rentenziel) => setze((d) => ({ ...d, rentenziel }))} titelId={zielTitel} />
+            </div>
+            <div className={`mt-6 ${aktuell ? '' : 'opacity-60'}`}>
+              {luecke ? (
+                <>
+                  <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
+                    <LueckenRing ganz={luecke.zielMonat} gedeckt={luecke.rente.nettoMonat} luecke={luecke.lueckeMonat}
+                      gedecktProzent={luecke.renteProzent} lueckeProzent={luecke.lueckeProzent} texte={RENTENZIEL_RING} />
+                    <dl className="space-y-4">
+                      <Zahl etikett="Netto-Altersrente" punkt="bg-ui-tinte" wert={euro(luecke.rente.nettoMonat)} zusatz={`${luecke.renteProzent} %`} />
+                      <Zahl etikett="Versorgungslücke" punkt="bg-ui-luecke ring-1 ring-ui-tinte/20" wert={euro(luecke.lueckeMonat)}
+                        zusatz={`${luecke.lueckeProzent} %`} />
+                    </dl>
+                  </div>
+                  {luecke.lueckeProzent > 0 && (
+                    <div className={`${AKZENT} mt-6 px-5 py-4`}>
+                      <p className="ui-titel text-[24px] leading-snug sm:text-[26px]">
+                        Bis zu Ihrem Rentenziel fehlen Ihnen <span className="whitespace-nowrap tabular-nums"><Hervor>{luecke.lueckeProzent} %</Hervor></span> Ihres heutigen Nettolohns.
+                      </p>
+                    </div>
+                  )}
+                  <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
+                    Die gesetzliche Rente ersetzt {luecke.renteProzent} % Ihres Nettolohns — in heutiger Kaufkraft.
+                    {luecke.lueckeProzent > 0
+                      ? ` Zum Rentenziel von ${luecke.zielProzent} % fehlen ${luecke.lueckeProzent} %.`
+                      : ` Ihr Rentenziel von ${luecke.zielProzent} % ist damit erreicht.`}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-ui-schiefer">Wird gerechnet …</p>
+              )}
+            </div>
+          </div>
+
+          {/* Die eine Zahl, die der Mitarbeiter mitbringt: Mit der Renteninformation wird aus der Schaetzung sein Wert. */}
+          <Karte titel="Ihre gesetzliche Rente">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ZahlFeld label="Gesetzliche Rente nach heutigem Stand (im Monat)" wert={eingetragen ? a.grvRente : Math.round(schaetzung.monat)}
+                onChange={(grvRente) => setzeA({ grvRente })} einheit="€" schritt={50}
+                hilfe={eingetragen
+                  ? 'Eingetragen — etwa aus der Renteninformation.'
+                  : 'Aus dem Gehalt geschätzt: Berufsstart mit 22, Gehalt im Verhältnis zum Durchschnitt wie heute. '
+                    + 'Mit dem Wert der Renteninformation überschreiben.'} />
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               {eingetragen ? (
                 <button type="button" onClick={() => setzeA({ grvRente: 0 })} className={`${LINK} text-xs`}>
@@ -382,43 +490,58 @@ export function SchrittLuecke({ daten, setze, luecke, aktuell }: SchrittProps & 
                 <Vermerk>geschätzt</Vermerk>
               )}
             </div>
-          </div>
-          {luecke && (
-            <dl className={`mt-4 divide-y divide-ui-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
-              {([
-                [a.gehaelter > 12 ? 'Ihr Bruttolohn im Monatsdurchschnitt' : 'Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
-                [a.gehaelter > 12 ? 'Ihr Nettolohn heute, im Monatsdurchschnitt' : 'Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
-                [`Ihr Rentenziel: ${luecke.zielProzent} % davon`, euro(luecke.zielMonat)],
-                ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
-                ['Angenommene Inflation', prozentText(luecke.inflation)],
-                ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
-                [`Brutto-Altersrente ${luecke.rentenbeginnJahr}, heutige Kaufkraft`, euro(luecke.rente.bruttoMonat)],
-                ['− Kranken- und Pflegeversicherung', euro(luecke.rente.kvPvMonat)],
-                ['− Steuer', euro(luecke.rente.steuerMonat)],
-              ] as const).map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3 py-1.5">
-                  <dt className="text-ui-schiefer">{k}</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{v}</dd>
-                </div>
-              ))}
-              <div className="flex justify-between gap-3 py-2 font-medium">
-                <dt className="text-ui-tinte">= Netto-Altersrente</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{euro(luecke.rente.nettoMonat)}</dd>
-              </div>
-            </dl>
-          )}
-        </Karte>
-      </div>
+          </Karte>
 
-      <p className="max-w-4xl text-xs leading-relaxed text-ui-schiefer">
-        Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
-        mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
-        Der Nettolohn rechnet {nettolohnGrundlage(a.steuerklasse, a.gehaelter)}
-        {a.steuerklasse === 5 ? ' — den höheren Abzug der Klasse V gleicht die Steuererklärung aus' : ''}, die Steuer im Alter
-        {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
-        Das Rentenziel ist eine Faustregel: Im Alter fallen manche Ausgaben weg, etwa die Fahrt zur Arbeit oder das Sparen
-        fürs Alter. Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
-      </p>
-    </div>
-  );
+          <p className="max-w-3xl text-xs leading-relaxed text-ui-schiefer">
+            Näherungswerte nach heutigem Recht. Wie gerechnet wird, steht darunter in den Berechnungsgrundlagen.
+          </p>
+        </Inhalt>
+      ),
+    },
+    // Wer nachrechnen will: der Weg vom Bruttolohn zur Netto-Rente, mit allen Annahmen.
+    ...(luecke ? [{
+      id: 'grundlagen',
+      vertiefung: true,
+      titel: 'Berechnungsgrundlagen',
+      ...grvZeile(a, schaetzung.monat),
+      inhalt: (
+        <Karte titel="Berechnungsgrundlagen">
+          <dl className={`divide-y divide-ui-linie text-sm ${aktuell ? '' : 'opacity-60'}`}>
+            {([
+              [a.gehaelter > 12 ? 'Ihr Bruttolohn im Monatsdurchschnitt' : 'Ihr monatlicher Bruttolohn', euro(luecke.lohn.bruttoMonat)],
+              [a.gehaelter > 12 ? 'Ihr Nettolohn heute, im Monatsdurchschnitt' : 'Ihr Nettolohn heute', euro(luecke.lohn.nettoMonat)],
+              [`Ihr Rentenziel: ${luecke.zielProzent} % davon`, euro(luecke.zielMonat)],
+              ['Rentenbeginn', `${luecke.rentenbeginn} (mit ${luecke.alterBeiRentenbeginn})`],
+              ['Angenommene Inflation', prozentText(luecke.inflation)],
+              ['Angenommene Rentenanpassung', prozentText(luecke.rentenanpassung)],
+              ['Gesetzliche Rente nach heutigem Stand', `${euro(eingetragen ? a.grvRente : schaetzung.monat)}${eingetragen ? '' : ' (geschätzt)'}`],
+              [`Brutto-Altersrente ${luecke.rentenbeginnJahr}, heutige Kaufkraft`, euro(luecke.rente.bruttoMonat)],
+              ['− Kranken- und Pflegeversicherung', euro(luecke.rente.kvPvMonat)],
+              ['− Steuer', euro(luecke.rente.steuerMonat)],
+            ] as const).map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3 py-1.5">
+                <dt className="text-ui-schiefer">{k}</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{v}</dd>
+              </div>
+            ))}
+            <div className="flex justify-between gap-3 py-2 font-medium">
+              <dt className="text-ui-tinte">= Netto-Altersrente</dt><dd className="shrink-0 tabular-nums text-ui-tinte">{euro(luecke.rente.nettoMonat)}</dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
+            Näherungswerte nach heutigem Recht. Die Rente steigt bis zum Rentenbeginn mit der Rentenanpassung, die Kaufkraft sinkt
+            mit der Inflation — deshalb ist die Rente im ersten Rentenjahr in heutiger Kaufkraft niedriger als nach heutigem Stand.
+            Der Nettolohn rechnet {nettolohnGrundlage(a.steuerklasse, a.gehaelter)}
+            {a.steuerklasse === 5 ? ' — den höheren Abzug der Klasse V gleicht die Steuererklärung aus' : ''}, die Steuer im Alter
+            {a.steuerklasse === 3 ? ' mit dem Splittingtarif' : ' mit dem Grundtarif'}.
+            Das Rentenziel ist eine Faustregel: Im Alter fallen manche Ausgaben weg, etwa die Fahrt zur Arbeit oder das Sparen
+            fürs Alter. Nicht berücksichtigt: bestehende Vorsorge außer der gesetzlichen Rente.
+          </p>
+        </Karte>
+      ),
+    }] : []),
+  ];
+
+  return <Stuecke kennung="luecke" beschriftung={stueckeVon('Versorgungslücke')} stuecke={stuecke} />;
 }
 
 /* --- 4. Rechnung ------------------------------------------------------------ */
@@ -736,65 +859,100 @@ function SpaeterKarte({ zeilen }: { zeilen: SpaeterZeile[] }) {
 }
 
 export function SchrittRechnung(props: SchrittProps) {
-  const { firma, daten, setze, r } = props;
+  const { firma, daten, setze, r, gesperrt } = props;
   const abrechnung = useMemo(() => probeabrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
   const h = useMemo(() => hochrechnung(firma.angebot, daten, r), [firma.angebot, daten, r]);
+  const spaeter = spaeterBeginnen(h, r.nettoAufwandMonat);
 
-  return (
-    <div className="space-y-6">
-      <NettoRegler {...props} />
+  const stuecke: Stueck[] = [
+    {
+      id: 'beitrag',
+      titel: 'Ihr Beitrag',
+      ...rechnungZeile(r),
+      // Volle Breite: Die drei grossen Zahlen brauchen sie — in der schmalen Spalte passt ein vierstelliger Betrag nicht.
+      breit: true,
+      inhalt: (
+        <Inhalt gesperrt={gesperrt} klasse="space-y-5 sm:space-y-6">
+          <NettoRegler {...props} />
 
-      {/* Drei Zahlen nebeneinander, gross — um sie geht es; die dritte, was in der Vorsorge ankommt, als Akzentkarte. */}
-      <section className="grid gap-4 sm:grid-cols-3 lg:gap-5">
-        <WertKarte gross titel="Sie zahlen netto" wert={euroGenau(r.nettoAufwandMonat)} unten={`von ${euro(r.umwandlungMonat)} Umwandlung`} />
-        <WertKarte gross titel="Ihr Arbeitgeber gibt dazu" wert={euroGenau(r.arbeitgeberMonat)}
-          unten={r.mindestzuschuss?.aufgestockt ? 'der gesetzliche Zuschuss' : 'jeden Monat'} />
-        <WertKarte gross titel="In Ihre Vorsorge" wert={euroGenau(r.gesamtMonat)} akzent
-          unten={r.hebel > 0 ? `je 1 € netto ${r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 1 })} € Vorsorge` : 'jeden Monat'} />
-      </section>
+          {/* Drei Zahlen nebeneinander, gross — um sie geht es; die dritte, was in der Vorsorge ankommt, als Akzentkarte. */}
+          <section className="grid gap-4 sm:grid-cols-3 lg:gap-5">
+            <WertKarte gross titel="Sie zahlen netto" wert={euroGenau(r.nettoAufwandMonat)} unten={`von ${euro(r.umwandlungMonat)} Umwandlung`} />
+            <WertKarte gross titel="Ihr Arbeitgeber gibt dazu" wert={euroGenau(r.arbeitgeberMonat)}
+              unten={r.mindestzuschuss?.aufgestockt ? 'der gesetzliche Zuschuss' : 'jeden Monat'} />
+            <WertKarte gross titel="In Ihre Vorsorge" wert={euroGenau(r.gesamtMonat)} akzent
+              unten={r.hebel > 0 ? `je 1 € netto ${r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 1 })} € Vorsorge` : 'jeden Monat'} />
+          </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <ProbeabrechnungKarte a={abrechnung} />
-        </div>
-        <div className="space-y-4 lg:col-span-2">
-          <Karte titel="Was in Ihre Vorsorge fließt im Monat">
-            <dl className="text-sm">
-              <Posten text="Ihre Umwandlung" wert={euro(r.umwandlungMonat)} />
-              {r.pflichtzuschussMonat > 0.005 && <Posten text="+ gesetzlicher Zuschuss" wert={euro(r.pflichtzuschussMonat)} />}
-              {r.freiwilligMonat > 0.005 && (
-                <Posten text={firma.angebot.modell.art === 'matching' ? '+ Arbeitgeber (Unterstützungskasse)' : '+ Zuschuss des Arbeitgebers'} wert={euro(r.freiwilligMonat)} />
-              )}
-              <Posten text="= in Ihre Vorsorge" wert={euro(r.gesamtMonat)} summe />
-            </dl>
-            {r.vertraege.length > 1 && r.vertraege.map((v) => (
-              <p key={v.weg} className="mt-1 flex justify-between gap-2 pl-3 text-xs text-ui-schiefer">
-                <span>davon {vertragName(v.weg, firma.angebot)}</span><span className="tabular-nums">{euro(v.beitragMonat)}</span>
-              </p>
-            ))}
-            {/* Die Pruefung des gesetzlichen Zuschusses — gerechnet ist er immer, hier steht, ob die Regel reicht. */}
-            {r.mindestzuschuss && (
-              <div data-pruefung="mindestzuschuss" className="mt-4 flex gap-2 border-t border-ui-linie pt-3 text-xs leading-relaxed text-ui-schiefer">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden />
-                <p>
-                  <span className="font-medium text-ui-tinte">Gesetzlicher Mindestzuschuss eingehalten</span> (§ 1a Abs. 1a BetrAVG).{' '}
-                  {mindestzuschussText(r.mindestzuschuss, firma.angebot.modell)}
-                </p>
-              </div>
-            )}
-          </Karte>
+          {/* Was der Rechenkern zum gewaehlten Betrag anmerkt — beim Betrag, nicht erst bei der Abrechnung. */}
           {r.hinweise.map((h2) => (
             <p key={h2} className="ui-karte px-4 py-3 text-xs leading-relaxed text-ui-tinte">{h2}</p>
           ))}
-        </div>
-      </div>
+        </Inhalt>
+      ),
+    },
+    {
+      id: 'abrechnung',
+      titel: 'Probeabrechnung',
+      ...abrechnungZeile(abrechnung),
+      breit: true,
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-3">
+              <ProbeabrechnungKarte a={abrechnung} />
+            </div>
+            <div className="lg:col-span-2">
+              <Karte titel="Was in Ihre Vorsorge fließt im Monat">
+                <dl className="text-sm">
+                  <Posten text="Ihre Umwandlung" wert={euro(r.umwandlungMonat)} />
+                  {r.pflichtzuschussMonat > 0.005 && <Posten text="+ gesetzlicher Zuschuss" wert={euro(r.pflichtzuschussMonat)} />}
+                  {r.freiwilligMonat > 0.005 && (
+                    <Posten text={firma.angebot.modell.art === 'matching' ? '+ Arbeitgeber (Unterstützungskasse)' : '+ Zuschuss des Arbeitgebers'} wert={euro(r.freiwilligMonat)} />
+                  )}
+                  <Posten text="= in Ihre Vorsorge" wert={euro(r.gesamtMonat)} summe />
+                </dl>
+                {r.vertraege.length > 1 && r.vertraege.map((v) => (
+                  <p key={v.weg} className="mt-1 flex justify-between gap-2 pl-3 text-xs text-ui-schiefer">
+                    <span>davon {vertragName(v.weg, firma.angebot)}</span><span className="tabular-nums">{euro(v.beitragMonat)}</span>
+                  </p>
+                ))}
+                {/* Die Pruefung des gesetzlichen Zuschusses — gerechnet ist er immer, hier steht, ob die Regel reicht. */}
+                {r.mindestzuschuss && (
+                  <div data-pruefung="mindestzuschuss" className="mt-4 flex gap-2 border-t border-ui-linie pt-3 text-xs leading-relaxed text-ui-schiefer">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-ui-tinte" aria-hidden />
+                    <p>
+                      <span className="font-medium text-ui-tinte">Gesetzlicher Mindestzuschuss eingehalten</span> (§ 1a Abs. 1a BetrAVG).{' '}
+                      {mindestzuschussText(r.mindestzuschuss, firma.angebot.modell)}
+                    </p>
+                  </div>
+                )}
+              </Karte>
+            </div>
+          </div>
+        </Inhalt>
+      ),
+    },
+    ...(h.monate > 0 ? [{
+      id: 'hochrechnung',
+      titel: 'Beispielhafte Hochrechnung',
+      ...hochrechnungZeile(h),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
+            setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
+        </Inhalt>
+      ),
+    }] : []),
+    ...(spaeter[1] ? [{
+      id: 'spaeter',
+      titel: 'Später beginnen?',
+      ...spaeterZeile(spaeter[1]),
+      inhalt: <SpaeterKarte zeilen={spaeter} />,
+    }] : []),
+  ];
 
-      <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
-        setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
-
-      <SpaeterKarte zeilen={spaeterBeginnen(h, r.nettoAufwandMonat)} />
-    </div>
-  );
+  return <Stuecke kennung="rechnung" beschriftung={stueckeVon('Ihre Rechnung')} stuecke={stuecke} />;
 }
 
 /* --- 5. Leistung im Alter -------------------------------------------------- */
@@ -997,7 +1155,7 @@ function LueckeMitBetriebsrenteKarte({ luecke, x, aktuell }: { luecke: Versorgun
   );
 }
 
-export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, luecke, aktuell }: SchrittProps & {
+export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, luecke, aktuell, gesperrt }: SchrittProps & {
   kennzahlen: KennzahlenErgebnis | null; luecke: Versorgungsluecke | null; aktuell: boolean;
 }) {
   const a = firma.angebot;
@@ -1010,100 +1168,131 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
   const h = hochrechnung(firma.angebot, daten, r);
 
   if (r.vertraege.length === 0) {
-    return <Karte><p className="text-sm text-ui-tinte">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>;
+    return (
+      <Stuecke kennung="leistung" beschriftung={stueckeVon('Leistung im Alter')} stuecke={[{
+        id: 'vertrag-direkt',
+        titel: 'Ihr Vertrag',
+        fehlt: 'Ohne Umwandlung kein Vertrag',
+        inhalt: <Karte><p className="text-sm text-ui-tinte">Ohne Umwandlung gibt es keinen Vertrag — bitte in Schritt 4 einen Betrag wählen.</p></Karte>,
+      }]} />
+    );
   }
-  return (
-    <div className="space-y-6">
-      <p className="max-w-4xl text-base leading-relaxed text-ui-schiefer">
-        Tragen Sie die Werte aus dem Angebot des Versicherers ein — oder übernehmen Sie die geschätzte Hochrechnung aus „Ihre
-        Rechnung“. Daraus wird die Rente nach Kranken- und Pflegeversicherung und Steuer im ersten
-        Rentenjahr{leistung ? ` (${leistung.rentenbeginnJahr})` : ''}.
-      </p>
-      {r.vertraege.map((v) => {
-        const w = daten.versicherer[v.weg];
-        const l = leistung?.vertraege.find((x) => x.weg === v.weg) ?? null;
-        const traeger = traegerText(v.weg, a);
-        const schaetzung = h.monate > 0 ? hochrechnungJeVertrag(h, r, v.weg) : null;
-        const veraltet = w.ausHochrechnung && schaetzung !== null
-          && (Math.abs(w.prognoseRente - schaetzung.renteMonat) >= 1 || Math.abs(w.prognoseKapital - schaetzung.kapital) >= 1);
-        // Die Hochrechnung rechnet mit gleichbleibenden Beitraegen — deshalb ohne Dynamik
-        const uebernehmen = () => schaetzung && setzeW(v.weg, {
-          prognoseRente: schaetzung.renteMonat, prognoseKapital: schaetzung.kapital, dynamik: 0, ausHochrechnung: true,
-        });
-        // „Ihre Belastung“ steht beim Vertrag, in den die Umwandlung fliesst
-        const belastung = belastungJeVertrag(v, r, daten.angaben, firma.angebot);
-        return (
-          <Karte key={v.weg} titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}
-            rechts={w.ausHochrechnung ? <Vermerk>Prognose aus der geschätzten Hochrechnung</Vermerk> : undefined}>
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-              <div className="space-y-3 lg:col-span-5">
-                <ZahlFeld label="Beitrag laut Angebot im Monat" wert={w.beitragMonat > 0 ? w.beitragMonat : Math.round(v.beitragMonat * 100) / 100}
-                  onChange={(beitragMonat) => setzeW(v.weg, { beitragMonat })} einheit="€" schritt={10}
-                  hilfe={`Aus der Rechnung: ${euroGenau(v.beitragMonat)}, davon Arbeitgeber ${euroGenau(v.arbeitgeberMonat)}.`} />
-                <ZahlFeld label="Garantierte Rente im Monat" wert={w.garantierteRente} onChange={(garantierteRente) => setzeW(v.weg, { garantierteRente })} einheit="€" schritt={10} />
-                <ZahlFeld label="Prognostizierte Rente im Monat" wert={w.prognoseRente} onChange={(prognoseRente) => setzePrognose(v.weg, { prognoseRente })} einheit="€" schritt={10} />
-                <ZahlFeld label="Kapital zum Rentenbeginn (Prognose)" wert={w.prognoseKapital} onChange={(prognoseKapital) => setzePrognose(v.weg, { prognoseKapital })} einheit="€" schritt={1000} />
-                <ProzentFeld label="Dynamik des Beitrags" wert={w.dynamik} onChange={(dynamik) => setzeW(v.weg, { dynamik })} max={10} />
-                {schaetzung && (!w.ausHochrechnung || veraltet) && (
-                  <div className="ui-innen p-4">
-                    <button type="button" onClick={uebernehmen} className={KNOPF_ZWEIT}>
-                      <Wand2 className="h-4 w-4" aria-hidden /> {veraltet ? 'Hochrechnung erneut übernehmen' : 'Geschätzte Hochrechnung übernehmen'}
-                    </button>
-                    <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-                      {veraltet ? <strong className="font-medium text-ui-tinte">Die Hochrechnung hat sich seit der Übernahme geändert. </strong> : ''}
-                      Aus „Ihre Rechnung“: Kapital {euro(schaetzung.kapital)} und Rente {euro(schaetzung.renteMonat)} im Monat — als
-                      Prognose, gekennzeichnet als geschätzt.
-                    </p>
-                  </div>
-                )}
-                {w.ausHochrechnung && !veraltet && (
-                  <p className="text-xs leading-relaxed text-ui-schiefer">
-                    Rente und Kapital stammen aus der geschätzten Hochrechnung — keine Zusage. Liegt das Angebot des Versicherers vor,
-                    tragen Sie dessen Werte einfach darüber ein.
-                  </p>
-                )}
-              </div>
-              <div className={`space-y-3 lg:col-span-7 ${aktuell ? '' : 'opacity-60'}`}>
-                {/* Oben die Belastung neben der Prognose; die garantierten Werte stehen nur unten in den Kennzahlen. */}
-                {(belastung || l?.prognose) && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {belastung && <BelastungKasten treppe={belastung} />}
-                    {l && leistung && (
-                      <Wertezeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} kk={leistung.kaufkraftfaktor} />
-                    )}
-                  </div>
-                )}
-                {ohneGeburt && <p className="text-sm text-ui-tinte">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
-                {!ohneGeburt && !l && <p className="text-sm text-ui-schiefer">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
-                {l?.kapital && (
-                  <div className="ui-innen p-4">
-                    <h3 className="text-base font-medium text-ui-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h3>
-                    <dl className="mt-2 text-[13px]">
-                      <Posten text="Kapital brutto" wert={euro(l.kapital.brutto)} />
-                      <Posten text="− Steuer" wert={euro(l.kapital.steuer)} />
-                      <Posten text="− Kranken- und Pflegeversicherung (10 Jahre)" wert={euro(l.kapital.kvPv)} />
-                      <Posten text="= netto" wert={euro(l.kapital.netto)} summe />
-                    </dl>
-                    {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins) && (
-                      <p className="mt-2 text-xs text-ui-schiefer">
-                        Die Rente holt das Kapital mit rund {Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.
+
+  const stuecke: Stueck[] = [
+    // Je Vertrag ein Stueck: links die Werte aus dem Angebot, rechts, was davon netto bleibt.
+    ...r.vertraege.map((v, nr): Stueck => {
+      const w = daten.versicherer[v.weg];
+      const l = leistung?.vertraege.find((x) => x.weg === v.weg) ?? null;
+      const traeger = traegerText(v.weg, a);
+      const schaetzung = h.monate > 0 ? hochrechnungJeVertrag(h, r, v.weg) : null;
+      const veraltet = w.ausHochrechnung && schaetzung !== null
+        && (Math.abs(w.prognoseRente - schaetzung.renteMonat) >= 1 || Math.abs(w.prognoseKapital - schaetzung.kapital) >= 1);
+      // Die Hochrechnung rechnet mit gleichbleibenden Beitraegen — deshalb ohne Dynamik
+      const uebernehmen = () => schaetzung && setzeW(v.weg, {
+        prognoseRente: schaetzung.renteMonat, prognoseKapital: schaetzung.kapital, dynamik: 0, ausHochrechnung: true,
+      });
+      // „Ihre Belastung“ steht beim Vertrag, in den die Umwandlung fliesst
+      const belastung = belastungJeVertrag(v, r, daten.angaben, firma.angebot);
+      return {
+        id: `vertrag-${v.weg}`,
+        titel: `${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`,
+        ...vertragZeile(l, w.ausHochrechnung),
+        breit: true,
+        inhalt: (
+          <Inhalt gesperrt={gesperrt} klasse="space-y-5">
+            {nr === 0 && (
+              <p className="max-w-4xl text-base leading-relaxed text-ui-schiefer">
+                Tragen Sie die Werte aus dem Angebot des Versicherers ein — oder übernehmen Sie die geschätzte Hochrechnung aus „Ihre
+                Rechnung“. Daraus wird die Rente nach Kranken- und Pflegeversicherung und Steuer im ersten
+                Rentenjahr{leistung ? ` (${leistung.rentenbeginnJahr})` : ''}.
+              </p>
+            )}
+            <Karte titel={`${vertragName(v.weg, a)}${traeger ? ` — ${traeger}` : ''}`}
+              rechts={w.ausHochrechnung ? <Vermerk>Prognose aus der geschätzten Hochrechnung</Vermerk> : undefined}>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                <div className="space-y-3 lg:col-span-5">
+                  <ZahlFeld label="Beitrag laut Angebot im Monat" wert={w.beitragMonat > 0 ? w.beitragMonat : Math.round(v.beitragMonat * 100) / 100}
+                    onChange={(beitragMonat) => setzeW(v.weg, { beitragMonat })} einheit="€" schritt={10}
+                    hilfe={`Aus der Rechnung: ${euroGenau(v.beitragMonat)}, davon Arbeitgeber ${euroGenau(v.arbeitgeberMonat)}.`} />
+                  <ZahlFeld label="Garantierte Rente im Monat" wert={w.garantierteRente} onChange={(garantierteRente) => setzeW(v.weg, { garantierteRente })} einheit="€" schritt={10} />
+                  <ZahlFeld label="Prognostizierte Rente im Monat" wert={w.prognoseRente} onChange={(prognoseRente) => setzePrognose(v.weg, { prognoseRente })} einheit="€" schritt={10} />
+                  <ZahlFeld label="Kapital zum Rentenbeginn (Prognose)" wert={w.prognoseKapital} onChange={(prognoseKapital) => setzePrognose(v.weg, { prognoseKapital })} einheit="€" schritt={1000} />
+                  <ProzentFeld label="Dynamik des Beitrags" wert={w.dynamik} onChange={(dynamik) => setzeW(v.weg, { dynamik })} max={10} />
+                  {schaetzung && (!w.ausHochrechnung || veraltet) && (
+                    <div className="ui-innen p-4">
+                      <button type="button" onClick={uebernehmen} className={KNOPF_ZWEIT}>
+                        <Wand2 className="h-4 w-4" aria-hidden /> {veraltet ? 'Hochrechnung erneut übernehmen' : 'Geschätzte Hochrechnung übernehmen'}
+                      </button>
+                      <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+                        {veraltet ? <strong className="font-medium text-ui-tinte">Die Hochrechnung hat sich seit der Übernahme geändert. </strong> : ''}
+                        Aus „Ihre Rechnung“: Kapital {euro(schaetzung.kapital)} und Rente {euro(schaetzung.renteMonat)} im Monat — als
+                        Prognose, gekennzeichnet als geschätzt.
                       </p>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                  {w.ausHochrechnung && !veraltet && (
+                    <p className="text-xs leading-relaxed text-ui-schiefer">
+                      Rente und Kapital stammen aus der geschätzten Hochrechnung — keine Zusage. Liegt das Angebot des Versicherers vor,
+                      tragen Sie dessen Werte einfach darüber ein.
+                    </p>
+                  )}
+                </div>
+                <div className={`space-y-3 lg:col-span-7 ${aktuell ? '' : 'opacity-60'}`}>
+                  {/* Oben die Belastung neben der Prognose; die garantierten Werte stehen nur unten in den Kennzahlen. */}
+                  {(belastung || l?.prognose) && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {belastung && <BelastungKasten treppe={belastung} />}
+                      {l && leistung && (
+                        <Wertezeile titel={w.ausHochrechnung ? 'Prognose (geschätzt)' : 'Prognose'} w={l.prognose} kk={leistung.kaufkraftfaktor} />
+                      )}
+                    </div>
+                  )}
+                  {ohneGeburt && <p className="text-sm text-ui-tinte">Für die Rechnung fehlt das Geburtsdatum (Schritt 2).</p>}
+                  {!ohneGeburt && !l && <p className="text-sm text-ui-schiefer">Mit einer Rente oder einem Kapital aus dem Angebot erscheint hier, was netto bleibt.</p>}
+                  {l?.kapital && (
+                    <div className="ui-innen p-4">
+                      <h3 className="text-base font-medium text-ui-tinte">Oder als Kapital ({w.ausHochrechnung ? 'geschätzt' : 'Prognose'})</h3>
+                      <dl className="mt-2 text-[13px]">
+                        <Posten text="Kapital brutto" wert={euro(l.kapital.brutto)} />
+                        <Posten text="− Steuer" wert={euro(l.kapital.steuer)} />
+                        <Posten text="− Kranken- und Pflegeversicherung (10 Jahre)" wert={euro(l.kapital.kvPv)} />
+                        <Posten text="= netto" wert={euro(l.kapital.netto)} summe />
+                      </dl>
+                      {l.breakEven && Number.isFinite(l.breakEven.breakEvenOhneZins) && (
+                        <p className="mt-2 text-xs text-ui-schiefer">
+                          Die Rente holt das Kapital mit rund {Math.floor(l.breakEven.breakEvenOhneZins)} Jahren ein.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </Karte>
-        );
-      })}
+            </Karte>
+          </Inhalt>
+        ),
+      };
+    }),
+    ...(luecke && geschlossen ? [{
+      id: 'luecke',
+      titel: 'Ihre Versorgungslücke mit Betriebsrente',
+      ...lueckeMitZeile(geschlossen),
+      breit: true,
+      inhalt: <LueckeMitBetriebsrenteKarte luecke={luecke} x={geschlossen} aktuell={aktuell} />,
+    }] : []),
+    ...(kennzahlen ? [{
+      id: 'kennzahlen',
+      titel: 'Kennzahlen und Fazit',
+      ...kennzahlenZeile(kennzahlen),
+      breit: true,
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <KennzahlenKarte k={kennzahlen} daten={daten} setze={setze} aktuell={aktuell} />
+        </Inhalt>
+      ),
+    }] : []),
+  ];
 
-      {luecke && geschlossen && <LueckeMitBetriebsrenteKarte luecke={luecke} x={geschlossen} aktuell={aktuell} />}
-
-      {kennzahlen && (
-        <KennzahlenKarte k={kennzahlen} daten={daten} setze={setze} aktuell={aktuell} />
-      )}
-    </div>
-  );
+  return <Stuecke kennung="leistung" beschriftung={stueckeVon('Leistung im Alter')} stuecke={stuecke} />;
 }
 
 /* --- 6. Entscheidung ------------------------------------------------------ */
@@ -1115,7 +1304,7 @@ const WAHL: { status: BeratungStatus; text: string; symbol: ReactNode }[] = [
 ];
 
 export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
-  const { firma, logo, daten, setze, r, leistung, geheZu, auftritt, sichern, luecke, kennzahlen } = props;
+  const { firma, logo, daten, setze, r, leistung, geheZu, auftritt, sichern, luecke, kennzahlen, gesperrt } = props;
   const drucken = useDrucken();
   const e = daten.entscheidung;
   const setzeE = (p: Partial<BeratungDaten['entscheidung']>) => setze((d) => ({ ...d, entscheidung: { ...d.entscheidung, ...p } }));
@@ -1127,77 +1316,102 @@ export function SchrittEntscheidung(props: SchrittProps & UnterlagenProps) {
     datum: e.datum || heute,
     ...(status === 'teilnahme' && !e.beginn ? { beginn: autoBeginn } : {}),
   });
+  const axa = e.status !== 'offen' && istAxaAntrag(firma.angebot);
+  const antrag = e.status === 'teilnahme';
 
-  return (
-    <div className="space-y-6">
-      <Karte titel="Die Entscheidung">
-        <div role="radiogroup" aria-label="Entscheidung" className="grid gap-2 sm:grid-cols-3">
-          {WAHL.map((w) => (
-            <button key={w.status} type="button" role="radio" aria-checked={e.status === w.status}
-              onClick={() => waehle(w.status)}
-              className={`flex items-center gap-2 rounded-full border px-5 py-3 text-left text-sm font-medium transition-colors ${
-                e.status === w.status ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-linie bg-ui-karte text-ui-tinte hover:border-ui-tinte'
-              }`}>
-              {w.symbol}{w.text}
-            </button>
-          ))}
-        </div>
-
-        {e.status === 'teilnahme' && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <div>
-              <span className={FELD_LABEL}>Umwandlung im Monat</span>
-              <p className="ui-titel text-[34px] leading-tight tabular-nums text-ui-tinte">{euroGenau(r.umwandlungMonat)}</p>
-              <button type="button" onClick={() => geheZu(3)} className={`${LINK} text-xs`}>Betrag ändern →</button>
-            </div>
-            <div>
-              <DatumFeld label="Beginn" wert={e.beginn || autoBeginn} onChange={(beginn) => setzeE({ beginn })}
-                hilfe={e.beginn && e.beginn !== autoBeginn ? 'Eingetragen.'
-                  : firma.angebot.beginn ? 'Automatisch: der Beginn laut Angebot der Firma.' : 'Automatisch: der nächste Monatserste. Ändern, wenn die Umwandlung später beginnt.'} />
-              {e.beginn && e.beginn !== autoBeginn && (
-                <button type="button" onClick={() => setzeE({ beginn: autoBeginn })} className={`mt-1 ${LINK} text-xs`}>
-                  {firma.angebot.beginn ? 'Beginn laut Angebot' : 'Nächsten Monatsersten'} verwenden ({autoBeginn})
+  const stuecke: Stueck[] = [
+    {
+      id: 'wahl',
+      titel: 'Die Entscheidung',
+      ...entscheidungZeile(daten, r, autoBeginn),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Die Entscheidung">
+            <div role="radiogroup" aria-label="Entscheidung" className="grid gap-2 sm:grid-cols-3">
+              {WAHL.map((w) => (
+                <button key={w.status} type="button" role="radio" aria-checked={e.status === w.status}
+                  onClick={() => waehle(w.status)}
+                  className={`flex items-center gap-2 rounded-full border px-5 py-3 text-left text-sm font-medium transition-colors ${
+                    e.status === w.status ? 'border-ui-dunkel bg-ui-dunkel text-white' : 'border-ui-linie bg-ui-karte text-ui-tinte hover:border-ui-tinte'
+                  }`}>
+                  {w.symbol}{w.text}
                 </button>
-              )}
+              ))}
             </div>
-          </div>
-        )}
-        {e.status === 'verzicht' && (
-          <div className="mt-4">
-            <TextBereich label="Grund (freiwillig)" wert={e.grund} onChange={(grund) => setzeE({ grund })} maxLaenge={500} zeilen={2} />
-          </div>
-        )}
-        {e.status === 'offen' && (
-          <div className="ui-innen mt-6 flex flex-wrap items-center gap-3 p-4">
-            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-ui-tinte">
-              Bedenkzeit? Geben Sie die Gesprächsunterlagen mit — alles aus dem Gespräch zum Nachlesen, mit Ihrem Kontakt für
-              Rückfragen.
-            </p>
-            <button type="button" className={`${KNOPF} max-w-full text-left`}
-              onClick={() => { void sichern(daten); drucken(<Gespraechsunterlagen {...{ firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen }} />); }}>
-              <Printer className="h-4 w-4" aria-hidden /> Gesprächsunterlagen drucken
-            </button>
-          </div>
-        )}
-      </Karte>
 
-      {e.status !== 'offen' && istAxaAntrag(firma.angebot) && (
-        <AxaKarte x={e.axa} setze={(p) => setzeE({ axa: { ...e.axa, ...p } })} antrag={e.status === 'teilnahme'}
-          auftritt={auftritt} angebot={firma.angebot} />
-      )}
+            {e.status === 'teilnahme' && (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <span className={FELD_LABEL}>Umwandlung im Monat</span>
+                  <p className="ui-titel text-[34px] leading-tight tabular-nums text-ui-tinte">{euroGenau(r.umwandlungMonat)}</p>
+                  <button type="button" onClick={() => geheZu(3, 'beitrag')} className={`${LINK} text-xs`}>Betrag ändern →</button>
+                </div>
+                <div>
+                  <DatumFeld label="Beginn" wert={e.beginn || autoBeginn} onChange={(beginn) => setzeE({ beginn })}
+                    hilfe={e.beginn && e.beginn !== autoBeginn ? 'Eingetragen.'
+                      : firma.angebot.beginn ? 'Automatisch: der Beginn laut Angebot der Firma.' : 'Automatisch: der nächste Monatserste. Ändern, wenn die Umwandlung später beginnt.'} />
+                  {e.beginn && e.beginn !== autoBeginn && (
+                    <button type="button" onClick={() => setzeE({ beginn: autoBeginn })} className={`mt-1 ${LINK} text-xs`}>
+                      {firma.angebot.beginn ? 'Beginn laut Angebot' : 'Nächsten Monatsersten'} verwenden ({autoBeginn})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {e.status === 'verzicht' && (
+              <div className="mt-4">
+                <TextBereich label="Grund (freiwillig)" wert={e.grund} onChange={(grund) => setzeE({ grund })} maxLaenge={500} zeilen={2} />
+              </div>
+            )}
+            {e.status === 'offen' && (
+              <div className="ui-innen mt-6 flex flex-wrap items-center gap-3 p-4">
+                <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-ui-tinte">
+                  Bedenkzeit? Geben Sie die Gesprächsunterlagen mit — alles aus dem Gespräch zum Nachlesen, mit Ihrem Kontakt für
+                  Rückfragen.
+                </p>
+                <button type="button" className={`${KNOPF} max-w-full text-left`}
+                  onClick={() => { void sichern(daten); drucken(<Gespraechsunterlagen {...{ firma, logo, daten, r, leistung, auftritt, luecke, kennzahlen }} />); }}>
+                  <Printer className="h-4 w-4" aria-hidden /> Gesprächsunterlagen drucken
+                </button>
+              </div>
+            )}
+          </Karte>
+        </Inhalt>
+      ),
+    },
+    ...(axa ? [{
+      id: 'axa',
+      titel: antrag ? 'Für den AXA-Antrag' : 'Für das AXA-Gesprächsprotokoll',
+      ...axaZeile(axaFehlt(daten, vollerName(axaBerater(e.axa, auftritt)))),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <AxaKarte x={e.axa} setze={(p) => setzeE({ axa: { ...e.axa, ...p } })} antrag={antrag}
+            auftritt={auftritt} angebot={firma.angebot} />
+        </Inhalt>
+      ),
+    }] : []),
+    {
+      id: 'empfehlung',
+      titel: 'Empfehlung und Ort',
+      ...ortZeile(e),
+      inhalt: (
+        <Inhalt gesperrt={gesperrt}>
+          <Karte titel="Empfehlung und Ort">
+            <div className="space-y-3">
+              <TextBereich label="Empfehlung des Beraters" wert={e.empfehlung} onChange={(empfehlung) => setzeE({ empfehlung })} maxLaenge={2000} zeilen={4}
+                hilfe="Steht im Beratungsprotokoll." />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextFeld label="Ort" wert={e.ort} onChange={(ort) => setzeE({ ort })} maxLaenge={120} />
+                <DatumFeld label="Datum" wert={e.datum} onChange={(datum) => setzeE({ datum })} />
+              </div>
+            </div>
+          </Karte>
+        </Inhalt>
+      ),
+    },
+  ];
 
-      <Karte titel="Empfehlung und Ort">
-        <div className="space-y-3">
-          <TextBereich label="Empfehlung des Beraters" wert={e.empfehlung} onChange={(empfehlung) => setzeE({ empfehlung })} maxLaenge={2000} zeilen={4}
-            hilfe="Steht im Beratungsprotokoll." />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextFeld label="Ort" wert={e.ort} onChange={(ort) => setzeE({ ort })} maxLaenge={120} />
-            <DatumFeld label="Datum" wert={e.datum} onChange={(datum) => setzeE({ datum })} />
-          </div>
-        </div>
-      </Karte>
-    </div>
-  );
+  return <Stuecke kennung="entscheidung" beschriftung={stueckeVon('Entscheidung')} stuecke={stuecke} />;
 }
 
 /** Ja oder Nein als Pillen, wie die Vorgabe im Loesungsvergleich. */
@@ -1360,11 +1574,13 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
     { person: 'mitarbeiter', rolle: 'Mitarbeiter', name, nameFest: true },
     { person: 'berater', rolle: 'Berater', name: beraterName, nameFest: false },
   ];
+  // Jede Luecke fuehrt an das Stueck, in dem das Feld steht.
   const luecken: Luecke[] = [
-    ...(name ? [] : [{ text: 'der Name des Mitarbeiters', schritt: 1 }]),
-    ...(daten.entscheidung.ort.trim() ? [] : [{ text: 'der Ort der Beratung', schritt: 5 }]),
-    ...(status === 'teilnahme' && r.umwandlungMonat <= 0 ? [{ text: 'eine Umwandlung über 0 €', schritt: 3 }] : []),
-    ...(status !== 'offen' && axa ? axaFehlt(daten, beraterName).map((text) => ({ text: `${axaZiel} ${text}`, schritt: 5 })) : []),
+    ...(name ? [] : [{ text: 'der Name des Mitarbeiters', schritt: 1, stueck: 'person' }]),
+    ...(daten.entscheidung.ort.trim() ? [] : [{ text: 'der Ort der Beratung', schritt: 5, stueck: 'empfehlung' }]),
+    ...(status === 'teilnahme' && r.umwandlungMonat <= 0 ? [{ text: 'eine Umwandlung über 0 €', schritt: 3, stueck: 'beitrag' }] : []),
+    ...(status !== 'offen' && axa
+      ? axaFehlt(daten, beraterName).map((text) => ({ text: `${axaZiel} ${text}`, schritt: 5, stueck: 'axa' })) : []),
   ];
 
   // Die erste Unterschrift — oder der erste Link — schreibt die Unterlagen fest: erst speichern, dann genau das, was
@@ -1398,46 +1614,55 @@ export function SchrittUnterlagen(props: SchrittProps & UnterlagenProps & Unters
     return l === 'fehler' ? 'Der Link konnte nicht erstellt werden. Bitte versuchen Sie es noch einmal.' : l;
   };
 
+  // Unterschreiben und Drucken gehoeren zusammen — ein Stueck, das auch unterschrieben bedienbar bleibt.
   return (
-    <div className="space-y-6">
-      <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
-        bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben}
-        onLinkErstellen={linkErstellenUndFestschreiben} onAufgehoben={aktualisieren}
-        beratungId={beratungId} axa={axa} kontakt={{ email: daten.angaben.email, telefon: daten.angaben.telefon }} />
+    <Stuecke kennung="unterlagen" beschriftung={stueckeVon('Unterlagen')} stuecke={[{
+      id: 'unterlagen',
+      titel: 'Unterschrift und Unterlagen',
+      ...unterlagenZeile(unterlagen),
+      breit: true,
+      inhalt: (
+        <div className="space-y-6">
+          <UnterschriftenKarte status={status} unterlagen={unterlagen} unterzeichner={unterzeichner} luecken={luecken}
+            bereit={aktuell} geheZu={geheZu} onUnterschreiben={unterschreibenUndFestschreiben}
+            onLinkErstellen={linkErstellenUndFestschreiben} onAufgehoben={aktualisieren}
+            beratungId={beratungId} axa={axa} kontakt={{ email: daten.angaben.email, telefon: daten.angaben.telefon }} />
 
-      <Karte titel="Unterlagen">
-        <p className="text-sm leading-relaxed text-ui-schiefer">
-          {fest
-            ? 'Die Unterlagen tragen die elektronischen Unterschriften. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
-              + `Arbeitgeber unterschreibt auf Papier. Dann gehen sie an die Personalabteilung, eine Kopie bekommt ${name || 'der Mitarbeiter'}.`
-            : 'Drucken Sie die Unterlagen aus oder speichern Sie sie als PDF. Unterschrieben gehen sie an die Personalabteilung, '
-              + `eine Kopie bekommt ${name || 'der Mitarbeiter'}.`}
-        </p>
-        {/* Das weiche Trennzeichen bricht das lange Wort auf dem Telefon, statt es ueber den Rand ragen zu lassen. */}
-        <div className="mt-5 flex flex-wrap gap-2">
-          {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
-          {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen', 'protokoll')}
-          {status === 'teilnahme' && knopf(axa ? 'AXA-Antrag auf Entgelt\u00ADumwandlung' : 'Entgeltumwandlungs\u00ADvereinbarung',
-            <FileSignature className="h-4 w-4" aria-hidden />, <Zweites {...dok} />, false, 'vereinbarung')}
-          {status === 'verzicht' && knopf(axa ? 'Verzichtserklärung mit AXA-Protokoll' : 'Verzichtserklärung',
-            <FileSignature className="h-4 w-4" aria-hidden />, <VerzichtDokument {...dok} />, false, 'verzicht')}
-          {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
+          <Karte titel="Unterlagen">
+            <p className="text-sm leading-relaxed text-ui-schiefer">
+              {fest
+                ? 'Die Unterlagen tragen die elektronischen Unterschriften. Drucken Sie sie aus oder speichern Sie sie als PDF; der '
+                  + `Arbeitgeber unterschreibt auf Papier. Dann gehen sie an die Personalabteilung, eine Kopie bekommt ${name || 'der Mitarbeiter'}.`
+                : 'Drucken Sie die Unterlagen aus oder speichern Sie sie als PDF. Unterschrieben gehen sie an die Personalabteilung, '
+                  + `eine Kopie bekommt ${name || 'der Mitarbeiter'}.`}
+            </p>
+            {/* Das weiche Trennzeichen bricht das lange Wort auf dem Telefon, statt es ueber den Rand ragen zu lassen. */}
+            <div className="mt-5 flex flex-wrap gap-2">
+              {status === 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />, true)}
+              {knopf('Beratungsprotokoll', <Printer className="h-4 w-4" aria-hidden />, <Protokoll {...dok} />, status !== 'offen', 'protokoll')}
+              {status === 'teilnahme' && knopf(axa ? 'AXA-Antrag auf Entgelt\u00ADumwandlung' : 'Entgeltumwandlungs\u00ADvereinbarung',
+                <FileSignature className="h-4 w-4" aria-hidden />, <Zweites {...dok} />, false, 'vereinbarung')}
+              {status === 'verzicht' && knopf(axa ? 'Verzichtserklärung mit AXA-Protokoll' : 'Verzichtserklärung',
+                <FileSignature className="h-4 w-4" aria-hidden />, <VerzichtDokument {...dok} />, false, 'verzicht')}
+              {status !== 'offen' && knopf('Gesprächsunterlagen', <FileText className="h-4 w-4" aria-hidden />, <Gespraechsunterlagen {...dok} />)}
+            </div>
+            {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
+            {status === 'offen' && (
+              <p className="mt-3 text-sm text-ui-schiefer">
+                Noch keine Entscheidung — die Gesprächsunterlagen bekommt {name || 'der Mitarbeiter'} zum Nachlesen mit,
+                das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
+              </p>
+            )}
+            <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
+              {axa
+                ? 'AXA-Antrag und AXA-Gesprächsprotokoll folgen im Wortlaut den Vorlagen der AXA. Die Verzichtserklärung ist ein '
+                  + 'Muster: Bitte vor der Verwendung rechtlich prüfen lassen und mit der Versorgungsordnung der Firma abgleichen.'
+                : 'Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der '
+                  + 'Versorgungsordnung der Firma abgleichen.'}
+            </p>
+          </Karte>
         </div>
-        {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
-        {status === 'offen' && (
-          <p className="mt-3 text-sm text-ui-schiefer">
-            Noch keine Entscheidung — die Gesprächsunterlagen bekommt {name || 'der Mitarbeiter'} zum Nachlesen mit,
-            das Protokoll hält den Stand fest. Vereinbarung oder Verzicht gibt es, sobald entschieden ist.
-          </p>
-        )}
-        <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
-          {axa
-            ? 'AXA-Antrag und AXA-Gesprächsprotokoll folgen im Wortlaut den Vorlagen der AXA. Die Verzichtserklärung ist ein '
-              + 'Muster: Bitte vor der Verwendung rechtlich prüfen lassen und mit der Versorgungsordnung der Firma abgleichen.'
-            : 'Vereinbarung und Verzichtserklärung sind Muster. Bitte vor der Verwendung rechtlich prüfen lassen und mit der '
-              + 'Versorgungsordnung der Firma abgleichen.'}
-        </p>
-      </Karte>
-    </div>
+      ),
+    }]} />
   );
 }

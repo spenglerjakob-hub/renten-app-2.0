@@ -82,18 +82,23 @@ describe('stueckeLage', () => {
 });
 
 describe('erreichteEtappen', () => {
-  const E = ['daten', 'ergebnis', 'sparen', 'loesungen', 'abschluss'] as const;
+  // Fuenf Etappen: Daten, Ergebnis, Sparen, Loesungen, Abschluss
 
   it('zeigt alle Etappen bis zur weitesten erreichten', () => {
-    expect(erreichteEtappen(E, 'daten', 0)).toEqual(['daten']);
-    expect(erreichteEtappen(E, 'sparen', 2)).toEqual(['daten', 'ergebnis', 'sparen']);
+    expect(erreichteEtappen(5, 0, 0)).toBe(1);
+    expect(erreichteEtappen(5, 2, 2)).toBe(3);
   });
 
   it('eine frühere Etappe wieder öffnen lässt die späteren als Zeilen stehen', () => {
-    expect(erreichteEtappen(E, 'daten', 3)).toEqual(['daten', 'ergebnis', 'sparen', 'loesungen']);
+    expect(erreichteEtappen(5, 0, 3)).toBe(4);
   });
 
   it('ein Sprung nach vorn (Seitenleiste) nimmt die Etappen davor mit', () => {
-    expect(erreichteEtappen(E, 'abschluss', 0)).toEqual([...E]);
+    expect(erreichteEtappen(5, 4, 0)).toBe(5);
+  });
+
+  it('nie mehr, als es gibt, und nie keine', () => {
+    expect(erreichteEtappen(5, 9, 9)).toBe(5);
+    expect(erreichteEtappen(5, -1, -1)).toBe(1);
   });
 });
