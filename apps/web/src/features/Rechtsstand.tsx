@@ -70,7 +70,8 @@ export function Rechtsstand({
 
         {r.vorab.map((v) => (
           <p key={v.jahr}>
-            {v.text} Sie gelten ab {v.jahr} anstelle der fortgeschriebenen Werte und werden
+            {/* „Diese Werte“, nicht „Sie“: Im Du-Gutachten laese sich der Satzanfang als Anrede. */}
+            {v.text} Diese Werte gelten ab {v.jahr} anstelle der fortgeschriebenen und werden
             von dort aus weitergeführt. Vorläufig heißt: von der Bundesregierung beschlossen, aber
             noch nicht verkündet. Der Steuertarif für {v.jahr} steht noch aus und bleibt fortgeschrieben.
           </p>
