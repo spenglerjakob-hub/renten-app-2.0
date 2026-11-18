@@ -8,7 +8,7 @@ import {
 import { P } from './rechnung';
 
 const firma: Firma = {
-  id: 'f', name: 'Muster GmbH', logoPfad: null, geaendertAm: '', besitzer: 'a', eigene: true, buero: null,
+  id: 'f', name: 'Muster GmbH', logoPfad: null, geaendertAm: '', besitzer: 'a', eigene: true, buero: null, agentur: null, aenderbar: true,
   angebot: firmenAngebotSchema.parse({ modell: { art: 'zuschuss', quote: 0.5, deckelMonat: 100 } }),
 };
 

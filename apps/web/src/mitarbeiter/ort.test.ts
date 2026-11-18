@@ -12,9 +12,9 @@ describe('Ort in der Adresse', () => {
 
   it('Firma mit Reiter, Beratung — hin und zurück', () => {
     for (const o of [
-      { firma: F, beratung: null, reiter: 'angebot' as const },
-      { firma: F, beratung: null, reiter: 'mitarbeiter' as const },
-      { firma: F, beratung: B, reiter: 'mitarbeiter' as const },
+      { agentur: null, firma: F, beratung: null, reiter: 'angebot' as const },
+      { agentur: null, firma: F, beratung: null, reiter: 'mitarbeiter' as const },
+      { agentur: null, firma: F, beratung: B, reiter: 'mitarbeiter' as const },
     ]) {
       expect(ortAus(ortSuche(o))).toEqual(o);
     }

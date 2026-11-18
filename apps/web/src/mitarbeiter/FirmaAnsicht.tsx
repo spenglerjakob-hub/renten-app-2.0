@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Lock, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Lock, Plus, Trash2, Users } from 'lucide-react';
 import { beratungDatenSchema } from '@renten/schema';
 import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
@@ -10,6 +10,9 @@ import { ETIKETT, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, LINK, Pillen, TIPPFLA
 import { FirmenZeichen, StatusChip, useFirmenlogo } from './bausteine';
 import { AngebotFormular } from './AngebotFormular';
 import { GemeinsamKarte } from './Gemeinsam';
+import { AgenturKarte } from './AgenturKarte';
+import { useFirmenAgentur } from './agentur-hook';
+import { useZugang } from '../store/zugang';
 import { betreutText, freigabeText } from './gemeinsam-texte';
 import { Uebersicht } from './Uebersicht';
 import { MODELL_NAME, regelText } from './texte';
@@ -29,6 +32,10 @@ const datumText = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`).toL
  * Arbeitgeber. Ist sie fuers Buero freigegeben, steht an jeder Beratung, wer
  * sie betreut; loeschen kann sie, wer sie angelegt hat, und wer die Firma
  * angelegt hat.
+ *
+ * Gehoert sie zu einer Agentur, steht das im Kopf; die bAV-Verwaltung kommt
+ * von hier zurueck zur Agentur, darf jede Beratung loeschen und ordnet die
+ * Firma im Reiter „Angebot“ einer Agentur zu (`AgenturKarte`).
  */
 export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reiter: Reiter; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
@@ -41,6 +48,8 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   // Die Kollegen im Buero — fehlt der Stand, entfallen nur die Namen.
   const [kollegen, setKollegen] = useState<Kollege[] | 'laedt' | 'fehler'>('laedt');
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
+  const verwaltet = useZugang((s) => s.zugang?.verwalter === true);
+  const agentur = useFirmenAgentur(firma && typeof firma === 'object' ? firma.agentur : null);
 
   useEffect(() => {
     let aktiv = true;
@@ -56,9 +65,13 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
     return () => { aktiv = false; };
   }, [firmaId]);
 
+  // Die Verwaltung kommt aus der Agentur und geht dorthin zurueck; alle anderen zu ihren Firmen.
+  const agenturOrt: Ort | null = verwaltet && firma && typeof firma === 'object' && firma.agentur
+    ? { agentur: firma.agentur, firma: null, beratung: null, reiter: 'mitarbeiter' }
+    : null;
   const zurueck = (
-    <button type="button" onClick={() => gehe(FIRMEN)} className={`${LINK} ${TIPPFLAECHE}`}>
-      <ArrowLeft className="h-4 w-4" aria-hidden /> Alle Firmen
+    <button type="button" onClick={() => gehe(agenturOrt ?? FIRMEN)} className={`${LINK} ${TIPPFLAECHE}`}>
+      <ArrowLeft className="h-4 w-4" aria-hidden /> {agenturOrt ? (agentur ? `Agentur ${agentur.name}` : 'Zur Agentur') : verwaltet ? 'Alle Agenturen und Firmen' : 'Alle Firmen'}
     </button>
   );
   if (firma === 'laedt') return <p className="text-sm text-ui-schiefer">Die Firma wird geladen …</p>;
@@ -77,11 +90,13 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   const imBuero = Array.isArray(kollegen) ? kollegen : [];
   const freigegeben = firma.buero !== null;
   const pflegt = firma.eigene ? null : kollegenName(imBuero, firma.besitzer);
-  const freigabeZeile = freigabeText(firma.eigene, freigegeben, pflegt);
+  // Eine Firma einer Agentur ist nicht „freigegeben“ — ausser, wer sie angelegt hat, gibt sie zusaetzlich seinem Buero frei.
+  const freigabeZeile = firma.agentur !== null && !freigegeben ? null : freigabeText(firma.eigene, freigegeben, pflegt);
+  const agenturName = firma.agentur !== null ? agentur?.name ?? null : null;
   const angelegtVon = (b: Beratung) => kollegenName(imBuero, b.besitzer);
   /** „betreut von …“ — nur bei freigegebenen Firmen */
   const betreut = (b: Beratung) => (freigegeben ? betreutText(b.eigene, angelegtVon(b)) : null);
-  const darfLoeschen = (b: Beratung) => firma.eigene || b.eigene;
+  const darfLoeschen = (b: Beratung) => firma.eigene || b.eigene || (verwaltet && firma.agentur !== null);
   /** Nach dem Freigeben oder Beenden: Beim Beenden gehen die Beratungen der Kollegen an den, der die Firma angelegt hat. */
   const freigabeGeaendert = (f: Firma) => {
     setFirma(f);
@@ -107,6 +122,11 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
         <p className="max-w-md text-sm leading-relaxed text-ui-schiefer">
           <span className={`block ${ETIKETT}`}>{MODELL_NAME[firma.angebot.modell.art]}</span>
           <span className="text-ui-tinte">{regelText(firma.angebot.modell)}</span>
+          {agenturName && (
+            <span className="mt-1.5 flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /> Agentur {agenturName}
+            </span>
+          )}
           {freigabeZeile && (
             <span className="mt-1.5 flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 shrink-0" aria-hidden /> {freigabeZeile}
@@ -187,10 +207,15 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
               logo={logo}
               beratungen={liste.length}
               pflegt={pflegt}
+              loeschbar={firma.eigene || (verwaltet && firma.agentur !== null)}
               onGespeichert={setFirma}
-              onGeloescht={() => gehe(FIRMEN)}
+              onGeloescht={() => gehe(agenturOrt ?? FIRMEN)}
             />
-            <GemeinsamKarte firma={firma} kollegen={kollegen} onGeaendert={freigabeGeaendert} />
+            <AgenturKarte firma={firma} agentur={agentur} onGeaendert={setFirma} />
+            {/* Gemeinsam beraten im Buero: nicht fuer Firmen einer Agentur — dort sehen sie ohnehin alle ihre Zugaenge. */}
+            {(firma.agentur === null || freigegeben) && (
+              <GemeinsamKarte firma={firma} kollegen={kollegen} onGeaendert={freigabeGeaendert} />
+            )}
           </div>
         )}
 

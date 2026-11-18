@@ -771,7 +771,7 @@ export function Seite() {
               <button type="button" onClick={() => window.print()} className={KNOPF} disabled={r.koepfe === 0}>
                 <Printer className="h-4 w-4" aria-hidden /> Entscheidungsvorlage drucken
               </button>
-              <UebernehmenKnopf modell={modell} bundesland={bundesland} firmaId={kunde.firma?.eigene ? kunde.firma.id : null} />
+              <UebernehmenKnopf modell={modell} bundesland={bundesland} firmaId={kunde.firma?.aenderbar ? kunde.firma.id : null} />
             </div>
             <RechtsLinks />
           </div>

@@ -343,7 +343,7 @@ export function Seite() {
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
               <UebernehmenKnopf modell={{ art: 'festbetrag', festbetragMonat: festbetrag, mindestUmwandlungMonat: mindest }} bundesland={bundesland}
-                firmaId={kunde.firma?.eigene ? kunde.firma.id : null} />
+                firmaId={kunde.firma?.aenderbar ? kunde.firma.id : null} />
             </div>
             <RechtsLinks />
           </div>

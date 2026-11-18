@@ -6,7 +6,8 @@ import { Dialog } from '../components/Dialog';
 import { ProzentFeld, ZahlFeld, euroGenau } from '../components/Feld';
 import { KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, Karte } from '../components/stil';
 import { UmlagenErklaerung } from '../arbeitgeber/bausteine';
-import { StatusChip, useBeraterAuftritt, useDrucken } from './bausteine';
+import { StatusChip, useDrucken } from './bausteine';
+import { useUnterlagenAuftritt } from './agentur-hook';
 import { UebersichtDruck } from './druck';
 import {
   AUFGESTOCKT_TEXT, anzahlText, belastungsZeilen, csvDateiname, durchdringung, durchdringungText, quoteText, satzText, uebersichtCsv,
@@ -33,7 +34,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
   const summen = useMemo(() => uebersichtSummen(zeilen), [zeilen]);
   const quote = useMemo(() => durchdringung(summen, firma.angebot.belegschaft), [summen, firma.angebot.belegschaft]);
   const drucken = useDrucken();
-  const auftritt = useBeraterAuftritt();
+  const auftritt = useUnterlagenAuftritt(firma);
   const [geladen, setGeladen] = useState(false);
   const [annahmen, setAnnahmen] = useState(false);
 
@@ -157,7 +158,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
               teilnahmen={summen.teilnahmen}
               annahmen={`Steuersatz auf den Gewinn ${satzText(firma.angebot.unternehmensSteuersatz)}, ${
                 firma.angebot.umlagenSatz > 0 ? `Umlagen ${satzText(firma.angebot.umlagenSatz)}` : 'ohne Umlagen'}.`}
-              aendern={firma.eigene ? () => setAnnahmen(true) : null}
+              aendern={firma.aenderbar ? () => setAnnahmen(true) : null}
             />
             <DurchdringungKasten d={quote} />
           </div>
@@ -170,7 +171,7 @@ export function Uebersicht({ firma, logo, beratungen, onGespeichert }: {
         </>
       )}
 
-      {firma.eigene && (
+      {firma.aenderbar && (
         <AnnahmenDialog offen={annahmen} firma={firma} onSchliessen={() => setAnnahmen(false)} onGespeichert={onGespeichert} />
       )}
     </Karte>

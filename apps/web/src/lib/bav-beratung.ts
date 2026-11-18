@@ -2,6 +2,7 @@ import {
   angebotLesen, beratungLesen, type BeratungDaten, type BeratungStatus, type FirmenAngebot,
 } from '@renten/schema';
 import { supabase } from './supabase';
+import { useZugang } from '../store/zugang';
 import { zufallsname } from './check';
 import { nachweisAus } from './unterschrift-link';
 
@@ -41,6 +42,14 @@ export interface Firma {
   eigene: boolean;
   /** Das Buero, fuer das die Firma freigegeben ist — oder null */
   buero: string | null;
+  /** Die Agentur, zu der die Firma gehoert (bAV-Verwaltung) — oder null */
+  agentur: string | null;
+  /**
+   * Darf der angemeldete Berater Angebot, Name und Logo aendern? Wer sie
+   * angelegt hat — und bei einer Firma einer Agentur die Verwaltung und die
+   * Mitglieder dieser Agentur.
+   */
+  aenderbar: boolean;
 }
 
 export interface Beratung {
@@ -114,20 +123,41 @@ const BERATUNG_SPALTEN = 'id, firma, mitarbeiter, status, beraten_am, daten, gea
 
 interface FirmaZeile {
   id: string; name: string; angebot: unknown; logo: string | null; geaendert_am: string; besitzer: string; buero?: string | null;
+  agentur?: string | null;
 }
 interface BeratungZeile {
   id: string; firma: string; mitarbeiter: string; status: string; beraten_am: string | null; daten: unknown; geaendert_am: string;
   besitzer: string;
 }
 
+/**
+ * Wer eine Firma einer Agentur SIEHT, darf sie auch aendern: die Verwaltung
+ * und die Mitglieder der Agentur (so die Regeln der Datenbank). Die eine
+ * Ausnahme: Sie ist zusaetzlich fuers Buero freigegeben — dann sieht sie auch
+ * ein Kollege, der nicht zur Agentur gehoert. Nur dafuer wird der Zugang
+ * gefragt; im Regelfall haengt die Antwort nicht an ihm (und damit nicht an
+ * einem Zwischenspeicher, der die Agentur noch nicht kennt).
+ */
+function agenturRecht(agentur: string | null, buero: string | null): boolean {
+  if (agentur === null) return false;
+  if (buero === null) return true;
+  const z = useZugang.getState().zugang;
+  return !!z && (z.verwalter || z.agentur === agentur);
+}
+
 /** `ich`: der angemeldete Berater — ohne Sitzung gehoert ihm nichts. */
-const firmaAus = (z: FirmaZeile, ich: string | null): Firma => ({
-  id: z.id, name: z.name, angebot: angebotLesen(z.angebot),
-  logoPfad: typeof z.logo === 'string' && z.logo !== '' ? z.logo : null,
-  geaendertAm: z.geaendert_am,
-  besitzer: z.besitzer, eigene: ich !== null && z.besitzer === ich,
-  buero: typeof z.buero === 'string' && z.buero !== '' ? z.buero : null,
-});
+const firmaAus = (z: FirmaZeile, ich: string | null): Firma => {
+  const eigene = ich !== null && z.besitzer === ich;
+  const buero = typeof z.buero === 'string' && z.buero !== '' ? z.buero : null;
+  const agentur = typeof z.agentur === 'string' && z.agentur !== '' ? z.agentur : null;
+  return {
+    id: z.id, name: z.name, angebot: angebotLesen(z.angebot),
+    logoPfad: typeof z.logo === 'string' && z.logo !== '' ? z.logo : null,
+    geaendertAm: z.geaendert_am,
+    besitzer: z.besitzer, eigene, buero, agentur,
+    aenderbar: eigene || (ich !== null && agenturRecht(agentur, buero)),
+  };
+};
 
 const STATUS: readonly BeratungStatus[] = ['offen', 'teilnahme', 'verzicht'];
 const statusAus = (s: string): BeratungStatus => (STATUS as readonly string[]).includes(s) ? s as BeratungStatus : 'offen';
@@ -187,22 +217,44 @@ export async function firmaLaden(id: string): Promise<Firma | null | 'fehler'> {
   }
 }
 
-/** 'grenze': hoechstens 200 Firmen je Konto. */
-export async function firmaAnlegen(name: string, angebot: FirmenAngebot): Promise<Firma | 'fehler' | 'grenze'> {
+/**
+ * 'grenze': hoechstens 200 Firmen je Konto bzw. 500 je Agentur.
+ *
+ * `agentur`: die Agentur, in der die Verwaltung die Firma anlegt. Ein
+ * Mitglied einer Agentur braucht sie nicht zu nennen — seine Firmen legt die
+ * Datenbank in seine Agentur. Die Spalte wird nur mitgeschickt, wenn sie
+ * gebraucht wird: so laeuft das Anlegen auch gegen eine Datenbank ohne sie.
+ */
+export async function firmaAnlegen(
+  name: string, angebot: FirmenAngebot, agentur: string | null = null,
+): Promise<Firma | 'fehler' | 'grenze'> {
   if (!supabase || name120(name) === '') return 'fehler';
   const ich = await nutzerId();
   try {
     const { data, error } = await supabase.from('bav_firmen')
-      .insert({ name: name120(name), angebot })
+      .insert({ name: name120(name), angebot, ...(agentur ? { agentur } : {}) })
       .select(FIRMA_SPALTEN).single();
-    if (error) return error.code === '23514' && /200 Firmen/.test(error.message) ? 'grenze' : 'fehler';
+    if (error) return error.code === '23514' && /(200|500) Firmen/.test(error.message) ? 'grenze' : 'fehler';
     return firmaAus(data as FirmaZeile, ich);
   } catch {
     return 'fehler';
   }
 }
 
-/** false auch, wenn keine Zeile getroffen wurde — das Angebot aendert nur, wer die Firma angelegt hat. */
+/** Eine Firma einer Agentur zuordnen oder herausnehmen (`null`) — nur die bAV-Verwaltung. */
+export async function firmaAgenturSetzen(id: string, agentur: string | null): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { data, error } = await supabase.from('bav_firmen').update({ agentur }).eq('id', id).select('id, agentur');
+    const zeile = (data ?? [])[0] as { agentur?: string | null } | undefined;
+    // Wer nicht zur Verwaltung gehoert, trifft die Zeile, aber die Agentur bleibt: das ist kein Erfolg.
+    return !error && zeile !== undefined && (zeile.agentur ?? null) === agentur;
+  } catch {
+    return false;
+  }
+}
+
+/** false auch, wenn keine Zeile getroffen wurde — aendern darf, wem `aenderbar` es sagt. */
 export async function firmaSpeichern(f: Pick<Firma, 'id' | 'name' | 'angebot' | 'logoPfad'>): Promise<boolean> {
   if (!supabase || name120(f.name) === '') return false;
   try {

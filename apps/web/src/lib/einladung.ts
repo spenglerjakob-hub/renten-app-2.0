@@ -18,7 +18,7 @@ const TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const istEinladungsToken = (t: unknown): t is string => typeof t === 'string' && TOKEN.test(t);
 
-function gemerkterLink(parameter: string, schluessel: string) {
+function gemerkterLink(parameter: string, schluessel: string, pfad = '/') {
   return {
     /** Liest den Parameter aus der Adresse, merkt sich das Token und raeumt die Adresse auf. */
     ausAdresse(): void {
@@ -47,7 +47,7 @@ function gemerkterLink(parameter: string, schluessel: string) {
     vergessen(): void {
       try { localStorage.removeItem(schluessel); } catch { /* egal */ }
     },
-    link: (token: string) => `${window.location.origin}/?${parameter}=${token}`,
+    link: (token: string) => `${window.location.origin}${pfad}?${parameter}=${token}`,
   };
 }
 
@@ -57,6 +57,19 @@ export const offeneEinladung = einladung.offen;
 export const einladungVergessen = einladung.vergessen;
 /** Der Link, den der Inhaber weitergibt. */
 export const einladungsLink = einladung.link;
+
+/*
+ * Die Einladung in eine Agentur (`/mitarbeiterberatung?agentur-einladung=<Token>`): Die
+ * bAV-Verwaltung gibt sie einer Agentur. Wer sie einloest, bekommt die
+ * Vorsorgemodelle und die Mitarbeiterberatung — deshalb fuehrt der Link
+ * dorthin und nicht in den Rechner.
+ */
+const agentur = gemerkterLink('agentur-einladung', 'rentenplaner.agentur-einladung', '/mitarbeiterberatung');
+export const agenturEinladungAusAdresse = agentur.ausAdresse;
+export const offeneAgenturEinladung = agentur.offen;
+export const agenturEinladungVergessen = agentur.vergessen;
+/** Der Link, den die bAV-Verwaltung der Agentur gibt. */
+export const agenturEinladungsLink = agentur.link;
 
 const fruehstart = gemerkterLink('fruehstart', 'rentenplaner.fruehstart');
 export const fruehstartAusAdresse = fruehstart.ausAdresse;

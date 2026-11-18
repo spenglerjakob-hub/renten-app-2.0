@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { supabase, supabaseKonfiguriert, adresseBeimStart } from '../lib/supabase';
 import { zustimmungDaten } from '../lib/nutzungsbedingungen';
-import { offeneEinladung, offenerFruehstart } from '../lib/einladung';
+import { offeneAgenturEinladung, offeneEinladung, offenerFruehstart } from '../lib/einladung';
 
 /**
  * Anmeldung mit E-Mail und Passwort.
@@ -356,6 +356,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     // sie auch, wenn die Bestaetigungsmail auf einem anderen Geraet aufgeht.
     const einladung = offeneEinladung();
     const fruehstart = offenerFruehstart();
+    const agentur = offeneAgenturEinladung();
     const { data, error } = await supabase.auth.signUp({
       email,
       password: passwort,
@@ -363,7 +364,10 @@ export const useAuth = create<AuthStore>((set, get) => ({
       // nicht absenden, festgehalten wird Fassung und Zeitpunkt.
       options: {
         emailRedirectTo: window.location.origin,
-        data: { ...zustimmungDaten(), ...(einladung ? { einladung } : {}), ...(fruehstart ? { fruehstart } : {}) },
+        data: {
+          ...zustimmungDaten(), ...(einladung ? { einladung } : {}), ...(fruehstart ? { fruehstart } : {}),
+          ...(agentur ? { agentur_einladung: agentur } : {}),
+        },
       },
     });
 

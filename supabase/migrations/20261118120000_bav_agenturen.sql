@@ -439,6 +439,57 @@ $$;
 
 revoke all on function privat.bav_agentur_firmen_abgeben(uuid, uuid) from public;
 
+-- Die Verwaltung verschiebt eine Firma in eine andere Agentur oder nimmt sie
+-- heraus. Wer sie angelegt hat und zu einer ANDEREN Agentur gehoert, saehe
+-- sie als Besitzer weiter — mit allen Beratungen. Deshalb geht sie dann an
+-- den, der sie verschiebt, und eine Freigabe fuers Buero endet. Was Zugaenge
+-- anderer Agenturen in ihr angelegt oder unterschrieben haben, geht an den
+-- Besitzer: Sie sehen die Firma danach nicht mehr.
+create or replace function privat.bav_firma_agentur_gewechselt()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ich    uuid := (select auth.uid());
+  v_nutzer uuid;
+begin
+  if v_ich is not null and new.besitzer <> v_ich
+     and exists (select 1 from privat.bav_agentur_mitglieder m
+                  where m.nutzer = new.besitzer and m.agentur is distinct from new.agentur) then
+    update public.bav_firmen f set besitzer = v_ich where f.id = new.id;
+    if new.buero is not null then
+      perform privat.bav_freigabe_beenden(new.id);
+    end if;
+  end if;
+  for v_nutzer in
+    select x.besitzer from (
+      select b.besitzer from public.bav_beratungen b where b.firma = new.id
+      union
+      select u.besitzer from public.bav_unterlagen u
+        join public.bav_beratungen b on b.id = u.beratung where b.firma = new.id
+      union
+      select s.besitzer from public.bav_unterschriften s
+        join public.bav_beratungen b on b.id = s.beratung where b.firma = new.id
+    ) x
+    where exists (select 1 from privat.bav_agentur_mitglieder m
+                   where m.nutzer = x.besitzer and m.agentur is distinct from new.agentur)
+  loop
+    perform privat.bav_uebergeben(new.id, v_nutzer);
+  end loop;
+  return null;
+end;
+$$;
+
+revoke all on function privat.bav_firma_agentur_gewechselt() from public;
+
+drop trigger if exists bav_firmen_agentur_gewechselt on public.bav_firmen;
+create trigger bav_firmen_agentur_gewechselt
+  after update on public.bav_firmen
+  for each row when (old.agentur is distinct from new.agentur)
+  execute function privat.bav_firma_agentur_gewechselt();
+
 -- Wer sein Konto loescht, gibt vorher ab — sonst loeschte die Kaskade die
 -- Firmen der Agentur mit dem Konto. Der Name sortiert vor
 -- bav_beteiligungen_uebergeben: erst die Firmen, dann der Rest.

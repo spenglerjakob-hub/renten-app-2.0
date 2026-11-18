@@ -29,10 +29,12 @@ const LOGO_MELDUNG = {
  * was sie bietet (Modell, Durchfuehrungsweg, Versicherer). Gespeichert wird
  * erst mit „Speichern“ — geprueft mit demselben Schema, mit dem gelesen wird.
  *
- * Aendern und loeschen kann es nur, wer die Firma angelegt hat. Kollegen im
+ * Aendern kann es, wer die Firma angelegt hat — bei einer Firma einer Agentur
+ * auch deren Zugaenge und die bAV-Verwaltung (`firma.aenderbar`). Loeschen
+ * kann sie, wer sie angelegt hat, und die Verwaltung (`loeschbar`). Kollegen im
  * Buero, fuer das sie freigegeben ist, sehen es schreibgeschuetzt.
  */
-export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGespeichert, onGeloescht }: {
+export function AngebotFormular({ firma, logo, beratungen, pflegt = null, loeschbar = firma.eigene, onGespeichert, onGeloescht }: {
   firma: Firma;
   /** Das gespeicherte Logo als Object-URL */
   logo: string | null;
@@ -40,6 +42,8 @@ export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGesp
   beratungen: number;
   /** Wer das Angebot pflegt — fuer Kollegen */
   pflegt?: string | null;
+  /** Darf der angemeldete Berater die Firma loeschen? */
+  loeschbar?: boolean;
   onGespeichert: (f: Firma) => void;
   onGeloescht: () => void;
 }) {
@@ -51,7 +55,7 @@ export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGesp
   const [status, setStatus] = useState<'bereit' | 'speichert' | 'gespeichert' | 'fehler'>('bereit');
   const [meldung, setMeldung] = useState<string | null>(null);
   const [loeschen, setLoeschen] = useState(false);
-  const nurLesen = !firma.eigene;
+  const nurLesen = !firma.aenderbar;
 
   const geaendert = name.trim() !== firma.name || JSON.stringify(a) !== JSON.stringify(firma.angebot) || neuesLogo !== null;
   const setze = <K extends keyof FirmenAngebot>(k: K, v: FirmenAngebot[K]) => {
@@ -210,9 +214,11 @@ export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGesp
             {status === 'gespeichert' && !geaendert ? 'Gespeichert.' : geaendert ? 'Nicht gespeichert.' : ''}
           </span>
           <span className="flex-1" />
-          <button type="button" onClick={() => setLoeschen(true)} className={KNOPF_GEFAHR}>
-            <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
-          </button>
+          {loeschbar && (
+            <button type="button" onClick={() => setLoeschen(true)} className={KNOPF_GEFAHR}>
+              <Trash2 className="h-4 w-4" aria-hidden /> Firma löschen
+            </button>
+          )}
         </div>
       )}
       {!nurLesen && beratungen > 0 && (
@@ -227,6 +233,7 @@ export function AngebotFormular({ firma, logo, beratungen, pflegt = null, onGesp
         <p className="text-sm leading-relaxed text-ui-tinte">
           „{firma.name}“ wird {mitGeloescht ? `mit ${mitGeloescht} ` : ''}gelöscht. Ausgedruckte Unterlagen bleiben davon unberührt.
           {firma.buero !== null && ' Sie ist für Ihr Büro freigegeben: Auch Ihre Kollegen sehen sie danach nicht mehr, und ihre Beratungen darin gehen mit.'}
+          {firma.agentur !== null && ' Sie gehört zu einer Agentur: Auch deren Zugänge sehen sie danach nicht mehr, und ihre Beratungen darin gehen mit.'}
         </p>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setLoeschen(false)} className={KNOPF_ZWEIT}>Abbrechen</button>

@@ -1,7 +1,8 @@
-import { firmenAngebotSchema } from '@renten/schema';
+import { neuesAngebot, type FirmenAngebot } from '@renten/schema';
 import {
   firmaAnlegen, firmaSpeichern, firmenLaden, firmenlogoHochladen, firmenlogoLaden, firmenlogosAufraeumen, type Firma,
 } from '../lib/bav-beratung';
+import { meineAgentur } from '../lib/bav-agenturen';
 import { logoVorbereiten } from '../lib/bild';
 import { DRUCKFARBEN_HINWEIS } from '../lib/druckfarben';
 import type { FirmenWerte } from './firmenkunde';
@@ -52,12 +53,20 @@ export async function logoLesen(datei: File): Promise<GelesenesLogo | { meldung:
 export async function firmaMitLogoAnlegen(
   name: string, werte: FirmenWerte, logo: Blob | null,
 ): Promise<{ firma: Firma; meldung: string | null } | { firma: null; meldung: string }> {
-  const angebot = firmenAngebotSchema.safeParse({
-    bundesland: werte.bundesland, unternehmensSteuersatz: werte.steuersatz, umlagenSatz: werte.umlagen,
-  });
-  if (!angebot.success) return { firma: null, meldung: 'Bitte die Angaben zum Unternehmen prüfen.' };
-  const r = await firmaAnlegen(name, angebot.data);
-  if (r === 'grenze') return { firma: null, meldung: 'Es sind höchstens 200 Firmen je Konto möglich.' };
+  // Eine neue Firma beginnt mit den Vorgaben (AXA; in einer Agentur mit deren Daten) — die Werte dieser Seite gehen vor.
+  const agentur = await meineAgentur();
+  let angebot: FirmenAngebot;
+  try {
+    angebot = neuesAngebot(agentur?.daten ?? null, {
+      bundesland: werte.bundesland, unternehmensSteuersatz: werte.steuersatz, umlagenSatz: werte.umlagen,
+    });
+  } catch {
+    return { firma: null, meldung: 'Bitte die Angaben zum Unternehmen prüfen.' };
+  }
+  const r = await firmaAnlegen(name, angebot);
+  if (r === 'grenze') {
+    return { firma: null, meldung: agentur ? 'Es sind höchstens 500 Firmen je Agentur möglich.' : 'Es sind höchstens 200 Firmen je Konto möglich.' };
+  }
   if (r === 'fehler') return { firma: null, meldung: 'Die Firma konnte nicht angelegt werden. Bitte versuchen Sie es noch einmal.' };
   if (!logo) return { firma: r, meldung: null };
   const mitLogo = await logoSpeichern(r, logo);

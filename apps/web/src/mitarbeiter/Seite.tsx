@@ -5,6 +5,8 @@ import { DruckBereich } from './bausteine';
 import { ortAus, ortSuche, type Ort } from './ort';
 import { FirmenListe } from './FirmenListe';
 import { FirmaAnsicht } from './FirmaAnsicht';
+import { AgenturAnsicht } from './AgenturAnsicht';
+import { useZugang } from '../store/zugang';
 import { BeratungAnsicht } from './Beratung';
 
 /**
@@ -16,12 +18,17 @@ import { BeratungAnsicht } from './Beratung';
  * Uebersicht fuer den Arbeitgeber) → Beratung. Wo man steht, steht in der
  * Adresse (`ort.ts`).
  *
+ * Fuer die bAV-Verwaltung liegt darueber eine vierte: Agenturen → Agentur
+ * (Firmenkunden, Daten, Zugaenge). Die Ansicht einer Agentur gibt es nur fuer
+ * sie; alle anderen landen mit einer solchen Adresse bei ihren Firmen.
+ *
  * Nur mit Konto und Paket „Arbeitgeber-Vorsorgemodelle“ (Zugangsschranke in
  * main.tsx). Gespeichert wird im Konto des Beraters; Mitarbeiter und
  * Arbeitgeber sehen nur, was er zeigt oder druckt.
  */
 export function Seite() {
   const [ort, setOrt] = useState<Ort>(() => ortAus(window.location.search));
+  const verwaltet = useZugang((s) => s.zugang?.verwalter === true);
 
   useEffect(() => {
     const zurueck = () => setOrt(ortAus(window.location.search));
@@ -42,7 +49,9 @@ export function Seite() {
         <SeitenKopf verlinkt />
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
           {ort.firma === null ? (
-            <FirmenListe gehe={gehe} />
+            ort.agentur && verwaltet
+              ? <AgenturAnsicht key={ort.agentur} agenturId={ort.agentur} gehe={gehe} />
+              : <FirmenListe gehe={gehe} />
           ) : ort.beratung === null ? (
             <FirmaAnsicht key={ort.firma} firmaId={ort.firma} reiter={ort.reiter} gehe={gehe} />
           ) : (

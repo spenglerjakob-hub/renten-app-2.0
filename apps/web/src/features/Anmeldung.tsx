@@ -23,7 +23,11 @@ type Maske = 'anmelden' | 'registrieren' | 'vergessen';
  * Bueros bzw. einen Early-Adopter-Link. Dann steht das oben, und die Maske
  * beginnt mit der Registrierung — die meisten haben noch kein Konto.
  */
-export function Anmeldung({ einladung = false, fruehstart = false }: { einladung?: boolean; fruehstart?: boolean }) {
+export function Anmeldung({ einladung = false, fruehstart = false, agentur = false }: {
+  einladung?: boolean; fruehstart?: boolean;
+  /** Der Nutzer kam ueber den Einladungslink einer Agentur (bAV-Verwaltung) */
+  agentur?: boolean;
+}) {
   const {
     status, laedt, meldung, link, unbestaetigt,
     registrieren, anmelden, passwortVergessen, passwortSetzen, meldungLoeschen,
@@ -32,7 +36,7 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
 
   // `/?registrieren` (Knopf "Kostenlos testen" der Preisseite) oeffnet gleich die Registrierung.
   const [maske, setMaske] = useState<Maske>(() =>
-    (einladung || fruehstart || new URLSearchParams(window.location.search).has('registrieren') ? 'registrieren' : 'anmelden'));
+    (einladung || fruehstart || agentur || new URLSearchParams(window.location.search).has('registrieren') ? 'registrieren' : 'anmelden'));
   const [email, setEmail] = useState('');
   const [passwort, setPasswort] = useState('');
   const [passwort2, setPasswort2] = useState('');
@@ -136,6 +140,16 @@ export function Anmeldung({ einladung = false, fruehstart = false }: { einladung
             {maske === 'registrieren' && (
               <> Bestätigen Sie die E-Mail-Adresse am besten in diesem Browser — hier liegt der Entwurf.</>
             )}
+          </span>
+        </Hinweis>
+      )}
+
+      {agentur && !passwortNeu && (
+        <Hinweis symbol={Users} klasse="mt-5">
+          <span>
+            <strong className="font-medium">Sie wurden als Agentur eingeladen.</strong> Legen Sie ein Konto an oder melden Sie sich
+            mit Ihrem bestehenden an — danach stehen Ihnen die Vorsorgemodelle und die bAV-Mitarbeiterberatung mit Ihren
+            Firmenkunden offen.
           </span>
         </Hinweis>
       )}

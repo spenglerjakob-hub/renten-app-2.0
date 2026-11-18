@@ -305,8 +305,8 @@ export function FirmenkundeWahl({ kunde }: { kunde: Firmenkunde }) {
       {!neu && firma && (
         <>
           <LogoZeile
-            bild={kunde.kunde?.logo ?? null} onDatei={(d) => void logoFuerGewaehlte(d)} aenderbar={firma.eigene} laeuft={laeuft}
-            hinweis={druckfarben ?? (firma.eigene ? null : 'Das Logo pflegt, wer die Firma angelegt hat.')}
+            bild={kunde.kunde?.logo ?? null} onDatei={(d) => void logoFuerGewaehlte(d)} aenderbar={firma.aenderbar} laeuft={laeuft}
+            hinweis={druckfarben ?? (firma.aenderbar ? null : 'Das Logo pflegt, wer die Firma angelegt hat.')}
           />
           <p className="text-xs leading-relaxed text-ui-schiefer">
             Aus dem Angebot der Firma übernommen: {werteText(firmenWerte(firma.angebot))}.

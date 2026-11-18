@@ -32,7 +32,10 @@ insert into ids values
   ('b1',  'b1b1b1b1-0000-4000-8000-0000000a90b1'),
   ('b2',  'b2b2b2b2-0000-4000-8000-0000000a90b2'),
   ('b3',  'b3b3b3b3-0000-4000-8000-0000000a90b3'),
-  ('kb',  'c1c1c1c1-0000-4000-8000-0000000a90c1');
+  ('kb',  'c1c1c1c1-0000-4000-8000-0000000a90c1'),
+  ('fx',  'f8f8f8f8-0000-4000-8000-0000000a90f8'),
+  ('bx',  'b4b4b4b4-0000-4000-8000-0000000a90b4'),
+  ('by',  'b5b5b5b5-0000-4000-8000-0000000a90b5');
 
 -- Alle Konten sind alt genug, dass keine Testphase mehr laeuft.
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
@@ -360,6 +363,13 @@ select 41, 'A1 sieht danach nichts mehr und ist ohne Agentur wie jeder andere', 
        and z ->> 'paket' = 'alles' and z ->> 'quelle' = 'vorab' and z ->> 'agentur' is null
   from (select public.mein_zugang() as z) x;
 
+-- Der alte Link bringt A1 nicht zurueck: Er ist verbraucht.
+insert into merk values ('a1wieder', public.bav_agentur_einladung_annehmen((select wert from merk where name = 'link1')::uuid));
+insert into ergebnis
+select 55, 'A1 kommt mit dem alten Link nicht zurueck in die Agentur', 'eingeloest / keine Agentur',
+       format('%s / %s', (select wert from merk where name = 'a1wieder'), coalesce(public.bav_meine_agentur()::text, 'keine Agentur')),
+       (select wert from merk where name = 'a1wieder') = 'eingeloest' and public.bav_meine_agentur() is null;
+
 -- ---------- Ein Konto der Agentur wird geloescht ----------
 set local request.jwt.claims = '{"sub":"50000000-0000-4000-8000-0000000a9005"}';
 insert into public.bav_firmen (id, name) values ((select id from ids where name = 'f3'), 'Nord Drei AG');
@@ -430,6 +440,51 @@ select 49, 'C mit eigenem Abo Rente: Rechner und Arbeitgeber-Seiten', 'alles / a
        format('%s / %s', z ->> 'paket', z ->> 'quelle'), z ->> 'paket' = 'alles' and z ->> 'quelle' = 'abo'
   from (select public.mein_zugang() as z) x;
 
+-- ---------- Eine Firma wechselt die Agentur ----------
+-- C (Agentur Sued) legt eine Firma mit einer Beratung an und beraet in einer Firma der Verwaltung mit.
+insert into public.bav_firmen (id, name) values ((select id from ids where name = 'fx'), 'Sued Zwei GmbH');
+insert into public.bav_beratungen (id, firma, mitarbeiter, status, daten) values
+  ((select id from ids where name = 'bx'), (select id from ids where name = 'fx'), 'Dora Zwei', 'offen', '{"schritt":1}'),
+  ((select id from ids where name = 'by'), (select id from ids where name = 'fs'), 'Emil Eins', 'offen', '{"schritt":1}');
+-- C selbst verschiebt nichts.
+update public.bav_firmen set agentur = (select id from ids where name = 'nord') where id = (select id from ids where name = 'fx');
+insert into ergebnis
+select 51, 'C verschiebt die eigene Firma nicht in eine andere Agentur', 'sued / c',
+       format('%s / %s', (select name from ids where id = f.agentur), (select name from ids where id = f.besitzer)),
+       f.agentur = (select id from ids where name = 'sued') and f.besitzer = (select id from ids where name = 'c')
+  from public.bav_firmen f where f.id = (select id from ids where name = 'fx');
+
+-- W (Verwaltung) verschiebt beide Firmen nach Nord.
+set local request.jwt.claims = '{"sub":"30000000-0000-4000-8000-0000000a9003"}';
+update public.bav_firmen set agentur = (select id from ids where name = 'nord')
+ where id in ((select id from ids where name = 'fx'), (select id from ids where name = 'fs'));
+reset role;
+insert into ergebnis
+select 52, 'W verschiebt nach Nord: die Firma von C und seine Beratungen gehen an W', 'nord / w / bx w / by w',
+       format('%s / %s / bx %s / by %s', (select name from ids where id = f.agentur), (select name from ids where id = f.besitzer),
+              (select name from ids where id = (select b.besitzer from public.bav_beratungen b where b.id = (select id from ids where name = 'bx'))),
+              (select name from ids where id = (select b.besitzer from public.bav_beratungen b where b.id = (select id from ids where name = 'by')))),
+       f.agentur = (select id from ids where name = 'nord') and f.besitzer = (select id from ids where name = 'w')
+       and (select b.besitzer from public.bav_beratungen b where b.id = (select id from ids where name = 'bx')) = (select id from ids where name = 'w')
+       and (select b.besitzer from public.bav_beratungen b where b.id = (select id from ids where name = 'by')) = (select id from ids where name = 'w')
+  from public.bav_firmen f where f.id = (select id from ids where name = 'fx');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"60000000-0000-4000-8000-0000000a9006"}';
+insert into ergebnis
+select 53, 'C sieht die verschobenen Firmen und ihre Beratungen nicht mehr', '0 / 0',
+       format('%s / %s', (select count(*) from public.bav_firmen), (select count(*) from public.bav_beratungen)),
+       (select count(*) from public.bav_firmen) = 0 and (select count(*) from public.bav_beratungen) = 0;
+
+-- W nimmt eine Firma aus der Agentur: Sie bleibt bei W, ohne Agentur.
+set local request.jwt.claims = '{"sub":"30000000-0000-4000-8000-0000000a9003"}';
+update public.bav_firmen set agentur = null where id = (select id from ids where name = 'fx');
+insert into ergebnis
+select 54, 'W nimmt die Firma aus der Agentur: ohne Agentur, weiter bei W', 'null / w',
+       format('%s / %s', coalesce((select name from ids where id = f.agentur), 'null'), (select name from ids where id = f.besitzer)),
+       f.agentur is null and f.besitzer = (select id from ids where name = 'w')
+  from public.bav_firmen f where f.id = (select id from ids where name = 'fx');
+
 -- ---------- Rechte an den Funktionen ----------
 reset role;
 insert into ergebnis
@@ -444,6 +499,7 @@ select 50, 'Funktionen: nichts fuer anon, die internen fuer niemanden', 'keine L
          case when has_table_privilege('authenticated', 'privat.bav_agentur_mitglieder', 'select') then 'authenticated mitglieder' end,
          case when has_function_privilege('authenticated', 'privat.bav_agentur_firmen_abgeben(uuid, uuid)', 'execute') then 'authenticated abgeben' end,
          case when has_function_privilege('authenticated', 'privat.bav_agentur_empfaenger(uuid, uuid)', 'execute') then 'authenticated empfaenger' end,
+         case when has_function_privilege('authenticated', 'privat.bav_firma_agentur_gewechselt()', 'execute') then 'authenticated gewechselt' end,
          case when not has_function_privilege('authenticated', 'public.bav_agentur_einladung_annehmen(uuid)', 'execute') then 'authenticated OHNE annehmen' end), ''), 'keine Luecke'),
        not has_function_privilege('anon', 'public.bav_ist_verwalter()', 'execute')
        and not has_function_privilege('anon', 'public.bav_agentur_einladung_annehmen(uuid)', 'execute')
@@ -454,6 +510,7 @@ select 50, 'Funktionen: nichts fuer anon, die internen fuer niemanden', 'keine L
        and not has_table_privilege('authenticated', 'privat.bav_agentur_mitglieder', 'select')
        and not has_function_privilege('authenticated', 'privat.bav_agentur_firmen_abgeben(uuid, uuid)', 'execute')
        and not has_function_privilege('authenticated', 'privat.bav_agentur_empfaenger(uuid, uuid)', 'execute')
+       and not has_function_privilege('authenticated', 'privat.bav_firma_agentur_gewechselt()', 'execute')
        and has_function_privilege('authenticated', 'public.bav_agentur_einladung_annehmen(uuid)', 'execute');
 
 select nr, bestanden, pruefung, tatsaechlich from ergebnis order by nr;
