@@ -23,6 +23,10 @@ export {
   type Entscheidung, type AxaAngaben, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';
 export {
+  AXA_VERSICHERER, agenturDatenSchema, agenturDatenLesen, agenturAnsprechpartner, neuesAngebot,
+  type AgenturDaten,
+} from './bav-agentur.js';
+export {
   BEZUGSRECHTE, BEZUGSRECHT_VORGABE, ANTRAG_FELDER, bezugsrechtText, ibanBereinigt, ibanGueltig, ibanFehler, ibanFormatiert,
   antragAngabenSchema, antragEingangSchema, antragLoesungSchema, braucheBank, offeneAngaben, eingangUebernehmen,
   type BezugsrechtWert, type AntragFeld, type AntragAngaben, type AntragEingang, type AntragLoesung,
