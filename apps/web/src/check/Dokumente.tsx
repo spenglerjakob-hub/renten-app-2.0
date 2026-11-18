@@ -8,8 +8,9 @@ import { bildVorbereiten } from '../lib/bild';
 import { KNOPF, KNOPF_ZWEIT } from '../components/stil';
 
 /**
- * „Statt abtippen: hochladen" — im Vorsorge-Check unter der Unterlage des
- * Schritts.
+ * „Statt abtippen: hochladen" — im Vorsorge-Check unter den Feldern des
+ * Schritts, dort zugeklappt (`eingebettet`: Rahmen und Titel traegt die Zeile
+ * zum Aufklappen).
  *
  * Wer die Renteninformation vor sich hat, soll die eine Zahl daraus nicht
  * suchen muessen: Ein Foto genuegt, der Berater liest sie ab. Nur mit dem
@@ -35,8 +36,10 @@ const FEHLER: Record<HochladenFehler, (name: string) => string> = {
 };
 
 export function DokumentHochladen({
-  code, art, titel, text, alle, einwilligung, onEinwilligung, onHinzu, onEntfernt,
+  code, art, titel, text, alle, einwilligung, onEinwilligung, onHinzu, onEntfernt, eingebettet = false,
 }: {
+  /** In einer Zeile zum Aufklappen: ohne eigenen Rahmen und Titel */
+  eingebettet?: boolean;
   code: string;
   art: DokumentArt;
   titel: string;
@@ -113,16 +116,19 @@ export function DokumentHochladen({
     haken.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
   const gesperrt = frei === 0 || laeuft.length > 0;
-  const haupt = `${KNOPF} disabled:cursor-not-allowed`;
-  const neben = `${KNOPF_ZWEIT} disabled:cursor-not-allowed`;
+  // Am Telefon fuellen die Knoepfe die Zeile und sind so hoch wie ein Daumen breit.
+  const haupt = `${KNOPF} min-h-[3rem] flex-1 disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
+  const neben = `${KNOPF_ZWEIT} min-h-[3rem] flex-1 disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
 
   /* Die Ablage gestrichelt wie jede Stelle, an der noch etwas hinein soll — ohne Farbe. */
   return (
-    <div className="mt-4 rounded-[10px] border border-dashed border-ui-feld-rand p-4">
-      <p className="flex items-center gap-2 text-sm font-medium text-ui-tinte">
-        <Camera className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> {titel}
-      </p>
-      <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
+    <div className={eingebettet ? '' : 'mt-4 rounded-[10px] border border-dashed border-ui-feld-rand p-4'}>
+      {!eingebettet && (
+        <p className="flex items-center gap-2 text-sm font-medium text-ui-tinte">
+          <Camera className="h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> {titel}
+        </p>
+      )}
+      <p className={`${eingebettet ? '' : 'mt-1 '}text-xs leading-relaxed text-ui-schiefer`}>
         {text ?? 'Foto oder PDF, bis 10 MB je Datei.'} Ihr Berater liest die Zahlen ab — die Felder
         können Sie dann leer lassen.
       </p>
@@ -143,7 +149,7 @@ export function DokumentHochladen({
               type="checkbox"
               checked={einwilligung}
               onChange={(e) => onEinwilligung(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0"
+              className="mt-0.5 h-5 w-5 shrink-0"
             />
             <span>
               Ich willige ein, dass meine Unterlagen beim Hochladen geschützt gespeichert und mit dem Absenden

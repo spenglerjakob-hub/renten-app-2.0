@@ -273,7 +273,7 @@ export function ZahlFeld(props: {
           </span>
         )}
         {einheit && !einheitWahl && (
-          <span className={`pointer-events-none absolute text-ui-schiefer ${
+          <span className={`ui-feld-einheit pointer-events-none absolute text-ui-schiefer ${
             gross ? 'right-4 top-3.5 text-lg' : stufen ? 'right-7 top-2 text-sm' : 'right-3 top-2 text-sm'
           } ${stufen ? 'print:right-3' : ''}`}>
             {einheit}
