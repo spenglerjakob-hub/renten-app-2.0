@@ -1,6 +1,6 @@
 import type { LegalParameters } from '../params/types.js';
 import {
-  betriebUmstieg, festbetragModell, matchingModell, zuschussModell,
+  betriebUmstieg, festbetragModell, freiesModell, freiHoechstMonat, matchingModell, zuschussModell, type FreiStufe,
   type MatchingSteuer, type ModellBasis, type ModellKosten, type UmwandlungsWeg,
 } from './matching-modell.js';
 import { zuschussDeckel } from './bav-mitarbeiter.js';
@@ -43,6 +43,7 @@ export interface BelegschaftGruppe {
 export type BetriebsModell =
   /** `deckelMonat` 0: ohne Deckel — wie an den Feldern der Seiten */
   | { art: 'zuschuss'; quote: number; deckelMonat: number }
+  | { art: 'frei'; quote: number; deckelMonat: number; stufen: FreiStufe[] }
   | { art: 'festbetrag'; festbetragMonat: number; mindestUmwandlungMonat: number }
   | { art: 'matching'; weg: UmwandlungsWeg; matchingMonat: number; zuschussImMatching: boolean };
 
@@ -153,11 +154,18 @@ function kopfRechnen(
       agBeitragMaxMonat: modell.matchingMonat,
     };
   }
+  const frei = modell.art === 'frei'
+    ? { quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat), stufen: modell.stufen }
+    : null;
   const r = modell.art === 'zuschuss'
     ? zuschussModell({ ...basis, quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat) }, steuerOpt, p)
-    : festbetragModell({
-      ...basis, festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat,
-    }, steuerOpt, p);
+    : frei
+      ? freiesModell({ ...basis, ...frei }, steuerOpt, p)
+      : festbetragModell({
+        ...basis,
+        festbetragMonat: modell.art === 'festbetrag' ? modell.festbetragMonat : 0,
+        mindestUmwandlungMonat: modell.art === 'festbetrag' ? modell.mindestUmwandlungMonat : 0,
+      }, steuerOpt, p);
   return {
     umwandlungMonat: r.mitarbeiter.umwandlungMonat,
     agBeitragMonat: r.arbeitgeber.zuschussMonat,
@@ -167,7 +175,9 @@ function kopfRechnen(
     maNettoMonat: r.mitarbeiter.nettoAufwandMonat,
     vorsorgeMonat: r.vertragMonat,
     gehaltNettoMonat: r.gehalt?.nettoMonat ?? 0,
-    agBeitragMaxMonat: modell.art === 'zuschuss' ? zuschussDeckel(modell.deckelMonat) : modell.festbetragMonat,
+    agBeitragMaxMonat: modell.art === 'zuschuss' ? zuschussDeckel(modell.deckelMonat)
+      : frei ? freiHoechstMonat(frei)
+      : modell.art === 'festbetrag' ? modell.festbetragMonat : 0,
   };
 }
 

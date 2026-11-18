@@ -1,6 +1,7 @@
 import type {
   BelegschaftGruppe, BetriebsCheckGruppe, BetriebsModell, LohnlisteErgebnis,
 } from '@renten/engine';
+import { freiRegelAus, freiRegelKurz } from '../frei/regel';
 
 /**
  * BETRIEBS-CHECK — die reinen Teile der Seite.
@@ -35,6 +36,8 @@ export const MODELL_VORGABEN: { [A in BetriebsModell['art']]: Extract<BetriebsMo
   zuschuss: { art: 'zuschuss', quote: 0.5, deckelMonat: 100 },
   festbetrag: { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 },
   matching: { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: false },
+  // Ohne Vorbelegung: Die Regel baut der Berater selbst.
+  frei: { art: 'frei', quote: 0, deckelMonat: 0, stufen: [] },
 };
 
 /** Was die Seite je Firma im Browser behaelt. */
@@ -107,6 +110,7 @@ function modellAus(roh: unknown): BetriebsModell | null {
       zuschussImMatching: weg === 'dv' && m.zuschussImMatching === true,
     };
   }
+  if (m.art === 'frei') return { art: 'frei', ...freiRegelAus(m) };
   return null;
 }
 
@@ -170,6 +174,7 @@ export function modellText(m: BetriebsModell): string {
   if (m.art === 'festbetrag') {
     return `Festbetrag ${euro(m.festbetragMonat)} im Monat ab ${euro(m.mindestUmwandlungMonat)} Umwandlung`;
   }
+  if (m.art === 'frei') return `Individuelles Modell: ${freiRegelKurz(m)}`;
   const weg = m.weg === 'dv' ? 'Direktversicherung' : 'Unterstützungskasse';
   return `Matching ${euro(m.matchingMonat)} im Monat in die Unterstützungskasse${
     m.zuschussImMatching ? ', einschließlich Pflichtzuschuss' : ''}, Umwandlung in die ${weg}`;
@@ -177,11 +182,13 @@ export function modellText(m: BetriebsModell): string {
 
 /** Wie der Beitrag des Arbeitgebers im Modell heisst. */
 export function beitragName(m: BetriebsModell): string {
+  if (m.art === 'frei') return 'Zuschuss';
   return m.art === 'zuschuss' ? 'Zuschuss' : m.art === 'festbetrag' ? 'Festbetrag' : 'Matching und Pflichtzuschuss';
 }
 
 /** Die Seite, die das Modell im Einzelnen zeigt. */
 export function modellSeite(m: BetriebsModell): string {
+  if (m.art === 'frei') return '/individuelles-modell';
   return m.art === 'zuschuss' ? '/zuschussmodell' : m.art === 'festbetrag' ? '/festbetrag' : '/arbeitgeber';
 }
 

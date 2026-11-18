@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { betriebsCheck, lohnlisteLesen, parameterFuer, type BelegschaftGruppe } from '@renten/engine';
+import { betriebsCheck, lohnlisteLesen, parameterFuer, type BelegschaftGruppe, type BetriebsModell } from '@renten/engine';
 import {
   BEISPIEL_GRUPPEN, HOECHSTENS_GRUPPEN, LAGE_TEXT, MODELL_VORGABEN, STAND_SCHLUESSEL, beitragName, durchschnittsGruppe,
   gruppenZeilen, lohnlisteText, modellSeite, modellText, standLesen, standSchreiben, standVorgabe,
@@ -9,6 +9,8 @@ const A = 'aaaaaaaa-0000-4000-8000-00000000f001';
 const B = 'bbbbbbbb-0000-4000-8000-00000000f002';
 const p = parameterFuer(2026, { indexRate: 0 });
 const steuer = { verheiratet: false, bundesland: 'Nordrhein-Westfalen', kirchensteuerpflichtig: false };
+/** Das Beispiel des individuellen Modells: ab 50 € Umwandlung 25 € fest, ab 70 € 30 € — dazu 20 % der ganzen Umwandlung. */
+const FREI: BetriebsModell & { art: 'frei' } = { art: 'frei', quote: 0.2, deckelMonat: 0, stufen: [{ abMonat: 50, betragMonat: 25 }, { abMonat: 70, betragMonat: 30 }] };
 
 const check = (gruppen: readonly BelegschaftGruppe[]) => betriebsCheck({
   gruppen, modell: MODELL_VORGABEN.zuschuss, umwandlungMonat: 100, quoten: [0.5],
@@ -114,6 +116,27 @@ describe('Modell in Worten', () => {
       .toBe('Matching 338 € im Monat in die Unterstützungskasse, einschließlich Pflichtzuschuss, Umwandlung in die Direktversicherung');
     expect(modellText({ art: 'matching', weg: 'ukasse', matchingMonat: 100, zuschussImMatching: false }))
       .toBe('Matching 100 € im Monat in die Unterstützungskasse, Umwandlung in die Unterstützungskasse');
+  });
+
+  it('individuelles Modell: die Regel in einem Satzteil, ohne Vorbelegung nur der Pflichtzuschuss', () => {
+    expect(MODELL_VORGABEN.frei).toEqual({ art: 'frei', quote: 0, deckelMonat: 0, stufen: [] });
+    expect(modellText(MODELL_VORGABEN.frei)).toBe('Individuelles Modell: nur der gesetzliche Pflichtzuschuss');
+    expect(modellText(FREI).replace(/\u00a0/g, ' '))
+      .toBe('Individuelles Modell: fester Zuschuss ab 50 € Umwandlung 25 € im Monat, ab 70 € 30 €; dazu 20 % der Umwandlung');
+    expect([beitragName(FREI), modellSeite(FREI)]).toEqual(['Zuschuss', '/individuelles-modell']);
+  });
+
+  it('individuelles Modell im Speicher: gelesen wie geschrieben, Fremdes wird begrenzt', () => {
+    const roh = standSchreiben(null, A, { ...standVorgabe(), modell: FREI });
+    expect(standLesen(roh, A)!.modell).toEqual(FREI);
+    const schief = standLesen(JSON.stringify({ [A]: { ...standVorgabe(), modell: {
+      art: 'frei', quote: 7, deckelMonat: -5,
+      stufen: [{ abMonat: 50, betragMonat: 99_999 }, 'x', { abMonat: 'viel' }, ...Array.from({ length: 20 }, () => ({ abMonat: 10, betragMonat: 1 }))],
+    } } }), A)!;
+    expect(schief.modell).toMatchObject({ art: 'frei', quote: 1, deckelMonat: 0 });
+    const stufen = (schief.modell as typeof FREI).stufen;
+    expect(stufen.slice(0, 2)).toEqual([{ abMonat: 50, betragMonat: 10_000 }, { abMonat: 0, betragMonat: 0 }]);
+    expect(stufen).toHaveLength(10);
   });
 
   it('Name des Beitrags und Seite des Modells', () => {

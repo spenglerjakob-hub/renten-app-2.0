@@ -7,6 +7,7 @@ import {
 import { AuswahlFeld, ProzentFeld, Schalter, ZahlFeld, euro, prozent } from '../components/Feld';
 import { RechtsLinks } from '../components/RechtsLinks';
 import { UebernehmenKnopf } from '../mitarbeiter/UebernehmenKnopf';
+import { FreiRegelFelder } from '../frei/RegelFelder';
 import {
   AKZENT, EINLEITUNG, FELD_LABEL, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, KNOPF_KLEIN_HAUPT, LINK, Titel,
 } from '../components/stil';
@@ -443,8 +444,15 @@ export function Seite() {
                   { wert: 'zuschuss', text: 'Zuschussmodell' },
                   { wert: 'festbetrag', text: 'Festbetrag-Modell' },
                   { wert: 'matching', text: 'Matching-Modell mit Unterstützungskasse' },
+                  { wert: 'frei', text: 'Individuelles Modell' },
                 ]}
               />
+              {modell.art === 'frei' && (
+                <FreiRegelFelder
+                  wert={modell}
+                  onChange={(regel) => aendern({ modell: { art: 'frei', ...regel } })}
+                />
+              )}
               {modell.art === 'zuschuss' && (
                 <>
                   <ProzentFeld

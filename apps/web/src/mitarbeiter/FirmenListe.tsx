@@ -175,8 +175,9 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
           Das Modell übernehmen Sie am schnellsten von der Arbeitgeber-Seite:{' '}
           <a href="/zuschussmodell" className="font-medium text-ui-tinte underline underline-offset-4">Zuschussmodell</a>,{' '}
-          <a href="/festbetrag" className="font-medium text-ui-tinte underline underline-offset-4">Festbetrag-Modell</a> oder{' '}
-          <a href="/arbeitgeber" className="font-medium text-ui-tinte underline underline-offset-4">Matching-Modell</a> —
+          <a href="/festbetrag" className="font-medium text-ui-tinte underline underline-offset-4">Festbetrag-Modell</a>,{' '}
+          <a href="/arbeitgeber" className="font-medium text-ui-tinte underline underline-offset-4">Matching-Modell</a> oder{' '}
+          <a href="/individuelles-modell" className="font-medium text-ui-tinte underline underline-offset-4">individuelles Modell</a> —
           dort „Für die Mitarbeiter-Beratung übernehmen“.
         </p>
       </div>

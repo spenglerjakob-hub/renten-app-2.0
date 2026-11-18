@@ -443,8 +443,8 @@ function Datenschutz() {
 
       <H2>13. Weitere Seiten</H2>
       <P>
-        Die Seite zum Altersvorsorgedepot und die Arbeitgeber-Seiten (Zuschuss-, Festbetrag- und Matching-Modell,
-        Betriebs-Check, betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
+        Die Seite zum Altersvorsorgedepot und die Arbeitgeber-Seiten (Zuschuss-, Festbetrag-, Matching- und individuelles
+        Modell, Betriebs-Check, betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
         selbst in Ihr Konto legen: eine Firma, die Sie auf einer Arbeitgeber-Seite anlegen oder deren Logo Sie dort
         ergänzen, und ein Modell, das Sie mit „Für die Mitarbeiter-Beratung übernehmen“ übernehmen (Abschnitt 7).
         Für welche Firma Sie gerade rechnen, merkt sich nur der geöffnete Tab Ihres Browsers, bis Sie ihn schließen.

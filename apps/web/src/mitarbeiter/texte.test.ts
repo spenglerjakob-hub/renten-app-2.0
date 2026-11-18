@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { firmenAngebotSchema, type FirmenModellDaten } from '@renten/schema';
 import {
-  euroText, fazitText, festePunkte, firmenHinweise, mindestzuschussText, regelFuerVereinbarung, regelKern, regelText, reglerErklaerung,
-  traegerText, vertragName,
+  MODELL_NAME, euroText, fazitText, festePunkte, firmenHinweise, mindestzuschussText, modellNameNachDas, regelFuerVereinbarung, regelKern,
+  regelText, reglerErklaerung, traegerText, vertragName,
 } from './texte';
 import type { KennzahlenErgebnis, KennzahlenWeg } from './rechnung';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
+/** Das Beispiel des individuellen Modells: ab 50 € Umwandlung 25 € fest, ab 70 € 30 € — dazu 20 % der ganzen Umwandlung. */
+const FREI: FirmenModellDaten = { art: 'frei', quote: 0.2, deckelMonat: 0, stufen: [{ abMonat: 50, betragMonat: 25 }, { abMonat: 70, betragMonat: 30 }] };
 
 describe('Die Regel der Firma in Worten', () => {
   it('Zuschussmodell mit und ohne Deckel', () => {
@@ -118,8 +120,62 @@ describe('regelKern', () => {
       { art: 'festbetrag', festbetragMonat: 50, mindestUmwandlungMonat: 50 },
       { art: 'matching', weg: 'dv', matchingMonat: 100, zuschussImMatching: false },
       { art: 'matching', weg: 'ukasse', matchingMonat: 80, zuschussImMatching: false },
+      FREI,
+      { art: 'frei', quote: 0, deckelMonat: 0, stufen: FREI.stufen },
+      { art: 'frei', quote: 0.25, deckelMonat: 60, stufen: [] },
+      { art: 'frei', quote: 0, deckelMonat: 0, stufen: [] },
     ];
     for (const m of modelle) expect(regelText(m)).toContain(regelKern(m));
+  });
+});
+
+describe('Individuelles Modell in Worten', () => {
+  it('Stufen und Anteil zusammen — das Beispiel: ab 50 € 25 €, ab 70 € 30 €, dazu 20 %', () => {
+    expect(nbsp(regelText(FREI))).toBe(
+      'Ihr Arbeitgeber gibt 20 % Ihres Beitrags dazu und obendrauf einen festen Zuschuss: ab 50 € Umwandlung 25 € im Monat, ab 70 € 30 €.',
+    );
+    expect(nbsp(regelFuerVereinbarung(FREI))).toBe(
+      'Der Arbeitgeber zahlt zusätzlich 20 % der Umwandlung und einen festen Zuschuss nach der Höhe der Umwandlung '
+      + '(ab 50 € Umwandlung 25 € im Monat, ab 70 € 30 €; es gilt die höchste erreichte Stufe), mindestens den Zuschuss nach § 1a Abs. 1a BetrAVG.',
+    );
+    expect(MODELL_NAME.frei).toBe('Individuelles Modell');
+    expect(modellNameNachDas('frei')).toBe('individuelle Modell');
+    expect(modellNameNachDas('zuschuss')).toBe('Zuschussmodell');
+  });
+
+  it('nur Stufen, nur Anteil (mit Deckel), nichts davon', () => {
+    expect(nbsp(regelText({ art: 'frei', quote: 0, deckelMonat: 0, stufen: FREI.stufen })))
+      .toBe('Ihr Arbeitgeber gibt einen festen Zuschuss dazu: ab 50 € Umwandlung 25 € im Monat, ab 70 € 30 €.');
+    expect(nbsp(regelText({ art: 'frei', quote: 0.25, deckelMonat: 60, stufen: [] })))
+      .toBe('Ihr Arbeitgeber gibt 25 % Ihres Beitrags (höchstens 60 € im Monat) dazu.');
+    expect(nbsp(regelText({ art: 'frei', quote: 0, deckelMonat: 0, stufen: [] })))
+      .toBe('Ihr Arbeitgeber zahlt den gesetzlichen Zuschuss von 15 %, soweit er Sozialabgaben spart.');
+    expect(nbsp(regelFuerVereinbarung({ art: 'frei', quote: 0, deckelMonat: 0, stufen: [] })))
+      .toBe('Der Arbeitgeber zahlt den Zuschuss nach § 1a Abs. 1a BetrAVG.');
+  });
+
+  it('die Stufen stehen aufsteigend da, wie auch immer sie eingetragen sind; Stufen ohne Betrag fallen weg', () => {
+    const m: FirmenModellDaten = { art: 'frei', quote: 0, deckelMonat: 0, stufen: [{ abMonat: 100, betragMonat: 40 }, { abMonat: 30, betragMonat: 0 }, { abMonat: 50, betragMonat: 25 }] };
+    expect(nbsp(regelText(m))).toBe('Ihr Arbeitgeber gibt einen festen Zuschuss dazu: ab 50 € Umwandlung 25 € im Monat, ab 100 € 40 €.');
+  });
+
+  it('gesetzlicher Zuschuss: enthalten, aufgestockt, unter der ersten Stufe', () => {
+    const z = (quote: number, mindest: number, regel: number) =>
+      ({ quoteMonat: quote, ersparnisMonat: mindest * 1.4, mindestMonat: mindest, regelMonat: regel, aufgestockt: regel + 0.005 < mindest });
+    expect(nbsp(mindestzuschussText(z(15, 15, 50), FREI)))
+      .toBe('15 % Ihrer Umwandlung sind 15 €. Ihr Arbeitgeber gibt 50 € — der Zuschuss ist darin enthalten.');
+    const nurStufe: FirmenModellDaten = { art: 'frei', quote: 0, deckelMonat: 0, stufen: [{ abMonat: 100, betragMonat: 20 }] };
+    expect(nbsp(mindestzuschussText(z(30, 30, 20), nurStufe)))
+      .toBe('15 % Ihrer Umwandlung sind 30 € — mehr als der Zuschuss nach der Regel Ihres Arbeitgebers (20 €). Ihr Arbeitgeber zahlt deshalb 30 €.');
+    expect(nbsp(mindestzuschussText(z(12, 12, 0), nurStufe)))
+      .toBe('Nach der Regel Ihres Arbeitgebers gibt es bei dieser Umwandlung noch keinen Zuschuss. Er zahlt den gesetzlichen Zuschuss: 15 % Ihrer Umwandlung sind 12 €.');
+    expect(nbsp(mindestzuschussText(z(12, 12, 0), { art: 'frei', quote: 0, deckelMonat: 0, stufen: [] })))
+      .toBe('Ihr Arbeitgeber zahlt den gesetzlichen Zuschuss: 15 % Ihrer Umwandlung sind 12 €.');
+  });
+
+  it('Gut zu wissen: wie beim Zuschussmodell — Pflichtzuschuss sofort, freiwilliger Teil nach drei Jahren, Vertrag zum Mitnehmen', () => {
+    const frei = festePunkte(firmenAngebotSchema.parse({ modell: FREI }));
+    expect(frei).toEqual(festePunkte(firmenAngebotSchema.parse({ modell: { art: 'zuschuss' } })));
   });
 });
 

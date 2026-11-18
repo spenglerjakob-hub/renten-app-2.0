@@ -13,9 +13,10 @@ import { AuswahlFeld, DatumFeld, ProzentFeld, Schalter, TextFeld, ZahlFeld } fro
 import { Dialog } from '../components/Dialog';
 import { FELD_LABEL, Hinweis, KNOPF, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, TextBereich } from '../components/stil';
 import { MODELL_NAME, WEG_NAME, regelText } from './texte';
+import { FreiRegelFelder } from '../frei/RegelFelder';
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
-const ARTEN = (['zuschuss', 'festbetrag', 'matching'] as const).map((art) => ({ wert: art, text: MODELL_NAME[art] }));
+const ARTEN = (['zuschuss', 'festbetrag', 'matching', 'frei'] as const).map((art) => ({ wert: art, text: MODELL_NAME[art] }));
 const WEGE = DURCHFUEHRUNGSWEGE.map((w) => ({ wert: w, text: WEG_NAME[w] }));
 
 const LOGO_MELDUNG = {
@@ -174,6 +175,9 @@ export function AngebotFormular({ firma, logo, beratungen, pflegt = null, loesch
                   <Schalter label="Gesetzlicher Zuschuss ist im Matching enthalten" wert={m.zuschussImMatching} onChange={(zuschussImMatching) => setzeModell({ zuschussImMatching })} />
                 )}
               </>
+            )}
+            {m.art === 'frei' && (
+              <FreiRegelFelder wert={m} onChange={(regel) => setze('modell', { art: 'frei', ...regel })} />
             )}
             <p className="ui-innen px-4 py-3 text-sm text-ui-tinte">{regelText(m)}</p>
 

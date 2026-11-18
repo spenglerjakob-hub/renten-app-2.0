@@ -6,7 +6,7 @@ import { meineAgentur } from '../lib/bav-agenturen';
 import { Dialog } from '../components/Dialog';
 import { TextFeld } from '../components/Feld';
 import { FEHLER, FELD_LABEL, KNOPF, KNOPF_ZWEIT } from '../components/stil';
-import { MODELL_NAME, regelText } from './texte';
+import { MODELL_NAME, modellNameNachDas, regelText } from './texte';
 import { ortSuche } from './ort';
 
 const NEU = 'neu';
@@ -82,7 +82,7 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland, vor
           <p className="flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-ui-tinte" aria-hidden />
             <span>
-              Das {MODELL_NAME[fertig.angebot.modell.art]} gilt jetzt für <span className="font-medium">{fertig.name}</span>. Ergänzen Sie
+              Das {modellNameNachDas(fertig.angebot.modell.art)} gilt jetzt für <span className="font-medium">{fertig.name}</span>. Ergänzen Sie
               dort Logo, Begrüßung und Versicherer — dann kann die erste Beratung beginnen.
             </span>
           </p>

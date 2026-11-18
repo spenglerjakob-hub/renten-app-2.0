@@ -68,7 +68,7 @@ export function axaBausteine(f: FirmenAngebot, x: AxaAngaben): string {
  */
 export function axaVerzichtZuschuss(f: FirmenAngebot, r: MitarbeiterBav): { prozent: number | null; euro: number | null } {
   const m = f.modell;
-  const prozent = m.art === 'zuschuss' && m.quote > 0 ? Math.round(m.quote * 1000) / 10 : null;
+  const prozent = (m.art === 'zuschuss' || m.art === 'frei') && m.quote > 0 ? Math.round(m.quote * 1000) / 10 : null;
   const fest = m.art === 'festbetrag' ? m.festbetragMonat : m.art === 'matching' ? m.matchingMonat : 0;
   return { prozent, euro: r.arbeitgeberMonat > 0.005 ? r.arbeitgeberMonat : fest > 0 ? fest : null };
 }

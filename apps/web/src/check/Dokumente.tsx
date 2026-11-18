@@ -117,8 +117,8 @@ export function DokumentHochladen({
   };
   const gesperrt = frei === 0 || laeuft.length > 0;
   // Am Telefon fuellen die Knoepfe die Zeile und sind so hoch wie ein Daumen breit.
-  const haupt = `${KNOPF} min-h-[3rem] flex-1 disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
-  const neben = `${KNOPF_ZWEIT} min-h-[3rem] flex-1 disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
+  const haupt = `${KNOPF} min-h-[3rem] flex-1 whitespace-nowrap disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
+  const neben = `${KNOPF_ZWEIT} min-h-[3rem] flex-1 whitespace-nowrap disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`;
 
   /* Die Ablage gestrichelt wie jede Stelle, an der noch etwas hinein soll — ohne Farbe. */
   return (

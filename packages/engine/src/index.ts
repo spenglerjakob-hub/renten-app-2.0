@@ -110,6 +110,8 @@ export {
   zuschussModell, zuschussVollAusschoepfen, zuschussStaffel,
   festbetragModell, festbetragGehaltsStaffel, festbetragVollAusschoepfen,
   type FestbetragEingaben, type FestbetragErgebnis, type FestbetragStufe,
+  freiesModell, freiStaffel, freiVollAusschoepfen, freiStufe, freiStufenGeordnet, freiRegelMonat, freiHoechstMonat,
+  type FreiStufe, type FreiRegel, type FreiEingaben, type FreiErgebnis, type FreiStaffelZeile,
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
   type BisherigeLeistungen, type Umstieg,

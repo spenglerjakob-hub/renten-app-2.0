@@ -456,11 +456,12 @@ export function Kopf({ kunde = null }: { kunde?: KopfKunde | null }) {
   );
 }
 
-/** Die drei Arbeitgebermodelle — fuer die Querverweise zwischen den Seiten. */
+/** Die Arbeitgebermodelle — fuer die Querverweise zwischen den Seiten. */
 const MODELLE = [
   { href: '/zuschussmodell', text: 'Zuschussmodell: 50 % obendrauf' },
   { href: '/festbetrag', text: 'Festbetrag: 50 € für jeden' },
   { href: '/arbeitgeber', text: 'Matching-Modell mit Unterstützungskasse' },
+  { href: '/individuelles-modell', text: 'Individuelles Modell: Stufen und Prozente frei kombiniert' },
 ] as const;
 
 /** Der Betriebs-Check rechnet ein Modell fuer die ganze Belegschaft — von jeder Modellseite aus erreichbar. */
@@ -469,7 +470,7 @@ const BETRIEBS_CHECK = '/betriebs-check';
 /**
  * Querverweis auf die jeweils anderen Arbeitgebermodelle — als Textlinks, die
  * leiseste Aktion. Von einem Modell aus fuehrt ausserdem einer zum
- * Betriebs-Check; dort stehen umgekehrt die drei Modelle.
+ * Betriebs-Check; dort stehen umgekehrt die Modelle.
  */
 export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] | typeof BETRIEBS_CHECK }) {
   const imCheck = aktuell === BETRIEBS_CHECK;
@@ -677,17 +678,20 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
   /**
    * Wie der Abschnitt im Druck steht: 'seite2' beginnt Seite 2 (Zuschuss,
    * Festbetrag — Seite 1 ist voll, die Umsetzung folgt ohne eigenen
-   * Umbruch). 'nurBildschirm' / 'nurDruck': die Matching-Seite zeigt ihn am
-   * Bildschirm beim Gehaltsvergleich, im Druck am Ende von Seite 2.
+   * Umbruch). 'folgt': ohne eigenen Umbruch — das individuelle Modell
+   * beginnt Seite 2 schon beim Gehaltsvergleich davor. 'nurBildschirm' /
+   * 'nurDruck': die Matching-Seite zeigt ihn am Bildschirm beim
+   * Gehaltsvergleich, im Druck am Ende von Seite 2.
    */
-  druck?: 'seite2' | 'nurBildschirm' | 'nurDruck';
+  druck?: 'seite2' | 'folgt' | 'nurBildschirm' | 'nurDruck';
   /** Die Rechnung je Kopf im Druck zeigen — auf der Matching-Seite fehlt dafuer der Platz. */
   kopfImDruck?: boolean;
 }) {
   const mehr = betrieb.mehrkostenNettoJahr;
   const k = betrieb.kopfVl;
   const druckKlasse = druck === 'seite2' ? 'print:break-before-page'
-    : druck === 'nurBildschirm' ? 'print:hidden' : 'hidden print:block';
+    : druck === 'folgt' ? ''
+      : druck === 'nurBildschirm' ? 'print:hidden' : 'hidden print:block';
   const hat = (g: BetriebGruppe) => betrieb.zeilen.some((z) => z.gruppe === g);
   return (
     <section className={`${KARTE} print:break-inside-avoid ${druckKlasse}`}>
