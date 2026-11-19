@@ -4,15 +4,17 @@ import { AUFTRITT_LEER } from '../features/auftritt';
 import type { Agentur } from '../lib/bav-agenturen';
 import type { Firma } from '../lib/bav-beratung';
 import { neuesAngebot } from '@renten/schema';
-import { agenturAuftritt, agenturKurz, agenturStandText, agenturZeilen } from './agentur-texte';
+import {
+  agenturAuftritt, agenturHatAuftritt, agenturKurz, agenturStandText, agenturZeilen, rolleText, zugaengeText, zugangName,
+} from './agentur-texte';
 import { ortAus, ortSuche } from './ort';
 import { axaBerater } from './axa';
 import { axaAngabenSchema } from '@renten/schema';
 
 const NORD = 'aaaaaaaa-0000-4000-8000-0000000000a1';
 const SUED = 'aaaaaaaa-0000-4000-8000-0000000000a2';
-const agentur = (id: string, name: string, daten = {}, geaendertAm = '2026-11-01'): Agentur =>
-  ({ id, name, daten: agenturDatenSchema.parse(daten), erstelltAm: '2026-10-01', geaendertAm });
+const agentur = (id: string, name: string, daten = {}, geaendertAm = '2026-11-01', logoPfad: string | null = null): Agentur =>
+  ({ id, name, daten: agenturDatenSchema.parse(daten), logoPfad, erstelltAm: '2026-10-01', geaendertAm });
 const firma = (id: string, a: string | null): Firma => ({
   id, name: id, angebot: neuesAngebot(), logoPfad: null, geaendertAm: '', besitzer: 'x', eigene: false, buero: null,
   agentur: a, aenderbar: a !== null,
@@ -63,7 +65,7 @@ describe('agenturAuftritt — wessen Name auf den Unterlagen einer Agentur-Firma
     expect(agenturAuftritt(null, null)).toBeNull();
   });
 
-  it('Name, Ansprechpartner und Kontakt kommen von der Agentur; Logo, Farbe und Zusatz bleiben', () => {
+  it('Name, Ansprechpartner und Kontakt kommen von der Agentur; ohne eigenen Auftritt der Agentur bleiben Logo, Farbe und Zusatz', () => {
     expect(agenturAuftritt(eigen, nord)).toEqual({
       ...eigen, firma: 'AXA Agentur Nord', berater: 'Anna Agentin', vorname: 'Anna', nachname: 'Agentin',
       telefon: '040 2', email: 'anna@nord.example',
@@ -80,14 +82,39 @@ describe('agenturAuftritt — wessen Name auf den Unterlagen einer Agentur-Firma
     expect(agenturAuftritt(null, nord, true)).toMatchObject({ firma: 'AXA Agentur Nord', berater: 'Anna Agentin', telefon: '040 2' });
   });
 
-  it('ein Zugang der Agentur: seine eigenen Angaben gehen vor, die Agentur füllt die Lücken', () => {
+  it('ein Zugang der Agentur: sein Name und sein Kontakt gehen vor, die Agentur füllt die Lücken', () => {
     const ben = { ...AUFTRITT_LEER, berater: 'Ben Berater', vorname: 'Ben', nachname: 'Berater', email: 'ben@nord.example' };
     expect(agenturAuftritt(ben, nord, true)).toEqual({
       ...ben, firma: 'AXA Agentur Nord', telefon: '040 2',
     });
-    // Nur der Name der Firma ist eingetragen: Dann beraet der Ansprechpartner der Agentur.
+    // Im Briefkopf steht die Agentur — auch wenn der Zugang einen eigenen Firmennamen hat. Ohne eigenen Namen berät ihr Ansprechpartner.
     expect(agenturAuftritt({ ...AUFTRITT_LEER, firma: 'Büro Ben' }, nord, true))
-      .toMatchObject({ firma: 'Büro Ben', berater: 'Anna Agentin', vorname: 'Anna', nachname: 'Agentin' });
+      .toMatchObject({ firma: 'AXA Agentur Nord', berater: 'Anna Agentin', vorname: 'Anna', nachname: 'Agentin' });
+  });
+
+  it('der Auftritt der Agentur gilt für alle: Logo, Akzentfarbe, Internetadresse, Zusatzzeile', () => {
+    const pfad = `u/agentur-${NORD}-0123456789abcdef01234567.png`;
+    const mit = agentur(NORD, 'AXA Agentur Nord', { farbe: '#0f766e', web: 'www.nord.example', zusatz: 'Vertreter nach § 34d GewO' }, '2026-11-01', pfad);
+    const ben = { ...AUFTRITT_LEER, berater: 'Ben Berater', vorname: 'Ben', nachname: 'Berater', telefon: '040 9', email: 'ben@nord.example' };
+    expect(agenturAuftritt(ben, mit, true, 'blob:nord')).toEqual({
+      ...ben, firma: 'AXA Agentur Nord', farbe: '#0f766e', web: 'www.nord.example', zusatz: 'Vertreter nach § 34d GewO', logo: 'blob:nord',
+    });
+    // auch für die Verwaltung — statt ihres eigenen Logos und ihrer eigenen Farbe
+    expect(agenturAuftritt(eigen, mit, false, 'blob:nord')).toMatchObject({
+      firma: 'AXA Agentur Nord', farbe: '#0f766e', web: 'www.nord.example', zusatz: 'Vertreter nach § 34d GewO', logo: 'blob:nord',
+    });
+    // Solange das Logo der Agentur lädt, steht keines da — nicht das eines anderen.
+    expect(agenturAuftritt(eigen, mit)!.logo).toBeNull();
+    // Eine Farbe, die keine ist, gilt nicht.
+    expect(agenturAuftritt(eigen, agentur(NORD, 'Nord', { farbe: 'blau' }))!.farbe).toBe('#112233');
+  });
+
+  it('hat die Agentur einen eigenen Auftritt?', () => {
+    expect(agenturHatAuftritt(agentur(NORD, 'Nord'))).toBe(false);
+    expect(agenturHatAuftritt(agentur(NORD, 'Nord', { vorname: 'Anna', telefon: '040' }))).toBe(false);
+    expect(agenturHatAuftritt(agentur(NORD, 'Nord', { farbe: '#0f766e' }))).toBe(true);
+    expect(agenturHatAuftritt(agentur(NORD, 'Nord', { zusatz: 'Register' }))).toBe(true);
+    expect(agenturHatAuftritt(agentur(NORD, 'Nord', {}, '', 'u/agentur-x.png'))).toBe(true);
   });
 
   it('der Ansprechpartner ist die Vorgabe für den Berater im AXA-Antrag — eine Beratung kann einen anderen nennen', () => {
@@ -95,6 +122,23 @@ describe('agenturAuftritt — wessen Name auf den Unterlagen einer Agentur-Firma
     expect(axaBerater(axaAngabenSchema.parse({}), auftritt)).toEqual({ vorname: 'Anna', nachname: 'Agentin' });
     expect(axaBerater(axaAngabenSchema.parse({ beraterVorname: 'Ben', beraterNachname: 'Berater' }), auftritt))
       .toEqual({ vorname: 'Ben', nachname: 'Berater' });
+  });
+});
+
+describe('Zugänge einer Agentur in Worten', () => {
+  it('der Name, wenn er eingetragen ist — sonst die Adresse mit dem Hinweis, was fehlt', () => {
+    expect(zugangName({ name: ' Anna Zwei ', email: 'anna@nord.example' })).toEqual({ haupt: 'Anna Zwei', neben: 'anna@nord.example' });
+    expect(zugangName({ name: '', email: 'neu@nord.example' }))
+      .toEqual({ haupt: 'neu@nord.example', neben: 'Angaben als Berater noch nicht eingetragen' });
+    expect(zugangName({ name: '', email: '' }).haupt).toBe('Ohne E-Mail-Adresse');
+  });
+
+  it('Rolle und Zahl der Zugänge', () => {
+    expect([rolleText('admin'), rolleText('mitglied')]).toEqual(['Admin', 'Mitglied']);
+    expect(zugaengeText([])).toBe('Noch kein Zugang');
+    expect(zugaengeText([{ rolle: 'mitglied' }])).toBe('1 Zugang');
+    expect(zugaengeText([{ rolle: 'admin' }, { rolle: 'mitglied' }, { rolle: 'mitglied' }])).toBe('3 Zugänge, davon 1 Admin');
+    expect(zugaengeText([{ rolle: 'admin' }, { rolle: 'admin' }])).toBe('2 Zugänge, davon 2 Admins');
   });
 });
 

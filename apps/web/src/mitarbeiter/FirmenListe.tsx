@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowRight, Building2, Plus } from 'lucide-react';
+import { ArrowRight, Building2, Plus, Settings2, UserRound } from 'lucide-react';
 import { agenturDatenSchema, neuesAngebot } from '@renten/schema';
 import { firmenLaden, staendeLaden, type Firma, type Stand } from '../lib/bav-beratung';
 import {
@@ -8,9 +8,11 @@ import {
 import { kollegenLaden, type Kollege } from '../lib/bav-gemeinsam';
 import { useZugang } from '../store/zugang';
 import { TextFeld } from '../components/Feld';
-import { EINLEITUNG, ETIKETT, FEHLER, FELD, FELD_LABEL, KNOPF, Karte, Titel } from '../components/stil';
+import { Dialog } from '../components/Dialog';
+import { EINLEITUNG, ETIKETT, FEHLER, FELD, FELD_LABEL, KNOPF, KNOPF_KLEIN, Karte, Titel } from '../components/stil';
 import { agenturKurz, agenturStandText, agenturZeilen, type Sortierung } from './agentur-texte';
 import { agenturMerken } from './agentur-hook';
+import { BeraterAngabenFormular } from './BeraterAngaben';
 import { FirmenKarten, NeueFirma, StandZeile } from './firmen-karten';
 import type { Ort } from './ort';
 
@@ -26,7 +28,9 @@ const SORTIERUNGEN: { wert: Sortierung; text: string }[] = [
  * - DIE bAV-VERWALTUNG sieht zuerst ihre Agenturen — sortierbar, mit Firmen,
  *   Beratungen und Zugaengen —, darunter die Firmen ohne Agentur.
  * - EIN ZUGANG EINER AGENTUR sieht die Firmenkunden seiner Agentur; was er
- *   anlegt, gehoert zu ihr und beginnt mit ihren Vorgaben.
+ *   anlegt, gehoert zu ihr und beginnt mit ihren Vorgaben. Im Kopf aendert er
+ *   seine Angaben als Berater; ein ADMIN kommt von dort in die Einrichtung
+ *   seiner Agentur (`AgenturAnsicht`).
  * - ALLE ANDEREN sehen ihre Firmen und die, die Kollegen fuer ihr Buero
  *   freigegeben haben — wie bisher.
  *
@@ -44,6 +48,7 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
   const [zugaenge, setZugaenge] = useState<Record<string, AgenturStand>>({});
   const [sortierung, setSortierung] = useState<Sortierung>('name');
   const verwaltet = zugang?.verwalter === true;
+  const [angaben, setAngaben] = useState(false);
 
   useEffect(() => {
     let aktiv = true;
@@ -161,10 +166,23 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
   return (
     <div className="space-y-10">
       <div>
-        {meineName && (
-          <p className={`mb-2 flex items-center gap-1.5 ${ETIKETT}`}>
-            <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /> Agentur {meineName}
-          </p>
+        {meineName && zugang?.agentur && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className={`flex items-center gap-1.5 ${ETIKETT}`}>
+              <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden /> Agentur {meineName}{zugang.agenturRolle === 'admin' ? ' · Sie sind Admin' : ''}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setAngaben(true)} className={KNOPF_KLEIN}>
+                <UserRound className="h-3.5 w-3.5" aria-hidden /> Ihre Angaben
+              </button>
+              {zugang.agenturRolle === 'admin' && (
+                <button type="button" className={KNOPF_KLEIN}
+                  onClick={() => gehe({ agentur: zugang.agentur, firma: null, beratung: null, reiter: 'mitarbeiter' })}>
+                  <Settings2 className="h-3.5 w-3.5" aria-hidden /> Agentur einrichten
+                </button>
+              )}
+            </div>
+          </div>
         )}
         <Titel gross>bAV-Mitarbeiterberatung</Titel>
         <p className="mt-3 max-w-3xl text-base leading-relaxed text-ui-schiefer">
@@ -198,6 +216,15 @@ export function FirmenListe({ gehe }: { gehe: (o: Ort) => void }) {
         <FirmenKarten firmen={firmen} staende={staende} kollegen={kollegen} gehe={gehe}
           beschriftung={meineName ? `Firmenkunden der Agentur ${meineName}` : 'Firmen'} />
       ))}
+
+      <Dialog
+        offen={angaben}
+        titel="Ihre Angaben als Berater"
+        beschreibung="So stehen Sie auf den Unterlagen: im Briefkopf, im Beratungsprotokoll und im AXA-Antrag."
+        onSchliessen={() => setAngaben(false)}
+      >
+        <BeraterAngabenFormular />
+      </Dialog>
     </div>
   );
 }

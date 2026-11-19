@@ -289,16 +289,21 @@ function Datenschutz() {
         <strong>Agenturen und bAV-Verwaltung.</strong> Betreuen wir für eine Agentur die betriebliche
         Altersversorgung ihrer Firmenkunden, legt unsere bAV-Verwaltung die Agentur an. Dazu speichern wir ihren
         Namen, Ansprechpartner, Anschrift, Telefonnummer, E-Mail-Adresse, Organisationsnummer und die Vorgaben für
-        neue Firmen (Versicherer, Tarif, Bundesland), außerdem die Einladungslinks (wer sie wann erstellt und
-        eingelöst hat) und welche Konten seit wann zur Agentur gehören. Ein Konto gehört zu einer Agentur, sobald es
-        einen Einladungslink einlöst; es nutzt die Arbeitgeber-Vorsorgemodelle und die Mitarbeiterberatung ohne Abo.
-        Alle Zugänge einer Agentur und die Konten der bAV-Verwaltung sehen und bearbeiten die Firmen der Agentur mit
-        Angebot, Logo und allen Beratungen, einschließlich Gehalt, Steuer- und Gesundheitsangaben und der
-        unterschriebenen Unterlagen. Die bAV-Verwaltung sieht dabei die E-Mail-Adressen der Zugänge. Name,
-        Ansprechpartner und Kontakt der Agentur stehen im Briefkopf der Unterlagen ihrer Firmenkunden. Wird ein
-        Zugang entfernt oder löscht er sein Konto, bleiben seine Firmen und Beratungen in der Agentur; sie gehen an
-        die bAV-Verwaltung über. Verschiebt die bAV-Verwaltung eine Firma in eine andere Agentur, sehen die Zugänge
-        der bisherigen sie nicht mehr.
+        neue Firmen (Versicherer, Tarif, Bundesland), ihren Auftritt (Logo, Akzentfarbe, Internetadresse,
+        Zusatzzeile), außerdem die Einladungslinks (wer sie wann erstellt und eingelöst hat, ob mit Adminrechten) und
+        welche Konten seit wann und in welcher Rolle zur Agentur gehören. Ein Konto gehört zu einer Agentur, sobald
+        es einen Einladungslink einlöst; es nutzt die Arbeitgeber-Vorsorgemodelle und die Mitarbeiterberatung ohne
+        Abo. Vor der ersten Beratung trägt jeder Zugang Vorname, Nachname, Telefonnummer und E-Mail-Adresse ein; sie
+        werden in „Ihr Auftritt“ des Kontos gespeichert und stehen als Berater auf den Unterlagen. Alle Zugänge
+        einer Agentur und die Konten der bAV-Verwaltung sehen und bearbeiten die Firmen der Agentur mit Angebot,
+        Logo und allen Beratungen, einschließlich Gehalt, Steuer- und Gesundheitsangaben und der unterschriebenen
+        Unterlagen. Die bAV-Verwaltung vergibt Adminrechte: Admins einer Agentur ändern deren Angaben und Auftritt
+        und sehen, wer zur Agentur gehört. Die bAV-Verwaltung und die Admins sehen dabei Namen und E-Mail-Adressen
+        der Zugänge. Name, Logo, Farbe und Kontakt der Agentur stehen im Briefkopf der Unterlagen ihrer
+        Firmenkunden; das Logo sehen alle Zugänge der Agentur und die bAV-Verwaltung. Wird ein Zugang entfernt oder
+        löscht er sein Konto, bleiben seine Firmen und Beratungen in der Agentur; sie gehen an die bAV-Verwaltung
+        über. Verschiebt die bAV-Verwaltung eine Firma in eine andere Agentur, sehen die Zugänge der bisherigen sie
+        nicht mehr.
       </P>
       <P>
         [Für die bAV-Verwaltung der Firmenkunden einer Agentur braucht es eine Vereinbarung mit der Agentur — je

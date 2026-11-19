@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, Info } from 'lucide-react';
 import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
@@ -8,7 +8,7 @@ import { Logo } from '../components/Logo';
 import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 import { AKZENT, Hervor, KNOPF_KLEIN, LINK } from '../components/stil';
 import { akzentVariablen, auftrittSichtbar, fusszeileCss, kontaktZeile } from '../features/auftritt';
-import { useAuftritt } from '../store/auftritt';
+import { useGeltenderAuftritt } from '../mitarbeiter/agentur-hook';
 import { datumText } from './firmenkunde';
 
 /**
@@ -403,10 +403,8 @@ export interface KopfKunde {
  * Seite ausserdem die Fusszeile des Gutachtens (Kontakt, Seitenzahl).
  */
 export function Kopf({ kunde = null }: { kunde?: KopfKunde | null }) {
-  const auftritt = useAuftritt((s) => s.auftritt);
-  const status = useAuftritt((s) => s.status);
-  const laden = useAuftritt((s) => s.laden);
-  useEffect(() => { if (status === 'aus') void laden(); }, [status, laden]);
+  // Fuer einen Zugang einer Agentur mit deren Auftritt (Name, Logo, Farbe) — sonst der eigene wie bisher.
+  const auftritt = useGeltenderAuftritt();
 
   const a = auftritt && auftrittSichtbar(auftritt) ? auftritt : null;
   const absender = a ? a.firma.trim() || a.berater.trim() : '';

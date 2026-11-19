@@ -24,8 +24,8 @@ export {
   type Entscheidung, type AxaAngaben, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';
 export {
-  AXA_VERSICHERER, agenturDatenSchema, agenturDatenLesen, agenturAnsprechpartner, neuesAngebot,
-  type AgenturDaten,
+  AXA_VERSICHERER, AGENTUR_ROLLEN, agenturDatenSchema, agenturDatenLesen, agenturAnsprechpartner, agenturRolleAus, neuesAngebot,
+  type AgenturDaten, type AgenturRolle,
 } from './bav-agentur.js';
 export {
   BEZUGSRECHTE, BEZUGSRECHT_VORGABE, ANTRAG_FELDER, bezugsrechtText, ibanBereinigt, ibanGueltig, ibanFehler, ibanFormatiert,

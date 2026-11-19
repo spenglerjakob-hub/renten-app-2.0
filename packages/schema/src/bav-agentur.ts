@@ -7,7 +7,12 @@ import { firmenAngebotSchema, type FirmenAngebot } from './bav-beratung.js';
  * Die bAV-Verwaltung des Betreibers fuehrt Agenturen; jede hat Firmenkunden.
  * Was die Verwaltung an der Agentur eintraegt, belegt jede Firma vor, die in
  * ihr angelegt wird: Organisationsnummer, Versicherer, Tarif, Sitz — und wer
- * als Berater im AXA-Antrag und im Gespraechsprotokoll steht.
+ * als Berater im AXA-Antrag und im Gespraechsprotokoll steht, solange der
+ * Zugang, der beraet, nichts Eigenes eingetragen hat.
+ *
+ * ROLLEN. Ein Zugang einer Agentur ist Mitglied oder Admin. Admins richten
+ * ihre Agentur selbst ein: Angaben und Auftritt (Logo, Akzentfarbe). Die
+ * Rolle vergibt die Verwaltung.
  *
  * VORGABE AXA. Das Werkzeug nutzen vorerst AXA-Vertriebe: Eine neue Firma
  * beginnt deshalb mit der AXA als Versicherer. Zusammen mit dem
@@ -33,9 +38,26 @@ export const agenturDatenSchema = z.object({
   /** Vorgaben fuer das Angebot neuer Firmen */
   versicherer: z.string().max(120).default(AXA_VERSICHERER),
   tarif: z.string().max(120).default(''),
+  /*
+   * DER AUFTRITT DER AGENTUR auf den Unterlagen ihrer Firmenkunden — fuer alle
+   * ihre Zugaenge derselbe (Migration 20261119120000). Das Logo steht in der
+   * Spalte `logo` der Agentur. Leer heisst: keine Vorgabe.
+   */
+  /** Akzentfarbe '#rrggbb' — sonst leer; was nicht passt, liest die App als „keine“ */
+  farbe: z.string().max(7).default(''),
+  web: z.string().max(200).default(''),
+  /** Freie Zeile unter dem Kontakt, etwa Vermittlerstatus und Registernummer */
+  zusatz: z.string().max(300).default(''),
 });
 
 export type AgenturDaten = z.infer<typeof agenturDatenSchema>;
+
+/** Die Rollen in einer Agentur — `admin` richtet die Agentur ein, `mitglied` beraet. */
+export const AGENTUR_ROLLEN = ['mitglied', 'admin'] as const;
+export type AgenturRolle = (typeof AGENTUR_ROLLEN)[number];
+
+/** Die Rolle aus einer Antwort der Datenbank — Unbekanntes ist ein Mitglied, nie ein Admin. */
+export const agenturRolleAus = (roh: unknown): AgenturRolle => (roh === 'admin' ? 'admin' : 'mitglied');
 
 /**
  * Die Daten einer Agentur aus der Datenbank lesen. Passt etwas nicht (zu

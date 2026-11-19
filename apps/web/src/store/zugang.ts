@@ -74,6 +74,12 @@ export interface Zugang {
    */
   agentur: string | null;
   agenturName: string | null;
+  /**
+   * Die Rolle in der Agentur — `admin` richtet sie ein (Angaben, Auftritt),
+   * `mitglied` beraet. null: keine Agentur, oder die Datenbank kennt noch
+   * keine Rollen (dann ist niemand Admin).
+   */
+  agenturRolle: 'admin' | 'mitglied' | null;
   /** Gehoert zur bAV-Verwaltung des Betreibers: fuehrt die Agenturen und sieht deren Firmen */
   verwalter: boolean;
 }
@@ -131,6 +137,7 @@ export function zugangAus(roh: unknown): Zugang | null {
     // Eine Datenbank ohne die Migration der Agenturen liefert die Felder nicht: dann ist es niemand.
     agentur: text(r.agentur),
     agenturName: text(r.agentur_name),
+    agenturRolle: text(r.agentur) ? aus(['admin', 'mitglied'] as const, r.agentur_rolle) : null,
     verwalter: r.verwalter === true,
   };
 }

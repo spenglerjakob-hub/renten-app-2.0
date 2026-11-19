@@ -259,6 +259,7 @@ export function AgenturBand() {
       <Band ton="gut" onWeg={gesehen}>
         <strong>Willkommen{z?.agenturName ? ` in der Agentur „${z.agenturName}“` : ''}.</strong> Ihr Zugang umfasst die
         Vorsorgemodelle und die bAV-Mitarbeiterberatung mit den Firmenkunden Ihrer Agentur.
+        {z?.agenturRolle === 'admin' && ' Sie haben Adminrechte: Angaben und Auftritt Ihrer Agentur richten Sie in der Mitarbeiterberatung unter „Agentur einrichten“ ein.'}
       </Band>
     );
   }

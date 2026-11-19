@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AXA_VERSICHERER, agenturAnsprechpartner, agenturDatenLesen, agenturDatenSchema, firmenAngebotSchema, neuesAngebot,
+  AGENTUR_ROLLEN, AXA_VERSICHERER, agenturAnsprechpartner, agenturDatenLesen, agenturDatenSchema, agenturRolleAus, firmenAngebotSchema,
+  neuesAngebot,
 } from '../src/index.js';
 
 describe('agenturDatenSchema — was die Verwaltung an einer Agentur eintraegt', () => {
   it('leer: alles leer, der Versicherer ist die AXA', () => {
     expect(agenturDatenSchema.parse({})).toEqual({
       vorname: '', nachname: '', organisationsnummer: '', anschrift: '', telefon: '', email: '', bundesland: '',
-      versicherer: AXA_VERSICHERER, tarif: '',
+      versicherer: AXA_VERSICHERER, tarif: '', farbe: '', web: '', zusatz: '',
     });
     expect(AXA_VERSICHERER).toBe('AXA Lebensversicherung AG');
+  });
+
+  it('der Auftritt der Agentur: Akzentfarbe, Internetadresse, Zusatzzeile', () => {
+    const d = agenturDatenLesen({ farbe: '#1e3a8a', web: 'www.nord.example', zusatz: 'Versicherungsvertreter nach § 34d GewO' });
+    expect([d.farbe, d.web, d.zusatz]).toEqual(['#1e3a8a', 'www.nord.example', 'Versicherungsvertreter nach § 34d GewO']);
+    // Daten von vor dem Auftritt lesen sich wie bisher — ohne Vorgabe
+    expect(agenturDatenLesen({ vorname: 'Anna' })).toMatchObject({ vorname: 'Anna', farbe: '', web: '', zusatz: '' });
+    expect(agenturDatenSchema.safeParse({ web: 'x'.repeat(201) }).success).toBe(false);
+  });
+
+  it('Rollen: Unbekanntes ist ein Mitglied, nie ein Admin', () => {
+    expect(AGENTUR_ROLLEN).toEqual(['mitglied', 'admin']);
+    expect([agenturRolleAus('admin'), agenturRolleAus('mitglied'), agenturRolleAus('Admin'), agenturRolleAus(null), agenturRolleAus(undefined)])
+      .toEqual(['admin', 'mitglied', 'mitglied', 'mitglied', 'mitglied']);
   });
 
   it('liest tolerant: Unbrauchbares ergibt die Vorgaben', () => {

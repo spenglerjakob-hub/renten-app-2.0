@@ -1,7 +1,7 @@
 import { agenturAnsprechpartner, type AgenturDaten } from '@renten/schema';
 import type { Auftritt } from '../features/auftritt';
-import { AUFTRITT_LEER } from '../features/auftritt';
-import type { Agentur, AgenturStand } from '../lib/bav-agenturen';
+import { AUFTRITT_LEER, farbeNormal } from '../features/auftritt';
+import type { Agentur, AgenturStand, AgenturZugang } from '../lib/bav-agenturen';
 import type { Firma, Stand } from '../lib/bav-beratung';
 
 /*
@@ -68,19 +68,25 @@ export function agenturKurz(d: Pick<AgenturDaten, 'vorname' | 'nachname' | 'orga
  * Der Auftritt auf den Unterlagen einer Firma, die zu einer Agentur gehoert.
  * Die Unterlagen eines Firmenkunden sprechen fuer seine Agentur:
  *
- * - Erstellt sie die bAV-VERWALTUNG, gelten Name der Agentur, ihr
- *   Ansprechpartner und ihr Kontakt, wo sie eingetragen sind — die Verwaltung
- *   arbeitet im Namen der Agentur, nicht im eigenen.
- * - Erstellt sie ein ZUGANG DER AGENTUR (`mitglied`), gehen seine eigenen
- *   Angaben aus „Ihr Auftritt“ vor: Er hat beraten. Was er nicht eingetragen
- *   hat, kommt von der Agentur — ohne eigenen Auftritt also alles.
+ * - DER AUFTRITT DER AGENTUR gilt fuer alle: ihr Name als Firma im Briefkopf,
+ *   ihr Logo, ihre Akzentfarbe, Internetadresse und Zusatzzeile — soweit sie
+ *   eingetragen sind (das richten ihre Admins ein, oder die Verwaltung). Was
+ *   fehlt, bleibt vom angemeldeten Berater.
+ * - WER BERATEN HAT: Erstellt sie ein ZUGANG DER AGENTUR (`mitglied`), stehen
+ *   sein Name und sein Kontakt da — die Angaben, die jeder Zugang beim ersten
+ *   Aufruf eintraegt. Was er nicht eingetragen hat, kommt von der Agentur.
+ *   Erstellt sie die bAV-VERWALTUNG, gelten Ansprechpartner und Kontakt der
+ *   Agentur, wo sie eingetragen sind: Die Verwaltung arbeitet im Namen der
+ *   Agentur, nicht im eigenen.
  *
- * Logo, Farbe, Internetadresse und Zusatzzeile bleiben immer vom
- * angemeldeten Berater. Der Name ist auch die Vorgabe fuer „Wer hat
- * beraten?“ im AXA-Antrag (`axaBerater`); je Beratung laesst sich ein
- * anderer eintragen.
+ * `agenturLogo` ist das geladene Logo der Agentur (Object-URL) — solange es
+ * noch laedt, steht keines da, nicht das eines anderen. Der Name ist auch die
+ * Vorgabe fuer „Wer hat beraten?“ im AXA-Antrag (`axaBerater`); je Beratung
+ * laesst sich ein anderer eintragen.
  */
-export function agenturAuftritt(auftritt: Auftritt | null, agentur: Agentur | null, mitglied = false): Auftritt | null {
+export function agenturAuftritt(
+  auftritt: Auftritt | null, agentur: Agentur | null, mitglied = false, agenturLogo: string | null = null,
+): Auftritt | null {
   if (!agentur) return auftritt;
   const d = agentur.daten;
   const basis = auftritt ?? AUFTRITT_LEER;
@@ -90,9 +96,37 @@ export function agenturAuftritt(auftritt: Auftritt | null, agentur: Agentur | nu
   const name = agenturAnsprechpartner(d);
   return {
     ...basis,
-    firma: wahl(basis.firma, agentur.name),
+    firma: agentur.name.trim() || basis.firma,
     ...(name && !(mitglied && eigenerName) ? { berater: name, vorname: d.vorname.trim(), nachname: d.nachname.trim() } : {}),
     telefon: wahl(basis.telefon, d.telefon),
     email: wahl(basis.email, d.email),
+    web: d.web.trim() || basis.web,
+    zusatz: d.zusatz.trim() || basis.zusatz,
+    farbe: farbeNormal(d.farbe) ?? basis.farbe,
+    logo: agentur.logoPfad ? agenturLogo : basis.logo,
   };
+}
+
+/** Hat die Agentur einen eigenen Auftritt eingerichtet — Logo, Farbe, Internetadresse oder Zusatzzeile? */
+export function agenturHatAuftritt(a: Pick<Agentur, 'daten' | 'logoPfad'>): boolean {
+  return a.logoPfad !== null || farbeNormal(a.daten.farbe) !== null || a.daten.web.trim() !== '' || a.daten.zusatz.trim() !== '';
+}
+
+const ROLLE_TEXT = { admin: 'Admin', mitglied: 'Mitglied' } as const;
+
+/** „Anna Zwei · anna@nord.example“ — der Name, wenn der Zugang ihn eingetragen hat, sonst nur die Adresse. */
+export function zugangName(z: Pick<AgenturZugang, 'name' | 'email'>): { haupt: string; neben: string } {
+  const name = z.name.trim();
+  const email = z.email.trim() || 'Ohne E-Mail-Adresse';
+  return name ? { haupt: name, neben: email } : { haupt: email, neben: 'Angaben als Berater noch nicht eingetragen' };
+}
+
+/** „Admin“ / „Mitglied“ — wie die Rolle in der Liste der Zugaenge heisst. */
+export const rolleText = (rolle: AgenturZugang['rolle']): string => ROLLE_TEXT[rolle];
+
+/** „2 Zugänge, davon 1 Admin“ — fuer die Ueberschrift der Liste. */
+export function zugaengeText(liste: readonly Pick<AgenturZugang, 'rolle'>[]): string {
+  const admins = liste.filter((z) => z.rolle === 'admin').length;
+  if (liste.length === 0) return 'Noch kein Zugang';
+  return `${mehrzahl(liste.length, 'Zugang', 'Zugänge')}${admins > 0 ? `, davon ${mehrzahl(admins, 'Admin', 'Admins')}` : ''}`;
 }
