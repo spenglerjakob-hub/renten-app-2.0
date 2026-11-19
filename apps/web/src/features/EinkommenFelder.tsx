@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
 import { ZahlFeld, AuswahlFeld, Schalter, euro, type Vorbelegt } from '../components/Feld';
+import { Wahl } from '../components/Frage';
 import { Hinweis } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 
@@ -30,12 +31,26 @@ type Einkommen = SzenarioParsed['einkommenHeute'];
  * Person A in den Basisdaten, fuer den Partner ebendort und im Dialog, der
  * beim Umschalten auf "Verheiratet" erscheint.
  */
+const ARTEN = [
+  { wert: 'brutto', text: 'Angestellt (Brutto)' },
+  { wert: 'netto', text: 'Angestellt (Netto)' },
+  { wert: 'besoldung', text: 'Beamter (Besoldung)' },
+  { wert: 'selbststaendig', text: 'Selbstständig (Gewinn)' },
+] as const;
+
 export function EinkommenFelder({
-  wert, onChange, spalten = 3, marke,
+  wert, onChange, spalten = 3, marke, artAlsKnoepfe = false,
 }: {
   wert: Einkommen;
   onChange: (p: Partial<Einkommen>) => void;
   spalten?: 2 | 3;
+  /**
+   * Die Art des Einkommens als vier Knoepfe ueber den Feldern statt als
+   * Auswahlliste daneben — wo Platz ist und die Frage „Was verdienst du?“
+   * im Mittelpunkt steht (Angaben im Rechner, Vorsorge-Check). Im
+   * Vertrags-TÜV und im Fenster des Ehepartners bleibt die kompakte Liste.
+   */
+  artAlsKnoepfe?: boolean;
   /** Vorbelegung je Feld — nur im Rechner, siehe `features/vorbelegung.ts` */
   marke?: (feld: 'modus' | 'betrag' | 'auszahlungen') => Vorbelegt | undefined;
 }) {
@@ -43,27 +58,35 @@ export function EinkommenFelder({
   // Das Einkommen einer Person: auch beim Paar „du“. Ohne Ansprache (Vorsorge-Check) wie bisher per Sie.
   const t = useAnsprache().einzeln;
 
+  const setzeArt = (v: Einkommen['modus']) => onChange({
+    modus: v,
+    // Ein Gewinn ist ein Jahresbetrag durch zwoelf — 13 Gehaelter aus
+    // einer vorherigen Angestellten-Eingabe wuerden ihn sonst
+    // stillschweigend um ein Dreizehntel erhoehen.
+    ...(v === 'selbststaendig' ? { auszahlungen: 12 } : {}),
+  });
+  // Mit den Knoepfen darueber stehen daneben nur noch die Betraege: zwei Felder, bei Beamten drei.
+  const raster = artAlsKnoepfe
+    ? (wert.modus === 'besoldung' && spalten === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')
+    : (spalten === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2');
+
   return (
     <>
-      <div className={`grid gap-3 ${spalten === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-        <AuswahlFeld
-          label="Art"
-          wert={wert.modus}
-          onChange={(v) => onChange({
-            modus: v,
-            // Ein Gewinn ist ein Jahresbetrag durch zwoelf — 13 Gehaelter aus
-            // einer vorherigen Angestellten-Eingabe wuerden ihn sonst
-            // stillschweigend um ein Dreizehntel erhoehen.
-            ...(v === 'selbststaendig' ? { auszahlungen: 12 } : {}),
-          })}
-          optionen={[
-            { wert: 'brutto', text: 'Angestellt (Brutto)' },
-            { wert: 'netto', text: 'Angestellt (Netto)' },
-            { wert: 'besoldung', text: 'Beamter (Besoldung)' },
-            { wert: 'selbststaendig', text: 'Selbstständig (Gewinn)' },
-          ]}
-          vorbelegt={marke?.('modus')}
-        />
+      {artAlsKnoepfe && (
+        <div className="mb-4">
+          <Wahl label="Art des Einkommens" wert={wert.modus} onChange={setzeArt} optionen={ARTEN} reihe vorbelegt={marke?.('modus')} />
+        </div>
+      )}
+      <div className={`grid gap-3 ${raster}`}>
+        {!artAlsKnoepfe && (
+          <AuswahlFeld
+            label="Art"
+            wert={wert.modus}
+            onChange={setzeArt}
+            optionen={ARTEN}
+            vorbelegt={marke?.('modus')}
+          />
+        )}
         {wert.modus === 'selbststaendig' ? (
           <ZahlFeld
             label="Gewinn monatlich"

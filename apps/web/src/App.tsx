@@ -1549,7 +1549,8 @@ export default function App() {
                   titel: 'Alle Angaben auf einen Blick',
                   breit: true,
                   inhalt: (
-                    <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
+                    // `handy-eingaben`: am Telefon Eingaben in 16 px und daumenhoch — wie Schritt für Schritt.
+                    <div className="handy-eingaben grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
                       <div id="eingaben" className="scroll-mt-28 lg:col-span-6">
                         <AkkordeonKarte
                           titel="Allgemeine Daten & Ziel"

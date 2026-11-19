@@ -24,6 +24,7 @@ import {
   EINLEITUNG, Etappen, FEHLER, FELD_LABEL, Hervor, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, LINK, Titel,
 } from '../components/stil';
 import { Dialog } from '../components/Dialog';
+import { Aufklapper, FrageKopf, Hilfe, Hilfen, JA_NEIN, Wahl, Zaehler } from '../components/Frage';
 import { EinkommenFelder } from '../features/EinkommenFelder';
 import { PkvFelder } from '../features/PkvFelder';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
@@ -370,7 +371,7 @@ export function Seite() {
           zweiten Schritt ist die Frage die Hauptueberschrift der Seite.
         */}
         <section className="ui-karte mt-4 p-5 sm:p-7 print:hidden">
-          <FrageKopf frage={FRAGEN[schritt]!} als={erster ? 'h2' : 'h1'} />
+          <FrageKopf {...FRAGEN[schritt]!} als={erster ? 'h2' : 'h1'} />
 
           {schritt === 0 && <SchrittHaushalt x={x} setze={setze} setzePerson={setzePerson} />}
           {schritt === 1 && (
@@ -491,124 +492,12 @@ export function Seite() {
    Bausteine
    -------------------------------------------------------------------------- */
 
-/** Zeichen, Frage und ein Satz dazu — der Kopf jedes Schritts. */
-function FrageKopf({ frage, als }: { frage: (typeof FRAGEN)[number]; als: 'h1' | 'h2' }) {
-  const Zeichen = frage.symbol;
-  return (
-    <>
-      <span aria-hidden className="ui-innen mb-3 flex h-11 w-11 items-center justify-center rounded-full">
-        <Zeichen className="h-5 w-5 text-ui-tinte" />
-      </span>
-      <Titel als={als}>{frage.titel}</Titel>
-      <p className="mt-2 text-sm leading-relaxed text-ui-schiefer">{frage.unter}</p>
-    </>
-  );
-}
-
-/**
- * Eine Zeile zum Aufklappen unter den Feldern — so hoch, dass der Daumen sie
- * trifft. Zu: Symbol, Titel und ein Satz, was sich dahinter verbirgt.
- */
-function Aufklapper({ symbol: Zeichen, titel, zusatz, offenAnfangs = false, children }: {
-  symbol: LucideIcon; titel: string; zusatz?: string; offenAnfangs?: boolean; children: ReactNode;
-}) {
-  const [offen, setOffen] = useState(offenAnfangs);
-  const id = useId();
-  return (
-    <div className="rounded-[10px] border border-ui-linie bg-ui-karte">
-      <button
-        type="button"
-        aria-expanded={offen}
-        aria-controls={id}
-        onClick={() => setOffen((o) => !o)}
-        className="flex min-h-[3.25rem] w-full items-center gap-3 rounded-[10px] px-4 py-2.5 text-left hover:bg-ui-hover"
-      >
-        <Zeichen className="h-5 w-5 shrink-0 text-ui-schiefer" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium text-ui-tinte">{titel}</span>
-          {zusatz && <span className="block text-xs leading-snug text-ui-schiefer">{zusatz}</span>}
-        </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-ui-schiefer transition-transform ${offen ? 'rotate-180' : ''}`} aria-hidden />
-      </button>
-      {offen && <div id={id} className="border-t border-ui-linie px-4 py-4">{children}</div>}
-    </div>
-  );
-}
-
-/** „Wo finde ich das?“ — welche Unterlage hilft und wo darauf die Zahl steht. */
-function Hilfe({ unterlage, children }: { unterlage: string; children: ReactNode }) {
-  return (
-    <Aufklapper symbol={HelpCircle} titel="Wo finde ich das?" zusatz={unterlage}>
-      <div className="text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">{children}</div>
-    </Aufklapper>
-  );
-}
-
-/** Was beim Ausfuellen hilft — unter den Feldern eines Schritts: Hilfe und Hochladen. */
-function Hilfen({ children }: { children: ReactNode }) {
-  return <div className="mt-6 space-y-2">{children}</div>;
-}
-
 /** Ein Abschnitt der Karte; ab dem zweiten durch eine Haarlinie getrennt. Die Ueberschrift nennt die Person, wenn es zwei gibt. */
 function Block({ titel, erster = false, children }: { titel?: string; erster?: boolean; children: ReactNode }) {
   return (
     <div className={erster ? 'mt-5' : 'mt-6 border-t border-ui-linie pt-6'}>
       {titel && <h3 className="mb-4 text-base font-medium text-ui-tinte">{titel}</h3>}
       {children}
-    </div>
-  );
-}
-
-/** Eine Wahl aus zwei, drei Antworten als grosse Knoepfe — am Telefon leichter zu treffen als ein Haken. */
-function Wahl<T extends string>({ label, wert, optionen, onChange }: {
-  label: string; wert: T; optionen: readonly { wert: T; text: string }[]; onChange: (v: T) => void;
-}) {
-  const id = useId();
-  return (
-    <div role="group" aria-labelledby={id}>
-      <span id={id} className={FELD_LABEL}>{label}</span>
-      <div className="grid grid-cols-2 gap-2">
-        {optionen.map((o) => (
-          <button
-            key={o.wert}
-            type="button"
-            onClick={() => onChange(o.wert)}
-            aria-pressed={wert === o.wert}
-            // Gewaehlt wie ein Reiter: gefuellt in Soot.
-            className={`min-h-[3rem] rounded-[8px] border px-3 py-2.5 text-left text-sm font-medium leading-snug transition-colors ${
-              wert === o.wert
-                ? 'border-ui-dunkel bg-ui-dunkel text-white'
-                : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
-            }`}
-          >
-            {o.text}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const JA_NEIN = [{ wert: 'ja', text: 'Ja' }, { wert: 'nein', text: 'Nein' }] as const;
-
-/** Eine kleine Anzahl mit Minus und Plus — statt eines Zahlenfelds mit winzigen Pfeilen. */
-function Zaehler({ label, wert, max, onChange, weniger, mehr }: {
-  label: string; wert: number; max: number; onChange: (n: number) => void; weniger: string; mehr: string;
-}) {
-  const id = useId();
-  const knopf = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover disabled:opacity-40';
-  return (
-    <div role="group" aria-labelledby={id}>
-      <span id={id} className={FELD_LABEL}>{label}</span>
-      <div className="flex items-center gap-4">
-        <button type="button" onClick={() => onChange(Math.max(0, wert - 1))} disabled={wert <= 0} aria-label={weniger} className={knopf}>
-          <Minus className="h-5 w-5" aria-hidden />
-        </button>
-        <output aria-live="polite" className="min-w-[2ch] text-center text-2xl font-medium tabular-nums text-ui-tinte">{wert}</output>
-        <button type="button" onClick={() => onChange(Math.min(max, wert + 1))} disabled={wert >= max} aria-label={mehr} className={knopf}>
-          <Plus className="h-5 w-5" aria-hidden />
-        </button>
-      </div>
     </div>
   );
 }
@@ -704,6 +593,7 @@ function SchrittEinkommen({ x, personen, setzePerson, upload }: {
             wert={x[id].einkommen}
             onChange={(p) => setzePerson(id, { einkommen: { ...x[id].einkommen, ...p } })}
             spalten={2}
+            artAlsKnoepfe
           />
         </Block>
       ))}

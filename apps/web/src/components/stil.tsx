@@ -46,7 +46,7 @@ export const FEHLER = 'rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900';
 
 /** Ueberschrift, Gewicht 400, in Inter Tight — die Handschrift der Seite. */
 export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '', id }: {
-  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string; id?: string;
+  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2' | 'h3'; klasse?: string; id?: string;
 }) {
   return (
     <Tag id={id} className={`ui-titel text-balance font-normal text-ui-tinte ${
