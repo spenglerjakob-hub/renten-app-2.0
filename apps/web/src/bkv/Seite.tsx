@@ -1,5 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, CircleCheck, Printer, TriangleAlert } from 'lucide-react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ArrowRight, CalendarCheck, Check, ChevronDown, CircleCheck, HeartHandshake, HeartPulse, Megaphone, Printer, type LucideIcon,
+} from 'lucide-react';
 import {
   bkvModell, parameterFuer, BUNDESLAENDER, SACHBEZUG_FREIGRENZE_MONAT, PAUSCHSTEUER_37B, type BkvWeg, type BkvWegId,
 } from '@renten/engine';
@@ -15,11 +17,20 @@ import { EINLEITUNG, Hervor, KNOPF, LINK, Titel } from '../components/stil';
 /**
  * Arbeitgeber-Seite „Betriebliche Krankenversicherung".
  *
+ * ERST DER NUTZEN, DANN DIE RECHNUNG. Eine bKV entscheidet sich selten ueber
+ * den Preis: Sie bindet Mitarbeiter, faellt Bewerbern auf und haelt gesund.
+ * Deshalb stehen die Vorteile fuer den Arbeitgeber und seine Mitarbeiter oben,
+ * gross und vor jeder Zahl. Darunter folgt, was sie kostet.
+ *
  * Die bKV ist Sachlohn und bis zur Freigrenze von 50 EUR im Monat steuer- und
- * beitragsfrei. Die Seite zeigt, was sie den Arbeitgeber kostet, warum sie
- * guenstiger ist als dieselbe Leistung als Gehaltserhoehung — und wo die
- * Freigrenze kippt. Die Beitraege haengen vom Tarif ab; die Knoepfe sind
- * Beispielbeitraege eines Budgettarifs, das echte Angebot wird eingetragen.
+ * beitragsfrei. Die Rechnung zeigt, was sie den Arbeitgeber kostet und warum
+ * sie guenstiger ist als dieselbe Leistung als Gehaltserhoehung. Liegt der
+ * Tarif ueber der Freigrenze, ist das kein Alarm, sondern ein anderer Weg
+ * (Aufteilen, Pauschalsteuer): Die Karte bleibt ruhig und nennt ihn. Der
+ * Vergleich aller Wege ist zugeklappt — er ist Sache des Beraters, nicht der
+ * erste Blick des Arbeitgebers; im Druck steht er offen. Die Beitraege haengen
+ * vom Tarif ab; die Knoepfe sind Beispielbeitraege eines Budgettarifs, das
+ * echte Angebot wird eingetragen.
  *
  * Eigenes Bundle, nur mit Konto (Zugangsschranke in main.tsx). Die Rechnung wird nicht gespeichert;
  * ins Konto geht nur die Firma, fuer die gerechnet wird (arbeitgeber/Firmenkunde.tsx).
@@ -39,6 +50,29 @@ const BEISPIELE: { budget: number; beitrag: number; abMitarbeitern?: number }[] 
   { budget: 1200, beitrag: 36.33 },
   { budget: 1500, beitrag: 42.67 },
 ];
+
+/** Was der Arbeitgeber davon hat — die vier Gruende, die im Gespraech tragen. Das Geld folgt darunter in der Rechnung. */
+const VORTEILE: { symbol: LucideIcon; titel: string; text: string }[] = [
+  {
+    symbol: HeartHandshake, titel: 'Mitarbeiter binden',
+    text: 'Ein Benefit, den Ihre Mitarbeiter im Alltag spüren — beim Zahnarzt, beim Optiker, beim Facharzt. Wer kündigt, verliert ihn.',
+  },
+  {
+    symbol: Megaphone, titel: 'Bewerber gewinnen',
+    text: 'In jeder Stellenanzeige sichtbar und ein Argument gegenüber Bewerbern, das Wettbewerber oft nicht bieten.',
+  },
+  {
+    symbol: HeartPulse, titel: 'Gesunde Belegschaft',
+    text: 'Vorsorge und schnellere Facharzttermine können Ausfallzeiten verkürzen.',
+  },
+  {
+    symbol: CalendarCheck, titel: 'Planbar, wenig Aufwand',
+    text: 'Ein fester Beitrag je Mitarbeiter. Die Leistungen wickelt der Versicherer direkt mit dem Mitarbeiter ab.',
+  },
+];
+
+/** Titel eines Abschnitts der Seite — zwischen dem Seitentitel und den Titeln der Karten. */
+const ABSCHNITT = 'ui-titel text-[22px] leading-tight text-ui-tinte sm:text-[26px] print:text-base';
 
 /** Kurzname fuer Tabellenkopf und Druckzeile */
 const SPALTE: Record<BkvWegId, string> = {
@@ -64,6 +98,16 @@ export function Seite() {
   const [eigenerSatz40, setEigenerSatz40] = useState(false);
   const [satz40, setSatz40] = useState(0.25);
   const [traegtMa40, setTraegtMa40] = useState(false);
+  /** Der Vergleich der Wege: am Bildschirm zugeklappt, im Druck immer offen */
+  const [wegeOffen, setWegeOffen] = useState(false);
+  const wegeRef = useRef<HTMLElement>(null);
+  const wegeZeigen = () => {
+    setWegeOffen(true);
+    // Erst nach dem Aufklappen ins Bild holen — vorher ist die Karte noch kurz.
+    requestAnimationFrame(() => wegeRef.current?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start',
+    }));
+  };
 
   // Fuer welche Firma gerechnet wird: Name und Logo fuer Kopf und Ausdruck, Sitz, Steuersatz und Umlagen aus ihrem Angebot.
   const kunde = useFirmenkunde({
@@ -119,6 +163,36 @@ export function Seite() {
           Sie zahlen für Ihre Mitarbeiter eine private Zusatzversicherung — für Zahnersatz, Brille, Vorsorge oder
           Facharzttermine. Bis {euro(SACHBEZUG_FREIGRENZE_MONAT)} im Monat ist das ein steuer- und abgabenfreier
           Sachbezug: Beim Mitarbeiter kommt jeder Euro an, und Sie zahlen keine Lohnnebenkosten darauf.
+        </p>
+
+        {/* --- Wofür: die Vorteile zuerst --------------------------------------- */}
+        <section aria-labelledby="bkv-vorteile" className="mt-8 sm:mt-10 print:mt-3">
+          <h2 id="bkv-vorteile" className={ABSCHNITT}>Was Sie als Arbeitgeber davon haben</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:mt-2 print:grid-cols-4 print:gap-2">
+            {VORTEILE.map((v) => <Vorteil key={v.titel} {...v} />)}
+          </div>
+          <div className={`${KARTE} mt-3 print:mt-2 print:break-inside-avoid`}>
+            <h3 className={KARTE_TITEL}>Was Ihre Mitarbeiter davon haben</h3>
+            <ul className="mt-3 grid gap-x-8 gap-y-2.5 text-sm leading-relaxed text-ui-tinte sm:grid-cols-2 lg:grid-cols-3 print:mt-1 print:grid-cols-3 print:gap-x-4 print:gap-y-1 print:text-[10px] print:leading-snug [&_strong]:font-medium">
+              <Haken><strong>Ohne Gesundheitsprüfung</strong> und meist ohne Wartezeiten — oft sind auch laufende
+                Behandlungen und bestehende Erkrankungen mitversichert.</Haken>
+              <Haken><strong>Budgettarif:</strong> ein Jahresbudget für Zahnreinigung, Brille, Vorsorge oder
+                Heilpraktiker, frei aufteilbar.</Haken>
+              <Haken><strong>Bausteine</strong> wie Zahnersatz, Krankenhaus mit Ein- oder Zweibettzimmer und
+                Chefarzt.</Haken>
+              <Haken><strong>Angehörige</strong> können oft zu Sonderkonditionen mitversichert werden, auf eigene
+                Kosten.</Haken>
+              <Haken>Beim Ausscheiden meist <strong>privat weiterführbar</strong>, ohne neue Gesundheitsprüfung.</Haken>
+            </ul>
+            <p className="mt-3 text-xs text-ui-schiefer print:mt-1 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
+          </div>
+        </section>
+
+        {/* --- Und was es kostet ------------------------------------------------- */}
+        <h2 className={`mt-10 sm:mt-12 print:mt-3 ${ABSCHNITT}`}>Was es kostet</h2>
+        <p className={`mt-2 ${EINLEITUNG} print:hidden`}>
+          Je Mitarbeiter und Monat, gerechnet mit Ihren Angaben — und verglichen mit derselben Leistung als
+          Gehaltserhöhung.
         </p>
 
         <p className="mt-2 hidden text-xs leading-snug text-ui-schiefer print:block print:text-[10px]">
@@ -267,27 +341,24 @@ export function Seite() {
 
             {/* --- Sachbezug-Check: die eine Grenze, an der alles haengt ------- */}
             {/*
-              DER SACHBEZUG-CHECK: in der Freigrenze ruhig wie jede Karte — der
-              Balken in Tinte, die Grenze als Strich in Cyan, dem einen Akzent.
-              Darueber wird es ein Fehler: Dann steht die Karte in Rot, denn
-              dann waere der ganze Betrag steuer- und beitragspflichtig.
+              DER SACHBEZUG-CHECK — immer eine ruhige Karte: der Balken in
+              Tinte, die Grenze als Strich in Cyan, dem einen Akzent. Liegt der
+              Tarif darueber, ist das kein Fehler, sondern der Anlass fuer einen
+              anderen Weg: Die Karte sagt, warum, und nennt den Weg, mit dem
+              gerechnet ist — ohne Warnzeichen und ohne Rot.
             */}
-            <section className={`print:break-inside-avoid ${
-              r.inFreigrenze ? KARTE : 'rounded-[10px] border border-rose-300 bg-rose-50 p-5 sm:p-6 print:p-2'
-            }`}>
+            <section className={`${KARTE} print:break-inside-avoid`}>
               <h2 className={`flex items-center gap-2 ${KARTE_TITEL}`}>
-                {r.inFreigrenze
-                  ? <CircleCheck className="h-5 w-5 shrink-0 text-ui-tinte print:h-4 print:w-4" aria-hidden />
-                  : <TriangleAlert className="h-5 w-5 shrink-0 text-rose-700 print:h-4 print:w-4" aria-hidden />}
+                {r.inFreigrenze && <CircleCheck className="h-5 w-5 shrink-0 text-ui-tinte print:h-4 print:w-4" aria-hidden />}
                 Sachbezug-Check: {euroGenau(summe)} von {euro(SACHBEZUG_FREIGRENZE_MONAT)}
               </h2>
               <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-ui-linie print:mt-2 print:[print-color-adjust:exact]">
                 <div
-                  className={`absolute inset-y-0 left-0 ${r.inFreigrenze ? 'bg-ui-tinte' : 'bg-rose-600'}`}
+                  className="absolute inset-y-0 left-0 bg-ui-tinte"
                   style={{ width: `${(Math.max(0, beitrag) / skala) * 100}%` }}
                 />
                 <div
-                  className={`absolute inset-y-0 ${r.inFreigrenze ? 'bg-ui-daten-3' : 'bg-rose-300'}`}
+                  className="absolute inset-y-0 bg-ui-daten-3"
                   style={{ left: `${(Math.max(0, beitrag) / skala) * 100}%`, width: `${(Math.max(0, weitere) / skala) * 100}%` }}
                 />
                 <div
@@ -295,44 +366,84 @@ export function Seite() {
                   style={{ left: `${(SACHBEZUG_FREIGRENZE_MONAT / skala) * 100}%` }}
                 />
               </div>
-              <div className={`mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs print:text-[11px] ${r.inFreigrenze ? 'text-ui-schiefer' : 'text-rose-900'}`}>
+              <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs text-ui-schiefer print:text-[11px]">
                 <span>bKV {euroGenau(beitrag)}{weitere > 0 ? ` + weitere Sachbezüge ${euroGenau(weitere)}` : ''}</span>
                 <span>Freigrenze {euro(SACHBEZUG_FREIGRENZE_MONAT)} (§ 8 Abs. 2 S. 11 EStG)</span>
               </div>
-              <p className={`mt-2 text-sm leading-relaxed print:mt-1.5 print:text-[10px] print:leading-snug [&_strong]:font-medium ${r.inFreigrenze ? 'text-ui-tinte' : 'text-rose-900'}`}>
+              <p className="mt-2 text-sm leading-relaxed text-ui-tinte print:mt-1.5 print:text-[10px] print:leading-snug [&_strong]:font-medium">
                 {r.inFreigrenze
                   ? <>In der Freigrenze: keine Lohnsteuer, keine Sozialabgaben — weder für Sie noch für den Mitarbeiter.
                     {r.freigrenzeRestMonat > 0.005 && <> Noch {euroGenau(r.freigrenzeRestMonat)} frei für andere Sachbezüge.</>}</>
-                  : <>Als Sachbezug wäre der <strong>gesamte</strong> Betrag steuer- und beitragspflichtig, auch die
-                    anderen Sachbezüge. Unten stehen die Wege, die stattdessen bleiben.</>}
+                  : <>Über der Freigrenze: Als reiner Sachbezug wäre der <strong>gesamte</strong> Betrag steuer- und
+                    beitragspflichtig. Gerechnet ist deshalb mit dem Weg <strong>{aktiv.titel}</strong>: {aktiv.kurz}.</>}
               </p>
+              {!r.inFreigrenze && !wegeOffen && (
+                <button type="button" onClick={wegeZeigen} className={`mt-2 ${LINK} text-sm print:hidden`}>
+                  Alle Wege vergleichen <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              )}
             </section>
 
             {/* --- Die Wege im Vergleich — anklickbar --------------------------- */}
-            <section className={`${KARTE} print:break-inside-avoid`}>
-              <h2 className={KARTE_TITEL}>Welcher Weg passt?</h2>
-              <p className={ERKLAERUNG}>
-                Je Mitarbeiter und Monat, für einen Tarif von {euroGenau(beitrag)}.<span className="print:hidden"> Antippen, um einen Weg zu wählen:</span>
-              </p>
-              <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-3 space-y-2 print:mt-2 print:space-y-1">
-                {r.wege.map((w) => (
-                  <WegZeile key={w.id} weg={w} aktiv={w.id === aktiv.id} onWaehlen={() => setWahl(w.id)} />
-                ))}
+            {/*
+              Die Hinweise gehoeren zum Sachbezug — deshalb direkt unter dem
+              Check. Ueber der Freigrenze sagt die Karte selbst, dass der ganze
+              Betrag pflichtig waere; derselbe Hinweis darunter waere doppelt.
+            */}
+            <Hinweiszeilen hinweise={r.inFreigrenze ? r.hinweise : r.hinweise.filter((h) => !h.includes('GESAMTE'))} />
+
+            {/*
+              EINKLAPPBAR, zu als Vorgabe: Sechs Wege mit je drei Zahlen sind
+              das Handwerk des Beraters. Zugeklappt nennt die Karte den
+              gewaehlten Weg; ein Tipp zeigt alle. Der Titel sitzt im Knopf
+              (`druck-kopf`), der Inhalt steht im Druck immer offen
+              (`druck-inhalt`).
+
+              IM DRUCK beginnt hier Seite 2: Seite 1 traegt, was den
+              Arbeitgeber ueberzeugt — Vorteile, Kosten, Sachbezug-Check —,
+              Seite 2 das Handwerk: Wege, Gehaltsvergleich, Umsetzung. Wege,
+              die nicht gehen, stehen nicht im Ausdruck; so bleibt es bei zwei
+              Seiten.
+            */}
+            <section ref={wegeRef} className={`${KARTE} scroll-mt-4 print:break-before-page print:break-inside-avoid`}>
+              {/* Der Knopf reicht 8 px in den Rand der Karte (Flaeche zum Treffen) — der Titel traegt den Versatz, damit der Knopf in ihm bleibt. */}
+              <h2 className={`${KARTE_TITEL} -m-2 print:m-0`}>
+                <button
+                  type="button" onClick={() => setWegeOffen((o) => !o)} aria-expanded={wegeOffen} aria-controls="bkv-wege"
+                  className="druck-kopf flex w-full items-center justify-between gap-3 rounded-[8px] p-2 text-left hover:bg-ui-hover print:p-0"
+                >
+                  <span>Welcher Weg passt?</span>
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-ui-schiefer transition-transform print:hidden ${wegeOffen ? 'rotate-180' : ''}`} aria-hidden />
+                </button>
+              </h2>
+              {!wegeOffen && (
+                <p className={`${ERKLAERUNG} print:hidden`}>
+                  Gewählt: <span className="font-medium text-ui-tinte">{aktiv.titel}</span> — kostet Sie
+                  netto {euro(ag.nettoKostenMonat)}, Vorteil beim Mitarbeiter {euro(ma.vorteilMonat)}. Aufklappen, um
+                  alle Wege zu vergleichen.
+                </p>
+              )}
+              <div id="bkv-wege" className={`druck-inhalt ${wegeOffen ? 'block' : 'hidden'}`}>
+                <p className={ERKLAERUNG}>
+                  Je Mitarbeiter und Monat, für einen Tarif von {euroGenau(beitrag)}.<span className="print:hidden"> Antippen, um einen Weg zu wählen:</span>
+                </p>
+                <div role="radiogroup" aria-label="Weg der Finanzierung" className="mt-3 space-y-2 print:mt-2 print:space-y-1">
+                  {r.wege.map((w) => (
+                    <WegZeile key={w.id} weg={w} aktiv={w.id === aktiv.id} onWaehlen={() => setWahl(w.id)} />
+                  ))}
+                </div>
+                <p className={FUSSNOTE}>
+                  „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
+                  {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt'
+                    : r.vorauswahl === 'aufteilen' ? 'die Freigrenze am besten nutzt'
+                    : 'bei dem je Euro Ihrer Kosten am meisten beim Mitarbeiter ankommt'}.</>}
+                </p>
               </div>
-              <p className={FUSSNOTE}>
-                „Vorteil“ ist, was dem Mitarbeiter netto bleibt: der Schutz abzüglich Eigenanteil, Steuer und Abgaben.
-                {wahl === null && <> Vorausgewählt ist der Weg, der {r.inFreigrenze ? 'ohne Steuer und Abgaben auskommt'
-                  : r.vorauswahl === 'aufteilen' ? 'die Freigrenze am besten nutzt'
-                  : 'bei dem je Euro Ihrer Kosten am meisten beim Mitarbeiter ankommt'}.</>}
-              </p>
             </section>
 
-            <Hinweiszeilen hinweise={r.hinweise} />
-
             {/* --- Vergleich mit einer Gehaltserhoehung ------------------------ */}
-            {/* Im Druck beginnt hier Seite 2: Seite 1 traegt Kacheln, Check und Wege. */}
             {g ? (
-              <section className={`${KARTE} print:break-before-page print:break-inside-avoid`}>
+              <section className={`${KARTE} print:break-inside-avoid`}>
                 <h2 className={KARTE_TITEL}>{aktiv.titel} — und als Gehaltserhöhung?</h2>
                 <p className={ERKLAERUNG}>
                   Damit beim Mitarbeiter netto derselbe Vorteil ankommt, im Monat:
@@ -410,7 +521,7 @@ export function Seite() {
                 </div>
               </section>
             ) : aktiv.id === 'arbeitnehmer' && (
-              <section className={`${KARTE} text-sm leading-relaxed text-ui-tinte print:break-before-page print:text-[10px] print:leading-snug`}>
+              <section className={`${KARTE} text-sm leading-relaxed text-ui-tinte print:break-inside-avoid print:text-[10px] print:leading-snug`}>
                 <h2 className={KARTE_TITEL}>Mitarbeiter zahlt selbst</h2>
                 <p className="mt-3 print:mt-1">
                   Sie schließen den Gruppenvertrag ab, der Mitarbeiter zahlt {euroGenau(beitrag)} im Monat aus dem
@@ -423,42 +534,6 @@ export function Seite() {
 
 
             <div className="space-y-4 print:space-y-2">
-              <p className="ui-titel hidden text-lg text-ui-tinte print:block">Vorteile und Umsetzung</p>
-
-              {/* Wie „Gut zu wissen“ in der Beratung: Punkte mit Gedankenstrich, ohne gruene und blaue Kaesten. */}
-              <section className="grid gap-3 sm:grid-cols-2 print:grid-cols-2 print:gap-2">
-                <div className={KARTE}>
-                  <h2 className={KARTE_TITEL}>Was Sie davon haben</h2>
-                  <Punkte klasse="mt-3 print:mt-1">
-                    <li><strong>Bindung:</strong> ein Benefit, den Mitarbeiter im Alltag spüren — beim Zahnarzt, beim
-                      Optiker, beim Facharzt. Wer kündigt, verliert ihn.</li>
-                    <li><strong>Arbeitgebermarke:</strong> in Stellenanzeigen sichtbar und ein Argument gegenüber
-                      Bewerbern, das Wettbewerber oft nicht bieten.</li>
-                    <li><strong>Gesundheit:</strong> Vorsorge und schnellere Facharzttermine können Ausfallzeiten
-                      verkürzen.</li>
-                    <li><strong>Günstig:</strong> in der Freigrenze keine Lohnnebenkosten, die Beiträge sind
-                      Betriebsausgabe.</li>
-                    <li><strong>Planbar:</strong> ein fester Beitrag je Mitarbeiter, die Leistungen wickelt der
-                      Versicherer direkt mit dem Mitarbeiter ab.</li>
-                  </Punkte>
-                </div>
-                <div className={KARTE}>
-                  <h2 className={KARTE_TITEL}>Was Ihre Mitarbeiter davon haben</h2>
-                  <Punkte klasse="mt-3 print:mt-1">
-                    <li><strong>Ohne Gesundheitsprüfung</strong> und meist ohne Wartezeiten — oft sind auch laufende
-                      Behandlungen und bestehende Erkrankungen mitversichert.</li>
-                    <li><strong>Budgettarif:</strong> ein Jahresbudget für Zahnreinigung, Brille, Vorsorge oder
-                      Heilpraktiker, frei aufteilbar.</li>
-                    <li><strong>Bausteine</strong> wie Zahnersatz, Krankenhaus mit Ein- oder Zweibettzimmer und
-                      Chefarzt.</li>
-                    <li><strong>Angehörige</strong> können oft zu Sonderkonditionen mitversichert werden, auf eigene
-                      Kosten.</li>
-                    <li>Beim Ausscheiden meist <strong>privat weiterführbar</strong>, ohne neue Gesundheitsprüfung.</li>
-                  </Punkte>
-                  <p className="mt-2 text-xs text-ui-schiefer print:mt-1 print:text-[8px]">Leistungen je nach Tarif und Versicherer.</p>
-                </div>
-              </section>
-
               <section className="grid gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
                 <div className={`${KARTE} sm:col-span-2 print:col-span-2 print:break-inside-avoid`}>
                   <h2 className={KARTE_TITEL}>Umsetzung: {aktiv.titel}</h2>
@@ -509,6 +584,29 @@ export function Seite() {
   );
 }
 
+/** Ein Vorteil fuer den Arbeitgeber: Zeichen, ein Schlagwort, ein Satz — gross genug, um im Gespraech zu tragen. */
+function Vorteil({ symbol: Zeichen, titel, text }: { symbol: LucideIcon; titel: string; text: string }) {
+  return (
+    <div className={`${KARTE} print:break-inside-avoid`}>
+      <span aria-hidden className="ui-innen flex h-11 w-11 items-center justify-center rounded-full print:hidden">
+        <Zeichen className="h-5 w-5 text-ui-tinte" />
+      </span>
+      <h3 className="mt-4 text-lg font-medium leading-snug tracking-[-0.01em] text-ui-tinte print:mt-0 print:text-xs">{titel}</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-ui-schiefer print:mt-0.5 print:text-[10px] print:leading-snug">{text}</p>
+    </div>
+  );
+}
+
+/** Ein Punkt mit Haken — was der Mitarbeiter bekommt. */
+function Haken({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-2">
+      <Check className="mt-1 h-4 w-4 shrink-0 text-ui-schiefer print:mt-0.5 print:h-2.5 print:w-2.5" aria-hidden />
+      <span>{children}</span>
+    </li>
+  );
+}
+
 /** Eine Zeile im Wege-Vergleich: Radio-Knopf mit den drei Zahlen, die zaehlen. */
 function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; onWaehlen: () => void }) {
   return (
@@ -517,8 +615,9 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
       // druck-kopf: Knoepfe verschwinden sonst im Druck — hier traegt der
       // Knopf den Vergleich selbst.
       // Gewaehlt wie die Wahl in der Beratung: Rand und Punkt in Tinte, auf der Innenflaeche — ohne Blau.
+      // Ein Weg, der nicht geht, steht nicht im Ausdruck — am Bildschirm sagt er, warum.
       className={`druck-kopf flex w-full flex-col gap-1.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors sm:flex-row sm:items-center sm:gap-3 print:flex-row print:items-center print:gap-2 print:px-2 print:py-1 ${
-        !w.moeglich ? 'cursor-not-allowed border-ui-linie bg-ui-innen text-ui-schiefer'
+        !w.moeglich ? 'cursor-not-allowed border-ui-linie bg-ui-innen text-ui-schiefer print:!hidden'
         : aktiv ? 'border-ui-tinte bg-ui-innen ring-1 ring-ui-tinte'
         : 'border-ui-linie bg-ui-karte hover:border-ui-feld-rand hover:bg-ui-hover'
       }`}
@@ -531,9 +630,7 @@ function WegZeile({ weg: w, aktiv, onWaehlen }: { weg: BkvWeg; aktiv: boolean; o
           <span className={`block text-sm font-medium print:text-xs ${w.moeglich ? 'text-ui-tinte' : ''}`}>{w.titel}</span>
           <span className="block text-xs leading-snug text-ui-schiefer print:text-[9px]">{w.kurz}</span>
           {w.grund && (
-            <span className={`block text-xs leading-snug print:text-[9px] ${
-              w.moeglich ? 'text-ui-tinte' : w.id === 'sachbezug' ? 'text-rose-700' : 'text-ui-schiefer'
-            }`}>
+            <span className={`block text-xs leading-snug print:text-[9px] ${w.moeglich ? 'text-ui-tinte' : 'text-ui-schiefer'}`}>
               {w.grund}
             </span>
           )}
