@@ -1633,7 +1633,7 @@ export default function App() {
               {fehltKarte}
             </div>
             {ergebnis
-              ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
+              ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} kaufkraftHeute={kaufkraftHeute} />
               : !angabenFehlen && <Stuecke kennung="sparen" beschriftung="Stücke des Sparrechners" stuecke={wartet} />}
           </>
         )}

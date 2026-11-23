@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
+import { AkkordeonKarte, ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
 import { Hervor, Karte, Kernsatz, Posten, Regler, SCHWEBEND } from '../components/stil';
@@ -21,13 +21,20 @@ import { Stuecke, type Stueck } from '../components/Ablauf';
  * Beitragsdynamik, weil ein Vertrag mit 3 % Steigerung heute deutlich
  * weniger kostet als einer ohne.
  *
- * In vier Stuecken (`components/Ablauf`): was die Luecke kostet (mit den
- * Annahmen darunter), was die Beitragsdynamik aendert, was Warten kostet —
- * und zuletzt die Frage, mit der es in die Loesungen geht: Was willst du
- * zuruecklegen, und wie viel der Luecke schliesst das?
+ * In drei Stuecken (`components/Ablauf`): was die Luecke kostet (mit den
+ * Annahmen darunter und, zum Aufklappen, was die Beitragsdynamik aendert),
+ * was Warten kostet — und zuletzt die Frage, mit der es in die Loesungen
+ * geht: Was willst du zuruecklegen, und wie viel der Luecke schliesst das?
  */
-export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
+export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHeute = true }: {
   zeile: Jahreszeile;
+  /**
+   * In welchem Geld die LUECKE steht — derselbe Schalter wie im Ergebnis und
+   * in der Fussleiste. Sonst stuenden auf einem Bildschirm zwei Luecken: hier
+   * die des Rentenjahres, unten die in heutiger Kaufkraft. Kapital und
+   * Beitraege sind davon unberuehrt: Sie sind Geld ihres Jahres.
+   */
+  kaufkraftHeute?: boolean;
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Startbeitrag */
   nettoHeute?: number;
   /** Meldet den noetigen Startbeitrag — der Titel der Etappe nennt ihn, die Loesungen koennen ihn uebernehmen */
@@ -37,6 +44,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
   const t = useAnsprache();
   const schmal = useSchmal();
   const [eingaben, setEingaben] = useState<SparzielEingaben>(SPARZIEL_VORGABE);
+  const [dynamikOffen, setDynamikOffen] = useState(false);
 
   const r = useMemo(
     () => sparzielRechnen(szenario, zeile, eingaben),
@@ -85,10 +93,10 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
   const gewaehlt = (dynamik: number) => Math.abs(dynamik - eingaben.dynamik) < 1e-9;
 
   /*
-    DREI STUECKE, EINS NACH DEM ANDEREN. Zuerst die Rechnung als das eine
-    schwebende Stueck — Luecke, Kapital, Startbeitrag —, darunter die
-    Annahmen zum Verstellen. Dann die Beitragsdynamik und am Ende der
-    Kernsatz, was Warten kostet. Die Annahmen gelten fuer alle drei.
+    EINS NACH DEM ANDEREN. Zuerst die Rechnung als das eine schwebende
+    Stueck — Luecke, Kapital, Startbeitrag —, darunter die Annahmen zum
+    Verstellen und zugeklappt die Beitragsdynamik. Dann der Kernsatz, was
+    Warten kostet, zuletzt der eigene Beitrag. Die Annahmen gelten fuer alle.
   */
   // Die staerkste Dynamik der Tabelle — sie zeigt am deutlichsten, wie weit der Einstieg sinkt.
   const steilste = r.varianten.reduce((a, v) => (v.dynamik > a.dynamik ? v : a), r.varianten[0]!);
@@ -101,11 +109,19 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
         <div className="flex flex-col gap-5 sm:gap-6">
           <section aria-label="Was die Lücke kostet" className={`${SCHWEBEND} p-5 sm:p-7`}>
             <dl className="grid gap-5 sm:grid-cols-3">
-              <Kachel
-                titel={`Lücke im Jahr ${zeile.jahr}`}
-                wert={euro(r.luecke)}
-                hinweis={`in heutigem Geld ${euro(r.lueckeHeute)}`}
-              />
+              {kaufkraftHeute ? (
+                <Kachel
+                  titel="Lücke im Monat"
+                  wert={euro(r.lueckeHeute)}
+                  hinweis={`in heutiger Kaufkraft — im Jahr ${zeile.jahr} sind das ${euro(r.luecke)}`}
+                />
+              ) : (
+                <Kachel
+                  titel={`Lücke im Jahr ${zeile.jahr}`}
+                  wert={euro(r.luecke)}
+                  hinweis={`in heutigem Geld ${euro(r.lueckeHeute)}`}
+                />
+              )}
               <Kachel
                 titel="Dafür nötiges Kapital"
                 wert={euro(r.zielkapital)}
@@ -157,63 +173,68 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
               Größenordnung, kein Produkt.
             </p>
           </Karte>
-        </div>
-      ),
-    },
-    {
-      id: 'dynamik',
-      titel: 'Mit Beitragsdynamik',
-      ergebnis: steilste.dynamik > 0
-        ? `Mit ${prozent(steilste.dynamik)} Dynamik ${euro(steilste.startbeitrag)} zum Start`
-        : undefined,
-      /*
-        Die Dynamik ist der eigentliche Punkt: sie senkt den Einstieg
-        und hebt das Ende. Eine Tabelle zeigt das in einem Blick, ein
-        einzelner Wert nicht.
-      */
-      inhalt: (
-        <Karte titel="Mit Beitragsdynamik">
-          {schmal ? (
-            <div className="space-y-2">
-              {r.varianten.map((v) => (
-                <Karteikarte
-                  key={v.dynamik}
-                  titel={v.dynamik === 0 ? 'Gleichbleibender Beitrag' : `${prozent(v.dynamik)} Beitragsdynamik`}
-                  hervor={gewaehlt(v.dynamik)}
-                  zeilen={[
-                    ['Start heute', euro(v.startbeitrag)],
-                    ['Im letzten Sparjahr', euro(v.endbeitrag)],
-                    ['Summe aller Beiträge', euro(v.summeBeitraege)],
-                  ]}
-                />
-              ))}
-            </div>
-          ) : (
-            <ScrollBereich name="Tabelle: Beitragsdynamik im Vergleich">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
-                    <th className="py-2 pr-3 font-medium">Beitragsdynamik</th>
-                    <th className="py-2 pr-3 text-right font-medium">Start heute</th>
-                    <th className="py-2 pr-3 text-right font-medium">Im letzten Jahr</th>
-                    <th className="py-2 text-right font-medium">Summe aller Beiträge</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Die gewaehlte Zeile in der Innenflaeche — hervorgehoben durch Flaeche und Gewicht, nicht durch Farbe. */}
-                  {r.varianten.map((v) => (
-                    <tr key={v.dynamik} className={`border-b border-ui-linie ${gewaehlt(v.dynamik) ? 'bg-ui-innen font-medium' : ''}`}>
-                      <td className="py-2 pr-3 text-ui-tinte">{prozent(v.dynamik)}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-ui-tinte">{euro(v.startbeitrag)}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums text-ui-schiefer">{euro(v.endbeitrag)}</td>
-                      <td className="py-2 text-right tabular-nums text-ui-schiefer">{euro(v.summeBeitraege)}</td>
+
+          {/*
+            MIT BEITRAGSDYNAMIK — zum Aufklappen, zu als Vorgabe. War ein
+            eigenes Stueck des Wegs; ein steigender Beitrag ist aber nicht fuer
+            jeden ein Thema, und wer ihn nicht braucht, musste trotzdem daran
+            vorbei. Zugeklappt nennt die Kopfzeile, wie weit der Einstieg sinkt.
+          */}
+          <AkkordeonKarte
+            titel="Mit Beitragsdynamik"
+            offen={dynamikOffen}
+            onUmschalten={() => setDynamikOffen((x) => !x)}
+            kopfzeile={steilste.dynamik > 0 && !dynamikOffen ? (
+              <span className="hidden text-sm text-ui-schiefer sm:inline">
+                mit {prozent(steilste.dynamik)} Dynamik {euro(steilste.startbeitrag)} zum Start
+              </span>
+            ) : undefined}
+          >
+            <p className="mb-4 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
+              Steigt der Beitrag jedes Jahr, beginnt er niedriger und endet höher.
+            </p>
+            {schmal ? (
+              <div className="space-y-2">
+                {r.varianten.map((v) => (
+                  <Karteikarte
+                    key={v.dynamik}
+                    titel={v.dynamik === 0 ? 'Gleichbleibender Beitrag' : `${prozent(v.dynamik)} Beitragsdynamik`}
+                    hervor={gewaehlt(v.dynamik)}
+                    zeilen={[
+                      ['Start heute', euro(v.startbeitrag)],
+                      ['Im letzten Sparjahr', euro(v.endbeitrag)],
+                      ['Summe aller Beiträge', euro(v.summeBeitraege)],
+                    ]}
+                  />
+                ))}
+              </div>
+            ) : (
+              <ScrollBereich name="Tabelle: Beitragsdynamik im Vergleich">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-ui-linie text-left text-xs text-ui-schiefer">
+                      <th className="py-2 pr-3 font-medium">Beitragsdynamik</th>
+                      <th className="py-2 pr-3 text-right font-medium">Start heute</th>
+                      <th className="py-2 pr-3 text-right font-medium">Im letzten Jahr</th>
+                      <th className="py-2 text-right font-medium">Summe aller Beiträge</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollBereich>
-          )}
-        </Karte>
+                  </thead>
+                  <tbody>
+                    {/* Die gewaehlte Zeile in der Innenflaeche — hervorgehoben durch Flaeche und Gewicht, nicht durch Farbe. */}
+                    {r.varianten.map((v) => (
+                      <tr key={v.dynamik} className={`border-b border-ui-linie ${gewaehlt(v.dynamik) ? 'bg-ui-innen font-medium' : ''}`}>
+                        <td className="py-2 pr-3 text-ui-tinte">{prozent(v.dynamik)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ui-tinte">{euro(v.startbeitrag)}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-ui-schiefer">{euro(v.endbeitrag)}</td>
+                        <td className="py-2 text-right tabular-nums text-ui-schiefer">{euro(v.summeBeitraege)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollBereich>
+            )}
+          </AkkordeonKarte>
+        </div>
       ),
     },
     /*
@@ -348,8 +369,17 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0 }: {
             <div className="h-full rounded-full bg-ui-tinte transition-all duration-500" style={{ width: `${w.anteil * 100}%` }} />
           </div>
           <dl className="mt-3 text-sm">
-            <Posten text={`Davon geschlossen, im Jahr ${zeile.jahr}`} wert={`${euro(w.gedecktMonat)} im Monat`} />
-            <Posten text="Bleibt offen" wert={`${euro(w.restMonat)} im Monat`} />
+            {kaufkraftHeute ? (
+              <>
+                <Posten text="Davon geschlossen, in heutiger Kaufkraft" wert={`${euro(w.gedecktHeute)} im Monat`} />
+                <Posten text="Bleibt offen" wert={`${euro(w.restMonat / zeile.kaufkraftfaktor)} im Monat`} />
+              </>
+            ) : (
+              <>
+                <Posten text={`Davon geschlossen, im Jahr ${zeile.jahr}`} wert={`${euro(w.gedecktMonat)} im Monat`} />
+                <Posten text="Bleibt offen" wert={`${euro(w.restMonat)} im Monat`} />
+              </>
+            )}
             {anteilAmNetto(wunsch, nettoHeute) && (
               <Posten text={`Anteil an ${t.dein('em')} heutigen Netto`} wert={anteilAmNetto(wunsch, nettoHeute)} />
             )}
