@@ -1,0 +1,3 @@
+# Gerenderte Filme und Standbilder gehoeren nicht ins Repo — sie entstehen aus index.html (siehe rendern.mjs).
+*.mp4
+standbilder/
