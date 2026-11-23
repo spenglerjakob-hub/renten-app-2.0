@@ -68,7 +68,7 @@ export function FallFortschritt({ schritte, onSprung }: {
               {x.erledigt ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-ui-linie bg-ui-innen px-2 py-0.5 text-xs font-medium text-ui-tinte">
                   <Check className="h-3 w-3" aria-hidden />
-                  <span>{x.text}{x.mitStandard && <span className="font-normal text-ui-schiefer"> · mit Standardwerten</span>}</span>
+                  <span>{x.text}</span>
                   <span className="sr-only"> — erledigt</span>
                 </span>
               ) : (

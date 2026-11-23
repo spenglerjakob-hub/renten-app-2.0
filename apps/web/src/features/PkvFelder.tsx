@@ -78,7 +78,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
           onChange={(n) => setze({ praemieMonat: n })}
           einheit="€"
           vorbelegt={vorbelegt}
-          hilfe={pkv.bet.aktiv
+          info={pkv.bet.aktiv
             ? `Alles zusammen, wie auf ${t.dein('er')} Rechnung — Kranken-, Pflege- und Entlastungstarif.`
             : `Kranken- und Pflegeversicherung zusammen, wie ${t.w('du ihn heute zahlst', undefined, 'Sie ihn heute zahlen')}.`}
         />
@@ -89,14 +89,14 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
               wert={pkv.steigerung}
               onChange={(n) => setze({ steigerung: n })}
               max={15}
-              hilfe="Bis 64. Historisch lagen PKV-Beiträge über der allgemeinen Inflation."
+              info="Gilt bis 64. Historisch lagen PKV-Beiträge über der allgemeinen Inflation."
             />
             <ProzentFeld
               label={`Steigerung ab ${DAEMPFUNG_AB_ALTER}`}
               wert={pkv.steigerungAb65}
               onChange={(n) => setze({ steigerungAb65: n })}
               max={15}
-              hilfe={`Gedämpft: ab ${DAEMPFUNG_AB_ALTER} finanzieren die angesparten Mittel die Erhöhungen mit (§ 150 Abs. 3 VAG).`}
+              info={`Gedämpft: ab ${DAEMPFUNG_AB_ALTER} finanzieren die angesparten Mittel die Erhöhungen mit (§ 150 Abs. 3 VAG).`}
             />
           </>
         )}
@@ -114,12 +114,12 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
           label={`Der gesetzliche Zuschlag von ${Math.round(ZUSCHLAG_QUOTE * 100)} % steckt im Beitrag`}
           wert={pkv.zuschlagEnthalten}
           onChange={(b) => setze({ zuschlagEnthalten: b })}
+          info={<>
+            Er wird bis zum Kalenderjahr {t.dein('es')} {ZUSCHLAG_BIS_ALTER}. Geburtstags erhoben und entfällt
+            danach (§ 149 VAG) — der Beitrag sinkt dann einmalig um gut 9 %. Wer die Grenze schon
+            überschritten hat, lässt den Haken weg.
+          </>}
         />
-        <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-          Er wird bis zum Kalenderjahr {t.dein('es')} {ZUSCHLAG_BIS_ALTER}. Geburtstags erhoben und entfällt
-          danach (§ 149 VAG) — der Beitrag sinkt dann einmalig um gut 9 %. Wer die Grenze schon
-          überschritten hat, lässt den Haken weg.
-        </p>
       </div>
       )}
 
@@ -143,14 +143,14 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
                 wert={pkv.bet.beitragMonat}
                 onChange={(n) => setzeBet({ beitragMonat: n })}
                 einheit="€"
-                hilfe="Welcher Teil des Gesamtbeitrags oben darauf entfällt."
+                info="Welcher Teil des Gesamtbeitrags oben auf den Entlastungstarif entfällt."
               />
               <ZahlFeld
                 label="Entlastung monatlich"
                 wert={pkv.bet.entlastungMonat}
                 onChange={(n) => setzeBet({ entlastungMonat: n })}
                 einheit="€"
-                hilfe="Fester Betrag, er wächst nicht mit."
+                info="Um diesen festen Betrag sinkt der Beitrag ab dem genannten Alter. Er wächst nicht mit."
               />
               <ZahlFeld
                 label="Ab Alter"
@@ -171,7 +171,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
                 onChange={(n) => setzeBet({ beginnJahr: n })}
                 min={1900}
                 max={new Date().getFullYear()}
-                hilfe="Abschlussjahr — sonst zählt die Rechnung nur ab heute."
+                info="Das Abschlussjahr — sonst zählt die Rechnung die Beiträge erst ab heute."
               />
               {/*
                 Der Beitrag endet dort meist NICHT. Bei der AXA sinkt er auf
@@ -184,7 +184,7 @@ export function PkvFelder({ wert, onChange, titel, einfach = false, vorbelegt }:
                 onChange={(n) => setzeBet({ beitragImRuhestand: n })}
                 max={100}
                 stellen={0}
-                hilfe="Anteil, der ab diesem Alter weiterläuft. 0 % für Tarife, die dann beitragsfrei sind."
+                info="Der Anteil des Beitrags, der ab diesem Alter weiterläuft. 0 % für Tarife, die dann beitragsfrei sind."
               />
             </div>
             {pkv.bet.beitragMonat > pkv.praemieMonat && (

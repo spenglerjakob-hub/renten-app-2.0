@@ -2,7 +2,7 @@ import {
   BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, durchschnittlicherZusatzbeitrag,
   type ProjektionsErgebnis,
 } from '@renten/engine';
-import { ArrowRight, RotateCcw, Target } from 'lucide-react';
+import { RotateCcw, Target } from 'lucide-react';
 import { Posten } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 import { useSzenario, regelaltersgrenzeText } from '../store/szenario';
@@ -11,10 +11,10 @@ import { PkvFelder } from './PkvFelder';
 import { KvdrHinweis } from './KvdrHinweis';
 import { EinkommenFelder } from './EinkommenFelder';
 import {
-  ZahlFeld, ProzentFeld, NamenFelder, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
+  ZahlFeld, ProzentFeld, NamenFelder, DatumFeld, AuswahlFeld, Schalter, Abschnitt, InfoPunkt, euro, prozent,
 } from '../components/Feld';
 import { JA_NEIN, Wahl, Zaehler } from '../components/Frage';
-import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { KinderZeilen, KinderHinweisText } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 import { mitName, namensTeile } from '../lib/namen';
 import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
@@ -45,13 +45,15 @@ const KV_TEXT = {
  */
 export type BasisTeil = 'ziel' | 'haushalt' | 'einkommen' | 'personen';
 
-export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, ohneNamen = false }: {
+export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = false }: {
   ergebnis?: ProjektionsErgebnis | null;
   onEhepartnerDialog?: () => void;
-  /** Nur diesen Teil zeigen, ohne Einklappen — fuer den Assistenten */
+  /**
+   * Nur diesen Teil zeigen, ohne Einklappen — fuer den Assistenten. Ohne
+   * Angabe: das ganze Formular „auf einen Blick“; den Wechsel zum Assistenten
+   * traegt der Umschalter darueber (App), kein zweiter Hinweis hier.
+   */
   teil?: BasisTeil;
-  /** Wechsel in den Assistenten; ohne Angabe fuehrt der Hinweis zum Vorsorge-Check */
-  onAssistent?: () => void;
   /** Ohne Vor- und Nachname — die Vertragspruefung fragt sie in ihrem eigenen Abschnitt ab */
   ohneNamen?: boolean;
 } = {}) {
@@ -100,34 +102,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
 
   return (
     <div className="space-y-4">
-      {/* Wer lieber gefuehrt wird: derselbe Datensatz, Schritt fuer Schritt
-          und mit Hinweis auf die jeweilige Unterlage. */}
-      {/* In der neutralen Innenflaeche wie ein Hinweis — ein Angebot, kein Alarm. */}
-      {teil === undefined && (onAssistent ? (
-        <button
-          type="button"
-          onClick={onAssistent}
-          className="ui-innen flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-left text-sm text-ui-tinte transition-colors hover:bg-ui-linie/40 print:hidden"
-        >
-          <span>
-            <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Assistent fragt alle Angaben
-            einzeln ab und sagt, welche Unterlage {t.du} dafür {t.w('brauchst', 'braucht')}.
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Assistenten <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
-        </button>
-      ) : (
-        <a
-          href="/vorsorge-check"
-          className="ui-innen flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm text-ui-tinte transition-colors hover:bg-ui-linie/40 print:hidden"
-        >
-          <span>
-            <strong className="font-medium">Lieber Schritt für Schritt?</strong> Der Vorsorge-Check fragt alle Angaben
-            einzeln ab und sagt, welche Unterlage {t.du} dafür {t.w('brauchst', 'braucht')}.
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-1 font-medium">Zum Check <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
-        </a>
-      ))}
-
       {/*
         Person B nur zeigen, solange sie auch gerechnet wird. Der Rechenkern
         filtert seit jeher genauso (timeline.ts, projiziere); die Karte blieb
@@ -137,25 +111,23 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
       */}
       {zeige('personen') && s.personen.filter((p) => p.id === 'A' || s.haushalt.verheiratet).map((p) => (
         <Abschnitt key={p.id} titel={personName(p)} einklappbar={einklappbar}>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
             {!ohneNamen && (
               <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
                 onChange={(teile) => setzePerson(p.id, mitName(teile))} />
             )}
             <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
               onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
-              hilfe="Acht Ziffern genügen — die Punkte setzt das Feld."
               vorbelegt={marke(`personen.${p.id}.geburtsdatum`)} />
             <DatumFeld
               label="Rentenbeginn"
               wert={p.rentenbeginn}
               onChange={(v) => setzePerson(p.id, { rentenbeginn: v })}
               vorbelegt={marke(`personen.${p.id}.rentenbeginn`)}
-              hilfe={
-                p.rentenbeginnManuell
-                  ? 'Von Hand gesetzt.'
-                  : `Automatisch: Regelaltersgrenze ${regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.`
-              }
+              info={<>
+                Ergibt sich aus dem Geburtsdatum: die Regelaltersgrenze, {regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.
+                Wer früher oder später in Rente geht, trägt das Datum von Hand ein.
+              </>}
               zusatz={p.rentenbeginnManuell ? (
                 <button
                   type="button"
@@ -182,7 +154,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               <>
                 <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
                   onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
-                  hilfe="Wert aus der Renteninformation: „Höhe Ihrer künftigen Regelaltersrente“."
+                  info={<>Der Betrag aus der Renteninformation der Deutschen Rentenversicherung, dort unter <em>„Höhe Ihrer künftigen Regelaltersrente“</em>.</>}
                   vorbelegt={marke(`personen.${p.id}.grvBruttoHeute`)} />
                 <Rentenschaetzer personId={p.id} />
               </>
@@ -193,7 +165,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                   optionen={BESOLDUNGSGRUPPEN.map((g) => ({ wert: g as string, text: g }))} />
                 <ZahlFeld label="Ruhegehaltssatz" wert={p.ruhegehaltssatz}
                   onChange={(n) => setzePerson(p.id, { ruhegehaltssatz: n })} max={71.75} einheit="%"
-                  hilfe="Maximal 71,75 % (§ 14 BeamtVG)." />
+                  info="Steht in der Versorgungsauskunft. Höchstens 71,75 % (§ 14 BeamtVG)." />
               </>
             )}
           </div>
@@ -215,12 +187,12 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                   ? { kvStatus: s.haushalt.kvStatus }
                   : { kvStatus: undefined, kvErwerb: undefined, zusatzbeitrag: undefined,
                       krankenkasse: undefined, pkv: undefined })}
+                info={<>
+                  Ohne Haken gilt die Angabe des Haushalts: {KV_TEXT[s.haushalt.kvStatus]}. Mit Haken bekommt{' '}
+                  {personName(p)} einen eigenen Status, eine eigene Kasse und einen eigenen Beitrag — etwa bei
+                  Beamtem und Angestellter.
+                </>}
               />
-              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                {p.kvStatus !== undefined
-                  ? 'Eigener Status, eigene Kasse, eigener Beitrag — unabhängig vom Haushalt.'
-                  : `Versichert wie der Haushalt: ${KV_TEXT[s.haushalt.kvStatus]}.`}
-              </p>
 
               {p.kvStatus !== undefined && (
                 <>
@@ -245,7 +217,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                             ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
                             : { krankenkasse: undefined });
                         }}
-                        hilfe={KASSEN_STAND}
+                        info={`${KASSEN_STAND}.`}
                         optionen={[
                           { wert: '', text: 'Wie der Haushalt' },
                           ...KRANKENKASSEN.map((k) => ({
@@ -289,9 +261,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
             }}
             vorbelegt={marke('haushalt.verheiratet')}
-            hilfe={s.haushalt.verheiratet
-              ? 'Gerechnet wird mit dem Splittingtarif.'
-              : 'Mit Ehepartner gilt der Splittingtarif, und der Planer fragt auch dessen Angaben ab.'}
+            info="Mit Ehepartner wird mit dem Splittingtarif gerechnet, und der Planer fragt auch dessen Angaben ab."
           />
         </div>
       )}
@@ -300,14 +270,13 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
           wieder angefasst — offen kostet er jedes Mal eine halbe
           Bildschirmlaenge auf dem Weg zum Einkommen und zum Ziel darunter. */}
       {zeige('haushalt') && <Abschnitt titel="Haushalt" einklappbar={einklappbar}>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-x-3 gap-y-4 sm:grid-cols-2">
           {/* Kurze Beschriftung: Die lange brach um, und das Feld stand tiefer als sein Nachbar. */}
           <AuswahlFeld
             label="Bundesland"
             wert={s.haushalt.bundesland}
             onChange={(v) => setzeHaushalt({ bundesland: v })}
             optionen={laenderOptionen}
-            hilfe="Bestimmt Kirchensteuersatz und Besoldungstabelle."
             vorbelegt={marke('haushalt.bundesland')}
           />
           {/* Neben dem Bundesland: Es bestimmt den Satz (8 oder 9 %), diese Antwort, ob er anfaellt. */}
@@ -328,9 +297,9 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             label="Krankenversicherung im Ruhestand"
             wert={s.haushalt.kvStatus}
             onChange={(v) => setzeHaushalt({ kvStatus: v })}
-            hilfe={selbststaendig
+            info={selbststaendig
               ? undefined
-              : 'Aus der PKV führt praktisch kein Weg zurück — die Erwerbsphase folgt dieser Angabe.'}
+              : 'Gilt auch für die Erwerbsphase: Aus der privaten Krankenversicherung führt praktisch kein Weg zurück in die gesetzliche.'}
             optionen={[
               { wert: 'kvdr', text: 'Gesetzlich pflichtversichert (KVdR)' },
               { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
@@ -350,7 +319,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               label="Krankenversicherung in der Erwerbsphase"
               wert={s.haushalt.kvErwerb}
               onChange={(v) => setzeHaushalt({ kvErwerb: v })}
-              hilfe={`Als Selbstständiger ${t.w('trägst du', 'tragt ihr')} den gesetzlichen Beitrag allein — einen Arbeitgeberanteil gibt es nicht.`}
+              info={`Als Selbstständiger ${t.w('trägst du', 'tragt ihr')} den gesetzlichen Beitrag allein — einen Arbeitgeberanteil gibt es nicht.`}
               optionen={[
                 { wert: 'gesetzlich', text: 'Gesetzlich freiwillig versichert' },
                 { wert: 'pkv', text: 'Privat versichert' },
@@ -374,7 +343,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                   ? { krankenkasse: k.name, zusatzbeitrag: k.zusatzbeitrag }
                   : { krankenkasse: undefined });
               }}
-              hilfe={`${KASSEN_STAND}. Findet sich ${t.dein('e')} Kasse nicht, den Satz unten von Hand eintragen.`}
               optionen={[
                 { wert: '', text: 'Keine Angabe — Satz selbst eintragen' },
                 ...KRANKENKASSEN.map((k) => ({
@@ -410,9 +378,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             })}
             max={10}
             stellen={2}
-            hilfe={s.haushalt.zusatzbeitrag === undefined
-              ? `Gesetzlicher Durchschnitt ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}. ${t.Dein('e')} Kasse weicht davon ab.`
-              : `Zum Vergleich: Der Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}.`}
+            info={`Die Auswahl der Krankenkasse trägt ihren Satz hier ein (${KASSEN_STAND}). Findet sich ${t.dein('e')} Kasse nicht, den Satz von Hand eintragen. Der gesetzliche Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}${s.haushalt.zusatzbeitrag === undefined ? ' — damit ist das Feld vorbelegt' : ''}.`}
             vorbelegt={marke('haushalt.zusatzbeitrag')}
           />
           {/*
@@ -429,7 +395,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             max={15}
             weniger="Ein Kind weniger"
             mehr="Ein Kind mehr"
-            hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag — bis zum 25. Geburtstag des Kindes. Danach steigt er wieder; die Rechnung berücksichtigt das über die Geburtsjahre."
+            info="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag — bis zum 25. Geburtstag des Kindes. Danach steigt er wieder; die Rechnung berücksichtigt das über die Geburtsjahre."
             vorbelegt={marke('haushalt.kinderUnter25')}
           />
         </div>
@@ -447,8 +413,9 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
 
         {s.haushalt.kinder.length > 0 && (
           <div className="ui-innen mt-4 p-3 sm:p-4">
-            <p className="text-xs font-medium text-ui-tinte">
+            <p className="flex items-center text-xs font-medium text-ui-tinte">
               Für die Kinderzulage des Altersvorsorgedepots
+              <InfoPunkt titel="Kinderzulage des Altersvorsorgedepots"><KinderHinweisText a={avdParam} /></InfoPunkt>
             </p>
             <KinderZeilen
               kinder={s.haushalt.kinder}
@@ -456,7 +423,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               a={avdParam}
               jetzt={jetzt}
             />
-            <KinderHinweis a={avdParam} />
           </div>
         )}
         {/*
@@ -465,9 +431,12 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
           verteilt nur den Lohnsteuerabzug uebers Jahr. Weil Berater sie aus
           jedem anderen Rechner kennen, steht hier, warum sie fehlt.
         */}
-        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-          Eine Steuerklasse {t.w('brauchst du', 'braucht ihr')} nicht: Gerechnet wird die Jahressteuer, bei Verheirateten
-          mit Splitting. Die Steuerklasse regelt nur, wie viel Lohnsteuer monatlich einbehalten wird.
+        <p className="mt-3 flex items-center text-xs text-ui-schiefer">
+          Ohne Steuerklasse
+          <InfoPunkt titel="Warum keine Steuerklasse?">
+            Gerechnet wird die Jahressteuer, bei Verheirateten mit Splitting. Die Steuerklasse regelt nur, wie viel
+            Lohnsteuer monatlich einbehalten wird — an der Steuer des Jahres ändert sie nichts.
+          </InfoPunkt>
         </p>
       </Abschnitt>}
 
@@ -495,12 +464,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               label="Einkommen je Partner getrennt erfassen"
               wert={s.einkommenGetrennt}
               onChange={setzeEinkommenGetrennt}
+              info="Mit Haken rechnet der Planer die Sozialabgaben je Person mit eigener Beitragsbemessungsgrenze. Ohne Haken verteilt er den Haushaltsbetrag dafür hälftig auf beide."
             />
-            <p className="mt-1 text-xs text-ui-schiefer">
-              {s.einkommenGetrennt
-                ? 'Die Sozialabgaben werden je Person mit eigener Beitragsbemessungsgrenze gerechnet.'
-                : 'Der Haushaltsbetrag wird für die Sozialabgaben hälftig auf beide verteilt.'}
-            </p>
           </div>
         )}
       </Abschnitt>}
@@ -553,6 +518,11 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                   wert={Math.round(p.zielAnteilHeute ?? s.haushalt.zielNettoHeute / 2)}
                   onChange={(n) => setzeZielAnteil(p.id, n)}
                   einheit="€"
+                  info={<>
+                    An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate, die nötig wäre,
+                    um sie zu schließen. Die beiden Beträge sind <strong>Anteile am gemeinsamen Budget</strong>; in der
+                    Einzelbetrachtung gilt jeder unverändert als Ziel der jeweiligen Person.
+                  </>}
                   vorbelegt={marke('haushalt.zielNettoHeute')}
                 />
               ))}
@@ -569,6 +539,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             onChange={(n) => setzeHaushalt({ zielNettoHeute: n })}
             einheit="€"
             gross
+            info="Im Monat, in heutiger Kaufkraft — die Preissteigerung bis zum Ruhestand rechnet der Planer selbst hinzu. An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate, die nötig wäre, um sie zu schließen."
             vorbelegt={marke('haushalt.zielNettoHeute')}
           />
         )}
@@ -593,15 +564,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             Faustregel {prozent(FAUSTREGEL_ZIEL, 0)} des heutigen Nettos: {euro(zielVorschlag)} übernehmen
           </button>
         )}
-        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-          An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate,
-          die nötig wäre, um sie zu schließen.
-          {paar && (
-            <> Die beiden Beträge oben sind <strong>Anteile am gemeinsamen Budget</strong>; in
-              der Einzelbetrachtung gilt jeder <strong>unverändert</strong> als Ziel der
-              jeweiligen Person.</>
-          )}
-        </p>
       </section>}
     </div>
   );

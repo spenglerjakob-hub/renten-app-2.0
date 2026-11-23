@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>JS-Rentenplaner — Werbevideo (30 Sekunden)</title>
+<!--
+  WERBEVIDEO, 30 SEKUNDEN, 16:9 (1920 × 1080).
+
+  Eine Buehne, eine Funktion: `zeige(t)` stellt das Bild zur Sekunde t her —
+  ohne Uhr, ohne CSS-Uebergaenge. So laesst sich jedes Einzelbild fuer sich
+  rendern (siehe rendern.mjs) und das Video ist bei jedem Lauf dasselbe.
+  Im Browser geoeffnet laeuft es in Echtzeit; `?t=12.5` zeigt ein Standbild.
+
+  AUFBAU
+     0 –  5 s  Das Problem: Rentenberatung mit Excel, der Kunde versteht nichts.
+     5 – 20 s  Die Loesung in drei Belegen: der Beitrag von heute, was Warten
+               kostet, bAV bis zum einzelnen Mitarbeiter.
+    20 – 27 s  Das Ergebnis: Die Luecke schliesst sich, der Kunde versteht,
+               das Gutachten ist unterschrieben.
+    27 – 30 s  Marke, Kernbotschaft, „Jetzt testen auf js-rentenplaner.de“.
+
+  DIE ZAHLEN sind keine Erfindung: Es ist der Musterfall des Rechners
+  (geboren 1985, 4.000 € brutto, Ziel 2.000 € in heutiger Kaufkraft) —
+  Luecke, Startbeitrag, „Was Warten kostet“ und der Foerdercheck zur
+  Entgeltumwandlung, so wie die App sie ausgibt.
+
+  FARBEN UND SCHRIFT wie in der App (apps/web/src/index.css): Stone Canvas,
+  Tinte, Stein fuer Daten, Cyan als die eine Hervorhebung; Inter und
+  Inter Tight.
+-->
+<style>
+  @font-face { font-family: "Inter Variable"; font-weight: 100 900; font-display: block;
+    src: url("../../apps/web/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2-variations"); }
+  @font-face { font-family: "Inter Tight Variable"; font-weight: 100 900; font-display: block;
+    src: url("../../apps/web/node_modules/@fontsource-variable/inter-tight/files/inter-tight-latin-wght-normal.woff2") format("woff2-variations"); }
+
+  :root {
+    --tinte: #0C0A09; --soot: #1C1917; --flaeche: #FAFAF9; --linie: #E8E6E5; --schiefer: #78716C;
+    --asche: #A8A29E; --stein: #D6D3D1; --cyan: #3BA6F1; --hervor-flaeche: #C1E1F7; --hervor-schrift: #1D6AA8;
+  }
+  html, body { margin: 0; height: 100%; background: #E7E5E4; overflow: hidden; }
+  #rahmen { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #buehne { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--flaeche);
+    font-family: "Inter Variable", system-ui, sans-serif; color: var(--tinte); }
+  .wert, .gross, .balkenwert, .posten b, #e-zahl, #v1-mitte b { font-variant-numeric: tabular-nums; }
+  #buehne * { box-sizing: border-box; }
+  .abs { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+  .titel { font-family: "Inter Tight Variable", "Inter Variable", sans-serif; font-weight: 500; letter-spacing: -0.022em; }
+  .karte { background: #fff; border: 1.5px solid var(--linie); border-radius: 22px; box-shadow: 0 10px 34px rgba(12, 10, 9, 0.06); }
+  .grau { color: var(--schiefer); }
+
+  /* Die Hervorhebung der App: Sky Wash hinter dem Wort, die Schrift in dunklem Cyan. Die Flaeche zieht von links auf. */
+  .hv { position: relative; display: inline-block; white-space: nowrap; margin: 0 0.14em; }
+  .hv > i { position: absolute; inset: 0.04em -0.14em 0.02em -0.14em; background: var(--hervor-flaeche); border-radius: 0.14em; transform-origin: 0 50%; }
+  .hv > b { position: relative; font-weight: inherit; }
+
+  /* ---------- Szene 1: die Tabelle ---------- */
+  #licht { position: absolute; inset: 0; background: radial-gradient(1200px 800px at 82% 8%, #fff 0%, rgba(255,255,255,0) 70%); }
+  #tab { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 62% 0%;
+    font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace; font-size: 19px; color: var(--schiefer); }
+  #tab .fx { position: absolute; left: 0; top: 0; width: 1920px; height: 58px; border-bottom: 1.5px solid var(--stein); background: #F5F5F4;
+    display: flex; align-items: center; padding-left: 22px; gap: 18px; color: var(--tinte); white-space: nowrap; overflow: hidden; }
+  #tab .fx span:first-child { color: var(--asche); font-style: italic; }
+  #tab .kopf { position: absolute; top: 58px; height: 34px; background: #F5F5F4; border-right: 1px solid var(--stein); border-bottom: 1.5px solid var(--stein);
+    display: flex; align-items: center; justify-content: center; color: var(--asche); font-size: 16px; }
+  #tab .zelle { position: absolute; height: 52px; border-right: 1px solid var(--linie); border-bottom: 1px solid var(--linie);
+    display: flex; align-items: center; padding: 0 12px; white-space: nowrap; overflow: hidden; background: rgba(255,255,255,0.55); }
+  #tab .zelle.zahl { justify-content: flex-end; color: #57534E; }
+  #tab .zelle.fehler { background: #FFE4E6; color: #BE123C; border-color: #FDA4AF; font-weight: 600; justify-content: center; }
+  #schleier { position: absolute; inset: 0;
+    background: radial-gradient(1150px 760px at 24% 47%, rgba(250,250,249,0.97) 0%, rgba(250,250,249,0.9) 42%, rgba(250,250,249,0) 78%); }
+  #s1-h { left: 120px; top: 322px; font-size: 124px; line-height: 1.02; }
+  #s1-h div { will-change: transform, opacity; }
+  #s1-chips { left: 124px; top: 628px; display: flex; gap: 14px; }
+  .chip { height: 58px; padding: 0 26px; border-radius: 29px; border: 1.5px solid var(--stein); background: #fff; display: flex; align-items: center;
+    font-size: 27px; font-weight: 500; color: var(--tinte); white-space: nowrap; }
+  #s1-kunde { left: 1160px; top: 600px; width: 640px; }
+  .blase { position: relative; background: #fff; border: 1.5px solid var(--linie); border-radius: 30px; padding: 28px 38px;
+    font-size: 40px; line-height: 1.22; font-weight: 500; box-shadow: 0 22px 60px rgba(12,10,9,0.14); }
+  .blase::after { content: ""; position: absolute; left: 54px; bottom: -13px; width: 24px; height: 24px; background: #fff;
+    border-right: 1.5px solid var(--linie); border-bottom: 1.5px solid var(--linie); transform: rotate(45deg); }
+  .wer { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 24px; color: var(--schiefer); font-weight: 500; }
+  .kopfbild { width: 44px; height: 44px; border-radius: 50%; background: var(--stein); position: relative; overflow: hidden; flex: none; }
+  .kopfbild::before { content: ""; position: absolute; left: 14px; top: 8px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .kopfbild::after { content: ""; position: absolute; left: 6px; top: 28px; width: 32px; height: 28px; border-radius: 50%; background: #fff; }
+
+  /* ---------- Marke ---------- */
+  #marke { display: flex; align-items: center; gap: 40px; transform-origin: 0 0; white-space: nowrap; }
+  #logo { width: 200px; height: 200px; flex: none; overflow: visible; }
+  #logo rect, #logo circle { transform-box: fill-box; }
+  #logo rect { transform-origin: 50% 100%; }
+  #logo circle { transform-origin: 50% 50%; }
+  #wort { font-size: 112px; line-height: 1; }
+  #motto { left: 0; top: 628px; width: 1920px; text-align: center; font-size: 40px; color: var(--schiefer); }
+
+  #fortschritt { left: 1638px; top: 94px; display: flex; gap: 10px; }
+  #fortschritt span { width: 46px; height: 6px; border-radius: 3px; background: var(--stein); overflow: hidden; display: block; }
+  #fortschritt i { display: block; width: 100%; height: 100%; background: var(--tinte); transform-origin: 0 50%; }
+  #fuss { left: 120px; top: 986px; font-size: 22px; color: var(--asche); }
+
+  /* ---------- Die drei Belege: links der Satz, rechts die App ---------- */
+  .links { left: 120px; top: 318px; width: 800px; }
+  .links .nr { font-size: 30px; font-weight: 600; color: var(--asche); letter-spacing: 0.04em; }
+  .links h2 { margin: 18px 0 0; font-size: 80px; line-height: 1.06; }
+  .links h2 div { will-change: transform, opacity; white-space: nowrap; }
+  .links p { margin: 30px 0 0; font-size: 31px; line-height: 1.42; color: var(--schiefer); width: 700px; }
+  .rechts { left: 980px; top: 0; width: 820px; height: 1080px; transform-origin: 50% 50%; }
+  .rechts > div { position: absolute; left: 0; will-change: transform, opacity; }
+  .etikett { font-size: 25px; color: var(--schiefer); display: flex; align-items: center; gap: 12px; }
+  .etikett i { width: 15px; height: 15px; border-radius: 50%; display: block; }
+  .wert { font-size: 64px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; white-space: nowrap; }
+  .wert small { font-size: 29px; font-weight: 500; color: var(--schiefer); letter-spacing: 0; margin-left: 10px; }
+  .kern { display: flex; align-items: center; padding: 0 40px; }
+  .kern .satz { font-size: 50px; line-height: 1.1; white-space: nowrap; }
+
+  /* 1 */
+  #v1-a { top: 196px; width: 820px; height: 350px; }
+  #v1-ring { position: absolute; left: 44px; top: 47px; width: 256px; height: 256px; }
+  #v1-mitte { position: absolute; left: 44px; top: 47px; width: 256px; height: 256px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #v1-mitte b { font-size: 39px; font-weight: 500; letter-spacing: -0.02em; }
+  #v1-mitte span { font-size: 20px; color: var(--schiefer); margin-top: 2px; }
+  #v1-l1 { position: absolute; left: 356px; top: 56px; }
+  #v1-l2 { position: absolute; left: 356px; top: 188px; }
+  #v1-b { top: 576px; width: 820px; height: 286px; padding: 40px 44px; }
+  #v1-b .oben { font-size: 28px; color: var(--schiefer); }
+  #v1-b .gross { font-size: 118px; line-height: 1; margin-top: 22px; white-space: nowrap; }
+  #v1-b .gross small { font-size: 46px; color: var(--schiefer); font-weight: 500; letter-spacing: -0.01em; margin-left: 30px; }
+  #v1-b .unten { font-size: 25px; color: var(--schiefer); margin-top: 22px; }
+
+  /* 2 */
+  #v2-a { top: 196px; width: 820px; height: 500px; }
+  #v2-a .kopfzeile { position: absolute; left: 44px; top: 34px; font-size: 26px; color: var(--schiefer); }
+  #v2-diagramm { position: absolute; left: 0; top: 0; width: 820px; height: 500px; overflow: visible; }
+  .balkenwert { position: absolute; width: 190px; text-align: center; font-size: 37px; font-weight: 500; letter-spacing: -0.02em; white-space: nowrap; }
+  .balkentext { position: absolute; top: 440px; width: 190px; text-align: center; font-size: 24px; color: var(--schiefer); white-space: nowrap; }
+  #v2-b { top: 726px; width: 820px; height: 136px; }
+
+  /* 3 */
+  #v3-a { top: 196px; width: 820px; height: 118px; display: flex; align-items: center; padding: 0 32px; gap: 22px; }
+  .zeichen { width: 62px; height: 62px; border-radius: 50%; background: var(--flaeche); border: 1.5px solid var(--linie); display: flex; align-items: center; justify-content: center; flex: none; }
+  #v3-a .name { font-size: 32px; font-weight: 500; letter-spacing: -0.01em; }
+  #v3-a .zusatz { font-size: 23px; color: var(--schiefer); margin-top: 3px; white-space: nowrap; }
+  .marke-chip { margin-left: auto; height: 46px; padding: 0 20px; border-radius: 23px; background: var(--soot); color: #fff; font-size: 22px; font-weight: 500;
+    display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+  #v3-b { top: 338px; width: 396px; height: 372px; padding: 26px 26px; }
+  #v3-b .mehr { font-size: 20px; color: var(--asche); border-top: 1.5px solid var(--linie); padding-top: 12px; }
+  #v3-b .kopfzeile, #v3-c .kopfzeile { font-size: 22px; color: var(--schiefer); font-weight: 500; }
+  .mensch { display: flex; align-items: center; gap: 12px; height: 64px; border-top: 1.5px solid var(--linie); will-change: transform, opacity; }
+  .mensch:first-of-type { margin-top: 14px; }
+  .mensch .rund { width: 40px; height: 40px; border-radius: 50%; background: var(--flaeche); border: 1.5px solid var(--linie); font-size: 17px; font-weight: 600; color: var(--schiefer);
+    display: flex; align-items: center; justify-content: center; flex: none; }
+  .mensch .wie { font-size: 25px; font-weight: 500; white-space: nowrap; }
+  .stand { margin-left: auto; position: relative; width: 150px; height: 38px; }
+  .stand span { position: absolute; right: 0; top: 0; height: 38px; padding: 0 13px; border-radius: 19px; font-size: 18px; font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .stand .offen { border: 1.5px dashed var(--asche); color: var(--schiefer); }
+  .stand .fertig { background: var(--soot); color: #fff; }
+  .stand .signiert { background: var(--hervor-flaeche); color: var(--hervor-schrift); }
+  #v3-c { top: 338px; left: 420px !important; width: 400px; height: 372px; padding: 26px 26px; }
+  #v3-leiste { position: relative; margin-top: 18px; width: 340px; height: 46px; border-radius: 10px; overflow: hidden; background: var(--flaeche); }
+  #v3-leiste i { position: absolute; top: 0; height: 46px; display: block; transform-origin: 0 50%; }
+  .posten { display: flex; align-items: center; gap: 11px; height: 47px; font-size: 21px; white-space: nowrap; will-change: transform, opacity; }
+  .posten i { width: 13px; height: 13px; border-radius: 4px; display: block; flex: none; }
+  .posten b { margin-left: auto; font-weight: 500; }
+  .posten.summe { border-top: 2px solid var(--tinte); margin-top: 8px; height: 56px; font-weight: 500; font-size: 24px; }
+  #v3-d { top: 734px; width: 820px; height: 128px; }
+  #v3-d .satz { font-size: 45px; }
+  #v3-d { padding: 0 36px; }
+
+  /* ---------- Ergebnis ---------- */
+  #e-text { left: 120px; top: 330px; width: 840px; }
+  #e-text .nr { font-size: 30px; font-weight: 600; color: var(--asche); letter-spacing: 0.04em; }
+  #e-text h2 { margin: 30px 0 0; font-size: 96px; line-height: 1.05; white-space: nowrap; }
+  #e-text p { margin: 34px 0 0; font-size: 34px; color: var(--schiefer); }
+  #e-ring { left: 1090px; top: 260px; width: 500px; height: 500px; transform-origin: 50% 50%; }
+  #e-ring svg { position: absolute; inset: 0; overflow: visible; }
+  #e-mitte { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #e-mitte b { font-size: 98px; line-height: 1; }
+  #e-mitte span { font-size: 27px; color: var(--schiefer); margin-top: 12px; }
+  #e-blase { left: 1296px; top: 84px; width: 560px; }
+  #e-blase .blase { font-size: 34px; padding: 24px 30px; white-space: nowrap; }
+  #e-pdf { left: 1500px; top: 590px; width: 300px; height: 388px; padding: 26px 26px; transform-origin: 50% 50%; box-shadow: 0 26px 70px rgba(12,10,9,0.16); }
+  #e-pdf .kopf { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 600; }
+  #e-pdf .strich { height: 9px; border-radius: 5px; background: var(--linie); margin-top: 13px; }
+  #e-pdf .unterschrift { position: absolute; left: 26px; right: 26px; bottom: 70px; height: 64px; border-bottom: 1.5px solid var(--asche); }
+  #e-pdf .unterschrift svg { position: absolute; left: 0; bottom: 2px; width: 200px; height: 64px; overflow: visible; }
+  #e-siegel { left: 1596px; top: 938px; height: 48px; padding: 0 20px; border-radius: 24px; background: var(--soot); color: #fff; font-size: 22px; font-weight: 500;
+    white-space: nowrap; box-shadow: 0 12px 30px rgba(12,10,9,0.2); }
+  #e-siegel > span { display: flex; align-items: center; gap: 9px; height: 48px; }
+
+  /* ---------- Abschluss ---------- */
+  #cta-satz { left: 0; top: 462px; width: 1920px; text-align: center; font-size: 70px; line-height: 1.2; }
+  #cta-satz div { will-change: transform, opacity; }
+  #cta-knopf { left: 0; top: 760px; width: 1920px; display: flex; justify-content: center; }
+  #cta-knopf span { height: 116px; padding: 0 60px; border-radius: 58px; background: var(--cyan); border: 2px solid #3398E1; color: var(--tinte);
+    font-size: 42px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="rahmen"><div id="buehne">
+  <div id="licht"></div>
+
+  <!-- ================= Szene 1: das Problem ================= -->
+  <div id="s1" class="abs" style="width:1920px;height:1080px">
+    <div id="tab"></div>
+    <div id="schleier"></div>
+    <div id="s1-h" class="abs titel"><div>Rentenberatung</div><div>mit Excel?</div></div>
+    <div id="s1-chips" class="abs">
+      <div class="chip">Steuer</div><div class="chip">Kranken- und Pflegeversicherung</div><div class="chip">Inflation</div>
+    </div>
+    <div id="s1-kunde" class="abs">
+      <div class="blase"><div class="wer"><span class="kopfbild"></span>Ihr Kunde</div>Und was bleibt mir im Alter wirklich?</div>
+    </div>
+  </div>
+
+  <!-- ================= Marke ================= -->
+  <div id="marke" class="abs">
+    <svg id="logo" viewBox="0 0 100 100" fill="none">
+      <rect id="lb1" x="11" y="67" width="18" height="26" rx="4" fill="#D6D3D1"/>
+      <rect id="lb2" x="44" y="51" width="18" height="42" rx="4" fill="#A8A29E"/>
+      <rect id="lb3" x="77" y="37" width="18" height="56" rx="4" fill="#78716C"/>
+      <path id="ll" d="M9 51 L37 35 L57 44 L85 16" stroke="#0C0A09" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle id="lp" cx="85" cy="16" r="9" fill="#3BA6F1"/>
+    </svg>
+    <div id="wort" class="titel">JS-Rentenplaner</div>
+  </div>
+  <div id="motto" class="abs">In Minuten gerechnet. Steuerlich korrekt.</div>
+
+  <div id="fortschritt" class="abs"><span><i></i></span><span><i></i></span><span><i></i></span></div>
+  <div id="fuss" class="abs">Beispielrechnung aus dem JS-Rentenplaner</div>
+
+  <!-- ================= 1: der Beitrag von heute ================= -->
+  <div id="t1" class="abs links">
+    <div class="nr">01</div>
+    <h2 class="titel"><div>Der Beitrag, den Ihr</div><div>Kunde <span class="hv"><i></i><b>heute</b></span> braucht.</div></h2>
+    <p>Die Lücke und was sie kostet — nach Steuer, Kranken- und Pflegeversicherung.</p>
+  </div>
+  <div id="v1" class="abs rechts">
+    <div id="v1-a" class="karte">
+      <svg id="v1-ring" viewBox="0 0 256 256">
+        <circle cx="128" cy="128" r="104" stroke="#D6D3D1" stroke-width="44" fill="none"/>
+        <circle id="v1-bogen" cx="128" cy="128" r="104" stroke="#0C0A09" stroke-width="44" fill="none" transform="rotate(-90 128 128)"/>
+      </svg>
+      <div id="v1-mitte"><b id="v1-ziel">3.347 €</b><span>Ziel im Monat</span></div>
+      <div id="v1-l1"><div class="etikett"><i style="background:#0C0A09"></i>Netto im Ruhestand</div><div class="wert"><span id="v1-netto">1.860 €</span><small>· 56 %</small></div></div>
+      <div id="v1-l2"><div class="etikett"><i style="background:#D6D3D1"></i>Versorgungslücke</div><div class="wert"><span id="v1-luecke">1.487 €</span><small>· 44 %</small></div></div>
+    </div>
+    <div id="v1-b" class="karte">
+      <div class="oben">Um die Lücke zu schließen</div>
+      <div class="gross titel"><span class="hv" id="v1-hv"><i></i><b id="v1-beitrag">437 €</b></span><small>im Monat</small></div>
+      <div class="unten">Startbeitrag heute, 26 Jahre lang</div>
+    </div>
+  </div>
+
+  <!-- ================= 2: was Warten kostet ================= -->
+  <div id="t2" class="abs links">
+    <div class="nr">02</div>
+    <h2 class="titel"><div>Was <span class="hv"><i></i><b>Warten</b></span></div><div>kostet.</div></h2>
+    <p>Dieselbe Lücke, später begonnen: Der Beitrag steigt mit jedem Jahr.</p>
+  </div>
+  <div id="v2" class="abs rechts">
+    <div id="v2-a" class="karte">
+      <div class="kopfzeile">Startbeitrag im Monat für dieselbe Lücke</div>
+      <svg id="v2-diagramm" viewBox="0 0 820 500"></svg>
+      <div id="v2-werte"></div>
+    </div>
+    <div id="v2-b" class="karte kern"><div class="satz titel">Ein Jahr später: <span class="hv" id="v2-hv"><i></i><b>+ 34 €</b></span> im Monat.</div></div>
+  </div>
+
+  <!-- ================= 3: bAV bis zum Mitarbeiter ================= -->
+  <div id="t3" class="abs links">
+    <div class="nr">03</div>
+    <h2 class="titel"><div>bAV für Firmenkunden,</div><div>bis zum <span class="hv"><i></i><b>Mitarbeiter</b></span>.</div></h2>
+    <p>Das Modell für den Arbeitgeber, Beratung und Unterschrift für jeden Einzelnen.</p>
+  </div>
+  <div id="v3" class="abs rechts">
+    <div id="v3-a" class="karte">
+      <span class="zeichen"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0C0A09" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M14 10h5a1 1 0 0 1 1 1v10"/><path d="M2 21h20"/><path d="M8 8h2M8 12h2M8 16h2"/></svg></span>
+      <div><div class="name">Muster GmbH</div><div class="zusatz">42 Mitarbeiter · Zuschuss 15 %</div></div>
+      <span class="marke-chip" id="v3-chip"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Modell gerechnet</span>
+    </div>
+    <div id="v3-b" class="karte">
+      <div class="kopfzeile">Mitarbeiterberatung</div>
+      <div class="mensch"><span class="rund">AB</span><span class="wie">Anna B.</span><span class="stand"><span class="offen">offen</span><span class="fertig">✓ beraten</span><span class="signiert">✓ unterschrieben</span></span></div>
+      <div class="mensch"><span class="rund">TK</span><span class="wie">Tobias K.</span><span class="stand"><span class="offen">offen</span><span class="fertig">✓ beraten</span></span></div>
+      <div class="mensch"><span class="rund">SY</span><span class="wie">Selin Y.</span><span class="stand"><span class="offen">offen</span><span class="fertig">✓ beraten</span></span></div>
+      <div class="mensch"><span class="rund">MW</span><span class="wie">Markus W.</span><span class="stand"><span class="offen">offen</span><span class="fertig">✓ beraten</span></span></div>
+      <div class="mehr" id="v3-mehr">+ 38 weitere</div>
+    </div>
+    <div id="v3-c" class="karte">
+      <div class="kopfzeile">Anna B. · 250 € Umwandlung</div>
+      <div id="v3-leiste"><i id="v3-s1" style="left:0;background:#0C0A09"></i><i id="v3-s2" style="background:#D6D3D1"></i><i id="v3-s3" style="background:#3BA6F1"></i></div>
+      <div style="margin-top:14px">
+        <div class="posten"><i style="background:#0C0A09"></i>Kostet netto<b>136 €</b></div>
+        <div class="posten"><i style="background:#D6D3D1"></i>Der Staat trägt<b>114 €</b></div>
+        <div class="posten"><i style="background:#3BA6F1"></i>Arbeitgeber legt drauf<b>37,50 €</b></div>
+        <div class="posten summe">Im Vertrag<b id="v3-summe">287,50 €</b></div>
+      </div>
+    </div>
+    <div id="v3-d" class="karte kern"><div class="satz titel"><span class="hv" id="v3-hv"><i></i><b>287,50 €</b></span> im Vertrag — für 136 € netto.</div></div>
+  </div>
+
+  <!-- ================= Das Ergebnis ================= -->
+  <div id="e-text" class="abs">
+    <div class="nr">DAS ERGEBNIS</div>
+    <h2 class="titel"><div>Überzeugte Kunden.</div><div>Souveräne Berater.</div></h2>
+    <p>Klar erklärt. Sauber dokumentiert.</p>
+  </div>
+  <div id="e-ring" class="abs">
+    <svg viewBox="0 0 500 500">
+      <circle id="e-puls" cx="250" cy="250" r="196" stroke="#3BA6F1" stroke-width="10" fill="none"/>
+      <circle cx="250" cy="250" r="196" stroke="#D6D3D1" stroke-width="72" fill="none"/>
+      <circle id="e-neu" cx="250" cy="250" r="196" stroke="#3BA6F1" stroke-width="72" fill="none" transform="rotate(111.6 250 250)"/>
+      <circle id="e-alt" cx="250" cy="250" r="196" stroke="#0C0A09" stroke-width="72" fill="none" transform="rotate(-90 250 250)"/>
+    </svg>
+    <div id="e-mitte"><b class="titel" id="e-zahl">56 %</b><span>des Ziels gedeckt</span></div>
+  </div>
+  <div id="e-blase" class="abs">
+    <div class="blase"><div class="wer"><span class="kopfbild"></span>Ihr Kunde</div>Jetzt verstehe ich meine Rente.</div>
+  </div>
+  <div id="e-pdf" class="abs karte">
+    <div class="kopf">
+      <svg width="34" height="34" viewBox="0 0 100 100" fill="none"><rect x="11" y="67" width="18" height="26" rx="4" fill="#D6D3D1"/><rect x="44" y="51" width="18" height="42" rx="4" fill="#A8A29E"/><rect x="77" y="37" width="18" height="56" rx="4" fill="#78716C"/><path d="M9 51 L37 35 L57 44 L85 16" stroke="#0C0A09" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="85" cy="16" r="9" fill="#3BA6F1"/></svg>
+      Gutachten
+    </div>
+    <div class="strich" style="width:86%;margin-top:22px"></div><div class="strich" style="width:64%"></div>
+    <svg width="248" height="96" viewBox="0 0 248 96" style="margin-top:18px">
+      <circle cx="48" cy="48" r="34" stroke="#D6D3D1" stroke-width="15" fill="none"/>
+      <circle cx="48" cy="48" r="34" stroke="#0C0A09" stroke-width="15" fill="none" stroke-dasharray="119.6 213.6" transform="rotate(-90 48 48)"/>
+      <circle cx="48" cy="48" r="34" stroke="#3BA6F1" stroke-width="15" fill="none" stroke-dasharray="94 213.6" transform="rotate(111.6 48 48)"/>
+      <rect x="112" y="24" width="124" height="10" rx="5" fill="#E8E6E5"/><rect x="112" y="44" width="92" height="10" rx="5" fill="#E8E6E5"/><rect x="112" y="64" width="110" height="10" rx="5" fill="#E8E6E5"/>
+    </svg>
+    <div class="unterschrift"><svg viewBox="0 0 200 64" fill="none"><path id="e-zug" d="M6 46 C 16 12, 28 8, 30 30 C 32 52, 20 58, 26 40 C 34 18, 48 20, 50 38 C 52 50, 60 26, 68 30 C 76 34, 70 50, 80 44 C 92 36, 96 22, 108 30 C 118 36, 108 50, 122 44 C 138 36, 150 30, 176 36" stroke="#0C0A09" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  </div>
+  <div id="e-siegel" class="abs"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>unterschrieben</span></div>
+
+  <!-- ================= Abschluss ================= -->
+  <div id="cta-satz" class="abs titel">
+    <div>Rentenberatung, die Kunden in Minuten</div>
+    <div><span class="hv" id="cta-hv"><i></i><b>Klarheit</b></span> schafft – steuerlich korrekt gerechnet.</div>
+  </div>
+  <div id="cta-knopf" class="abs"><span>Jetzt testen auf js-rentenplaner.de
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#0C0A09" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+</div></div>
+
+<script>
+'use strict';
+const DAUER = 30;
+const $ = (id) => document.getElementById(id);
+const kl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+/** Fortschritt 0…1 eines Abschnitts, der bei `ab` beginnt und `dauer` Sekunden laeuft */
+const p = (t, ab, dauer) => kl((t - ab) / dauer);
+const mix = (a, b, x) => a + (b - a) * x;
+/** Die Kurven: fast alles kommt weich an (`aus`), geht entschlossen (`ein`); Wege von A nach B laufen `beide`. */
+const e = {
+  aus: (x) => 1 - Math.pow(1 - x, 3),
+  aus5: (x) => 1 - Math.pow(1 - x, 5),
+  ein: (x) => x * x * x,
+  beide: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+  feder: (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); },
+};
+const euro = (n) => `${Math.round(n).toLocaleString('de-DE')} €`;
+
+/** Ein Element tritt auf (von unten oder von der Seite) und wieder ab. */
+function auftritt(el, t, { ab, bis = null, dauer = 0.6, weg = 0.32, dy = 34, dx = 0, wegDy = -22, wegDx = 0, s0 = 1, kurve = e.aus }) {
+  const a = kurve(p(t, ab, dauer));
+  const b = bis === null ? 0 : e.ein(p(t, bis, weg));
+  const o = kl(p(t, ab, dauer * 0.7)) * (1 - b);
+  el.style.opacity = o.toFixed(4);
+  el.style.visibility = o < 0.002 ? 'hidden' : 'visible';
+  el.style.transform = `translate(${(dx * (1 - a) + wegDx * b).toFixed(2)}px, ${(dy * (1 - a) + wegDy * b).toFixed(2)}px) scale(${mix(s0, 1, a).toFixed(4)})`;
+}
+/** Die Hervorhebung zieht von links auf; die Schrift wird dabei cyan. */
+function hervor(hv, x) {
+  const [flaeche, schrift] = hv.children;
+  flaeche.style.transform = `scaleX(${e.aus(x).toFixed(4)})`;
+  const c = (a, b) => Math.round(mix(a, b, kl(x * 1.4)));
+  schrift.style.color = `rgb(${c(12, 29)}, ${c(10, 106)}, ${c(9, 168)})`;
+}
+/** Kreisbogen: `anteil` des Umfangs ist gezeichnet. */
+function bogen(kreis, r, anteil) {
+  const u = 2 * Math.PI * r;
+  kreis.setAttribute('stroke-dasharray', `${(u * kl(anteil)).toFixed(2)} ${u.toFixed(2)}`);
+  kreis.style.visibility = anteil <= 0.0005 ? 'hidden' : 'visible';
+}
+
+/* ====================== Szene 1: die Tabelle aufbauen ====================== */
+const zufall = (() => { let a = 20261123; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let x = Math.imul(a ^ (a >>> 15), 1 | a); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; }; })();
+const SPALTEN = 12, ZEILEN = 19, BREITE = 155, HOEHE = 52, LINKS = 60, OBEN = 92;
+const FORMELN = ['=B7*0,093', '=SVERWEIS(A4;Tab!A:F;5)', '=WENN(C9>BBG;BBG;C9)', '=SUMME(D4:D29)', '=F12*(1+$K$2)^26', '=RUNDEN(E8*0,186;2)', '=WENN(H3="PKV";0;G3*ZB)', '=D15-E15-F15', '=MAX(0;C22-GFB)', '=INDEX(St!B:B;K7)'];
+const FEHLERTEXT = ['#BEZUG!', '#WERT!', '#DIV/0!', '#NAME?', '#NV'];
+const FORMELZEILE = '=WENN(UND(B12>BBG_KV;C12<>"PKV");B12*(0,073+ZB/2)+SVERWEIS(A12;Steuer!A:H;6;0)*(1+Infl)^(Rentenjahr-2026);#BEZUG!)';
+const ZELLEN = [];
+{
+  const tab = $('tab');
+  tab.innerHTML = `<div class="fx"><span>fx</span><span id="formel"></span></div>`
+    + `<div class="kopf" style="left:0;width:${LINKS}px"></div>`
+    + Array.from({ length: SPALTEN }, (_, s) => `<div class="kopf" style="left:${LINKS + s * BREITE}px;width:${BREITE}px">${String.fromCharCode(65 + s)}</div>`).join('');
+  // Fehler dort, wo der Blick hinfaellt: rechts, ausserhalb des Schleiers
+  const fehlerOrte = new Set(['7,3', '9,6', '8,10', '10,2', '7,13', '9,16', '11,8', '8,1', '10,12', '6,5', '11,15', '6,17', '9,11']);
+  for (let z = 0; z < ZEILEN; z++) {
+    const nr = document.createElement('div');
+    nr.className = 'kopf'; nr.style.cssText = `left:0;top:${OBEN + z * HOEHE}px;width:${LINKS}px;height:${HOEHE}px`; nr.textContent = z + 1; tab.appendChild(nr);
+    for (let s = 0; s < SPALTEN; s++) {
+      const el = document.createElement('div');
+      const formel = zufall() < 0.34;
+      const text = formel ? FORMELN[Math.floor(zufall() * FORMELN.length)] : (zufall() < 0.2 ? '' : (zufall() * (zufall() < 0.5 ? 4000 : 90000)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      el.className = `zelle${formel ? '' : ' zahl'}`;
+      el.style.cssText = `left:${LINKS + s * BREITE}px;top:${OBEN + z * HOEHE}px;width:${BREITE}px`;
+      tab.appendChild(el);
+      const fehler = fehlerOrte.has(`${s},${z}`);
+      ZELLEN.push({ el, text, formel, s, z, ab: 0.1 + zufall() * 1.7, fehler, fehlerAb: 2.15 + zufall() * 1.15, fehlerText: FEHLERTEXT[Math.floor(zufall() * FEHLERTEXT.length)],
+        fall: 4.32 + s * 0.02 + z * 0.012 + zufall() * 0.06, tief: 90 + zufall() * 160, dreh: (zufall() - 0.5) * 14 });
+    }
+  }
+}
+
+/* ====================== Diagramm „Was Warten kostet“ ====================== */
+// Jeder Balken hat zwei Teile: unten der Beitrag von heute (Tinte) — bei allen gleich hoch —, darueber, was das
+// Warten kostet (Stein). Zuerst wachsen alle auf den Beitrag von heute, dann waechst der Aufschlag: erst wenig, dann viel.
+const WARTEN = [{ text: 'heute', wert: 437 }, { text: 'in 5 Jahren', wert: 646 }, { text: 'in 10 Jahren', wert: 1006 }, { text: 'in 15 Jahren', wert: 1725 }];
+const D = { boden: 420, hoch: 262, links: 52, schritt: 186, breit: 118 };
+{
+  const h = (w) => (w / 1725) * D.hoch;
+  let svg = `<line x1="44" x2="776" y1="${D.boden}" y2="${D.boden}" stroke="#E8E6E5" stroke-width="2"/>`;
+  let werte = '';
+  WARTEN.forEach((b, i) => {
+    const x = D.links + i * D.schritt + (D.schritt - D.breit) / 2;
+    b.x = x; b.h = h(b.wert); b.basis = h(437);
+    if (i > 0) svg += `<rect id="v2-o${i}" x="${x}" y="${D.boden - b.h}" width="${D.breit}" height="${b.h - b.basis + 12}" rx="10" fill="#D6D3D1" style="transform-box:fill-box;transform-origin:50% 100%"/>`;
+    svg += `<rect id="v2-u${i}" x="${x}" y="${D.boden - b.basis}" width="${D.breit}" height="${b.basis}" rx="10" fill="#0C0A09" style="transform-box:fill-box;transform-origin:50% 100%"/>`;
+    werte += `<div class="balkenwert" id="v2-w${i}" style="left:${x + D.breit / 2 - 95}px">0 €</div><div class="balkentext" id="v2-t${i}" style="left:${x + D.breit / 2 - 95}px">${b.text}</div>`;
+  });
+  $('v2-diagramm').innerHTML = svg;
+  $('v2-werte').innerHTML = werte;
+}
+
+/* ====================== Masse, die sich aus dem Satz ergeben ====================== */
+const MASS = {};
+function vermesse() {
+  const marke = $('marke');
+  marke.style.transform = 'none';
+  const r = marke.getBoundingClientRect(), b = $('buehne').getBoundingClientRect();
+  const f = b.width / 1920;
+  MASS.breit = r.width / f; MASS.hoch = r.height / f;
+  MASS.mitte = { x: (1920 - MASS.breit) / 2, y: 452 - MASS.hoch / 2, s: 1 };
+  MASS.kopf = { x: 96, y: 58, s: 0.29 };
+  MASS.cta = { s: 0.62 }; MASS.cta.x = (1920 - MASS.breit * MASS.cta.s) / 2; MASS.cta.y = 196;
+  // Der Punkt der Marke im Abschluss — dorthin zieht sich der Ring des Ergebnisses zusammen.
+  MASS.punkt = { x: MASS.cta.x + 200 * 0.85 * MASS.cta.s, y: MASS.cta.y + ((MASS.hoch - 200) / 2 + 200 * 0.16) * MASS.cta.s };
+  MASS.linie = $('ll').getTotalLength();
+  MASS.zug = $('e-zug').getTotalLength();
+}
+
+/* ====================== Das Bild zur Sekunde t ====================== */
+function zeige(t) {
+  t = kl(t, 0, DAUER);
+
+  /* ---------- 0 – 5 s: das Problem ---------- */
+  const s1 = $('s1');
+  s1.style.display = t < 5.2 ? '' : 'none';
+  if (t < 5.2) {
+    const tab = $('tab');
+    // Die Kamera schiebt sich langsam hinein; bei den ersten Fehlern ruckt das Bild.
+    const ruck = t > 2.15 && t < 2.7 ? Math.sin((t - 2.15) * 62) * 4 * (1 - p(t, 2.15, 0.55)) : 0;
+    tab.style.transform = `translate(${ruck.toFixed(2)}px, 0) scale(${(1 + 0.055 * e.beide(p(t, 0, 4.8))).toFixed(4)})`;
+    tab.style.opacity = (e.aus(p(t, 0, 0.45)) * (1 - p(t, 4.75, 0.4))).toFixed(4);
+    $('formel').textContent = FORMELZEILE.slice(0, Math.floor(p(t, 0.35, 2.3) * FORMELZEILE.length)) + (t < 2.7 && Math.floor(t * 3) % 2 === 0 ? '▍' : '');
+    for (const z of ZELLEN) {
+      const istFehler = z.fehler && t >= z.fehlerAb;
+      const da = e.aus(p(t, z.ab, 0.22));
+      const f = e.ein(p(t, z.fall, 0.55));
+      z.el.textContent = da > 0 ? (istFehler ? z.fehlerText : z.text) : '';
+      z.el.className = `zelle${z.formel ? '' : ' zahl'}${istFehler ? ' fehler' : ''}`;
+      const sprung = istFehler ? 1 + 0.16 * (1 - e.aus(p(t, z.fehlerAb, 0.3))) : 1;
+      z.el.style.opacity = (1 - f).toFixed(3);
+      z.el.style.transform = f > 0 || sprung !== 1 ? `translate(0, ${(z.tief * f).toFixed(1)}px) rotate(${(z.dreh * f).toFixed(2)}deg) scale(${sprung.toFixed(3)})` : 'none';
+      z.el.style.zIndex = istFehler ? 2 : 0;
+    }
+    $('schleier').style.opacity = (e.aus(p(t, 0.2, 0.7)) * (1 - p(t, 4.5, 0.5))).toFixed(4);
+    const [h1, h2] = $('s1-h').children;
+    auftritt(h1, t, { ab: 0.45, bis: 4.25, dy: 46, dauer: 0.7 });
+    auftritt(h2, t, { ab: 0.7, bis: 4.3, dy: 46, dauer: 0.7 });
+    [...$('s1-chips').children].forEach((c, i) => auftritt(c, t, { ab: 1.55 + i * 0.22, bis: 4.2 + i * 0.03, dy: 20, dauer: 0.45, s0: 0.92 }));
+    auftritt($('s1-kunde'), t, { ab: 2.75, bis: 4.2, dy: 30, dauer: 0.6, s0: 0.94, kurve: e.feder });
+  }
+
+  /* ---------- Die Marke: entsteht aus dem Sturz der Tabelle, wandert in die Ecke — und baut sich zum Schluss neu auf ---------- */
+  {
+    const marke = $('marke');
+    // Zum Schluss blendet die Marke in der Ecke aus und entsteht in der Mitte noch einmal, wie am Anfang:
+    // Balken, Linie — und der Punkt ist der Ring des Ergebnisses, der sich dorthin zusammenzieht.
+    const schluss = t >= 26.72;
+    marke.style.visibility = t < 4.55 ? 'hidden' : 'visible';
+    marke.style.opacity = schluss ? '1' : (1 - p(t, 26.35, 0.32)).toFixed(4);
+    const inEcke = e.beide(p(t, 6.55, 0.7));
+    const lage = (k) => (schluss ? MASS.cta[k] : mix(MASS.mitte[k], MASS.kopf[k], inEcke));
+    // Am Anfang steht das Zeichen zuerst allein in der Mitte; mit dem Schriftzug rueckt es an seinen Platz in der Wortmarke.
+    const allein = schluss ? 0 : ((MASS.breit - 200) / 2) * (1 - e.beide(p(t, 5.4, 0.7)));
+    marke.style.transform = `translate(${(lage('x') + allein).toFixed(2)}px, ${lage('y').toFixed(2)}px) scale(${lage('s').toFixed(4)})`;
+    ['lb1', 'lb2', 'lb3'].forEach((id, i) => {
+      $(id).style.transform = `scaleY(${(schluss ? e.aus5(p(t, 26.76 + i * 0.08, 0.5)) : e.aus5(p(t, 4.6 + i * 0.13, 0.55))).toFixed(4)})`;
+    });
+    const l = schluss ? e.beide(p(t, 26.9, 0.42)) : e.beide(p(t, 5.05, 0.55));
+    $('ll').setAttribute('stroke-dasharray', `${(MASS.linie * l).toFixed(2)} ${MASS.linie}`);
+    $('ll').style.visibility = l <= 0 ? 'hidden' : 'visible';
+    // Der Punkt: am Anfang springt er auf; am Schluss ist er der angekommene Ring — ein kurzer Stoss, dann Ruhe.
+    const stoss = 0.5 * Math.sin(Math.PI * p(t, 27.04, 0.46)) * (1 - p(t, 27.04, 0.46));
+    $('lp').style.transform = `scale(${(schluss ? (t >= 27.04 ? 1 + stoss : 0) : Math.max(0, e.feder(p(t, 5.5, 0.4)))).toFixed(4)})`;
+    const wort = $('wort');
+    wort.style.opacity = (schluss ? e.aus(p(t, 27.12, 0.45)) : e.aus(p(t, 5.55, 0.5))).toFixed(4);
+    wort.style.transform = `translate(${(-40 * (1 - (schluss ? e.aus(p(t, 27.1, 0.55)) : e.aus(p(t, 5.5, 0.6))))).toFixed(2)}px, 0)`;
+    auftritt($('motto'), t, { ab: 5.9, bis: 6.45, dy: 18, dauer: 0.5, weg: 0.3, wegDy: -14 });
+  }
+
+  /* ---------- 7 – 20 s: drei Belege ---------- */
+  const BELEGE = [{ ab: 7.0, bis: 10.95 }, { ab: 11.25, bis: 15.1 }, { ab: 15.4, bis: 19.6 }];
+  {
+    const fo = $('fortschritt');
+    auftritt(fo, t, { ab: 7.0, bis: 19.6, dy: 0, wegDy: 0, dauer: 0.4 });
+    [...fo.children].forEach((s, i) => { s.firstElementChild.style.transform = `scaleX(${p(t, BELEGE[i].ab, (BELEGE[i + 1]?.ab ?? 19.9) - BELEGE[i].ab).toFixed(4)})`; });
+    auftritt($('fuss'), t, { ab: 7.6, bis: 19.6, dy: 0, wegDy: 0, dauer: 0.5 });
+  }
+  BELEGE.forEach((b, i) => {
+    const text = $(`t${i + 1}`), bild = $(`v${i + 1}`);
+    // Ganz aus dem Bild (display), nicht nur versteckt: Die Kinder setzen ihre Sichtbarkeit selbst.
+    const sichtbar = t > b.ab - 0.05 && t < b.bis + 0.45;
+    text.style.display = bild.style.display = sichtbar ? '' : 'none';
+    if (!sichtbar) return;
+    const [nr, h2, satz] = text.children;
+    auftritt(nr, t, { ab: b.ab, bis: b.bis, dy: 18, dauer: 0.45 });
+    [...h2.children].forEach((zeile, k) => auftritt(zeile, t, { ab: b.ab + 0.08 + k * 0.12, bis: b.bis + k * 0.03, dy: 40, dauer: 0.65 }));
+    auftritt(satz, t, { ab: b.ab + 0.4, bis: b.bis + 0.05, dy: 24, dauer: 0.6 });
+    hervor(text.querySelector('.hv'), p(t, b.ab + 0.75, 0.5));
+    // Die Karten rechts atmen waehrend der Standzeit ganz leicht — nichts steht tot.
+    bild.style.transform = `scale(${(1 + 0.012 * p(t, b.ab, b.bis - b.ab)).toFixed(5)})`;
+  });
+
+  // --- 1: der Ring, dann der Beitrag
+  if (t > 6.9 && t < 11.5) {
+    const b = BELEGE[0];
+    auftritt($('v1-a'), t, { ab: b.ab + 0.25, bis: b.bis, dx: 90, dy: 0, wegDx: -70, wegDy: 0, dauer: 0.7, kurve: e.aus5 });
+    const ring = e.beide(p(t, 7.55, 1.15));
+    bogen($('v1-bogen'), 104, 0.56 * ring);
+    $('v1-netto').textContent = euro(1860 * e.aus(p(t, 7.6, 1.1)));
+    $('v1-luecke').textContent = euro(1487 * e.aus(p(t, 7.85, 1.1)));
+    auftritt($('v1-l1'), t, { ab: 7.55, dy: 16, dauer: 0.5 });
+    auftritt($('v1-l2'), t, { ab: 7.8, dy: 16, dauer: 0.5 });
+    auftritt($('v1-mitte'), t, { ab: 7.5, dy: 0, dauer: 0.5 });
+    auftritt($('v1-b'), t, { ab: 8.95, bis: b.bis + 0.04, dx: 0, dy: 60, wegDx: -70, wegDy: 0, dauer: 0.7, kurve: e.aus5 });
+    $('v1-beitrag').textContent = euro(437 * e.aus(p(t, 9.2, 0.95)));
+    hervor($('v1-hv'), p(t, 9.95, 0.5));
+  }
+
+  // --- 2: vier Balken — erst der Beitrag von heute, dann der Aufschlag —, darunter der Satz
+  if (t > 11.1 && t < 15.6) {
+    const b = BELEGE[1];
+    auftritt($('v2-a'), t, { ab: b.ab + 0.25, bis: b.bis, dx: 90, dy: 0, wegDx: -70, wegDy: 0, dauer: 0.7, kurve: e.aus5 });
+    WARTEN.forEach((w, i) => {
+      // Erst der Beitrag von heute — bei allen vieren; dann der Aufschlag, Balken fuer Balken.
+      const unten = e.aus5(p(t, 11.8 + i * 0.09, 0.6));
+      const oben = i === 0 ? 0 : e.beide(p(t, 12.55 + (i - 1) * 0.3, 0.85));
+      $(`v2-u${i}`).style.transform = `scaleY(${Math.max(0.0001, unten).toFixed(4)})`;
+      $(`v2-u${i}`).style.visibility = unten <= 0 ? 'hidden' : 'visible';
+      if (i > 0) {
+        $(`v2-o${i}`).style.transform = `scaleY(${Math.max(0.0001, (12 + (w.h - w.basis) * oben) / (w.h - w.basis + 12)).toFixed(4)})`;
+        $(`v2-o${i}`).style.visibility = oben <= 0 ? 'hidden' : 'visible';
+      }
+      const hoch = w.basis * unten + (w.h - w.basis) * oben;
+      const wert = $(`v2-w${i}`);
+      wert.textContent = euro(437 * unten + (w.wert - 437) * oben);
+      wert.style.top = `${(D.boden - hoch - 56).toFixed(1)}px`;
+      wert.style.opacity = kl(p(t, 11.8 + i * 0.09, 0.3)).toFixed(3);
+      $(`v2-t${i}`).style.opacity = kl(p(t, 11.7 + i * 0.09, 0.4)).toFixed(3);
+    });
+    auftritt($('v2-b'), t, { ab: 13.75, bis: b.bis + 0.04, dy: 50, wegDx: -70, wegDy: 0, dauer: 0.65, kurve: e.aus5 });
+    hervor($('v2-hv'), p(t, 14.2, 0.5));
+  }
+
+  // --- 3: die Firma, ihre Mitarbeiter, eine Rechnung
+  if (t > 15.2 && t < 20.1) {
+    const b = BELEGE[2];
+    auftritt($('v3-a'), t, { ab: b.ab + 0.2, bis: b.bis, dx: 90, dy: 0, wegDx: -70, wegDy: 0, dauer: 0.65, kurve: e.aus5 });
+    auftritt($('v3-chip'), t, { ab: 16.0, dy: 0, s0: 0.7, dauer: 0.4, kurve: e.feder });
+    auftritt($('v3-b'), t, { ab: b.ab + 0.4, bis: b.bis + 0.03, dx: 0, dy: 50, wegDx: -70, wegDy: 0, dauer: 0.65, kurve: e.aus5 });
+    [...document.querySelectorAll('#v3-b .mensch')].forEach((m, i) => {
+      auftritt(m, t, { ab: 16.05 + i * 0.13, dy: 14, dauer: 0.4 });
+      if (i === 0) auftritt($('v3-mehr'), t, { ab: 16.6, dy: 10, dauer: 0.4 });
+      const [offen, fertig, signiert] = m.querySelector('.stand').children;
+      const f = e.feder(p(t, 16.75 + i * 0.22, 0.34));
+      offen.style.opacity = (1 - kl(p(t, 16.75 + i * 0.22, 0.15))).toFixed(3);
+      fertig.style.opacity = kl(p(t, 16.75 + i * 0.22, 0.15)).toFixed(3);
+      fertig.style.transform = `scale(${mix(0.7, 1, f).toFixed(4)})`;
+      if (signiert) {
+        const s = e.feder(p(t, 18.75, 0.36));
+        signiert.style.opacity = kl(p(t, 18.75, 0.15)).toFixed(3);
+        signiert.style.transform = `scale(${mix(0.7, 1, s).toFixed(4)})`;
+        fertig.style.opacity = (kl(p(t, 16.75, 0.15)) * (1 - kl(p(t, 18.75, 0.15)))).toFixed(3);
+      }
+    });
+    auftritt($('v3-c'), t, { ab: 17.05, bis: b.bis + 0.06, dx: 60, dy: 0, wegDx: -70, wegDy: 0, dauer: 0.65, kurve: e.aus5 });
+    // 136 € netto + 114 € gespart + 37,50 € vom Arbeitgeber = 287,50 € im Vertrag
+    const teile = [136, 114, 37.5]; let links = 0;
+    teile.forEach((w, i) => {
+      const s = $(`v3-s${i + 1}`), breit = (w / 287.5) * 340;
+      s.style.left = `${links.toFixed(2)}px`; s.style.width = `${breit.toFixed(2)}px`;
+      s.style.transform = `scaleX(${e.aus5(p(t, 17.45 + i * 0.3, 0.5)).toFixed(4)})`;
+      links += breit;
+    });
+    [...document.querySelectorAll('#v3-c .posten')].forEach((z, i) => auftritt(z, t, { ab: 17.45 + i * 0.3, dy: 10, dauer: 0.4 }));
+    $('v3-summe').textContent = `${(287.5 * e.aus(p(t, 18.35, 0.6))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+    auftritt($('v3-d'), t, { ab: 18.35, bis: b.bis + 0.09, dy: 50, wegDx: -70, wegDy: 0, dauer: 0.65, kurve: e.aus5 });
+    hervor($('v3-hv'), p(t, 18.8, 0.5));
+  }
+
+  /* ---------- 20 – 27 s: das Ergebnis ---------- */
+  {
+    const sichtbar = t > 19.9 && t < 27.6;
+    ['e-text', 'e-ring', 'e-blase', 'e-pdf', 'e-siegel'].forEach((id) => { $(id).style.display = sichtbar ? '' : 'none'; });
+    if (sichtbar) {
+      const [nr, h2, satz] = $('e-text').children;
+      auftritt(nr, t, { ab: 20.15, bis: 26.3, dy: 18, dauer: 0.5 });
+      auftritt(h2.children[0], t, { ab: 20.3, bis: 26.33, dy: 44, dauer: 0.75 });
+      auftritt(h2.children[1], t, { ab: 21.5, bis: 26.36, dy: 44, dauer: 0.75 });
+      auftritt(satz, t, { ab: 22.9, bis: 26.4, dy: 24, dauer: 0.6 });
+
+      // Der Ring: 56 % stehen, dann schliesst der neue Bogen die Luecke — der Hoehepunkt des Films.
+      const ring = $('e-ring');
+      const da = e.aus5(p(t, 20.05, 0.8));
+      const schluss = e.beide(p(t, 20.95, 1.75));
+      const erst = e.beide(p(t, 20.1, 0.8));
+      bogen($('e-alt'), 196, 0.56 * erst);
+      bogen($('e-neu'), 196, 0.44 * schluss);
+      $('e-zahl').textContent = `${Math.round(56 * erst + 44 * schluss)} %`;
+      const puls = p(t, 22.6, 0.9);
+      $('e-puls').setAttribute('r', (196 + 78 * e.aus(puls)).toFixed(2));
+      $('e-puls').style.opacity = (puls > 0 && puls < 1 ? 0.55 * (1 - puls) : 0).toFixed(3);
+      // Ein leichtes Aufatmen beim Schluss; am Ende zieht sich der Ring in den Punkt der Marke zusammen.
+      const atem = 1 + 0.035 * Math.sin(Math.PI * p(t, 22.55, 0.6));
+      const flug = e.beide(p(t, 26.4, 0.66));
+      const mx = 1090 + 250, my = 260 + 250;
+      ring.style.visibility = 'visible';
+      ring.style.opacity = (kl(p(t, 20.05, 0.4)) * (1 - p(t, 27.02, 0.08))).toFixed(4);
+      ring.style.transform = `translate(${((MASS.punkt.x - mx) * flug).toFixed(2)}px, ${((MASS.punkt.y - my) * flug + 40 * (1 - da)).toFixed(2)}px) scale(${(mix(0.92, 1, da) * atem * mix(1, 0.048, flug)).toFixed(5)})`;
+      $('e-mitte').style.opacity = (1 - p(t, 26.4, 0.2)).toFixed(3);
+
+      auftritt($('e-blase'), t, { ab: 23.0, bis: 26.2, dy: 26, dauer: 0.6, s0: 0.94, kurve: e.feder });
+      const pdf = $('e-pdf');
+      const pe = e.aus5(p(t, 23.9, 0.8)), pw = e.ein(p(t, 26.24, 0.34));
+      pdf.style.visibility = pe > 0 ? 'visible' : 'hidden';
+      pdf.style.opacity = (kl(p(t, 23.9, 0.35)) * (1 - pw)).toFixed(4);
+      pdf.style.transform = `translate(${(70 * (1 - pe)).toFixed(2)}px, ${(90 * (1 - pe) - 26 * pw).toFixed(2)}px) rotate(${mix(9, -3.5, pe).toFixed(3)}deg)`;
+      const zug = e.beide(p(t, 24.65, 0.85));
+      $('e-zug').setAttribute('stroke-dasharray', `${(MASS.zug * zug).toFixed(2)} ${MASS.zug}`);
+      $('e-zug').style.visibility = zug <= 0 ? 'hidden' : 'visible';
+      auftritt($('e-siegel'), t, { ab: 25.5, bis: 26.22, dy: 0, s0: 0.6, dauer: 0.42, kurve: e.feder });
+    }
+  }
+
+  /* ---------- 27 – 30 s: Kernbotschaft und Aufruf ---------- */
+  {
+    const [z1, z2] = $('cta-satz').children;
+    auftritt(z1, t, { ab: 27.3, dy: 38, dauer: 0.65 });
+    auftritt(z2, t, { ab: 27.46, dy: 38, dauer: 0.65 });
+    hervor($('cta-hv'), p(t, 27.95, 0.5));
+    const knopf = $('cta-knopf');
+    auftritt(knopf, t, { ab: 28.3, dy: 26, s0: 0.9, dauer: 0.55, kurve: e.feder });
+    // Ein einziger weicher Schein, kein Blinken
+    const schein = Math.sin(Math.PI * p(t, 28.95, 0.95));
+    knopf.firstElementChild.style.boxShadow = `0 ${18 + 8 * schein}px ${44 + 26 * schein}px rgba(59, 166, 241, ${(0.3 + 0.22 * schein).toFixed(3)})`;
+  }
+}
+
+/* ====================== Start ====================== */
+window.zeige = zeige;
+window.bereit = document.fonts.ready.then(() => { vermesse(); zeige(0); return true; });
+
+// Im Browser: die Buehne einpassen und in Echtzeit abspielen (Leertaste haelt an, ?t=… zeigt ein Standbild).
+if (!new URLSearchParams(location.search).has('render')) {
+  const passe = () => { const f = Math.min(innerWidth / 1920, innerHeight / 1080); const r = $('rahmen'); r.style.transform = `scale(${f})`; r.style.left = `${(innerWidth - 1920 * f) / 2}px`; r.style.top = `${(innerHeight - 1080 * f) / 2}px`; };
+  addEventListener('resize', passe); passe();
+  window.bereit.then(() => {
+    const fest = new URLSearchParams(location.search).get('t');
+    if (fest !== null) { zeige(Number(fest)); return; }
+    let start = performance.now(), halt = false, stand = 0;
+    addEventListener('keydown', (ev) => { if (ev.key === ' ') { halt = !halt; if (!halt) start = performance.now() - stand * 1000; } });
+    const lauf = (jetzt) => { if (!halt) { stand = ((jetzt - start) / 1000) % (DAUER + 1.5); zeige(Math.min(stand, DAUER)); } requestAnimationFrame(lauf); };
+    requestAnimationFrame(lauf);
+  });
+}
+</script>
+</body>
+</html>

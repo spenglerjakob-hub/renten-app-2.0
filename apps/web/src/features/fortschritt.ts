@@ -9,7 +9,7 @@ import { eintragVon, offenePfade, relevant } from './vorbelegung';
  * es gibt ausdruecklich keine), das Ergebnis wurde angesehen. Vorbelegte
  * Beispielwerte zaehlen NICHT — sonst stuende ein unberuehrter Fall auf
  * „fast fertig“. Standardwerte blockieren keinen Schritt: Sie sind gueltige
- * Annahmen und sichtbar gekennzeichnet.
+ * Annahmen und werden nicht eigens genannt.
  *
  * Nie 0 %: Das Konto ist ein echter, erledigter Schritt. Kommt ein Fall aus
  * dem Vorsorge-Check, sind Mandantendaten, Einkuenfte und Vertraege oft
@@ -24,8 +24,6 @@ export interface FallSchritt {
   erledigt: boolean;
   /** Was noch fehlt, in Worten: „Beispielwert: Rentenanspruch“ */
   offen: string[];
-  /** Erledigt, aber mit Standardwerten — die Leiste sagt es dazu */
-  mitStandard: boolean;
 }
 
 const PERSON = /^personen\.([AB])\.(.+)$/;
@@ -59,12 +57,11 @@ export function fallFortschritt(
       text: titel,
       erledigt: beispiele.length === 0,
       offen: beispiele.map((p) => `Beispielwert: ${text(p)}`),
-      mitStandard: beispiele.length === 0 && hier.some((p) => eintragVon(p)?.art === 'standard'),
     };
   };
 
   return [
-    { id: 'konto', text: 'Konto', erledigt: konto, offen: konto ? [] : ['nicht angemeldet'], mitStandard: false },
+    { id: 'konto', text: 'Konto', erledigt: konto, offen: konto ? [] : ['nicht angemeldet'] },
     bereich('mandant', 'Mandantendaten'),
     bereich('einkuenfte', 'Einkünfte'),
     {
@@ -72,7 +69,6 @@ export function fallFortschritt(
       text: 'Vorsorgeverträge',
       erledigt: !offen.includes('vertraege'),
       offen: offen.includes('vertraege') ? ['noch nicht erfasst'] : [],
-      mitStandard: false,
     },
     bereich('ziel', 'Ziel'),
     {
@@ -80,7 +76,6 @@ export function fallFortschritt(
       text: 'Auswertung',
       erledigt: !offen.includes('auswertung'),
       offen: offen.includes('auswertung') ? ['Ergebnis noch nicht angesehen'] : [],
-      mitStandard: false,
     },
   ];
 }
