@@ -7,7 +7,8 @@ import {
 import { AblaufGeber, EtappenAblauf, type AblaufEtappe } from '../components/Ablauf';
 import type { StueckeStand } from '../components/ablauf-logik';
 import { KNOPF_ZWEIT, LINK, TIPPFLAECHE } from '../components/stil';
-import { FirmenZeichen, useBeraterAuftritt, useFirmenlogo } from './bausteine';
+import { FirmenZeichen, useFirmenlogo } from './bausteine';
+import { useUnterlagenAuftritt } from './agentur-hook';
 import { zeitpunktText } from './unterschrift-daten';
 import {
   automatischerBeginn, beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung,
@@ -65,7 +66,8 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const gesperrtRef = useRef(gesperrt);
   gesperrtRef.current = gesperrt;
   const logo = useFirmenlogo(firma && typeof firma === 'object' ? firma.logoPfad : null);
-  const auftritt = useBeraterAuftritt();
+  // Bei einer Firma einer Agentur stehen deren Angaben im Briefkopf und im AXA-Antrag (`agenturAuftritt`).
+  const auftritt = useUnterlagenAuftritt(firma && typeof firma === 'object' ? firma : null);
   /*
     WIE WEIT DIE BERATUNG GEKOMMEN IST: Alle Schritte bis dorthin stehen als
     Zeilen da, auch wenn man einen frueheren wieder oeffnet. Nur im

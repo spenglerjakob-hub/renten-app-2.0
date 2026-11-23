@@ -239,7 +239,8 @@ function Datenschutz() {
         dem Berater für Rückfragen und den Versand der Unterlagen aus seinem eigenen Mailprogramm; wir schicken dem
         Mitarbeiter nichts. Gerechnet wird
         im Browser; gespeichert werden die Eingaben. Firmen und Beratungen sind nur für das Konto sichtbar, das sie
-        angelegt hat, und — gibt der Berater eine Firma für sein Büro frei — für die Mitglieder dieses Büros (siehe
+        angelegt hat, und — gibt der Berater eine Firma für sein Büro frei — für die Mitglieder dieses Büros;
+        gehört eine Firma zu einer Agentur, für deren Zugänge und die bAV-Verwaltung (beides siehe
         unten); das erzwingt die Datenbank selbst. Logos liegen in einem nicht öffentlichen Speicher bei Supabase in
         der EU.
       </P>
@@ -283,6 +284,32 @@ function Datenschutz() {
         Kollegen an den Berater, der die Firma angelegt hat. Verlässt ein Mitglied das Büro, wird es entfernt oder
         löscht es sein Konto, bleiben seine Beratungen samt unterschriebener Unterlagen bei den Firmen; Firmen, die es
         für das Büro freigegeben hat, übernimmt mit allen Beratungen, wer das Büro verwaltet.
+      </P>
+      <P>
+        <strong>Agenturen und bAV-Verwaltung.</strong> Betreuen wir für eine Agentur die betriebliche
+        Altersversorgung ihrer Firmenkunden, legt unsere bAV-Verwaltung die Agentur an. Dazu speichern wir ihren
+        Namen, Ansprechpartner, Anschrift, Telefonnummer, E-Mail-Adresse, Organisationsnummer und die Vorgaben für
+        neue Firmen (Versicherer, Tarif, Bundesland), ihren Auftritt (Logo, Akzentfarbe, Internetadresse,
+        Zusatzzeile), außerdem die Einladungslinks (wer sie wann erstellt und eingelöst hat, ob mit Adminrechten) und
+        welche Konten seit wann und in welcher Rolle zur Agentur gehören. Ein Konto gehört zu einer Agentur, sobald
+        es einen Einladungslink einlöst; es nutzt die Arbeitgeber-Vorsorgemodelle und die Mitarbeiterberatung ohne
+        Abo. Vor der ersten Beratung trägt jeder Zugang Vorname, Nachname, Telefonnummer und E-Mail-Adresse ein; sie
+        werden in „Ihr Auftritt“ des Kontos gespeichert und stehen als Berater auf den Unterlagen. Alle Zugänge
+        einer Agentur und die Konten der bAV-Verwaltung sehen und bearbeiten die Firmen der Agentur mit Angebot,
+        Logo und allen Beratungen, einschließlich Gehalt, Steuer- und Gesundheitsangaben und der unterschriebenen
+        Unterlagen. Die bAV-Verwaltung vergibt Adminrechte: Admins einer Agentur ändern deren Angaben und Auftritt
+        und sehen, wer zur Agentur gehört. Die bAV-Verwaltung und die Admins sehen dabei Namen und E-Mail-Adressen
+        der Zugänge. Name, Logo, Farbe und Kontakt der Agentur stehen im Briefkopf der Unterlagen ihrer
+        Firmenkunden; das Logo sehen alle Zugänge der Agentur und die bAV-Verwaltung. Wird ein Zugang entfernt oder
+        löscht er sein Konto, bleiben seine Firmen und Beratungen in der Agentur; sie gehen an die bAV-Verwaltung
+        über. Verschiebt die bAV-Verwaltung eine Firma in eine andere Agentur, sehen die Zugänge der bisherigen sie
+        nicht mehr.
+      </P>
+      <P>
+        [Für die bAV-Verwaltung der Firmenkunden einer Agentur braucht es eine Vereinbarung mit der Agentur — je
+        nach Ausgestaltung einen Auftragsverarbeitungsvertrag (Art. 28 DSGVO) oder eine Vereinbarung über
+        gemeinsame Verantwortlichkeit (Art. 26 DSGVO) — und einen Hinweis an die betroffenen Mitarbeiter. Vor dem
+        ersten Einsatz mit echten Daten rechtlich prüfen lassen.]
       </P>
       <P>
         Für die Daten der Mitarbeiter ist der <strong>Berater</strong> verantwortlich, wir verarbeiten sie in seinem
@@ -421,12 +448,22 @@ function Datenschutz() {
 
       <H2>13. Weitere Seiten</H2>
       <P>
-        Die Seite zum Altersvorsorgedepot und die Arbeitgeber-Seiten (Zuschuss-, Festbetrag- und Matching-Modell,
-        betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
+        Die Seite zum Altersvorsorgedepot und die Arbeitgeber-Seiten (Zuschuss-, Festbetrag-, Matching- und individuelles
+        Modell, Betriebs-Check, betriebliche Krankenversicherung) rechnen ausschließlich in Ihrem Browser. Gespeichert wird dort nur, was Sie
         selbst in Ihr Konto legen: eine Firma, die Sie auf einer Arbeitgeber-Seite anlegen oder deren Logo Sie dort
         ergänzen, und ein Modell, das Sie mit „Für die Mitarbeiter-Beratung übernehmen“ übernehmen (Abschnitt 7).
         Für welche Firma Sie gerade rechnen, merkt sich nur der geöffnete Tab Ihres Browsers, bis Sie ihn schließen.
         „Beratung anfragen“ öffnet Ihr eigenes E-Mail-Programm; was Sie dort absenden, entscheiden Sie selbst.
+      </P>
+      <P>
+        Der Betriebs-Check rechnet mit der Belegschaft eines Betriebs als Gehaltsgruppen: Bezeichnung, Anzahl und
+        Jahresgehalt. Diese Angaben bleiben im Speicher Ihres Browsers auf Ihrem Gerät, getrennt je Firma, bis Sie
+        sie dort mit „Hier löschen“ entfernen oder die Daten Ihres Browsers löschen; in Ihr Konto und an uns werden
+        sie nicht übertragen. Eine eingefügte Lohnliste wird nur im Browser gelesen: Namen und Personalnummern
+        werden nicht übernommen, einzelne Gehälter auf volle 1.000 € gerundet und zu Gruppen zusammengefasst. Bei
+        kleinen Gruppen kann ein Gehalt trotzdem einer Person zuzuordnen sein — ob Sie die Angaben verwenden dürfen,
+        klären Sie mit dem Arbeitgeber. [Einordnung der Gehaltsgruppen als personenbezogene Daten und Hinweis
+        rechtlich prüfen lassen.]
       </P>
 
       <H2>14. Empfänger und Auftragsverarbeiter</H2>
@@ -460,6 +497,10 @@ function Datenschutz() {
           auch über Ihr Ausscheiden aus dem Büro hinaus.
         </li>
         <li>Büro, Mitglieder, Einladungen und Stand des Abos: bis zur Löschung des Kontos, das das Büro verwaltet.</li>
+        <li>
+          Agenturen, ihre Zugänge und Einladungen: bis die bAV-Verwaltung die Agentur löscht; Firmen und Beratungen
+          einer Agentur, bis sie gelöscht werden — auch über das Ausscheiden eines Zugangs hinaus.
+        </li>
         <li>Rechnungen und Buchhaltungsunterlagen: solange gesetzlich vorgeschrieben, in der Regel acht Jahre.</li>
         <li>Anfragen als Early Adopter: 180 Tage nach Eingang.</li>
         <li>
@@ -501,7 +542,8 @@ function Datenschutz() {
         öffentlichen Speicher; abrufen kann sie nur der Berater, dem der Link gehört, und nur über kurz
         gültige, signierte Verweise. Ebenso liegen das Logo für Ihr Gutachten und die Firmenlogos der
         Mitarbeiterberatung in nicht öffentlichen Speichern, die nur Ihr Konto lesen kann — ein Firmenlogo auch die
-        Kollegen, für deren Büro die Firma freigegeben ist. Zahlungsdaten gibt
+        Kollegen, für deren Büro die Firma freigegeben ist, und bei einer Firma einer Agentur deren Zugänge und die
+        bAV-Verwaltung. Zahlungsdaten gibt
         es bei uns nicht; Meldungen von Stripe über Ihr Abo nehmen wir nur mit gültiger Signatur an.
       </P>
     </>

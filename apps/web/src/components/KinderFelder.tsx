@@ -34,7 +34,8 @@ export function KinderZeilen({
 
         return (
           <div key={i} className="rounded-[10px] border border-ui-linie bg-ui-karte p-2.5">
-            <div className="flex items-center gap-2">
+            {/* Am Telefon bricht „noch N Jahre“ in die naechste Zeile, statt das Jahr auf zwei Ziffern zu quetschen. */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}`}>
                 {i + 1}. Kind, geb.
               </label>
@@ -45,9 +46,9 @@ export function KinderZeilen({
                 min={1900}
                 max={2200}
                 onChange={(e) => onKind(i, { geburtsjahr: Number(e.target.value) })}
-                className="ui-feld w-full p-1.5 text-sm tabular-nums"
+                className="ui-feld min-w-[5.5rem] flex-1 p-1.5 text-sm tabular-nums"
               />
-              <span className="w-24 shrink-0 text-right text-xs text-ui-schiefer">
+              <span className="ml-auto shrink-0 text-right text-xs text-ui-schiefer sm:w-24">
                 {jahre <= 0 ? 'kein Anspruch' : jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`}
               </span>
             </div>
@@ -68,7 +69,7 @@ export function KinderZeilen({
             </div>
 
             {inAusbildung && (
-              <div className="mt-1.5 flex items-center gap-2 pl-6">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-6">
                 <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}-bis`}>
                   bis Ende
                 </label>
@@ -81,9 +82,9 @@ export function KinderZeilen({
                   // das Gesetz ohnehin nicht mehr foerdert.
                   max={kind.geburtsjahr + a.kinderzulageBisAlterAusbildung - 1}
                   onChange={(e) => onKind(i, { ausbildungBisJahr: Number(e.target.value) })}
-                  className="ui-feld w-full p-1.5 text-sm tabular-nums"
+                  className="ui-feld min-w-[5.5rem] flex-1 p-1.5 text-sm tabular-nums"
                 />
-                <span className="w-24 shrink-0 text-right text-xs text-ui-schiefer">
+                <span className="ml-auto shrink-0 text-right text-xs text-ui-schiefer sm:w-24">
                   dann {(kind.ausbildungBisJahr ?? 0) - kind.geburtsjahr} J. alt
                 </span>
               </div>

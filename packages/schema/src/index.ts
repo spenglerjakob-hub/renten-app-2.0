@@ -19,9 +19,14 @@ export {
   entscheidungSchema, axaAngabenSchema, hochrechnungSchema, beratungDatenSchema, angebotLesen, beratungLesen,
   MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS, AXA_KANAELE,
   STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, RENTENZIELE, steuerklasseAus, type SteuerklasseBeratung,
+  FREI_STUFEN_MAX,
   type FirmenModellDaten, type FirmenAngebot, type BeratungAngaben, type VersichererWerte,
   type Entscheidung, type AxaAngaben, type BeratungDaten, type BeratungStatus,
 } from './bav-beratung.js';
+export {
+  AXA_VERSICHERER, AGENTUR_ROLLEN, agenturDatenSchema, agenturDatenLesen, agenturAnsprechpartner, agenturRolleAus, neuesAngebot,
+  type AgenturDaten, type AgenturRolle,
+} from './bav-agentur.js';
 export {
   BEZUGSRECHTE, BEZUGSRECHT_VORGABE, ANTRAG_FELDER, bezugsrechtText, ibanBereinigt, ibanGueltig, ibanFehler, ibanFormatiert,
   antragAngabenSchema, antragEingangSchema, antragLoesungSchema, braucheBank, offeneAngaben, eingangUebernehmen,

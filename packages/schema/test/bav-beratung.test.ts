@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  firmenAngebotSchema, beratungDatenSchema, angebotLesen, beratungLesen, MODELL_VORGABE,
+  firmenAngebotSchema, beratungDatenSchema, angebotLesen, beratungLesen, MODELL_VORGABE, FREI_STUFEN_MAX,
   STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, RENTENZIELE, steuerklasseAus,
 } from '../src/bav-beratung.js';
 
@@ -33,6 +33,34 @@ describe('Firmenangebot', () => {
     expect(angebotLesen({ modell: { art: 'gold' } }).modell).toEqual(MODELL_VORGABE);
     expect(angebotLesen(null).bundesland).toBe('Nordrhein-Westfalen');
     expect(angebotLesen({ versicherer: 'Muster Leben AG' }).versicherer).toBe('Muster Leben AG');
+  });
+
+  it('lesen: Ist nur das Modell unlesbar, bleibt der Rest des Angebots stehen', () => {
+    const a = angebotLesen({ modell: { art: 'gold' }, versicherer: 'Muster Leben AG', anschrift: 'Musterweg 1', bundesland: 'Bayern' });
+    expect(a.modell).toEqual(MODELL_VORGABE);
+    expect(a).toMatchObject({ versicherer: 'Muster Leben AG', anschrift: 'Musterweg 1', bundesland: 'Bayern' });
+    // Ist mehr kaputt als das Modell, bleibt es bei den Vorgaben.
+    expect(angebotLesen({ modell: { art: 'gold' }, beginn: '2027-01-01', versicherer: 'Muster Leben AG' }).versicherer).toBe('');
+  });
+
+  it('individuelles Modell: ohne Vorbelegung — keine Stufe, kein Anteil, kein Deckel', () => {
+    expect(firmenAngebotSchema.parse({ modell: { art: 'frei' } }).modell).toEqual({ art: 'frei', quote: 0, deckelMonat: 0, stufen: [] });
+  });
+
+  it('individuelles Modell: Stufen fester Zuschüsse und ein Anteil der Umwandlung', () => {
+    const modell = { art: 'frei', quote: 0.2, deckelMonat: 0, stufen: [{ abMonat: 50, betragMonat: 25 }, { abMonat: 70, betragMonat: 30 }] };
+    const a = firmenAngebotSchema.parse({ modell });
+    expect(a.modell).toEqual(modell);
+    expect(angebotLesen(JSON.parse(JSON.stringify(a)))).toEqual(a);
+  });
+
+  it('individuelles Modell: weist Unsinn ab — negative Stufe, zu viele Stufen, Anteil über 100 %', () => {
+    const mit = (modell: object) => firmenAngebotSchema.safeParse({ modell: { art: 'frei', ...modell } }).success;
+    expect(mit({ stufen: [{ abMonat: -1, betragMonat: 10 }] })).toBe(false);
+    expect(mit({ stufen: [{ abMonat: 50 }] })).toBe(false);
+    expect(mit({ quote: 1.2 })).toBe(false);
+    expect(mit({ stufen: Array.from({ length: FREI_STUFEN_MAX }, (_, i) => ({ abMonat: i * 10, betragMonat: i })) })).toBe(true);
+    expect(mit({ stufen: Array.from({ length: FREI_STUFEN_MAX + 1 }, (_, i) => ({ abMonat: i * 10, betragMonat: i })) })).toBe(false);
   });
 });
 

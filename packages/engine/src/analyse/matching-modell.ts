@@ -989,6 +989,194 @@ export function festbetragGehaltsStaffel(
 }
 
 /* ==========================================================================
+ * FREIES MODELL: feste Zuschuesse nach Stufen — und dazu ein Anteil der
+ * Umwandlung.
+ *
+ * Der Arbeitgeber baut seine Regel selbst: „ab 50 EUR Umwandlung 25 EUR
+ * fest, ab 70 EUR 30 EUR“ und obendrauf „20 % auf die ganze Umwandlung“.
+ * Beides zusammen ist der Zuschuss nach der Regel; gezahlt wird — wie in
+ * jedem Modell — mindestens der gesetzliche Pflichtzuschuss.
+ *
+ *   - STUFEN: Es gilt die Stufe mit der hoechsten erreichten Schwelle, nicht
+ *     die Summe aller erreichten. Unter der ersten Schwelle gibt es keinen
+ *     festen Zuschuss.
+ *   - ANTEIL: `quote` auf die gesamte Umwandlung, hoechstens `deckelMonat`.
+ *
+ * Ohne Stufen ist es das Zuschussmodell, mit einer Stufe und ohne Anteil das
+ * Festbetragsmodell — die Rechnung ist dieselbe (`zuschussKern`).
+ * ======================================================================== */
+
+/** Eine Stufe: Ab `abMonat` Umwandlung gibt der Arbeitgeber `betragMonat` fest dazu. */
+export interface FreiStufe {
+  abMonat: number;
+  betragMonat: number;
+}
+
+export interface FreiRegel {
+  /** Anteil der gesamten Umwandlung, den der Arbeitgeber dazugibt — 0: keiner */
+  quote: number;
+  /** Hoechstbetrag des Anteils, Monat — `Infinity`: ohne Deckel */
+  deckelMonat: number;
+  stufen: readonly FreiStufe[];
+}
+
+export interface FreiEingaben extends KernEingaben, FreiRegel {}
+
+/**
+ * Die Stufen, wie gerechnet wird: aufsteigend nach der Schwelle, ohne
+ * negative Werte. Stehen zwei auf derselben Schwelle, gilt die spaetere —
+ * die zuletzt eingetragene.
+ */
+export function freiStufenGeordnet(stufen: readonly FreiStufe[]): FreiStufe[] {
+  const jeSchwelle = new Map<number, FreiStufe>();
+  for (const s of stufen) {
+    if (!Number.isFinite(s.abMonat) || !Number.isFinite(s.betragMonat)) continue;
+    const ab = Math.max(0, s.abMonat);
+    jeSchwelle.set(ab, { abMonat: ab, betragMonat: Math.max(0, s.betragMonat) });
+  }
+  return [...jeSchwelle.values()].sort((x, y) => x.abMonat - y.abMonat);
+}
+
+/** Die Stufe, die bei dieser Umwandlung gilt: die mit der hoechsten erreichten Schwelle — null unter der ersten. */
+export function freiStufe(stufen: readonly FreiStufe[], umwandlungMonat: number): FreiStufe | null {
+  let gilt: FreiStufe | null = null;
+  if (umwandlungMonat <= 0) return null;
+  for (const s of freiStufenGeordnet(stufen)) {
+    if (umwandlungMonat + 0.005 >= s.abMonat) gilt = s;
+  }
+  return gilt;
+}
+
+/** Der Zuschuss nach der Regel allein, Monat — vor der Untergrenze Pflichtzuschuss. */
+export function freiRegelMonat(regel: FreiRegel, umwandlungMonat: number): { festMonat: number; anteilMonat: number; gesamtMonat: number } {
+  const u = Math.max(0, umwandlungMonat);
+  const festMonat = freiStufe(regel.stufen, u)?.betragMonat ?? 0;
+  const anteilMonat = Math.min(Math.max(0, regel.quote) * u, Math.max(0, regel.deckelMonat));
+  return { festMonat, anteilMonat, gesamtMonat: festMonat + anteilMonat };
+}
+
+/** Der hoechste Zuschuss, den die Regel hergibt, Monat — `Infinity` bei einem Anteil ohne Deckel. */
+export function freiHoechstMonat(regel: FreiRegel): number {
+  const fest = freiStufenGeordnet(regel.stufen).reduce((m, s) => Math.max(m, s.betragMonat), 0);
+  return fest + (regel.quote > 0 ? Math.max(0, regel.deckelMonat) : 0);
+}
+
+const freieRegel = (regel: FreiRegel): ZuschussRegel =>
+  (e) => freiRegelMonat(regel, e / 12).gesamtMonat * 12;
+
+/**
+ * Die Umwandlung, bei der Umwandlung und Zuschuss den beitragsfreien Rahmen
+ * genau fuellen — Monat, auf Cent abgerundet. An jeder Schwelle springt die
+ * Summe; solange keine Stufe weniger gibt als die davor, faellt sie nie, und
+ * die Bisektion in `rahmenVoll` gilt auch hier.
+ */
+export function freiVollAusschoepfen(
+  e: Pick<FreiEingaben, 'jahresbrutto' | 'privatVersichert' | 'pkvPraemieMonat' | 'quote' | 'deckelMonat' | 'stufen' | 'bisher'>,
+  bundesland: string,
+  p: LegalParameters,
+): number {
+  return rahmenVoll(e, freieRegel(e), bundesland, p, vorbelegtJahr(e.bisher, true));
+}
+
+export interface FreiErgebnis extends ZuschussErgebnis {
+  /** Die Stufe, die bei dieser Umwandlung gilt — null unter der ersten */
+  stufe: FreiStufe | null;
+  /** Die naechste Stufe darueber — null, wenn es keine gibt */
+  naechsteStufe: FreiStufe | null;
+  /** Nach der Regel allein: der feste Zuschuss der Stufe, Monat */
+  festMonat: number;
+  /** Nach der Regel allein: der Anteil der Umwandlung, nach dem Deckel, Monat */
+  anteilMonat: number;
+}
+
+export function freiesModell(
+  e: FreiEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+): FreiErgebnis {
+  const regel = freieRegel(e);
+  const stufen = freiStufenGeordnet(e.stufen);
+  const quote = Math.max(0, e.quote);
+  const gedeckeltBei = (uJahr: number) => quote > 0 && quote * uJahr > e.deckelMonat * 12 + 0.5;
+  const r = zuschussKern(e, regel, steuerOpt, p, (a) => {
+    const h: string[] = [];
+    const nachRegel = regel(a.e);
+    if (a.e > 0 && nachRegel === 0) {
+      h.push(
+        'Nach Ihrer Regel gibt es bei dieser Umwandlung keinen Zuschuss. Gezahlt wird der gesetzliche '
+        + 'Pflichtzuschuss von 15 %, soweit der Arbeitgeber Sozialabgaben spart (§ 1a Abs. 1a BetrAVG).',
+      );
+    } else if (a.e > 0 && a.pflicht > nachRegel + 0.5) {
+      h.push(
+        `Bei dieser Umwandlung liegt der gesetzliche Pflichtzuschuss (15 %) mit ${euro(a.pflicht / 12)} über dem `
+        + `Zuschuss nach Ihrer Regel (${euro(nachRegel / 12)}) — gezahlt wird der höhere Betrag.`,
+      );
+    }
+    if (gedeckeltBei(a.e)) {
+      h.push(
+        `Der prozentuale Zuschuss ist bei ${euro(e.deckelMonat)} im Monat gedeckelt — jeder weitere Euro `
+        + 'Umwandlung erhöht ihn nicht mehr.',
+      );
+    }
+    // Eine hoehere Stufe mit kleinerem Betrag: Wer mehr umwandelt, bekaeme weniger.
+    const faellt = stufen.find((s, i) => i > 0 && s.betragMonat + 0.005 < stufen[i - 1]!.betragMonat);
+    if (faellt) {
+      h.push(
+        `Die Stufe ab ${euro(faellt.abMonat)} gibt weniger als die Stufe davor: Wer mehr umwandelt, bekäme `
+        + 'dann weniger festen Zuschuss. Üblich sind steigende Beträge.',
+      );
+    }
+    return h;
+  });
+  const u = r.mitarbeiter.umwandlungMonat;
+  const stufe = freiStufe(stufen, u);
+  const naechsteStufe = stufen.find((s) => s.abMonat > u + 0.005) ?? null;
+  const { festMonat, anteilMonat } = freiRegelMonat(e, u);
+  return { ...r, gedeckelt: gedeckeltBei(u * 12), stufe, naechsteStufe, festMonat, anteilMonat };
+}
+
+export interface FreiStaffelZeile extends ZuschussStufe {
+  /** Nach der Regel allein: fester Zuschuss der Stufe */
+  festMonat: number;
+  /** Nach der Regel allein: Anteil der Umwandlung */
+  anteilMonat: number;
+  /** Diese Umwandlung ist die Schwelle einer Stufe */
+  schwelle: boolean;
+}
+
+/**
+ * Die Staffel fuer den Arbeitgeber: was kostet ein Mitarbeiter an jeder
+ * Schwelle der Regel, bei 50, 100, 150, 200 EUR — und beim voll
+ * ausgeschoepften Rahmen. Hoechstens zehn Zeilen; die Schwellen gehen vor.
+ */
+export function freiStaffel(
+  e: FreiEingaben,
+  steuerOpt: MatchingSteuer,
+  p: LegalParameters,
+  weitere: readonly number[] = [50, 100, 150, 200],
+): FreiStaffelZeile[] {
+  const voll = freiVollAusschoepfen(e, steuerOpt.bundesland, p);
+  const schwellen = freiStufenGeordnet(e.stufen).map((s) => s.abMonat).filter((x) => x > 0);
+  const fest = [...new Set([...schwellen, voll])].filter((x) => x > 0);
+  const dazu = weitere.filter((x) => x > 0 && !fest.includes(x)).slice(0, Math.max(0, 10 - fest.length));
+  const alle = [...fest, ...dazu].sort((x, y) => x - y).slice(0, 10);
+  return alle.map((u) => {
+    const r = freiesModell({ ...e, umwandlungMonat: u }, steuerOpt, p);
+    return {
+      umwandlungMonat: u,
+      zuschussMonat: r.arbeitgeber.zuschussMonat,
+      festMonat: r.festMonat,
+      anteilMonat: r.anteilMonat,
+      arbeitgeberNettoMonat: r.arbeitgeber.nettoKostenMonat,
+      mitarbeiterNettoMonat: r.mitarbeiter.nettoAufwandMonat,
+      vertragMonat: r.vertragMonat,
+      voll: u === voll,
+      schwelle: schwellen.includes(u),
+    };
+  });
+}
+
+/* ==========================================================================
  * DER GANZE BETRIEB: Was kostet der Umstieg im Jahr?
  *
  * Gruppen, jede je Kopf exakt mit dem Modell der Seite gerechnet:

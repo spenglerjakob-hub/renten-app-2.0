@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
-  ArrowLeft, ArrowRight, Calculator, CheckCircle2, CircleDashed, ExternalLink, FileText,
-  Plus, Send, SkipForward, Trash2,
+  ArrowLeft, ArrowRight, Calculator, Camera, Check, CheckCircle2, ChevronDown, CircleDashed, ExternalLink, FileStack,
+  HeartPulse, HelpCircle, Landmark, ListChecks, Minus, Plus, Send, Target, Trash2, UserRound, Wallet, type LucideIcon,
 } from 'lucide-react';
 import {
   BUNDESLAENDER, BESOLDUNGSGRUPPEN, parameterFuer, parseDatum, alterExakt, heute,
@@ -17,13 +17,14 @@ import { DokumentHochladen } from './Dokumente';
 import { SeitenKopf } from '../components/SeitenKopf';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  ZahlFeld, ProzentFeld, DatumFeld, NamenFelder, AuswahlFeld, Schalter, euro,
+  ZahlFeld, ProzentFeld, DatumFeld, NamenFelder, AuswahlFeld, euro,
 } from '../components/Feld';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import {
-  EINLEITUNG, Etappen, FEHLER, Hervor, Hinweis, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, LINK, Titel,
+  EINLEITUNG, Etappen, FEHLER, FELD_LABEL, Hervor, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, LINK, Titel,
 } from '../components/stil';
 import { Dialog } from '../components/Dialog';
+import { Aufklapper, FrageKopf, Hilfe, Hilfen, JA_NEIN, Wahl, Zaehler } from '../components/Frage';
 import { EinkommenFelder } from '../features/EinkommenFelder';
 import { PkvFelder } from '../features/PkvFelder';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
@@ -35,9 +36,13 @@ import {
 /**
  * VORSORGE-CHECK — Schritt fuer Schritt alle Angaben, die der Rechner braucht.
  *
- * Fuer Endkunden: Jeder Schritt sagt zuerst, welche Unterlage man dafuer zur
- * Hand haben sollte und wo darauf die Zahl steht; danach kommen nur die
- * Felder, die der Rechner tatsaechlich verwendet. Gerechnet wird hier nicht —
+ * Fuer Endkunden, meist am Telefon ueber den Link des Beraters. Deshalb
+ * steht in jedem Schritt ZUERST die Frage und darunter gleich die Felder —
+ * nur die, die der Rechner tatsaechlich verwendet. Was beim Ausfuellen hilft,
+ * klappt darunter auf: wo die Zahl steht („Wo finde ich das?“) und, mit Link
+ * des Beraters, das Hochladen eines Fotos statt des Abtippens. Titel,
+ * Einleitung und Hinweis des Beraters stehen nur ueber dem ersten Schritt;
+ * „Weiter“ haftet am Telefon am unteren Rand. Gerechnet wird hier nicht —
  * am Ende wandert alles als Szenario in den Rentenplaner.
  *
  * Eigener Einstieg. Ohne Konto nur mit dem persoenlichen Link des Beraters
@@ -61,6 +66,21 @@ const SCHRITTE = [
   'Ihr Ziel',
   'Übersicht',
 ] as const;
+
+/**
+ * Die Frage ueber jedem Schritt, ein Satz dazu und ein Zeichen, an dem man
+ * den Schritt wiedererkennt. Die kurzen Namen oben (`SCHRITTE`) bleiben fuer
+ * die Schrittleiste und die Uebersicht.
+ */
+const FRAGEN: readonly { symbol: LucideIcon; titel: string; unter: string }[] = [
+  { symbol: UserRound, titel: 'Zuerst zu Ihnen', unter: 'Aus dem Geburtsdatum ergibt sich Ihr Rentenbeginn; die Familie zählt für Steuer und Zulagen.' },
+  { symbol: Wallet, titel: 'Was verdienen Sie?', unter: 'Ein normaler Monat, ohne Weihnachts- oder Urlaubsgeld.' },
+  { symbol: HeartPulse, titel: 'Wie sind Sie krankenversichert?', unter: 'Gesetzlich genügt der Name der Kasse; privat der Monatsbeitrag.' },
+  { symbol: Landmark, titel: 'Was bekommen Sie später an Rente?', unter: 'Der Betrag steht auf Ihrer Renteninformation. Nicht zur Hand? Dann schätzen wir.' },
+  { symbol: FileStack, titel: 'Welche Vorsorge haben Sie schon?', unter: 'Betriebsrente, Riester, private Rente, Depot — je Vertrag ein Eintrag. Keinen zu haben ist auch eine Angabe.' },
+  { symbol: Target, titel: 'Wie viel möchten Sie im Ruhestand haben?', unter: 'Im Monat, in heutigem Geld — die Preissteigerung bis dahin rechnen wir selbst hinzu.' },
+  { symbol: ListChecks, titel: 'Alles auf einen Blick', unter: 'Prüfen Sie Ihre Angaben. Was offen ist, können Sie ergänzen — oder so lassen.' },
+];
 
 /** Vertragsarten in Alltagssprache — die Fachbegriffe stehen in Klammern. */
 const VERTRAGSARTEN: { wert: VertragsTyp; text: string }[] = [
@@ -112,6 +132,15 @@ function ladeStand(): Stand {
   return { antworten: leereAntworten(), schritt: 0 };
 }
 
+/** Die Unterlage in der zugeklappten Zeile „Foto statt abtippen“. */
+const UNTERLAGE_KURZ: Record<DokumentArt, string> = {
+  einkommen: 'Gehaltsabrechnung',
+  kv: 'Beitragsrechnung oder Versichertenkarte',
+  rente: 'Renteninformation',
+  vertraege: 'Standmitteilungen',
+  sonstiges: 'Versicherungsschein, Bescheid oder Angebot',
+};
+
 /**
  * Welche Unterlage zu welchem Schritt gehoert. Ist dort eine hochgeladen, gilt
  * der Schritt als erledigt: Der Berater liest die Zahlen selbst ab.
@@ -152,6 +181,9 @@ export function Seite() {
   /* --- Anfrage des Beraters --- */
   const [codeStatus, setCodeStatus] = useState<CodeStatus | 'pruefe'>(ANFRAGE ? 'pruefe' : 'gueltig');
   const [einwilligung, setEinwilligung] = useState(false);
+  /** „Senden“ ohne Haken getippt: zum Haken fuehren, statt den Knopf stumm zu sperren. */
+  const [erinnern, setErinnern] = useState(false);
+  const haken = useRef<HTMLInputElement>(null);
   const [senden, setSenden] = useState<'bereit' | 'laeuft' | 'fertig' | 'fehler'>('bereit');
   useEffect(() => {
     if (ANFRAGE) void codePruefen(ANFRAGE).then(setCodeStatus);
@@ -165,6 +197,12 @@ export function Seite() {
   /** An den Berater, der den Link geschickt hat. */
   const absenden = async () => {
     if (!ANFRAGE) return;
+    if (!einwilligung) {
+      setErinnern(true);
+      haken.current?.focus({ preventScroll: true });
+      haken.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
     setSenden('laeuft');
     const r = await einreichen(ANFRAGE, JSON.parse(exportiere(szenarioAusCheck(x))) as unknown);
     if (r === 'ok') {
@@ -194,19 +232,34 @@ export function Seite() {
     setStand((s) => ({
       ...s, antworten: { ...s.antworten, dokumente: s.antworten.dokumente.filter((d) => d.pfad !== pfad) },
     }));
-  const upload = (art: DokumentArt, titel: string, text?: string) => (darfHochladen && ANFRAGE ? (
-    <DokumentHochladen
-      code={ANFRAGE}
-      art={art}
-      titel={titel}
-      text={text}
-      alle={x.dokumente}
-      einwilligung={x.dokumenteEinwilligung}
-      onEinwilligung={(b) => setze({ dokumenteEinwilligung: b })}
-      onHinzu={dokumentHinzu}
-      onEntfernt={dokumentWeg}
-    />
-  ) : undefined);
+  /** Zugeklappt unter den Feldern; mit schon hochgeladenen Unterlagen offen. */
+  const upload = (art: DokumentArt, titel: string, text?: string) => {
+    if (!darfHochladen || !ANFRAGE) return undefined;
+    const n = x.dokumente.filter((d) => d.art === art).length;
+    return (
+      <Aufklapper
+        symbol={Camera}
+        titel={art === 'sonstiges' ? 'Weitere Unterlagen hochladen' : 'Foto statt abtippen'}
+        zusatz={n > 0
+          ? `${n} ${n === 1 ? 'Unterlage' : 'Unterlagen'} hochgeladen`
+          : `${UNTERLAGE_KURZ[art]} hochladen — Ihr Berater liest die Zahlen ab.`}
+        offenAnfangs={n > 0}
+      >
+        <DokumentHochladen
+          eingebettet
+          code={ANFRAGE}
+          art={art}
+          titel={titel}
+          text={text}
+          alle={x.dokumente}
+          einwilligung={x.dokumenteEinwilligung}
+          onEinwilligung={(b) => setze({ dokumenteEinwilligung: b })}
+          onHinzu={dokumentHinzu}
+          onEntfernt={dokumentWeg}
+        />
+      </Aufklapper>
+    );
+  };
   const setzePerson = (id: 'a' | 'b', p: Partial<PersonAntwort>) =>
     setStand((s) => ({ ...s, antworten: { ...s.antworten, [id]: { ...s.antworten[id], ...p } } }));
   const geheZu = (i: number) => {
@@ -229,57 +282,67 @@ export function Seite() {
     else uebernehmen();
   };
 
+  const erster = schritt === 0;
+  const fertig = senden === 'fertig';
   const personen: ['a' | 'b', string][] = x.verheiratet
     ? [['a', x.a.name.trim() || 'Sie'], ['b', x.b.name.trim() || 'Partner/in']]
     : [['a', 'Sie']];
 
   return (
-    <div className="min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
+    <div className="check-seite min-h-screen bg-ui-flaeche text-ui-tinte print:min-h-0 print:bg-white">
       <SeitenKopf breite="max-w-4xl" />
 
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
-        <Titel gross>
-          Ihre Vorsorge in <Hervor>7 Schritten</Hervor>
-        </Titel>
-        <p className={`mt-3 ${EINLEITUNG}`}>
-          Wir fragen nur, was für die Berechnung wirklich zählt — und sagen bei jedem Schritt,
-          welche Unterlage Sie dafür brauchen. Was Sie gerade nicht zur Hand haben, überspringen
-          Sie einfach; es lässt sich später ergänzen.
-        </p>
+      {/* Am Telefon bleibt unten Platz fuer die haftende Leiste mit „Weiter“. */}
+      <main className="mx-auto max-w-4xl px-4 pb-32 pt-4 sm:px-6 sm:pb-10 sm:pt-10">
+        {/* Titel und Einleitung nur ueber dem ersten Schritt: Danach zaehlt die Frage, nicht die Begruessung. */}
+        {erster && !fertig && (
+          <>
+            <Titel gross>
+              Ihre Vorsorge in <Hervor>7 Schritten</Hervor>
+            </Titel>
+            {/*
+              MIT LINK DES BERATERS. Der Name des Beraters steht hier bewusst
+              NICHT: Konten kann jeder anlegen, ein angezeigter Name bewiese
+              also nichts. Wahr ist allein, dass die Angaben dorthin gehen,
+              woher der Link kam — und genau das steht da.
+            */}
+            <p className={`mt-3 ${EINLEITUNG}`}>
+              {ANFRAGE
+                ? 'Ihr Berater hat Sie um diese Angaben gebeten. Am Ende senden Sie sie mit einem Klick an ihn — ohne Konto.'
+                : 'Sieben kurze Schritte, dann rechnet der Rentenplaner Ihre Versorgung im Ruhestand durch.'}
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm leading-relaxed text-ui-tinte">
+              {[
+                'Was Sie nicht wissen oder nicht zur Hand haben, lassen Sie frei.',
+                ...(darfHochladen ? ['Unterlagen können Sie fotografieren, statt abzutippen.'] : []),
+                ...(ANFRAGE ? ['Ihr Zwischenstand bleibt auf diesem Gerät gespeichert.'] : []),
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-ui-schiefer" aria-hidden /> {t}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
-        {/*
-          MIT LINK DES BERATERS. Der Name des Beraters steht hier bewusst
-          NICHT: Konten kann jeder anlegen, ein angezeigter Name bewiese also
-          nichts. Wahr ist allein, dass die Angaben dorthin gehen, woher der
-          Link kam — und genau das steht da.
-        */}
-        {ANFRAGE && senden !== 'fertig' && (
-          /* Ein abgelaufener Link ist ein Fehler und steht in Rot; alles andere ruhig auf der Innenflaeche. */
-          <div role="status" className={`mt-6 rounded-[10px] px-4 py-3 text-sm leading-relaxed [&_strong]:font-medium ${
+        {/* Stimmt mit dem Link etwas nicht, steht es ueber jedem Schritt: abgelaufen in Rot, sonst ruhig. */}
+        {ANFRAGE && !fertig && (codeStatus === 'ungueltig' || codeStatus === 'fehler') && (
+          <div role="status" className={`rounded-[10px] px-4 py-3 text-sm leading-relaxed [&_strong]:font-medium ${
+            erster ? 'mt-5' : 'mb-4'} ${
             codeStatus === 'ungueltig' ? 'border border-rose-200 bg-rose-50 text-rose-900' : 'ui-innen text-ui-tinte'
           }`}>
             {codeStatus === 'ungueltig'
               ? <><strong>Dieser Link ist abgelaufen oder wurde schon genutzt.</strong> Bitte fragen Sie
                   Ihren Berater nach einem neuen Link. Ihre Eingaben bleiben auf diesem Gerät erhalten.</>
-              : codeStatus === 'fehler'
-                ? <>Die Verbindung zum Server ließ sich gerade nicht prüfen. Sie können trotzdem
-                    ausfüllen — beim Absenden wird es erneut versucht.</>
-                : <><strong>Ihr Berater hat Sie um diese Angaben gebeten.</strong> Wenn Sie fertig sind,
-                    senden Sie sie mit einem Klick an ihn — ein Konto brauchen Sie nicht. Ihr
-                    Zwischenstand bleibt auf diesem Gerät gespeichert, bis Sie absenden.
-                    {darfHochladen && (
-                      <span className="mt-1.5 block">
-                        <strong>Statt abtippen:</strong> Gehaltsabrechnung, Renteninformation und Verträge
-                        können Sie ab Schritt 2 einfach fotografieren oder als PDF hochladen.
-                      </span>
-                    )}</>}
+              : <>Die Verbindung zum Server ließ sich gerade nicht prüfen. Sie können trotzdem
+                  ausfüllen — beim Absenden wird es erneut versucht.</>}
           </div>
         )}
 
-        {senden === 'fertig' ? (
-          <section className="ui-karte mt-8 p-6 text-center sm:p-10">
+        {fertig ? (
+          <section className="ui-karte mt-4 p-6 text-center sm:p-10">
             <CheckCircle2 className="mx-auto h-12 w-12 text-ui-tinte" aria-hidden />
-            <h2 className="ui-titel mt-4 text-[26px] font-normal text-ui-tinte">Vielen Dank!</h2>
+            <Titel klasse="mt-4">Vielen Dank!</Titel>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ui-schiefer">
               Ihre Angaben sind bei Ihrem Berater angekommen. Er rechnet Ihre Vorsorge damit durch
               und bespricht das Ergebnis mit Ihnen. Auf diesem Gerät ist nichts mehr gespeichert.
@@ -292,7 +355,7 @@ export function Seite() {
           aktuell volle Tinte, erledigt halbe, offen Haarlinie — statt Blau
           und Gruen. Erledigt heisst vollstaendig, nicht nur besucht.
         */}
-        <div className="mt-8 print:hidden">
+        <div className={`${erster ? 'mt-8' : ''} print:hidden`}>
           <Etappen
             schritte={SCHRITTE}
             aktiv={schritt}
@@ -302,11 +365,13 @@ export function Seite() {
           />
         </div>
 
-        {/* --- Der aktuelle Schritt: eine weisse Karte wie ein Schritt der Beratung --- */}
+        {/*
+          Der aktuelle Schritt: eine weisse Karte. Oben die Frage, darunter
+          gleich die Felder; Hilfe und Hochladen klappen darunter auf. Ab dem
+          zweiten Schritt ist die Frage die Hauptueberschrift der Seite.
+        */}
         <section className="ui-karte mt-4 p-5 sm:p-7 print:hidden">
-          <Titel als="h2">
-            <span className="text-ui-schiefer">{schritt + 1}.</span> {SCHRITTE[schritt]}
-          </Titel>
+          <FrageKopf {...FRAGEN[schritt]!} als={erster ? 'h2' : 'h1'} />
 
           {schritt === 0 && <SchrittHaushalt x={x} setze={setze} setzePerson={setzePerson} />}
           {schritt === 1 && (
@@ -336,7 +401,9 @@ export function Seite() {
               geheZu={geheZu}
               anfrage={ANFRAGE !== null}
               einwilligung={einwilligung}
-              setEinwilligung={setEinwilligung}
+              setEinwilligung={(b) => { setEinwilligung(b); if (b) setErinnern(false); }}
+              haken={haken}
+              erinnern={erinnern}
               upload={upload('sonstiges', 'Weitere Unterlagen hochladen',
                 'Was sonst noch hilft — Versicherungsschein, Bescheid, Angebot. Foto oder PDF, bis 10 MB.')}
             />
@@ -347,48 +414,48 @@ export function Seite() {
               Sie es noch einmal. Ihre Angaben sind nicht verloren.
             </p>
           )}
+          {/* Statt eines zweiten Knopfs „Habe ich gerade nicht zur Hand“: „Weiter“ geht immer. */}
+          {schritt < SCHRITTE.length - 1 && !vollstaendig(schritt, x) && (
+            <p className="mt-6 text-sm leading-relaxed text-ui-schiefer">
+              Nicht alles zur Hand? Gehen Sie einfach weiter — Sie können es später ergänzen.
+            </p>
+          )}
+        </section>
 
-          {/* Navigation */}
-          {/* Wie die Navigation der Beratung: Zurueck mit Kontur, Weiter gefuellt — rechts. */}
-          <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-ui-linie pt-6">
+        {/*
+          NAVIGATION. Am Telefon haftet sie am unteren Rand: „Weiter“ liegt
+          immer unter dem Daumen, gleich wie lang der Schritt ist. Ab der
+          Breite eines Tablets steht sie unter der Karte, Weiter rechts.
+        */}
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-ui-linie bg-ui-karte px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:z-auto sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 print:hidden">
+          <div className="mx-auto flex max-w-4xl items-center gap-2">
             {schritt > 0 && (
-              <button type="button" onClick={() => geheZu(schritt - 1)} className={KNOPF_ZWEIT}>
+              <button type="button" onClick={() => geheZu(schritt - 1)} className={`${KNOPF_ZWEIT} min-h-[3rem] sm:min-h-0`}>
                 <ArrowLeft className="h-4 w-4" aria-hidden /> Zurück
               </button>
             )}
-            <span className="flex-1" />
+            <span className="hidden flex-1 sm:block" />
             {schritt < SCHRITTE.length - 1 ? (
-              <>
-                {!vollstaendig(schritt, x) && (
-                  <button
-                    type="button"
-                    onClick={() => geheZu(schritt + 1)}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-ui-schiefer hover:bg-ui-innen hover:text-ui-tinte"
-                  >
-                    <SkipForward className="h-3.5 w-3.5" aria-hidden /> Habe ich gerade nicht zur Hand
-                  </button>
-                )}
-                <button type="button" onClick={() => geheZu(schritt + 1)} className={KNOPF}>
-                  Weiter <ArrowRight className="h-4 w-4" aria-hidden />
-                </button>
-              </>
+              <button type="button" onClick={() => geheZu(schritt + 1)} className={`${KNOPF} min-h-[3rem] flex-1 sm:min-h-0 sm:flex-none`}>
+                Weiter <ArrowRight className="h-4 w-4" aria-hidden />
+              </button>
             ) : ANFRAGE ? (
               <button
                 type="button"
                 onClick={() => void absenden()}
-                disabled={!einwilligung || codeStatus === 'ungueltig' || senden === 'laeuft'}
-                className={`${KNOPF} disabled:cursor-not-allowed`}
+                disabled={codeStatus === 'ungueltig' || senden === 'laeuft'}
+                className={`${KNOPF} min-h-[3rem] flex-1 disabled:cursor-not-allowed sm:min-h-0 sm:flex-none`}
               >
                 <Send className="h-4 w-4" aria-hidden />
                 {senden === 'laeuft' ? 'Wird gesendet …' : 'An meinen Berater senden'}
               </button>
             ) : (
-              <button type="button" onClick={berechnen} className={KNOPF}>
+              <button type="button" onClick={berechnen} className={`${KNOPF} min-h-[3rem] flex-1 sm:min-h-0 sm:flex-none`}>
                 <Calculator className="h-4 w-4" aria-hidden /> Ergebnis berechnen
               </button>
             )}
           </div>
-        </section>
+        </div>
 
         </>)}
 
@@ -425,19 +492,10 @@ export function Seite() {
    Bausteine
    -------------------------------------------------------------------------- */
 
-/** „Das brauchen Sie" — die Unterlage zu diesem Schritt und wo die Zahl steht: ein ruhiger Hinweis statt eines gelben Kastens. */
-function Unterlage({ children }: { children: ReactNode }) {
+/** Ein Abschnitt der Karte; ab dem zweiten durch eine Haarlinie getrennt. Die Ueberschrift nennt die Person, wenn es zwei gibt. */
+function Block({ titel, erster = false, children }: { titel?: string; erster?: boolean; children: ReactNode }) {
   return (
-    <Hinweis symbol={FileText} klasse="mt-5 [&_strong]:font-medium">
-      <span className="font-medium">Das brauchen Sie: </span>{children}
-    </Hinweis>
-  );
-}
-
-/** Ein Abschnitt der Karte, durch eine Haarlinie getrennt; die Ueberschrift nennt die Person, wenn es zwei gibt. */
-function Block({ titel, children }: { titel?: string; children: ReactNode }) {
-  return (
-    <div className="mt-6 border-t border-ui-linie pt-6">
+    <div className={erster ? 'mt-5' : 'mt-6 border-t border-ui-linie pt-6'}>
       {titel && <h3 className="mb-4 text-base font-medium text-ui-tinte">{titel}</h3>}
       {children}
     </div>
@@ -453,22 +511,22 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
   const avd = parameterFuer(Math.max(JETZT, 2027), { indexRate: 0 }).avd;
   return (
     <>
-      <Unterlage>
-        Ihr Personalausweis für das Geburtsdatum — daraus ergibt sich Ihr Rentenbeginn. Bei Kindern
-        genügt das Geburtsjahr; es entscheidet über Kinderfreibetrag und Zulagen.
-      </Unterlage>
-
-      <Block>
+      <Block erster>
         <div className="grid gap-4 sm:grid-cols-2">
           <NamenFelder {...namensTeile(x.a.name, x.a.vorname, x.a.nachname)} beschriftung={['Ihr Vorname', 'Ihr Nachname']}
             onChange={(teile) => setzePerson('a', mitName(teile))} eigener />
           <DatumFeld label="Ihr Geburtsdatum" wert={x.a.geburtsdatum}
             onChange={(s) => setzePerson('a', { geburtsdatum: s })} />
         </div>
-        <div className="mt-3">
-          <Schalter label="Verheiratet oder eingetragene Lebenspartnerschaft" wert={x.verheiratet}
-            onChange={(b) => setze({ verheiratet: b })} />
-        </div>
+      </Block>
+
+      <Block>
+        <Wahl
+          label="Verheiratet oder in eingetragener Lebenspartnerschaft?"
+          wert={x.verheiratet ? 'ja' : 'nein'}
+          optionen={JA_NEIN}
+          onChange={(v) => setze({ verheiratet: v === 'ja' })}
+        />
         {x.verheiratet && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <NamenFelder {...namensTeile(x.b.name, x.b.vorname, x.b.nachname)}
@@ -477,30 +535,19 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
               onChange={(s) => setzePerson('b', { geburtsdatum: s })} />
           </div>
         )}
-      </Block>
-
-      <Block>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <AuswahlFeld label="Bundesland" wert={x.bundesland} onChange={(v) => setze({ bundesland: v })}
-            optionen={BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }))} />
-          <div className="sm:pt-6">
-            <Schalter label="Kirchensteuerpflichtig" wert={x.kirchensteuer}
-              onChange={(b) => setze({ kirchensteuer: b })} />
-          </div>
-        </div>
-        <div className="mt-3">
-          <ZahlFeld
+        <div className="mt-5">
+          <Zaehler
             label="Kinder"
             wert={x.kinder.length}
-            onChange={(n) => setze({
-              kinder: Array.from({ length: Math.max(0, Math.min(15, Math.round(n))) },
-                (_, i) => x.kinder[i] ?? { geburtsjahr: JETZT - 5 }),
-            })}
             max={15}
-            stufen
+            weniger="Ein Kind weniger"
+            mehr="Ein Kind mehr"
+            onChange={(n) => setze({
+              kinder: Array.from({ length: n }, (_, i) => x.kinder[i] ?? { geburtsjahr: JETZT - 5 }),
+            })}
           />
           {x.kinder.length > 0 && (
-            <div className="ui-innen mt-2 p-3">
+            <div className="ui-innen mt-3 p-3">
               <KinderZeilen
                 kinder={x.kinder}
                 onKind={(index, p) => setze({
@@ -512,6 +559,19 @@ function SchrittHaushalt({ x, setze, setzePerson }: { x: Antworten; setze: Setze
               <KinderHinweis a={avd} />
             </div>
           )}
+        </div>
+      </Block>
+
+      <Block>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <AuswahlFeld label="Bundesland" wert={x.bundesland} onChange={(v) => setze({ bundesland: v })}
+            optionen={BUNDESLAENDER.map((l) => ({ wert: l as string, text: l }))} />
+          <Wahl
+            label="Zahlen Sie Kirchensteuer?"
+            wert={x.kirchensteuer ? 'ja' : 'nein'}
+            optionen={JA_NEIN}
+            onChange={(v) => setze({ kirchensteuer: v === 'ja' })}
+          />
         </div>
       </Block>
     </>
@@ -527,22 +587,25 @@ function SchrittEinkommen({ x, personen, setzePerson, upload }: {
 }) {
   return (
     <>
-      <Unterlage>
-        Ihre letzte <strong>Gehaltsabrechnung</strong>: das Gesamtbrutto eines normalen Monats, ohne
-        Sonderzahlungen — Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter.
-        Beamte: die <strong>Bezügemitteilung</strong> (Besoldungsgruppe, Stufe).
-        Selbstständige: der Gewinn aus dem letzten <strong>Steuerbescheid</strong>, geteilt durch 12.
-      </Unterlage>
-      {upload}
-      {personen.map(([id, name]) => (
-        <Block key={id} titel={personen.length > 1 ? name : undefined}>
+      {personen.map(([id, name], i) => (
+        <Block key={id} erster={i === 0} titel={personen.length > 1 ? name : undefined}>
           <EinkommenFelder
             wert={x[id].einkommen}
             onChange={(p) => setzePerson(id, { einkommen: { ...x[id].einkommen, ...p } })}
             spalten={2}
+            artAlsKnoepfe
           />
         </Block>
       ))}
+      <Hilfen>
+        <Hilfe unterlage="Auf der Gehaltsabrechnung">
+          Ihre letzte <strong>Gehaltsabrechnung</strong>: das Gesamtbrutto eines normalen Monats, ohne
+          Sonderzahlungen — Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter.
+          Beamte: die <strong>Bezügemitteilung</strong> (Besoldungsgruppe, Stufe).
+          Selbstständige: der Gewinn aus dem letzten <strong>Steuerbescheid</strong>, geteilt durch 12.
+        </Hilfe>
+        {upload}
+      </Hilfen>
     </>
   );
 }
@@ -591,14 +654,8 @@ function SchrittKv({ x, setze, personen, upload }: {
   const setzeB = (p: Partial<Antworten['kvB']>) => setze({ kvB: { ...kB, ...p } });
   return (
     <>
-      <Unterlage>
-        Gesetzlich versichert: nur der <strong>Name Ihrer Krankenkasse</strong> — den Zusatzbeitrag
-        kennen wir. Privat versichert: Ihre <strong>Beitragsrechnung</strong> oder das letzte
-        Schreiben zur Beitragsanpassung (Monatsbeitrag gesamt, ggf. Beitragsentlastungstarif).
-      </Unterlage>
-      {upload}
-      <Block titel={personen.length > 1 ? personen[0]![1] : undefined}>
-        <div className="grid gap-2 sm:grid-cols-2">
+      <Block erster titel={personen.length > 1 ? personen[0]![1] : undefined}>
+        <div className="grid grid-cols-2 gap-2">
           {(['gesetzlich', 'privat'] as const).map((art) => (
             <button
               key={art}
@@ -606,7 +663,7 @@ function SchrittKv({ x, setze, personen, upload }: {
               onClick={() => setze({ kv: art })}
               aria-pressed={x.kv === art}
               // Gewaehlt wie ein Reiter: gefuellt in Soot.
-              className={`rounded-[8px] border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+              className={`min-h-[3rem] rounded-[8px] border px-3 py-2.5 text-left text-sm font-medium leading-snug transition-colors ${
                 x.kv === art
                   ? 'border-ui-dunkel bg-ui-dunkel text-white'
                   : 'border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover'
@@ -645,6 +702,14 @@ function SchrittKv({ x, setze, personen, upload }: {
           )}
         </Block>
       )}
+      <Hilfen>
+        <Hilfe unterlage="Krankenkasse oder Beitragsrechnung">
+          Gesetzlich versichert: nur der <strong>Name Ihrer Krankenkasse</strong> — den Zusatzbeitrag
+          kennen wir. Privat versichert: Ihre <strong>Beitragsrechnung</strong> oder das letzte
+          Schreiben zur Beitragsanpassung (Monatsbeitrag gesamt, ggf. Beitragsentlastungstarif).
+        </Hilfe>
+        {upload}
+      </Hilfen>
     </>
   );
 }
@@ -656,37 +721,39 @@ function SchrittRente({ x, personen, setzePerson, upload }: {
 }) {
   return (
     <>
-      <Unterlage>
-        Die <strong>Renteninformation</strong> der Deutschen Rentenversicherung (kommt jährlich ab
-        27): der Betrag unter <em>„Höhe Ihrer künftigen Regelaltersrente“</em>. Beamte: die{' '}
-        <strong>Versorgungsauskunft</strong> Ihres Dienstherrn mit dem Ruhegehaltssatz. Keine
-        Renteninformation zur Hand? Dann schätzen wir aus Ihrem Einkommen — oder Sie fordern sie an.
-        {/*
-          Der Weg zur genauen Zahl. Die Schaetzung ist eine Notloesung; wer die
-          Renteninformation nicht findet, soll sie mit einem Klick anfordern
-          koennen, statt sie im Keller zu suchen.
-        */}
-        <a
-          href={DRV_ESERVICE}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`${LINK} mt-2 underline`}
-        >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          Renteninformation / Rentenauskunft online anfordern (Deutsche Rentenversicherung)
-        </a>
-      </Unterlage>
-      {upload}
-      {personen.map(([id, name]) => (
-        <RenteJePerson key={id} p={x[id]} name={personen.length > 1 ? name : undefined}
+      {personen.map(([id, name], i) => (
+        <RenteJePerson key={id} p={x[id]} name={personen.length > 1 ? name : undefined} erster={i === 0}
           setze={(p) => setzePerson(id, p)} />
       ))}
+      <Hilfen>
+        <Hilfe unterlage="Auf der Renteninformation">
+          Die <strong>Renteninformation</strong> der Deutschen Rentenversicherung (kommt jährlich ab
+          27): der Betrag unter <em>„Höhe Ihrer künftigen Regelaltersrente“</em>. Beamte: die{' '}
+          <strong>Versorgungsauskunft</strong> Ihres Dienstherrn mit dem Ruhegehaltssatz. Keine
+          Renteninformation zur Hand? Dann schätzen wir aus Ihrem Einkommen — oder Sie fordern sie an.
+          {/*
+            Der Weg zur genauen Zahl. Die Schaetzung ist eine Notloesung; wer die
+            Renteninformation nicht findet, soll sie mit einem Klick anfordern
+            koennen, statt sie im Keller zu suchen.
+          */}
+          <a
+            href={DRV_ESERVICE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${LINK} mt-2 underline`}
+          >
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Renteninformation / Rentenauskunft online anfordern (Deutsche Rentenversicherung)
+          </a>
+        </Hilfe>
+        {upload}
+      </Hilfen>
     </>
   );
 }
 
-function RenteJePerson({ p, name, setze }: {
-  p: PersonAntwort; name?: string; setze: (p: Partial<PersonAntwort>) => void;
+function RenteJePerson({ p, name, erster, setze }: {
+  p: PersonAntwort; name?: string; erster: boolean; setze: (p: Partial<PersonAntwort>) => void;
 }) {
   const [geschaetzt, setGeschaetzt] = useState(false);
   const regel = regelRentenbeginn(p.geburtsdatum);
@@ -713,7 +780,7 @@ function RenteJePerson({ p, name, setze }: {
   };
 
   return (
-    <Block titel={name}>
+    <Block erster={erster} titel={name}>
       {beamter ? (
         <div className="grid gap-3 sm:grid-cols-3">
           <AuswahlFeld label="Besoldungsgruppe am Ende" wert={p.endBesoldungsgruppe}
@@ -749,9 +816,9 @@ function RenteJePerson({ p, name, setze }: {
                 type="button"
                 onClick={schaetzen}
                 disabled={!parseDatum(p.geburtsdatum) || (e.modus !== 'selbststaendig' && e.betrag <= 0)}
-                className={`mb-6 ${KNOPF_KLEIN} disabled:cursor-not-allowed`}
+                className={`${KNOPF_ZWEIT} min-h-[3rem] w-full disabled:cursor-not-allowed sm:mb-6 sm:min-h-0 sm:w-auto`}
               >
-                <Calculator className="h-3.5 w-3.5" aria-hidden /> Keine Renteninformation? Schätzen
+                <Calculator className="h-4 w-4" aria-hidden /> Keine Renteninformation? Schätzen
               </button>
             )}
           </div>
@@ -784,16 +851,8 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
 
   return (
     <>
-      <Unterlage>
-        Die jährliche <strong>Standmitteilung</strong> jedes Vertrags: die garantierte bzw.
-        prognostizierte Monatsrente, der aktuelle Beitrag und das Beginnjahr. Bei Betriebsrenten
-        den Anteil Ihres Arbeitgebers (Gehaltsabrechnung). Für Depots den aktuellen{' '}
-        <strong>Depotauszug</strong>. Die gesetzliche Rente gehört nicht hierher — die kam in Schritt 4.
-      </Unterlage>
-      {upload}
-
       {x.vertraege.length === 0 && (
-        <p className="mt-6 rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-5 text-center text-sm text-ui-schiefer">
+        <p className="mt-5 rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-5 text-center text-sm text-ui-schiefer">
           {x.dokumente.some((d) => d.art === 'vertraege')
             ? 'Ihre Standmitteilungen sind hochgeladen — Ihr Berater übernimmt die Verträge daraus.'
             : 'Noch keine Verträge. Keine zu haben ist auch eine Angabe — dann einfach weiter.'}
@@ -805,7 +864,7 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
         const avd = v.typ === 'avd';
         const immobilie = v.typ === 'immobilie';
         return (
-          <Block key={v.id}>
+          <Block key={v.id} erster={i === 0}>
             <div className="mb-3 flex items-center justify-between">
               <span className="text-base font-medium text-ui-tinte">Vertrag {i + 1}</span>
               <button
@@ -856,9 +915,18 @@ function SchrittVertraege({ x, setze, upload }: { x: Antworten; setze: Setze; up
         );
       })}
 
-      <button type="button" onClick={neu} className={`mt-6 ${KNOPF_ZWEIT}`}>
+      <button type="button" onClick={neu} className={`mt-5 min-h-[3rem] w-full sm:min-h-0 sm:w-auto ${KNOPF_ZWEIT}`}>
         <Plus className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
       </button>
+      <Hilfen>
+        <Hilfe unterlage="Auf der Standmitteilung">
+          Die jährliche <strong>Standmitteilung</strong> jedes Vertrags: die garantierte bzw.
+          prognostizierte Monatsrente, der aktuelle Beitrag und das Beginnjahr. Bei Betriebsrenten
+          den Anteil Ihres Arbeitgebers (Gehaltsabrechnung). Für Depots den aktuellen{' '}
+          <strong>Depotauszug</strong>. Die gesetzliche Rente gehört nicht hierher — die kam in Schritt 4.
+        </Hilfe>
+        {upload}
+      </Hilfen>
     </>
   );
 }
@@ -883,11 +951,7 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
 
   return (
     <>
-      <Unterlage>
-        Keine Unterlage — nur eine Überlegung: Wie viel Geld im Monat brauchen Sie im Ruhestand,
-        gerechnet in <strong>heutigem Geld</strong>? Die Preissteigerung bis dahin rechnen wir selbst hinzu.
-      </Unterlage>
-      <Block>
+      <Block erster>
         <div className="grid items-end gap-4 sm:grid-cols-2">
           <ZahlFeld label="Gewünschtes Netto im Monat (heutiges Geld)" wert={x.zielNettoHeute}
             onChange={(n) => setze({ zielNettoHeute: n })} einheit="€" />
@@ -895,7 +959,7 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
             <button
               type="button"
               onClick={() => setze({ zielNettoHeute: vorschlag })}
-              className="mb-0.5 rounded-[8px] border border-ui-zweit-rand bg-ui-karte px-3 py-2 text-left text-xs text-ui-tinte transition-colors hover:bg-ui-hover"
+              className="mb-0.5 min-h-[3rem] rounded-[8px] border border-ui-zweit-rand bg-ui-karte px-3 py-2 text-left text-sm text-ui-tinte transition-colors hover:bg-ui-hover"
             >
               Vorschlag übernehmen: <span className="font-medium">{euro(vorschlag)}</span>
               <span className="block text-xs text-ui-schiefer">
@@ -911,13 +975,16 @@ function SchrittZiel({ x, setze }: { x: Antworten; setze: Setze }) {
 
 /* --- 7. Uebersicht ---------------------------------------------------------- */
 
-function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, upload }: {
+function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, haken, erinnern, upload }: {
   x: Antworten;
   geheZu: (i: number) => void;
   /** Mit Link des Beraters: senden statt selbst berechnen */
   anfrage: boolean;
   einwilligung: boolean;
   setEinwilligung: (b: boolean) => void;
+  /** Der Haken der Einwilligung — „Senden“ ohne ihn fuehrt hierher */
+  haken: RefObject<HTMLInputElement>;
+  erinnern: boolean;
   /** „Weitere Unterlagen" — nur mit Link */
   upload?: ReactNode;
 }) {
@@ -959,7 +1026,7 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
                     ? `${unterlagen} Unterlage${unterlagen > 1 ? 'n' : ''} hochgeladen — Ihr Berater liest die Zahlen ab`
                     : ok
                       ? `${zusammenfassung[i]}${unterlagen > 0 ? ` · ${unterlagen} Unterlage${unterlagen > 1 ? 'n' : ''}` : ''}`
-                      : 'Noch offen — der Rechner nimmt dafür einen Standardwert.'}
+                      : anfrage ? 'Noch offen' : 'Noch offen — der Rechner nimmt einen Standardwert.'}
                 </div>
               </div>
               <button type="button" onClick={() => geheZu(i)} className={KNOPF_KLEIN}>
@@ -970,7 +1037,7 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
         })}
       </ul>
 
-      {upload}
+      {upload && <Hilfen>{upload}</Hilfen>}
 
       {anfrage ? (
         <div className="ui-innen mt-5 p-4 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">
@@ -991,12 +1058,14 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
             muessen beim Namen genannt sein. Die Loeschfrist steht hier, weil
             der Kunde sonst nicht weiss, wie lange er einwilligt.
           */}
-          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-[8px] border border-ui-linie bg-ui-karte p-3 text-xs leading-relaxed text-ui-tinte">
+          <label className={`mt-3 flex cursor-pointer items-start gap-2.5 rounded-[8px] border border-ui-linie bg-ui-karte p-3 text-xs leading-relaxed text-ui-tinte ${
+            erinnern ? 'ring-2 ring-ui-knopf' : ''}`}>
             <input
+              ref={haken}
               type="checkbox"
               checked={einwilligung}
               onChange={(e) => setEinwilligung(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0"
+              className="mt-0.5 h-5 w-5 shrink-0"
             />
             <span>
               Ich willige ein, dass meine Angaben{x.dokumente.length > 0 && ' und die hochgeladenen Unterlagen'} an
@@ -1011,6 +1080,11 @@ function SchrittUebersicht({ x, geheZu, anfrage, einwilligung, setEinwilligung, 
               </a>.
             </span>
           </label>
+          {erinnern && (
+            <p role="alert" className="mt-1.5 text-xs font-medium text-rose-700">
+              Bitte setzen Sie zuerst den Haken — dann können Sie Ihre Angaben senden.
+            </p>
+          )}
         </div>
       ) : (
       <div className="ui-innen mt-5 p-4 text-sm leading-relaxed text-ui-tinte [&_strong]:font-medium">

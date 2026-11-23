@@ -5,10 +5,12 @@ import { useAuth } from './store/auth';
 import { aboAktiv, deckt, useZugang, wirksam } from './store/zugang';
 import { supabase, supabaseKonfiguriert } from './lib/supabase';
 import { hatZugestimmt } from './lib/nutzungsbedingungen';
-import { einladungAusAdresse, fruehstartAusAdresse, offeneEinladung, offenerFruehstart } from './lib/einladung';
+import {
+  agenturEinladungAusAdresse, einladungAusAdresse, fruehstartAusAdresse, offeneAgenturEinladung, offeneEinladung, offenerFruehstart,
+} from './lib/einladung';
 import { Anmeldung } from './features/Anmeldung';
 import { Zustimmung } from './features/Zustimmung';
-import { EinladungsBand, FruehstartBand, VorschauBand, ZugangsBand } from './features/ZugangsBand';
+import { AgenturBand, EinladungsBand, FruehstartBand, VorschauBand, ZugangsBand } from './features/ZugangsBand';
 import { Dialog } from './components/Dialog';
 
 // Selten gebraucht — erst laden, wenn es so weit ist.
@@ -54,8 +56,12 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
     if (typeof window !== 'undefined') {
       einladungAusAdresse();
       fruehstartAusAdresse();
+      agenturEinladungAusAdresse();
     }
-    return { einladung: offeneEinladung() !== null, fruehstart: offenerFruehstart() !== null };
+    return {
+      einladung: offeneEinladung() !== null, fruehstart: offenerFruehstart() !== null,
+      agentur: offeneAgenturEinladung() !== null,
+    };
   });
 
   // Abgemeldet: Der Zugang des vorigen Kontos gilt nicht mehr.
@@ -99,7 +105,9 @@ export function Zugangsschranke({ children, bereich }: { children: ReactNode; be
   // auf, obwohl man angemeldet ist.
   if (status === 'prueft') return <Moment />;
 
-  if (status !== 'angemeldet') return <Anmeldung einladung={links.einladung} fruehstart={links.fruehstart} />;
+  if (status !== 'angemeldet') {
+    return <Anmeldung einladung={links.einladung} fruehstart={links.fruehstart} agentur={links.agentur} />;
+  }
 
   if (zugestimmt === null) return <Moment />;
   if (!zugestimmt) return <Zustimmung onFertig={() => setZugestimmt(true)} />;
@@ -170,6 +178,7 @@ function PaketPruefung({ bereich, children }: { bereich: Bereich; children: Reac
     <>
       <VorschauBand />
       <EinladungsBand />
+      <AgenturBand />
       <FruehstartBand />
       {offen ? (
         <>

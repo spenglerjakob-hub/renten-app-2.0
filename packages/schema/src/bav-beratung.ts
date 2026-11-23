@@ -16,6 +16,9 @@ const betrag = (max: number) => z.number().finite().min(0).max(max);
 /** TT.MM.JJJJ oder leer — wie im Rechner (`DatumFeld`, `parseDatum`). */
 const datum = () => z.string().regex(/^(\d{2}\.\d{2}\.\d{4})?$/).default('');
 
+/** So viele Stufen nimmt das individuelle Modell auf. */
+export const FREI_STUFEN_MAX = 10;
+
 /** Das Modell der Firma — dieselben Stellschrauben wie auf den Arbeitgeber-Seiten. */
 export const firmenModellSchema = z.discriminatedUnion('art', [
   z.object({
@@ -23,6 +26,20 @@ export const firmenModellSchema = z.discriminatedUnion('art', [
     /** Anteil der Umwandlung, den der Arbeitgeber dazugibt, z. B. 0,5 */
     quote: z.number().min(0).max(1).default(0.5),
     deckelMonat: betrag(10_000).default(100),
+  }),
+  /*
+   * Das individuelle Modell: feste Zuschuesse nach Stufen („ab 50 EUR
+   * Umwandlung 25 EUR“) und dazu ein Anteil der gesamten Umwandlung. Ohne
+   * Vorbelegung — der Berater baut die Regel der Firma selbst.
+   */
+  z.object({
+    art: z.literal('frei'),
+    /** Anteil der gesamten Umwandlung, den der Arbeitgeber dazugibt — 0: keiner */
+    quote: z.number().min(0).max(1).default(0),
+    /** Hoechstbetrag des Anteils, Monat — 0: ohne Deckel */
+    deckelMonat: betrag(10_000).default(0),
+    /** Ab `abMonat` Umwandlung gibt es `betragMonat` fest dazu — es gilt die hoechste erreichte Stufe */
+    stufen: z.array(z.object({ abMonat: betrag(10_000), betragMonat: betrag(10_000) })).max(FREI_STUFEN_MAX).default([]),
   }),
   z.object({
     art: z.literal('festbetrag'),
@@ -272,7 +289,15 @@ export type BeratungStatus = (typeof BERATUNG_STATUS)[number];
  */
 export function angebotLesen(roh: unknown): FirmenAngebot {
   const r = firmenAngebotSchema.safeParse(roh ?? {});
-  return r.success ? r.data : firmenAngebotSchema.parse({});
+  if (r.success) return r.data;
+  // Liegt es nur am Modell (etwa einer Art, die diese Fassung noch nicht kennt), bleibt der Rest
+  // des Angebots stehen — Anschrift, Versicherer und Texte gehen nicht mit verloren.
+  if (roh && typeof roh === 'object' && !Array.isArray(roh)) {
+    const { modell: _modell, ...rest } = roh as Record<string, unknown>;
+    const ohne = firmenAngebotSchema.safeParse(rest);
+    if (ohne.success) return ohne.data;
+  }
+  return firmenAngebotSchema.parse({});
 }
 
 /**

@@ -3,9 +3,10 @@ import type { KinderStatus } from '../social/kv-pv.js';
 import { entgeltpunkteJahr } from '../pension/grv.js';
 import { STEUER_FREI_QUOTE, SV_FREI_QUOTE } from './vertrags-tuev.js';
 import {
-  matchingModell, zuschussModell, festbetragModell,
-  optimaleUmwandlung, zuschussVollAusschoepfen, festbetragVollAusschoepfen,
-  type BisherigeLeistungen, type MatchingSteuer, type UmwandlungsWeg,
+  matchingModell, zuschussModell, festbetragModell, freiesModell,
+  optimaleUmwandlung, zuschussVollAusschoepfen, festbetragVollAusschoepfen, freiVollAusschoepfen,
+  freiRegelMonat, freiStufe, freiStufenGeordnet,
+  type BisherigeLeistungen, type FreiStufe, type MatchingSteuer, type UmwandlungsWeg,
 } from './matching-modell.js';
 
 /**
@@ -13,8 +14,8 @@ import {
  *
  * Die Mitarbeiterberatung zeigt einem Mitarbeiter, was das Modell seiner
  * Firma fuer IHN bedeutet. Gerechnet wird ausschliesslich mit
- * `matchingModell`, `zuschussModell` und `festbetragModell` — dieselben
- * Funktionen wie auf den Arbeitgeber-Seiten. Mitarbeiter und Arbeitgeber
+ * `matchingModell`, `zuschussModell`, `festbetragModell` und `freiesModell`
+ * — dieselben Funktionen wie auf den Arbeitgeber-Seiten. Mitarbeiter und Arbeitgeber
  * sehen deshalb dieselben Zahlen; eine zweite Fassung der Formeln gibt es
  * nicht.
  *
@@ -28,11 +29,12 @@ import {
 
 /**
  * Das Modell der Firma — wie es auf der Arbeitgeber-Seite eingestellt wurde.
- * Beim Zuschuss heisst `deckelMonat` 0: ohne Deckel — so steht es im Angebot
- * der Firma und in der Vereinbarung.
+ * Beim Zuschuss und beim freien Modell heisst `deckelMonat` 0: ohne Deckel —
+ * so steht es im Angebot der Firma und in der Vereinbarung.
  */
 export type FirmenModell =
   | { art: 'zuschuss'; quote: number; deckelMonat: number }
+  | { art: 'frei'; quote: number; deckelMonat: number; stufen: FreiStufe[] }
   | { art: 'festbetrag'; festbetragMonat: number; mindestUmwandlungMonat: number }
   | { art: 'matching'; weg: UmwandlungsWeg; matchingMonat: number; zuschussImMatching: boolean };
 
@@ -151,6 +153,7 @@ export const zuschussDeckel = (deckelMonat: number) => (deckelMonat > 0 ? deckel
 /** Was die Regel der Firma fuer eine Umwandlung allein ergaebe — ohne den gesetzlichen Zuschuss als Untergrenze. */
 function regelMonat(modell: FirmenModell, u: number, pflichtMonat: number): number {
   if (modell.art === 'zuschuss') return Math.min(Math.max(0, modell.quote) * u, zuschussDeckel(modell.deckelMonat));
+  if (modell.art === 'frei') return freiRegelMonat({ ...modell, deckelMonat: zuschussDeckel(modell.deckelMonat) }, u).gesamtMonat;
   if (modell.art === 'festbetrag') return u + 0.005 >= modell.mindestUmwandlungMonat ? Math.max(0, modell.festbetragMonat) : 0;
   // Matching: Ist der Zuschuss enthalten, ist das Matching die ganze Regel; sonst kommt er obendrauf.
   return Math.max(0, modell.matchingMonat) + (modell.zuschussImMatching ? 0 : pflichtMonat);
@@ -214,7 +217,9 @@ export function bavMitarbeiter(
   } else {
     const x = modell.art === 'zuschuss'
       ? zuschussModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat) }, steuerOpt, p)
-      : festbetragModell({ ...kern(m, firma), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
+      : modell.art === 'frei'
+        ? freiesModell({ ...kern(m, firma), quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat), stufen: modell.stufen }, steuerOpt, p)
+        : festbetragModell({ ...kern(m, firma), festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat }, steuerOpt, p);
     r = {
       ...x.mitarbeiter,
       pflichtzuschussMonat: x.arbeitgeber.davonPflichtzuschussMonat,
@@ -278,6 +283,24 @@ function mitarbeiterHinweise(
       + 'Umwandlung im Monat. Darunter gibt es nur den gesetzlichen Zuschuss von 15 %, soweit er Sozialabgaben spart.',
     );
   }
+  if (modell.art === 'frei') {
+    // Die naechste Stufe, wenn sie mehr bringt: der Satz, der im Gespraech zaehlt.
+    const stufen = freiStufenGeordnet(modell.stufen);
+    const jetzt = freiStufe(stufen, u)?.betragMonat ?? 0;
+    const naechste = stufen.find((s) => s.abMonat > u + 0.005 && s.betragMonat > jetzt + 0.005);
+    if (naechste) {
+      h.push(
+        `Ab ${euro(naechste.abMonat)} Umwandlung im Monat gibt Ihr Arbeitgeber ${euro(naechste.betragMonat)} fest dazu`
+        + `${jetzt > 0 ? ` statt ${euro(jetzt)}` : ''}.`,
+      );
+    }
+    if (modell.deckelMonat > 0 && modell.quote * u > modell.deckelMonat + 0.005 && !r.mindestzuschuss?.aufgestockt) {
+      h.push(
+        `Der prozentuale Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
+        + 'jeder weitere Euro Umwandlung erhöht ihn nicht mehr.',
+      );
+    }
+  }
   if (r.svPflichtigMonat > 0.5) {
     h.push(
       `Beitragsfrei sind 4 % der Beitragsbemessungsgrenze, ${euro(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat — `
@@ -320,6 +343,11 @@ export function bavRahmenVoll(
   if (modell.art === 'matching') return optimaleUmwandlung(modell.weg, e, bundesland, p);
   if (modell.art === 'zuschuss') {
     return zuschussVollAusschoepfen({ ...e, quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat) }, bundesland, p);
+  }
+  if (modell.art === 'frei') {
+    return freiVollAusschoepfen(
+      { ...e, quote: modell.quote, deckelMonat: zuschussDeckel(modell.deckelMonat), stufen: modell.stufen }, bundesland, p,
+    );
   }
   return festbetragVollAusschoepfen(
     { ...e, festbetragMonat: modell.festbetragMonat, mindestUmwandlungMonat: modell.mindestUmwandlungMonat },

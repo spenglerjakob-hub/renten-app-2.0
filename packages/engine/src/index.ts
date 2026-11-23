@@ -110,12 +110,20 @@ export {
   zuschussModell, zuschussVollAusschoepfen, zuschussStaffel,
   festbetragModell, festbetragGehaltsStaffel, festbetragVollAusschoepfen,
   type FestbetragEingaben, type FestbetragErgebnis, type FestbetragStufe,
+  freiesModell, freiStaffel, freiVollAusschoepfen, freiStufe, freiStufenGeordnet, freiRegelMonat, freiHoechstMonat,
+  type FreiStufe, type FreiRegel, type FreiEingaben, type FreiErgebnis, type FreiStaffelZeile,
   type MatchingEingaben, type MatchingErgebnis, type MatchingSteuer, type UmwandlungsWeg,
   type GehaltsVergleich, type ZuschussEingaben, type ZuschussErgebnis, type ZuschussStufe,
   type BisherigeLeistungen, type Umstieg,
   betriebUmstieg, type BetriebAngaben, type BetriebGruppe, type BetriebZeile, type BetriebErgebnis, type BetriebKopfVl,
   type ModellBasis, type ModellKosten,
 } from './analyse/matching-modell.js';
+export {
+  betriebsCheck, lohnlisteLesen,
+  type BelegschaftGruppe, type BetriebsModell, type BetriebsCheckEingaben, type BetriebsCheckKopf,
+  type BetriebsCheckGruppe, type BetriebsCheckSzenario, type BetriebsCheckVl, type BetriebsCheckErgebnis,
+  type LohnlisteErgebnis, type AnzahlSpalte,
+} from './analyse/betriebs-check.js';
 export {
   bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung, zuschussDeckel,
   type FirmenModell, type MitarbeiterEingaben, type MitarbeiterBav, type MitarbeiterVertrag,

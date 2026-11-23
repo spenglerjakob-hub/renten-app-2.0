@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Eye, Info, X, type LucideIcon
 import { FRUEHSTART_MONATE, FRUEHSTART_RABATT_PROZENT } from '@renten/schema/preise';
 import {
   aboAktiv, rueckmeldungFaellig, useZugang, wirksam, tageBis, tage, datum,
-  type EinladungsAntwort, type FruehstartAntwort, type Zugang,
+  type AgenturAntwort, type EinladungsAntwort, type FruehstartAntwort, type Zugang,
 } from '../store/zugang';
 
 /**
@@ -238,6 +238,32 @@ export function EinladungsBand() {
       {text}
     </Band>
   );
+}
+
+const AGENTUR: Record<Exclude<AgenturAntwort, 'ok'>, string> = {
+  ungueltig: 'Diese Einladung gilt nicht — sie wurde zurückgezogen. Bitten Sie um einen neuen Link.',
+  abgelaufen: 'Diese Einladung ist abgelaufen; die Links gelten 14 Tage. Bitten Sie um einen neuen Link.',
+  eingeloest: 'Diese Einladung wurde schon verwendet. Jeder Link gilt einmal, für ein Konto — bitten Sie um einen neuen.',
+  andere_agentur: 'Ihr Konto gehört bereits zu einer anderen Agentur. Ein Konto kann nur einer Agentur angehören.',
+  verwaltung: 'Ihr Konto gehört zur bAV-Verwaltung und sieht ohnehin alle Agenturen — die Einladung wird nicht gebraucht.',
+};
+
+/** Die Antwort auf eine eingeloeste Einladung in eine Agentur. */
+export function AgenturBand() {
+  const antwort = useZugang((s) => s.agenturAntwort);
+  const gesehen = useZugang((s) => s.agenturGesehen);
+  const z = useZugang((s) => s.zugang);
+  if (!antwort) return null;
+  if (antwort === 'ok') {
+    return (
+      <Band ton="gut" onWeg={gesehen}>
+        <strong>Willkommen{z?.agenturName ? ` in der Agentur „${z.agenturName}“` : ''}.</strong> Ihr Zugang umfasst die
+        Vorsorgemodelle und die bAV-Mitarbeiterberatung mit den Firmenkunden Ihrer Agentur.
+        {z?.agenturRolle === 'admin' && ' Sie haben Adminrechte: Angaben und Auftritt Ihrer Agentur richten Sie in der Mitarbeiterberatung unter „Agentur einrichten“ ein.'}
+      </Band>
+    );
+  }
+  return <Band ton={antwort === 'verwaltung' ? 'neutral' : 'warnung'} onWeg={gesehen}>{AGENTUR[antwort]}</Band>;
 }
 
 const FRUEHSTART: Record<Exclude<FruehstartAntwort, 'ok'>, { ton: keyof typeof TON; text: string }> = {

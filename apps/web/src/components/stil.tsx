@@ -46,7 +46,7 @@ export const FEHLER = 'rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900';
 
 /** Ueberschrift, Gewicht 400, in Inter Tight — die Handschrift der Seite. */
 export function Titel({ children, gross = false, als: Tag = 'h1', klasse = '', id }: {
-  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2'; klasse?: string; id?: string;
+  children: ReactNode; gross?: boolean; als?: 'h1' | 'h2' | 'h3'; klasse?: string; id?: string;
 }) {
   return (
     <Tag id={id} className={`ui-titel text-balance font-normal text-ui-tinte ${
@@ -382,7 +382,8 @@ export function Etappen({ schritte, aktiv, onWechsel, beschriftung, erledigt, of
               className="group relative flex w-full flex-col items-center gap-1 after:absolute after:-inset-x-0.5 after:-inset-y-5 after:content-[''] sm:after:-inset-y-2"
             >
               <span className={`h-1 w-full rounded-full ${i === aktiv ? 'bg-ui-tinte' : fertig(i) ? 'bg-ui-tinte/30' : 'bg-ui-linie'}`} />
-              <span className={`hidden text-xs leading-tight sm:block ${i === aktiv ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
+              {/* Ein langer Name („Krankenversicherung“) bricht in schmalen Spalten um, statt in den Nachbarn zu ragen. */}
+              <span className={`hidden max-w-full hyphens-auto text-xs leading-tight [overflow-wrap:anywhere] sm:block ${i === aktiv ? 'font-medium text-ui-tinte' : 'text-ui-schiefer group-hover:text-ui-tinte'}`}>
                 {t}
                 {offen?.(i) && <span aria-hidden className="ml-1.5 inline-block h-2 w-2 rounded-full border border-ui-schiefer align-middle" />}
               </span>

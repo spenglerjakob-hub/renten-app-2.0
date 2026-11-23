@@ -13,6 +13,7 @@ import { EinkommenFelder } from './EinkommenFelder';
 import {
   ZahlFeld, ProzentFeld, NamenFelder, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro, prozent,
 } from '../components/Feld';
+import { JA_NEIN, Wahl, Zaehler } from '../components/Frage';
 import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 import { mitName, namensTeile } from '../lib/namen';
@@ -141,9 +142,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
               <NamenFelder {...namensTeile(p.name, p.vorname, p.nachname)}
                 onChange={(teile) => setzePerson(p.id, mitName(teile))} />
             )}
-            <AuswahlFeld label="Versorgungsart" wert={p.art}
-              onChange={(v) => setzePerson(p.id, { art: v })}
-              optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
             <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
               onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
               hilfe="Acht Ziffern genügen — die Punkte setzt das Feld."
@@ -168,6 +166,18 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
                 </button>
               ) : null}
             />
+            {/*
+              ZWEI ANTWORTEN, ZWEI KNOEPFE: Beide stehen da, ein Tipp genuegt —
+              statt einer Auswahlliste, die man erst aufklappen muss. Nach
+              Geburtsdatum und Rentenbeginn, direkt vor dem Betrag, den die
+              Antwort bestimmt (Rentenanspruch oder Ruhegehaltssatz).
+            */}
+            {/* „Auf einen Blick“ sind die Spalten schmal: Dort bekommen die beiden Knoepfe die ganze Zeile. */}
+            <div className={einklappbar ? 'sm:col-span-2' : undefined}>
+              <Wahl label="Altersversorgung" wert={p.art}
+                onChange={(v) => setzePerson(p.id, { art: v })}
+                optionen={[{ wert: 'grv', text: 'Gesetzliche Rente' }, { wert: 'pension', text: 'Beamtenpension' }]} />
+            </div>
             {p.art === 'grv' ? (
               <>
                 <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
@@ -266,18 +276,23 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
         „oben“ zu setzen.
       */}
       {zeige('personen') && (
-        <div>
-          <Schalter label="Verheiratet (Splittingtarif)" wert={s.haushalt.verheiratet}
-            onChange={(b) => {
+        <div className="max-w-md">
+          <Wahl
+            label="Verheiratet oder in eingetragener Lebenspartnerschaft?"
+            wert={s.haushalt.verheiratet ? 'ja' : 'nein'}
+            optionen={JA_NEIN}
+            onChange={(v) => {
+              const b = v === 'ja';
+              // Ein zweiter Tipp auf dieselbe Antwort aendert nichts — und oeffnet das Fenster des Partners nicht noch einmal.
+              if (b === s.haushalt.verheiratet) return;
               setzeHaushalt({ verheiratet: b });
               if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
             }}
-            vorbelegt={marke('haushalt.verheiratet')} />
-          {!s.haushalt.verheiratet && (
-            <p className="mt-1 text-xs text-ui-schiefer">
-              Mit Ehepartner fragt der Planer auch dessen Angaben ab.
-            </p>
-          )}
+            vorbelegt={marke('haushalt.verheiratet')}
+            hilfe={s.haushalt.verheiratet
+              ? 'Gerechnet wird mit dem Splittingtarif.'
+              : 'Mit Ehepartner gilt der Splittingtarif, und der Planer fragt auch dessen Angaben ab.'}
+          />
         </div>
       )}
 
@@ -294,6 +309,14 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             optionen={laenderOptionen}
             hilfe="Bestimmt Kirchensteuersatz und Besoldungstabelle."
             vorbelegt={marke('haushalt.bundesland')}
+          />
+          {/* Neben dem Bundesland: Es bestimmt den Satz (8 oder 9 %), diese Antwort, ob er anfaellt. */}
+          <Wahl
+            label="Kirchensteuerpflichtig?"
+            wert={s.haushalt.kirchensteuer ? 'ja' : 'nein'}
+            optionen={JA_NEIN}
+            onChange={(v) => setzeHaushalt({ kirchensteuer: v === 'ja' })}
+            vorbelegt={marke('haushalt.kirchensteuer')}
           />
           {/*
             ZWEI FRAGEN, nicht eine. Bis hierher galt die Angabe fuer beide
@@ -398,11 +421,14 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             darunter auslaufen. Ohne diesen Zusatz sah es aus, als senke ein
             heute kleines Kind den Beitrag bis ans Lebensende.
           */}
-          <ZahlFeld
+          {/* Minus und Plus statt eines Zahlenfelds: Es sind selten mehr als drei. */}
+          <Zaehler
             label="Kinder unter 25 (heute)"
             wert={s.haushalt.kinderUnter25}
             onChange={setzeKinderAnzahl}
             max={15}
+            weniger="Ein Kind weniger"
+            mehr="Ein Kind mehr"
             hilfe="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag — bis zum 25. Geburtstag des Kindes. Danach steigt er wieder; die Rechnung berücksichtigt das über die Geburtsjahre."
             vorbelegt={marke('haushalt.kinderUnter25')}
           />
@@ -433,11 +459,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
             <KinderHinweis a={avdParam} />
           </div>
         )}
-        <div className="mt-3 flex flex-wrap gap-4">
-          <Schalter label="Kirchensteuerpflichtig" wert={s.haushalt.kirchensteuer}
-            onChange={(b) => setzeHaushalt({ kirchensteuer: b })}
-            vorbelegt={marke('haushalt.kirchensteuer')} />
-        </div>
         {/*
           DIE STEUERKLASSE fragt der Rechner bewusst nicht ab: Er rechnet die
           Jahressteuer, und an der aendert die Steuerklasse nichts — sie
@@ -465,7 +486,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
         titel={s.einkommenGetrennt ? `Einkommen — ${nameVon('A')}` : 'Heutiges Einkommen'}
         einklappbar={einklappbar}
       >
-        <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen}
+        <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} artAlsKnoepfe
           marke={(f) => marke(`einkommenHeute.${f}`)} />
 
         {s.haushalt.verheiratet && (
@@ -486,7 +507,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, onAssistent, oh
 
       {zeige('einkommen') && s.haushalt.verheiratet && s.einkommenGetrennt && (
         <Abschnitt titel={`Einkommen — ${nameVon('B')}`} einklappbar={einklappbar}>
-          <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner}
+          <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} artAlsKnoepfe
             marke={(f) => marke(`einkommenPartner.${f}`)} />
         </Abschnitt>
       )}

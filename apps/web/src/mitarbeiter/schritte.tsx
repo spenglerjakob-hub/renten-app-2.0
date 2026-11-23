@@ -13,8 +13,9 @@ import { linkSeite } from '../lib/unterschrift-link';
 import type { Auftritt } from '../features/auftritt';
 import { KRANKENKASSEN, KASSEN_STAND } from '../features/krankenkassen';
 import {
-  AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, NamenFelder, ProzentFeld, Schalter, TextFeld, ZahlFeld, euro, euroGenau,
+  AuswahlFeld, DatumFeld, GegenueberZeile, InfoPunkt, Kennzahl, NamenFelder, ProzentFeld, TextFeld, ZahlFeld, euro, euroGenau,
 } from '../components/Feld';
+import { JA_NEIN, Wahl } from '../components/Frage';
 import { mitName, namensTeile, vollerName } from '../lib/namen';
 import { emailGueltig } from '../lib/email';
 import { laufzeitText } from '../features/tuev-berechnung';
@@ -97,7 +98,8 @@ export interface SchrittProps {
  * darin gerade gezogen wird, etwa den Regler.
  */
 function Inhalt({ gesperrt, klasse, children }: { gesperrt: boolean; klasse?: string; children: ReactNode }) {
-  return <fieldset disabled={gesperrt} className="min-w-0"><div className={klasse}>{children}</div></fieldset>;
+  // `handy-eingaben`: am Telefon Eingaben in 16 px und daumenhoch (index.css) — darunter zoomt iOS beim Antippen hinein.
+  return <fieldset disabled={gesperrt} className="handy-eingaben min-w-0"><div className={klasse}>{children}</div></fieldset>;
 }
 
 /** Name der Liste der Stuecke fuer Screenreader. */
@@ -271,7 +273,11 @@ export function SchrittAngaben({ firma, daten, setze, gesperrt }: SchrittProps) 
                   onChange={(v) => { const steuerklasse = steuerklasseAus({ steuerklasse: Number(v), verheiratet: false, partnerBrutto: 0 }); setzeA({ steuerklasse, verheiratet: steuerklasse >= 3 }); }}
                   hilfe="Wie auf der Gehaltsabrechnung. Bei III/V gleicht die Steuererklärung aus." />
               </div>
-              <Schalter label="kirchensteuerpflichtig" wert={a.kirchensteuer} onChange={(kirchensteuer) => setzeA({ kirchensteuer })} />
+              {/* Ja oder Nein als zwei Knoepfe — beide Antworten stehen da, ein Tipp genuegt. */}
+              <div className={ZWEI}>
+                <Wahl label="Kirchensteuerpflichtig?" wert={a.kirchensteuer ? 'ja' : 'nein'} optionen={JA_NEIN}
+                  onChange={(v) => setzeA({ kirchensteuer: v === 'ja' })} />
+              </div>
               <div>
                 <span className={FELD_LABEL}>Kinder</span>
                 <div className="space-y-2">
@@ -309,8 +315,8 @@ export function SchrittAngaben({ firma, daten, setze, gesperrt }: SchrittProps) 
           <Karte titel="Krankenversicherung">
             <div className="space-y-3">
               <div className={ZWEI}>
-                <AuswahlFeld label="Versichert" wert={a.kv} onChange={(kv) => setzeA({ kv })}
-                  optionen={[{ wert: 'gesetzlich', text: 'gesetzlich' }, { wert: 'privat', text: 'privat' }]} />
+                <Wahl label="Wie sind Sie krankenversichert?" wert={a.kv} onChange={(kv) => setzeA({ kv })}
+                  optionen={[{ wert: 'gesetzlich', text: 'Gesetzlich' }, { wert: 'privat', text: 'Privat' }]} />
               </div>
               {a.kv === 'gesetzlich' ? (
                 <div className={ZWEI}>

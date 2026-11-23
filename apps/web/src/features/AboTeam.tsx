@@ -97,6 +97,14 @@ function Status({ z }: { z: Zugang }) {
     titel = `Early Adopter: noch ${tage(tageBis(z.bis))}`;
     text = `Bis zum ${datum(z.bis)} nutzen Sie alle Funktionen kostenlos. Danach erhalten Sie als Dankeschön `
       + `${FRUEHSTART_RABATT_PROZENT} % Rabatt auf das erste Jahr.`;
+  } else if (z.quelle === 'agentur') {
+    titel = z.agenturName ? `Zugang der Agentur ${z.agenturName}` : 'Zugang Ihrer Agentur';
+    text = 'Arbeitgeber-Vorsorgemodelle und bAV-Mitarbeiterberatung mit den Firmenkunden Ihrer Agentur, ohne Abo. '
+      + 'Für die Rentenplanung brauchen Sie ein eigenes Paket.';
+  } else if (z.quelle === 'verwaltung') {
+    titel = 'bAV-Verwaltung';
+    text = 'Arbeitgeber-Vorsorgemodelle und bAV-Mitarbeiterberatung mit allen Agenturen, ohne Abo. '
+      + 'Für die Rentenplanung brauchen Sie ein eigenes Paket.';
   } else if (z.quelle === 'abo' && z.paket) {
     titel = `Paket „${paketVon(z.paket).name}“`;
     text = z.rolle === 'mitglied' ? 'Über das Abo Ihres Büros.' : 'Über Ihr Abo.';

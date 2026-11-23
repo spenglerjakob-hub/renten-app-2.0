@@ -144,4 +144,16 @@ describe('axaVerzichtZuschuss', () => {
     expect(axaVerzichtZuschuss(matching, r)).toEqual({ prozent: null, euro: expect.closeTo(r.arbeitgeberMonat, 9) });
     expect(axaVerzichtZuschuss(matching, beitragsRechnung(matching, beratung(0)))).toEqual({ prozent: null, euro: 100 });
   });
+
+  it('individuelles Modell: der Prozentsatz, wenn es einen gibt — und was der Arbeitgeber laut Beratung dazugaebe', () => {
+    const stufen = [{ abMonat: 50, betragMonat: 25 }, { abMonat: 70, betragMonat: 30 }];
+    const frei = angebot({ modell: { art: 'frei', quote: 0.2, deckelMonat: 0, stufen } });
+    // 150 € Umwandlung: 30 € der Stufe und 20 % = 30 €
+    expect(axaVerzichtZuschuss(frei, beitragsRechnung(frei, beratung(150)))).toEqual({ prozent: 20, euro: expect.closeTo(60, 6) });
+    expect(axaVerzichtZuschuss(frei, beitragsRechnung(frei, beratung(0)))).toEqual({ prozent: 20, euro: null });
+    const nurStufen = angebot({ modell: { art: 'frei', quote: 0, deckelMonat: 0, stufen } });
+    expect(axaVerzichtZuschuss(nurStufen, beitragsRechnung(nurStufen, beratung(150)))).toEqual({ prozent: null, euro: expect.closeTo(30, 6) });
+    // Ohne berechnete Umwandlung steht kein fester Betrag fest — die Linie bleibt zum Ausfuellen.
+    expect(axaVerzichtZuschuss(nurStufen, beitragsRechnung(nurStufen, beratung(0)))).toEqual({ prozent: null, euro: null });
+  });
 });

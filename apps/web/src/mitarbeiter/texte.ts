@@ -1,5 +1,5 @@
 import { GEHAELTER_IM_JAHR, type FirmenAngebot, type FirmenModellDaten, type SteuerklasseBeratung } from '@renten/schema';
-import type { Mindestzuschuss, MitarbeiterVertrag } from '@renten/engine';
+import { freiStufenGeordnet, type Mindestzuschuss, type MitarbeiterVertrag } from '@renten/engine';
 import type { KennzahlenErgebnis, ReglerGrenzen } from './rechnung';
 
 /**
@@ -57,9 +57,13 @@ export function lohnsteuerHinweis(k: SteuerklasseBeratung): string {
 
 export const MODELL_NAME: Record<FirmenModellDaten['art'], string> = {
   zuschuss: 'Zuschussmodell',
+  frei: 'Individuelles Modell',
   festbetrag: 'Festbetrag-Modell',
   matching: 'Matching-Modell',
 };
+
+/** Der Name nach „Das …“ — „Das individuelle Modell gilt jetzt für …“. */
+export const modellNameNachDas = (art: FirmenModellDaten['art']): string => (art === 'frei' ? 'individuelle Modell' : MODELL_NAME[art]);
 
 export const WEG_NAME: Record<FirmenAngebot['durchfuehrungsweg'], string> = {
   direktversicherung: 'Direktversicherung',
@@ -78,12 +82,34 @@ export function traegerText(weg: MitarbeiterVertrag['weg'], a: FirmenAngebot): s
   return [a.versicherer.trim(), a.tarif.trim()].filter(Boolean).join(', Tarif ');
 }
 
+type FreiModell = Extract<FirmenModellDaten, { art: 'frei' }>;
+
+/** Die Stufen des individuellen Modells, aufsteigend nach der Schwelle — wie der Rechenkern sie liest. */
+export const freiStufen = (m: FreiModell) => freiStufenGeordnet(m.stufen).filter((s) => s.betragMonat > 0);
+
+/** „ab 50 € Umwandlung 25 € im Monat, ab 70 € 30 €“ — leer ohne Stufen. */
+export function freiStufenText(m: FreiModell): string {
+  return freiStufen(m).map((s, i) => (i === 0
+    ? `ab ${euroText(s.abMonat)} Umwandlung ${euroText(s.betragMonat)} im Monat`
+    : `ab ${euroText(s.abMonat)} ${euroText(s.betragMonat)}`)).join(', ');
+}
+
 /** Die Regel der Firma in einem Satz, aus Sicht des Mitarbeiters. */
 export function regelText(m: FirmenModellDaten): string {
   if (m.art === 'zuschuss') {
     return m.deckelMonat > 0
       ? `Ihr Arbeitgeber gibt ${prozentText(m.quote)} Ihres Beitrags dazu, höchstens ${euroText(m.deckelMonat)} im Monat.`
       : `Ihr Arbeitgeber gibt ${prozentText(m.quote)} Ihres Beitrags dazu.`;
+  }
+  if (m.art === 'frei') {
+    const stufen = freiStufenText(m);
+    const anteil = m.quote > 0
+      ? `${prozentText(m.quote)} Ihres Beitrags${m.deckelMonat > 0 ? ` (höchstens ${euroText(m.deckelMonat)} im Monat)` : ''}`
+      : '';
+    if (anteil && stufen) return `Ihr Arbeitgeber gibt ${anteil} dazu und obendrauf einen festen Zuschuss: ${stufen}.`;
+    if (anteil) return `Ihr Arbeitgeber gibt ${anteil} dazu.`;
+    if (stufen) return `Ihr Arbeitgeber gibt einen festen Zuschuss dazu: ${stufen}.`;
+    return 'Ihr Arbeitgeber zahlt den gesetzlichen Zuschuss von 15 %, soweit er Sozialabgaben spart.';
   }
   if (m.art === 'festbetrag') {
     return m.mindestUmwandlungMonat > 0
@@ -103,6 +129,10 @@ export function regelText(m: FirmenModellDaten): string {
  */
 export function regelKern(m: FirmenModellDaten): string {
   if (m.art === 'zuschuss') return `${prozentText(m.quote)} Ihres Beitrags`;
+  if (m.art === 'frei') {
+    return m.quote > 0 ? `${prozentText(m.quote)} Ihres Beitrags`
+      : freiStufen(m).length > 0 ? 'einen festen Zuschuss' : 'den gesetzlichen Zuschuss von 15 %';
+  }
   if (m.art === 'festbetrag') return `${euroText(m.festbetragMonat)} im Monat`;
   return `${euroText(m.matchingMonat)} im Monat`;
 }
@@ -112,6 +142,16 @@ export function regelFuerVereinbarung(m: FirmenModellDaten): string {
   if (m.art === 'zuschuss') {
     return `Der Arbeitgeber zahlt zusätzlich ${prozentText(m.quote)} der Umwandlung`
       + `${m.deckelMonat > 0 ? `, höchstens ${euroText(m.deckelMonat)} im Monat` : ''}, mindestens den Zuschuss nach § 1a Abs. 1a BetrAVG.`;
+  }
+  if (m.art === 'frei') {
+    const stufen = freiStufenText(m);
+    const teile = [
+      m.quote > 0 ? `${prozentText(m.quote)} der Umwandlung${m.deckelMonat > 0 ? ` (höchstens ${euroText(m.deckelMonat)} im Monat)` : ''}` : '',
+      stufen ? `einen festen Zuschuss nach der Höhe der Umwandlung (${stufen}; es gilt die höchste erreichte Stufe)` : '',
+    ].filter(Boolean);
+    return teile.length > 0
+      ? `Der Arbeitgeber zahlt zusätzlich ${teile.join(' und ')}, mindestens den Zuschuss nach § 1a Abs. 1a BetrAVG.`
+      : 'Der Arbeitgeber zahlt den Zuschuss nach § 1a Abs. 1a BetrAVG.';
   }
   if (m.art === 'festbetrag') {
     return `Der Arbeitgeber zahlt zusätzlich ${euroText(m.festbetragMonat)} im Monat`
@@ -142,13 +182,17 @@ export function mindestzuschussText(z: Mindestzuschuss, m: FirmenModellDaten): s
   const regel = euroText(z.regelMonat);
 
   if (z.aufgestockt && z.regelMonat <= 0.005) {
-    const vorab = m.art === 'festbetrag' ? `Den Festbetrag gibt es ab ${euroText(m.mindestUmwandlungMonat)} Umwandlung. Bis dahin zahlt ` : 'Ihr Arbeitgeber zahlt ';
+    const vorab = m.art === 'festbetrag' ? `Den Festbetrag gibt es ab ${euroText(m.mindestUmwandlungMonat)} Umwandlung. Bis dahin zahlt `
+      : m.art === 'frei' && (m.quote > 0 || freiStufen(m).length > 0)
+        ? 'Nach der Regel Ihres Arbeitgebers gibt es bei dieser Umwandlung noch keinen Zuschuss. Er zahlt '
+        : 'Ihr Arbeitgeber zahlt ';
     return `${vorab}${m.art === 'festbetrag' ? 'Ihr Arbeitgeber ' : ''}den gesetzlichen Zuschuss: ${pflicht}.`;
   }
   if (z.aufgestockt) {
     const u = z.quoteMonat / 0.15;
     const name = m.art === 'festbetrag' ? `der Festbetrag von ${regel}`
       : m.art === 'matching' ? `das Matching von ${regel}`
+      : m.art === 'frei' ? `der Zuschuss nach der Regel Ihres Arbeitgebers (${regel})`
       : m.deckelMonat > 0 && m.quote * u > m.deckelMonat + 0.005 ? `der Deckel von ${regel}`
       : `${prozentText(m.quote)} Ihres Beitrags (${regel})`;
     const wohin = m.art === 'matching' ? ' in Ihre Direktversicherung; in die Unterstützungskasse fließt dann nichts' : '';
@@ -202,7 +246,7 @@ export function festePunkte(a: FirmenAngebot): string[] {
   const p: string[] = [
     'Ihre eigene Umwandlung gehört Ihnen sofort — sie ist ab dem ersten Beitrag unverfallbar.',
   ];
-  if (m.art === 'zuschuss' || m.art === 'festbetrag') {
+  if (m.art !== 'matching') {
     p.push(
       'Den gesetzlichen Zuschuss von 15 % behalten Sie ebenfalls sofort. Was der Arbeitgeber freiwillig darüber hinaus '
       + 'gibt, wird nach drei Jahren unverfallbar, wenn die Versorgungsordnung nichts Günstigeres regelt.',

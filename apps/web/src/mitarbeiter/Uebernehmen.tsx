@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { firmenAngebotSchema, firmenModellSchema, type FirmenModellDaten } from '@renten/schema';
+import { firmenModellSchema, neuesAngebot, type FirmenModellDaten } from '@renten/schema';
 import { firmaAnlegen, firmaSpeichern, firmenLaden, type Firma } from '../lib/bav-beratung';
+import { meineAgentur } from '../lib/bav-agenturen';
 import { Dialog } from '../components/Dialog';
 import { TextFeld } from '../components/Feld';
 import { FEHLER, FELD_LABEL, KNOPF, KNOPF_ZWEIT } from '../components/stil';
-import { MODELL_NAME, regelText } from './texte';
+import { MODELL_NAME, modellNameNachDas, regelText } from './texte';
 import { ortSuche } from './ort';
 
 const NEU = 'neu';
@@ -40,7 +41,7 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland, vor
     setFirmen('laedt');
     void firmenLaden().then((f) => {
       if (!aktiv) return;
-      const eigene = Array.isArray(f) ? f.filter((x) => x.eigene) : f;
+      const eigene = Array.isArray(f) ? f.filter((x) => x.aenderbar) : f;
       setFirmen(eigene);
       setWahl(Array.isArray(eigene) && vorauswahl && eigene.some((x) => x.id === vorauswahl) ? vorauswahl : NEU);
     });
@@ -65,9 +66,11 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland, vor
       else setMeldung('Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.');
       return;
     }
-    const r = await firmaAnlegen(name, firmenAngebotSchema.parse({ modell: geprueft.data, bundesland }));
+    // Eine neue Firma beginnt mit den Vorgaben (AXA; in einer Agentur mit deren Daten) — Modell und Sitz von dieser Seite gehen vor.
+    const agentur = await meineAgentur();
+    const r = await firmaAnlegen(name, neuesAngebot(agentur?.daten ?? null, { modell: geprueft.data, bundesland }));
     setLaeuft(false);
-    if (r === 'grenze') setMeldung('Es sind höchstens 200 Firmen je Konto möglich.');
+    if (r === 'grenze') setMeldung(agentur ? 'Es sind höchstens 500 Firmen je Agentur möglich.' : 'Es sind höchstens 200 Firmen je Konto möglich.');
     else if (r === 'fehler') setMeldung('Die Firma konnte nicht angelegt werden. Bitte versuchen Sie es noch einmal.');
     else setFertig(r);
   };
@@ -79,7 +82,7 @@ export function UebernehmenDialog({ offen, onSchliessen, modell, bundesland, vor
           <p className="flex items-start gap-2 text-sm leading-relaxed text-ui-tinte">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-ui-tinte" aria-hidden />
             <span>
-              Das {MODELL_NAME[fertig.angebot.modell.art]} gilt jetzt für <span className="font-medium">{fertig.name}</span>. Ergänzen Sie
+              Das {modellNameNachDas(fertig.angebot.modell.art)} gilt jetzt für <span className="font-medium">{fertig.name}</span>. Ergänzen Sie
               dort Logo, Begrüßung und Versicherer — dann kann die erste Beratung beginnen.
             </span>
           </p>

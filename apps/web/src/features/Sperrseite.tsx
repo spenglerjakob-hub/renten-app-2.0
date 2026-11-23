@@ -27,6 +27,9 @@ import { KontoLoeschen } from './KontoLoeschen';
  *    Inhaber wenden — oder austreten und selbst buchen.
  *  - Ein Paket fuer den anderen Teil (nur Rente oder nur AG): die
  *    enthaltenen Seiten verlinken und den Wechsel zu "All inklusive" anbieten.
+ *  - Zugang ueber eine Agentur oder als bAV-Verwaltung (ohne Abo): die
+ *    enthaltenen Seiten verlinken — fuer die Rentenplanung braucht es ein
+ *    eigenes Paket.
  *
  * IMMER DABEI: Abmelden, die gespeicherten Szenarien als Datei (Art. 20
  * DSGVO) und Konto loeschen (Art. 17). Ohne Paket gehen keine Daten
@@ -35,7 +38,9 @@ import { KontoLoeschen } from './KontoLoeschen';
 export function Sperrseite({ bereich, zugang }: { bereich: Bereich; zugang: Zugang }) {
   const vorschau = useZugang((s) => s.vorschau !== null && s.zugang?.betreiber === true);
   const inhalt = zugang.paket
-    ? <AnderesPaket z={zugang} bereich={bereich} vorschau={vorschau} />
+    ? zugang.quelle === 'agentur' || zugang.quelle === 'verwaltung'
+      ? <AgenturZugang z={zugang} />
+      : <AnderesPaket z={zugang} bereich={bereich} vorschau={vorschau} />
     : zugang.rolle === 'mitglied'
       ? <OhnePlatz z={zugang} vorschau={vorschau} />
       : <PaketWaehlen z={zugang} vorschau={vorschau} />;
@@ -216,22 +221,7 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
         </Titel>
       </div>
 
-      <Karte titel="Enthalten sind diese Seiten">
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {seiten.map((s) => (
-            <li key={s.href}>
-              <a href={s.href}
-                className="flex h-full items-start gap-3 rounded-lg border border-ui-linie p-4 hover:border-ui-feld-rand hover:bg-ui-innen">
-                <span className="mt-0.5 text-ui-schiefer">{s.symbol}</span>
-                <span>
-                  <span className="block text-base font-medium text-ui-tinte">{s.titel}</span>
-                  <span className="mt-0.5 block text-sm text-ui-schiefer">{s.text}</span>
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Karte>
+      <EnthalteneSeiten seiten={seiten} />
 
       {/* Die eine Akzentkarte: was „All inklusive“ kostet, der Preis hervorgehoben. */}
       <div className={`${AKZENT} p-6 sm:p-8`}>
@@ -256,6 +246,54 @@ function AnderesPaket({ z, bereich, vorschau }: { z: Zugang; bereich: Bereich; v
           <p className="mt-4 text-sm text-ui-schiefer">Bitten Sie die Person, die das Abo verwaltet, das Paket zu wechseln.</p>
         )}
       </div>
+    </section>
+  );
+}
+
+function EnthalteneSeiten({ seiten }: { seiten: readonly Seite[] }) {
+  return (
+    <Karte titel="Enthalten sind diese Seiten">
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {seiten.map((s) => (
+          <li key={s.href}>
+            <a href={s.href}
+              className="flex h-full items-start gap-3 rounded-lg border border-ui-linie p-4 hover:border-ui-feld-rand hover:bg-ui-innen">
+              <span className="mt-0.5 text-ui-schiefer">{s.symbol}</span>
+              <span>
+                <span className="block text-base font-medium text-ui-tinte">{s.titel}</span>
+                <span className="mt-0.5 block text-sm text-ui-schiefer">{s.text}</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Karte>
+  );
+}
+
+/**
+ * Zugang ueber eine Agentur oder als bAV-Verwaltung: die Arbeitgeber-Seiten
+ * und die Mitarbeiterberatung, ohne Abo. Die Rentenplanung gehoert nicht dazu.
+ */
+function AgenturZugang({ z }: { z: Zugang }) {
+  const agentur = z.quelle === 'agentur';
+  return (
+    <section className="space-y-6">
+      <div>
+        <p className={ETIKETT}>
+          {agentur ? (z.agenturName ? `Zugang der Agentur ${z.agenturName}` : 'Zugang Ihrer Agentur') : 'Zugang der bAV-Verwaltung'}
+        </p>
+        <Titel gross klasse="mt-1">Die Rentenplanung gehört nicht zu Ihrem Zugang</Titel>
+        <p className={`mt-3 ${EINLEITUNG}`}>
+          {agentur
+            ? 'Ihre Agentur nutzt den JS-Rentenplaner für die betriebliche Altersversorgung ihrer Firmenkunden. '
+            : 'Ihr Konto gehört zur bAV-Verwaltung. '}
+          Enthalten sind die Arbeitgeber-Vorsorgemodelle und die bAV-Mitarbeiterberatung — ohne Abo. Für die
+          Rentenplanung mit Gutachten brauchen Sie ein eigenes Paket.
+        </p>
+      </div>
+      <EnthalteneSeiten seiten={ARBEITGEBER} />
+      <a href="/preise" className={KNOPF_ZWEIT}>Pakete und Preise ansehen</a>
     </section>
   );
 }

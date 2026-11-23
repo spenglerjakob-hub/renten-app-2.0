@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, Info } from 'lucide-react';
 import type {
   BetriebAngaben, BetriebErgebnis, BetriebGruppe, GehaltsVergleich,
@@ -8,7 +8,7 @@ import { Logo } from '../components/Logo';
 import { AuswahlFeld, ProzentFeld, ZahlFeld, euro, euroGenau, prozent } from '../components/Feld';
 import { AKZENT, Hervor, KNOPF_KLEIN, LINK } from '../components/stil';
 import { akzentVariablen, auftrittSichtbar, fusszeileCss, kontaktZeile } from '../features/auftritt';
-import { useAuftritt } from '../store/auftritt';
+import { useGeltenderAuftritt } from '../mitarbeiter/agentur-hook';
 import { datumText } from './firmenkunde';
 
 /**
@@ -403,10 +403,8 @@ export interface KopfKunde {
  * Seite ausserdem die Fusszeile des Gutachtens (Kontakt, Seitenzahl).
  */
 export function Kopf({ kunde = null }: { kunde?: KopfKunde | null }) {
-  const auftritt = useAuftritt((s) => s.auftritt);
-  const status = useAuftritt((s) => s.status);
-  const laden = useAuftritt((s) => s.laden);
-  useEffect(() => { if (status === 'aus') void laden(); }, [status, laden]);
+  // Fuer einen Zugang einer Agentur mit deren Auftritt (Name, Logo, Farbe) — sonst der eigene wie bisher.
+  const auftritt = useGeltenderAuftritt();
 
   const a = auftritt && auftrittSichtbar(auftritt) ? auftritt : null;
   const absender = a ? a.firma.trim() || a.berater.trim() : '';
@@ -456,23 +454,40 @@ export function Kopf({ kunde = null }: { kunde?: KopfKunde | null }) {
   );
 }
 
-/** Die drei Arbeitgebermodelle — fuer die Querverweise zwischen den Seiten. */
+/** Die Arbeitgebermodelle — fuer die Querverweise zwischen den Seiten. */
 const MODELLE = [
   { href: '/zuschussmodell', text: 'Zuschussmodell: 50 % obendrauf' },
   { href: '/festbetrag', text: 'Festbetrag: 50 € für jeden' },
   { href: '/arbeitgeber', text: 'Matching-Modell mit Unterstützungskasse' },
+  { href: '/individuelles-modell', text: 'Individuelles Modell: Stufen und Prozente frei kombiniert' },
 ] as const;
 
-/** Querverweis auf die jeweils anderen Arbeitgebermodelle — als Textlinks, die leiseste Aktion. */
-export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] }) {
+/** Der Betriebs-Check rechnet ein Modell fuer die ganze Belegschaft — von jeder Modellseite aus erreichbar. */
+const BETRIEBS_CHECK = '/betriebs-check';
+
+/**
+ * Querverweis auf die jeweils anderen Arbeitgebermodelle — als Textlinks, die
+ * leiseste Aktion. Von einem Modell aus fuehrt ausserdem einer zum
+ * Betriebs-Check; dort stehen umgekehrt die Modelle.
+ */
+export function AndereModelle({ aktuell }: { aktuell: (typeof MODELLE)[number]['href'] | typeof BETRIEBS_CHECK }) {
+  const imCheck = aktuell === BETRIEBS_CHECK;
   return (
     <p className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm print:hidden">
-      <span className="text-ui-schiefer">Andere Modelle:</span>
+      <span className="text-ui-schiefer">{imCheck ? 'Die Modelle im Einzelnen:' : 'Andere Modelle:'}</span>
       {MODELLE.filter((m) => m.href !== aktuell).map((m) => (
         <a key={m.href} href={m.href} className={LINK}>
           {m.text} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </a>
       ))}
+      {!imCheck && (
+        <>
+          <span className="text-ui-schiefer">Für den ganzen Betrieb:</span>
+          <a href={BETRIEBS_CHECK} className={LINK}>
+            Betriebs-Check mit Ihrer Belegschaft <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </a>
+        </>
+      )}
     </p>
   );
 }
@@ -661,17 +676,20 @@ export function UmstiegVergleich({ betrieb, vlVertrag, steuersatz, mitUmlagen, d
   /**
    * Wie der Abschnitt im Druck steht: 'seite2' beginnt Seite 2 (Zuschuss,
    * Festbetrag — Seite 1 ist voll, die Umsetzung folgt ohne eigenen
-   * Umbruch). 'nurBildschirm' / 'nurDruck': die Matching-Seite zeigt ihn am
-   * Bildschirm beim Gehaltsvergleich, im Druck am Ende von Seite 2.
+   * Umbruch). 'folgt': ohne eigenen Umbruch — das individuelle Modell
+   * beginnt Seite 2 schon beim Gehaltsvergleich davor. 'nurBildschirm' /
+   * 'nurDruck': die Matching-Seite zeigt ihn am Bildschirm beim
+   * Gehaltsvergleich, im Druck am Ende von Seite 2.
    */
-  druck?: 'seite2' | 'nurBildschirm' | 'nurDruck';
+  druck?: 'seite2' | 'folgt' | 'nurBildschirm' | 'nurDruck';
   /** Die Rechnung je Kopf im Druck zeigen — auf der Matching-Seite fehlt dafuer der Platz. */
   kopfImDruck?: boolean;
 }) {
   const mehr = betrieb.mehrkostenNettoJahr;
   const k = betrieb.kopfVl;
   const druckKlasse = druck === 'seite2' ? 'print:break-before-page'
-    : druck === 'nurBildschirm' ? 'print:hidden' : 'hidden print:block';
+    : druck === 'folgt' ? ''
+      : druck === 'nurBildschirm' ? 'print:hidden' : 'hidden print:block';
   const hat = (g: BetriebGruppe) => betrieb.zeilen.some((z) => z.gruppe === g);
   return (
     <section className={`${KARTE} print:break-inside-avoid ${druckKlasse}`}>

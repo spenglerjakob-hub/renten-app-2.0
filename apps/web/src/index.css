@@ -141,6 +141,20 @@
   .ui-feld::placeholder { color: rgb(var(--ui-schiefer)); }
   .ui-feld:disabled { background-color: rgb(var(--ui-innen)); color: rgb(var(--ui-schiefer)); }
   /*
+   * EINGABEN AM TELEFON. Der Kunde oeffnet den Link des Beraters zum
+   * Vorsorge-Check meist am Handy: Eingaben in 16 px (darunter zoomt iOS beim
+   * Antippen hinein und die Seite verrutscht) und so hoch, dass der Daumen sie
+   * trifft; Haken groesser. Die Einheit im Feld („€“) rueckt in die Mitte der
+   * neuen Hoehe. Dasselbe gilt, wo ein Formular `handy-eingaben` traegt — etwa
+   * die Angaben eines neuen Zugangs einer Agentur.
+   */
+  @media (max-width: 639px) {
+    :is(.check-seite, .handy-eingaben) .ui-feld { font-size: 16px; min-height: 3rem; }
+    :is(.check-seite, .handy-eingaben) .ui-feld-einheit { top: 50%; transform: translateY(-50%); font-size: 16px; }
+    :is(.check-seite, .handy-eingaben) input[type='checkbox'] { width: 1.25rem; height: 1.25rem; }
+    :is(.check-seite, .handy-eingaben) label:has(> input[type='checkbox']) { min-height: 2.75rem; }
+  }
+  /*
    * Der Regler selbst gestaltet: helle Spur, gefuellt bis zum Wert (--anteil
    * setzt die Seite), Knopf in der Reglerfarbe. Der native Regler malte bei
    * hellem Cyan den Rest der Spur fast schwarz.

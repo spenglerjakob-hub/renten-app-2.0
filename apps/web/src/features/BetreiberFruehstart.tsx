@@ -11,13 +11,14 @@ import {
   rueckmeldungenLaden, type FruehstartAnfrage, type FruehstartLink, type FruehstartTeilnehmer, type Rueckmeldung,
 } from '../lib/fruehstart';
 import { absageMail, anfrageLink, zusageMail } from './fruehstart-mail';
+import { BetreiberVerwaltung } from './BetreiberVerwaltung';
 import { datum } from '../store/zugang';
 
 /**
  * Nur fuer den Betreiber, im Fenster "Abo & Team": Anfragen von der
  * Preisseite zu- oder absagen, Early-Adopter-Links erstellen und verwalten,
- * die Teilnehmer im Blick behalten (wer schweigt?) und alle Rueckmeldungen
- * lesen.
+ * die Teilnehmer im Blick behalten (wer schweigt?), alle Rueckmeldungen
+ * lesen — und die Konten der bAV-Verwaltung benennen (BetreiberVerwaltung).
  *
  * Beide Bereiche laden erst beim Aufklappen — und bei jedem Aufklappen neu.
  * Was angezeigt wird, entscheidet der Server: Fuer andere Konten liefern die
@@ -29,6 +30,7 @@ export function BetreiberFruehstart() {
       <Klappe titel="Early Adopter: Anfragen"><Anfragen /></Klappe>
       <Klappe titel="Early Adopter: Links und Teilnehmer"><EarlyAdopter /></Klappe>
       <Klappe titel="Rückmeldungen"><Rueckmeldungen /></Klappe>
+      <Klappe titel="bAV-Verwaltung: Konten"><BetreiberVerwaltung /></Klappe>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { paketDeckt, paketVon, type Bereich, type Intervall, type PaketId } from '@renten/schema/preise';
 import { supabase } from '../lib/supabase';
 import {
-  einladungVergessen, fruehstartVergessen, istEinladungsToken, offeneEinladung, offenerFruehstart,
+  agenturEinladungVergessen, einladungVergessen, fruehstartVergessen, istEinladungsToken, offeneAgenturEinladung,
+  offeneEinladung, offenerFruehstart,
 } from '../lib/einladung';
 
 /**
@@ -24,7 +25,7 @@ import {
  * den Browser-Code ohnehin heran. Speichern geht ohne Paket trotzdem nicht.
  */
 
-export type Quelle = 'vorab' | 'frei' | 'fruehstart' | 'abo' | 'test';
+export type Quelle = 'vorab' | 'frei' | 'fruehstart' | 'abo' | 'test' | 'agentur' | 'verwaltung';
 export type Rolle = 'inhaber' | 'mitglied';
 
 export interface AboAngaben {
@@ -66,16 +67,34 @@ export interface Zugang {
   fruehstartBis: string | null;
   /** Wann zuletzt eine Rueckmeldung kam — fuer die Erinnerung */
   letzteRueckmeldung: string | null;
+  /**
+   * Die Agentur, zu der das Konto gehoert (Einladungslink der bAV-Verwaltung)
+   * — null: keine. Ein solches Konto hat die Vorsorgemodelle und die
+   * Mitarbeiterberatung (`quelle: 'agentur'`), ohne Abo.
+   */
+  agentur: string | null;
+  agenturName: string | null;
+  /**
+   * Die Rolle in der Agentur — `admin` richtet sie ein (Angaben, Auftritt),
+   * `mitglied` beraet. null: keine Agentur, oder die Datenbank kennt noch
+   * keine Rollen (dann ist niemand Admin).
+   */
+  agenturRolle: 'admin' | 'mitglied' | null;
+  /** Gehoert zur bAV-Verwaltung des Betreibers: fuehrt die Agenturen und sieht deren Firmen */
+  verwalter: boolean;
 }
 
 export type EinladungsAntwort =
   'ok' | 'ungueltig' | 'abgelaufen' | 'schon_im_buero' | 'anderes_buero' | 'kein_abo' | 'voll';
 export type FruehstartAntwort = 'ok' | 'ungueltig' | 'abgelaufen' | 'schon_dabei' | 'frei';
+/** Antwort von `bav_agentur_einladung_annehmen` */
+export type AgenturAntwort = 'ok' | 'ungueltig' | 'abgelaufen' | 'eingeloest' | 'andere_agentur' | 'verwaltung';
 
 const PAKET_IDS = ['alles', 'rente', 'ag'] as const;
-const QUELLEN = ['vorab', 'frei', 'fruehstart', 'abo', 'test'] as const;
+const QUELLEN = ['vorab', 'frei', 'fruehstart', 'abo', 'test', 'agentur', 'verwaltung'] as const;
 const ANTWORTEN = ['ok', 'ungueltig', 'abgelaufen', 'schon_im_buero', 'anderes_buero', 'kein_abo', 'voll'] as const;
 const FRUEHSTART_ANTWORTEN = ['ok', 'ungueltig', 'abgelaufen', 'schon_dabei', 'frei'] as const;
+const AGENTUR_ANTWORTEN = ['ok', 'ungueltig', 'abgelaufen', 'eingeloest', 'andere_agentur', 'verwaltung'] as const;
 
 const aus = <T extends string>(liste: readonly T[], v: unknown): T | null =>
   (liste as readonly unknown[]).includes(v) ? (v as T) : null;
@@ -115,6 +134,11 @@ export function zugangAus(roh: unknown): Zugang | null {
     fruehstartSeit: text(r.fruehstart_seit),
     fruehstartBis: text(r.fruehstart_bis),
     letzteRueckmeldung: text(r.letzte_rueckmeldung),
+    // Eine Datenbank ohne die Migration der Agenturen liefert die Felder nicht: dann ist es niemand.
+    agentur: text(r.agentur),
+    agenturName: text(r.agentur_name),
+    agenturRolle: text(r.agentur) ? aus(['admin', 'mitglied'] as const, r.agentur_rolle) : null,
+    verwalter: r.verwalter === true,
   };
 }
 
@@ -156,6 +180,8 @@ export function aboZusatz(z: Zugang): string {
     return `${paketVon(z.abo.paket).name} · ${z.abo.plaetze} ${z.abo.plaetze === 1 ? 'Platz' : 'Plätze'}`;
   }
   if (z.betreiber) return 'Betreiberkonto';
+  if (z.quelle === 'agentur') return z.agenturName ? `Zugang der Agentur ${z.agenturName}` : 'Zugang Ihrer Agentur';
+  if (z.quelle === 'verwaltung') return 'bAV-Verwaltung';
   if (z.freizugang === 'bestand') return 'Kostenlos (Bestandsschutz)';
   if (z.freizugang === 'partner') return 'Kostenlos (Partnerzugang)';
   return 'Paket wählen, Kollegen einladen';
@@ -223,6 +249,8 @@ interface ZugangStore {
   einladung: EinladungsAntwort | null;
   /** Antwort auf den zuletzt eingeloesten Early-Adopter-Link — fuer das Band */
   fruehstartAntwort: FruehstartAntwort | null;
+  /** Antwort auf die zuletzt eingeloeste Einladung in eine Agentur — fuer das Band */
+  agenturAntwort: AgenturAntwort | null;
   /** Solange ein Link eingeloest wird, wartet die Schranke. */
   loestEin: boolean;
   /** Das Fenster "Feedback geben" — von ueberall erreichbar */
@@ -232,6 +260,7 @@ interface ZugangStore {
   linksEinloesen: () => Promise<void>;
   einladungGesehen: () => void;
   fruehstartGesehen: () => void;
+  agenturGesehen: () => void;
   zuruecksetzen: () => void;
   setzeVorschau: (v: Vorschau | null) => void;
   oeffneFenster: () => void;
@@ -270,6 +299,7 @@ export const useZugang = create<ZugangStore>((set, get) => ({
   fensterOffen: false,
   einladung: null,
   fruehstartAntwort: null,
+  agenturAntwort: null,
   loestEin: false,
   rueckmeldungOffen: false,
 
@@ -309,6 +339,7 @@ export const useZugang = create<ZugangStore>((set, get) => ({
 
   einladungGesehen: () => set({ einladung: null }),
   fruehstartGesehen: () => set({ fruehstartAntwort: null }),
+  agenturGesehen: () => set({ agenturAntwort: null }),
 
   zuruecksetzen: () => {
     speicherLeeren();
@@ -316,7 +347,7 @@ export const useZugang = create<ZugangStore>((set, get) => ({
     anfrage += 1;
     set({
       fuer: null, zugang: null, stand: 'offen', geladenAm: 0, vorschau: null, fensterOffen: false,
-      einladung: null, fruehstartAntwort: null, loestEin: false, rueckmeldungOffen: false,
+      einladung: null, fruehstartAntwort: null, agenturAntwort: null, loestEin: false, rueckmeldungOffen: false,
     });
   },
 
@@ -343,7 +374,8 @@ async function einloesen(set: Setzen, get: () => ZugangStore): Promise<void> {
   const konto = (sitzung.session?.user.user_metadata ?? {}) as Record<string, unknown>;
   const einladung = offeneEinladung() ?? (istEinladungsToken(konto.einladung) ? konto.einladung : null);
   const fruehstart = offenerFruehstart() ?? (istEinladungsToken(konto.fruehstart) ? konto.fruehstart : null);
-  if (!einladung && !fruehstart) return;
+  const agentur = offeneAgenturEinladung() ?? (istEinladungsToken(konto.agentur_einladung) ? konto.agentur_einladung : null);
+  if (!einladung && !fruehstart && !agentur) return;
 
   set({ loestEin: true });
   const ergebnis: Partial<ZugangStore> = {};
@@ -369,6 +401,17 @@ async function einloesen(set: Setzen, get: () => ZugangStore): Promise<void> {
       if (konto.fruehstart != null) aufraeumen.fruehstart = null;
       ergebnis.fruehstartAntwort = aus(FRUEHSTART_ANTWORTEN, data) ?? 'ungueltig';
       neuLaden ||= ergebnis.fruehstartAntwort === 'ok';
+    }
+  }
+  if (agentur) {
+    const { data, error } = await sb.rpc('bav_agentur_einladung_annehmen', { p_token: agentur });
+    // Auch ohne die Funktion (Datenbank noch ohne Agenturen) bleibt der Link gemerkt — bis er zu alt ist.
+    if (error) console.warn('Einladung der Agentur nicht eingeloest', error);
+    else {
+      agenturEinladungVergessen();
+      if (konto.agentur_einladung != null) aufraeumen.agentur_einladung = null;
+      ergebnis.agenturAntwort = aus(AGENTUR_ANTWORTEN, data) ?? 'ungueltig';
+      neuLaden ||= ergebnis.agenturAntwort === 'ok';
     }
   }
   if (Object.keys(aufraeumen).length > 0) void sb.auth.updateUser({ data: aufraeumen });

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Check, FileText } from 'lucide-react';
+import { Check, FileStack, HeartPulse, Target, UserRound, Wallet, type LucideIcon } from 'lucide-react';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { Basisdaten, type BasisTeil } from './Basisdaten';
 import { useSzenario } from '../store/szenario';
@@ -7,15 +7,20 @@ import { eintragVon, offenePfade, relevant } from './vorbelegung';
 import type { FallSchrittId } from './fortschritt';
 import { KNOPF_ZWEIT } from '../components/stil';
 import { Stuecke, type Stueck } from '../components/Ablauf';
+import { FrageKopf, Hilfe, Hilfen } from '../components/Frage';
 import { einkommenSatz, haushaltSatz, personenSatz, vertraegeSatz, zielSatz } from './daten-ergebnis';
 import { useAnsprache } from '../components/Ansprache';
 import type { AnspracheWoerter } from '../lib/ansprache';
 
 /**
  * DER ASSISTENT fuer die erste Etappe: dieselben Angaben wie im Formular,
- * aber einzeln abgefragt — mit der Unterlage, in der die Zahl steht. Ein
- * Schritt ist offen; die davor stehen darueber als Zeilen mit dem, was
- * eingetragen ist.
+ * aber einzeln abgefragt. Ein Schritt ist offen; die davor stehen darueber
+ * als Zeilen mit dem, was eingetragen ist.
+ *
+ * FRAGE ZUERST, wie im Vorsorge-Check: Jeder Schritt beginnt mit einer Frage
+ * und einem Satz dazu, darunter stehen gleich die Felder. In welcher
+ * Unterlage die Zahl steht, klappt darunter auf („Wo finde ich das?“) — wer
+ * sie kennt, muss nicht daran vorbei.
  *
  * Er schreibt in denselben Speicher wie das Formular und der Rechner. Es gibt
  * also nichts zu „uebernehmen": Wer mitten im Assistenten auf das Formular
@@ -25,9 +30,15 @@ import type { AnspracheWoerter } from '../lib/ansprache';
  */
 
 interface AssistentSchritt {
-  /** Titel und Unterlage sprechen den Kunden an — per Du, ein Paar per ihr */
+  /** Der kurze Name — fuer die Zeile des erledigten Schritts und „Weiter: …“ */
   titel: (t: AnspracheWoerter) => string;
-  unterlage: (t: AnspracheWoerter) => ReactNode;
+  /** Zeichen, Frage und ein Satz dazu — der Kopf des offenen Schritts. Per Du, ein Paar per ihr. */
+  symbol: LucideIcon;
+  frage: (t: AnspracheWoerter) => string;
+  unter: (t: AnspracheWoerter) => string;
+  /** „Wo finde ich das?“: die Unterlage in zwei, drei Woertern und der Hinweis dazu — ohne: keine Hilfe */
+  unterlageKurz?: string;
+  unterlage?: (t: AnspracheWoerter) => ReactNode;
   /** Ein Teil der Basisdaten — oder die Vertraege, die der Aufrufer mitgibt */
   teil: BasisTeil | 'vertraege';
 }
@@ -43,6 +54,10 @@ const SCHRITTE: AssistentSchritt[] = [
   {
     titel: (t) => t.w('Du & deine gesetzliche Rente', 'Ihr beide & eure gesetzliche Rente'),
     teil: 'personen',
+    symbol: UserRound,
+    frage: (t) => t.w('Zuerst zu dir', 'Zuerst zu euch beiden'),
+    unter: (t) => `Aus dem Geburtsdatum ergibt sich der Rentenbeginn; was ${t.dir} die Rentenversicherung heute zusagt, steht in der Renteninformation.`,
+    unterlageKurz: 'Renteninformation oder Versorgungsauskunft',
     // Das Zitat aus der Renteninformation bleibt woertlich — so steht es im Brief.
     unterlage: (t) => (
       <>
@@ -56,6 +71,10 @@ const SCHRITTE: AssistentSchritt[] = [
   {
     titel: () => 'Haushalt & Krankenversicherung',
     teil: 'haushalt',
+    symbol: HeartPulse,
+    frage: (t) => t.w('Wo wohnst du, wie bist du krankenversichert?', 'Wo wohnt ihr, wie seid ihr krankenversichert?'),
+    unter: () => 'Bundesland, Kirchensteuer und Kinder zählen für Steuer, Pflegebeitrag und Zulagen. Gesetzlich versichert genügt der Name der Kasse.',
+    unterlageKurz: 'Versichertenkarte oder Beitragsrechnung',
     unterlage: (t) => (
       <>
         Gesetzlich versichert: der <strong>Name {t.dein('er')} Krankenkasse</strong> — den Zusatzbeitrag kennt
@@ -67,6 +86,10 @@ const SCHRITTE: AssistentSchritt[] = [
   {
     titel: () => 'Einkommen',
     teil: 'einkommen',
+    symbol: Wallet,
+    frage: (t) => t.w('Was verdienst du?', 'Was verdient ihr?'),
+    unter: () => 'Ein normaler Monat — Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter.',
+    unterlageKurz: 'Gehaltsabrechnung, Bezügemitteilung oder Steuerbescheid',
     unterlage: () => (
       <>
         Die letzte <strong>Gehaltsabrechnung</strong>: das Gesamtbrutto eines normalen Monats —
@@ -79,25 +102,25 @@ const SCHRITTE: AssistentSchritt[] = [
   {
     titel: () => 'Bestehende Vorsorge',
     teil: 'vertraege',
+    symbol: FileStack,
+    frage: (t) => t.w('Welche Vorsorge hast du schon?', 'Welche Vorsorge habt ihr schon?'),
+    unter: () => 'Betriebsrente, Riester, private Rente, Depot — je Vertrag ein Eintrag. Keinen zu haben ist auch eine Angabe.',
+    unterlageKurz: 'Standmitteilung oder Depotauszug',
     unterlage: () => (
       <>
         Die jährliche <strong>Standmitteilung</strong> jedes Vertrags: garantierte bzw. prognostizierte
         Monatsrente, Beitrag und Beginn. Bei Betriebsrenten den Anteil des Arbeitgebers
-        (Gehaltsabrechnung), bei Depots den <strong>Depotauszug</strong>. Kein Vertrag? Dann einfach
-        weiter.
+        (Gehaltsabrechnung), bei Depots den <strong>Depotauszug</strong>.
       </>
     ),
   },
   {
     titel: (t) => `${t.Dein()} Ziel`,
     teil: 'ziel',
-    unterlage: (t) => (
-      <>
-        Keine Unterlage — nur eine Überlegung: Wie viel Geld im Monat {t.w('brauchst du', 'braucht ihr')} im Ruhestand,
-        gerechnet in <strong>heutigem Geld</strong>? Die Preissteigerung bis dahin rechnet der
-        Planer selbst hinzu.
-      </>
-    ),
+    symbol: Target,
+    // Keine Unterlage — nur eine Ueberlegung; sie steht deshalb gleich unter der Frage.
+    frage: (t) => t.w('Wie viel möchtest du im Ruhestand haben?', 'Wie viel möchtet ihr im Ruhestand haben?'),
+    unter: () => 'Im Monat, in heutigem Geld — die Preissteigerung bis dahin rechnet der Planer selbst hinzu.',
   },
 ];
 
@@ -194,13 +217,9 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
     ergebnis: ergebnisVon[x.teil](),
     fehlt: beispielOffen(x) ? (x.teil === 'vertraege' ? 'noch nicht erfasst' : 'Beispielwerte offen') : undefined,
     inhalt: (
-      <div className="ui-karte p-5 sm:p-7">
-        <h3 className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">{x.titel(t)}</h3>
-        {/* Die Unterlage als leiser Satz unter dem Titel — wie die Hilfetexte der Beratung, kein gelber Kasten. */}
-        <p className="mt-2 flex max-w-3xl gap-2.5 text-sm leading-relaxed text-ui-schiefer [&_strong]:font-medium [&_strong]:text-ui-tinte">
-          <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span><span className="font-medium text-ui-tinte">Das {t.w('brauchst du', 'braucht ihr')}: </span>{x.unterlage(t)}</span>
-        </p>
+      // `handy-eingaben`: am Telefon Eingaben in 16 px und daumenhoch (index.css) — wie im Vorsorge-Check.
+      <div className="ui-karte handy-eingaben p-5 sm:p-7">
+        <FrageKopf symbol={x.symbol} titel={x.frage(t)} unter={x.unter(t)} als="h3" />
 
         <div className="mt-6">
           {x.teil === 'vertraege'
@@ -227,6 +246,13 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
             )
             : <Basisdaten teil={x.teil} ergebnis={ergebnis} onEhepartnerDialog={onEhepartnerDialog} />}
         </div>
+
+        {/* Was beim Ausfuellen hilft, steht UNTER den Feldern und klappt auf — wer die Zahl kennt, muss nicht daran vorbei. */}
+        {x.unterlage && x.unterlageKurz && (
+          <Hilfen>
+            <Hilfe unterlage={x.unterlageKurz}>{x.unterlage(t)}</Hilfe>
+          </Hilfen>
+        )}
       </div>
     ),
   }));

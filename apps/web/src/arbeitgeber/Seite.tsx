@@ -358,7 +358,7 @@ export function Seite() {
                 <Printer className="h-4 w-4" aria-hidden /> Für den Arbeitgeber drucken
               </button>
               <UebernehmenKnopf modell={{ art: 'matching', weg, matchingMonat: matching, zuschussImMatching: weg === 'dv' && inklusive }} bundesland={bundesland}
-                firmaId={kunde.firma?.eigene ? kunde.firma.id : null} />
+                firmaId={kunde.firma?.aenderbar ? kunde.firma.id : null} />
             </div>
             <RechtsLinks />
           </div>
