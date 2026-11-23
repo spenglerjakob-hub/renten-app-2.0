@@ -1561,7 +1561,6 @@ export default function App() {
                           <Basisdaten
                             ergebnis={ergebnis ?? null}
                             onEhepartnerDialog={() => setEhepartnerDialog(true)}
-                            onAssistent={() => setEingabeArt('assistent')}
                           />
                         </AkkordeonKarte>
                       </div>

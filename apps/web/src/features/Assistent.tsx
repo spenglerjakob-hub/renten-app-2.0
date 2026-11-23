@@ -18,9 +18,13 @@ import type { AnspracheWoerter } from '../lib/ansprache';
  * als Zeilen mit dem, was eingetragen ist.
  *
  * FRAGE ZUERST, wie im Vorsorge-Check: Jeder Schritt beginnt mit einer Frage
- * und einem Satz dazu, darunter stehen gleich die Felder. In welcher
+ * und einer kurzen Zeile dazu, darunter stehen gleich die Felder. In welcher
  * Unterlage die Zahl steht, klappt darunter auf („Wo finde ich das?“) — wer
  * sie kennt, muss nicht daran vorbei.
+ *
+ * SO WENIG TEXT WIE MOEGLICH: Unter den Feldern steht keine Erklaerung mehr.
+ * Was man nur einmal wissen muss, oeffnet sich am Fragezeichen neben der
+ * Beschriftung (`info` an den Feldern).
  *
  * Er schreibt in denselben Speicher wie das Formular und der Rechner. Es gibt
  * also nichts zu „uebernehmen": Wer mitten im Assistenten auf das Formular
@@ -32,7 +36,7 @@ import type { AnspracheWoerter } from '../lib/ansprache';
 interface AssistentSchritt {
   /** Der kurze Name — fuer die Zeile des erledigten Schritts und „Weiter: …“ */
   titel: (t: AnspracheWoerter) => string;
-  /** Zeichen, Frage und ein Satz dazu — der Kopf des offenen Schritts. Per Du, ein Paar per ihr. */
+  /** Zeichen, Frage und eine kurze Zeile dazu — der Kopf des offenen Schritts. Per Du, ein Paar per ihr. */
   symbol: LucideIcon;
   frage: (t: AnspracheWoerter) => string;
   unter: (t: AnspracheWoerter) => string;
@@ -56,7 +60,7 @@ const SCHRITTE: AssistentSchritt[] = [
     teil: 'personen',
     symbol: UserRound,
     frage: (t) => t.w('Zuerst zu dir', 'Zuerst zu euch beiden'),
-    unter: (t) => `Aus dem Geburtsdatum ergibt sich der Rentenbeginn; was ${t.dir} die Rentenversicherung heute zusagt, steht in der Renteninformation.`,
+    unter: () => 'Geburtsdatum und der Betrag aus der Renteninformation.',
     unterlageKurz: 'Renteninformation oder Versorgungsauskunft',
     // Das Zitat aus der Renteninformation bleibt woertlich — so steht es im Brief.
     unterlage: (t) => (
@@ -73,7 +77,7 @@ const SCHRITTE: AssistentSchritt[] = [
     teil: 'haushalt',
     symbol: HeartPulse,
     frage: (t) => t.w('Wo wohnst du, wie bist du krankenversichert?', 'Wo wohnt ihr, wie seid ihr krankenversichert?'),
-    unter: () => 'Bundesland, Kirchensteuer und Kinder zählen für Steuer, Pflegebeitrag und Zulagen. Gesetzlich versichert genügt der Name der Kasse.',
+    unter: () => 'Für Steuer, Krankenversicherung und Zulagen.',
     unterlageKurz: 'Versichertenkarte oder Beitragsrechnung',
     unterlage: (t) => (
       <>
@@ -88,7 +92,7 @@ const SCHRITTE: AssistentSchritt[] = [
     teil: 'einkommen',
     symbol: Wallet,
     frage: (t) => t.w('Was verdienst du?', 'Was verdient ihr?'),
-    unter: () => 'Ein normaler Monat — Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter.',
+    unter: () => 'Ein normaler Monat, ohne Sonderzahlungen.',
     unterlageKurz: 'Gehaltsabrechnung, Bezügemitteilung oder Steuerbescheid',
     unterlage: () => (
       <>
@@ -104,7 +108,7 @@ const SCHRITTE: AssistentSchritt[] = [
     teil: 'vertraege',
     symbol: FileStack,
     frage: (t) => t.w('Welche Vorsorge hast du schon?', 'Welche Vorsorge habt ihr schon?'),
-    unter: () => 'Betriebsrente, Riester, private Rente, Depot — je Vertrag ein Eintrag. Keinen zu haben ist auch eine Angabe.',
+    unter: () => 'Betriebsrente, Riester, private Rente, Depot — je Vertrag ein Eintrag.',
     unterlageKurz: 'Standmitteilung oder Depotauszug',
     unterlage: () => (
       <>
@@ -120,7 +124,7 @@ const SCHRITTE: AssistentSchritt[] = [
     symbol: Target,
     // Keine Unterlage — nur eine Ueberlegung; sie steht deshalb gleich unter der Frage.
     frage: (t) => t.w('Wie viel möchtest du im Ruhestand haben?', 'Wie viel möchtet ihr im Ruhestand haben?'),
-    unter: () => 'Im Monat, in heutigem Geld — die Preissteigerung bis dahin rechnet der Planer selbst hinzu.',
+    unter: () => 'Im Monat, in heutiger Kaufkraft.',
   },
 ];
 

@@ -10,39 +10,32 @@ import { FELD_LABEL } from './stil';
  * VORBELEGT — der Wert im Feld stammt nicht vom Berater, sondern aus der
  * Vorbelegung eines neuen Falls (siehe `features/vorbelegung.ts`).
  *
+ * Eine Marke tragen nur BEISPIELWERTE: Sie stehen fuer eine Angabe, die noch
+ * fehlt, und lassen sich mit „Stimmt so“ bestaetigen. STANDARDWERTE (uebliche
+ * Annahmen wie „12 Gehaelter“) stehen ohne Marke da — unter jedem zweiten Feld
+ * das Wort „Standardwert“ machte die Angaben unruhig, ohne mehr zu sagen: Dass
+ * ein Feld anpassbar ist, sieht man ihm an.
+ *
  * Die Marke steht UNTER dem Feld, nicht neben der Beschriftung: Dort braeche
  * sie lange Beschriftungen um, und die Felder einer Zeile staenden nicht
  * mehr auf einer Hoehe.
  */
 export interface Vorbelegt {
   art: 'beispiel' | 'standard';
-  /** Woher der Standardwert kommt — steht im Tooltip */
+  /** Woher der Wert kommt — steht im Tooltip der Marke */
   hinweis?: string;
   /** „Stimmt so“: bestaetigt einen Beispielwert, ohne ihn zu aendern */
   onPruefen?: () => void;
 }
 
-const VORBELEGT_TEXT = {
-  standard: 'Vorbelegt mit einem üblichen Wert. Ändern Sie ihn, wenn er für Ihren Mandanten nicht passt.',
-  beispiel: 'Ein Beispiel, keine Angabe Ihres Mandanten. Im Gutachten steht es als Beispielwert, bis Sie es ersetzen oder bestätigen.',
-} as const;
+const BEISPIEL_TEXT = 'Ein Beispiel, keine Angabe Ihres Mandanten. Im Gutachten steht es als Beispielwert, bis Sie es ersetzen oder bestätigen.';
+
+/** Traegt das Feld eine Marke? Nur dann gibt es das Element, auf das `aria-describedby` zeigt. */
+export const hatMarke = (v?: Vorbelegt): v is Vorbelegt => v?.art === 'beispiel';
 
 export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: string; klasse?: string }) {
-  const titel = v.hinweis ? `${v.hinweis} ${VORBELEGT_TEXT[v.art]}` : VORBELEGT_TEXT[v.art];
-  /*
-    Standardwerte leise: ein Wort, kein Kaestchen. Dass ein Eingabefeld
-    anpassbar ist, sieht man ihm an; unter jedem zweiten Feld ein grauer
-    Kasten machte das Formular unruhig, ohne mehr zu sagen. Woher der Wert
-    stammt, traegt weiter der Tooltip (gepunktete Linie).
-  */
-  if (v.art === 'standard') {
-    return (
-      <span id={id} title={titel}
-        className={`inline-flex cursor-help items-center text-xs text-ui-schiefer underline decoration-ui-asche decoration-dotted underline-offset-2 print:hidden ${klasse}`}>
-        Standardwert
-      </span>
-    );
-  }
+  if (!hatMarke(v)) return null;
+  const titel = v.hinweis ? `${v.hinweis} ${BEISPIEL_TEXT}` : BEISPIEL_TEXT;
   /*
     Kurz, weil die Marke auch in schmalen Spalten (drei Felder je Zeile)
     in eine Zeile passen soll. Dass zu pruefen ist, sagen der Rahmen des
@@ -68,6 +61,40 @@ export function VorbelegtMarke({ v, id, klasse = 'mt-1' }: { v: Vorbelegt; id?: 
   );
 }
 
+/** Wie `FELD_LABEL`, aber ohne eigenen Abstand — den traegt die Zeile mit dem Info-Kaestchen. */
+const FELD_LABEL_ZEILE = 'min-w-0 text-xs font-medium text-ui-tinte/80';
+
+/**
+ * DIE BESCHRIFTUNG EINES FELDS — auf Wunsch mit einem Info-Kaestchen daneben.
+ *
+ * Eine Erklaerung, die man nur einmal braucht, steht nicht mehr als Satz
+ * unter dem Feld: Sie oeffnet sich am Fragezeichen neben der Beschriftung
+ * (`InfoPunkt`), bei Bedarf. Unter dem Feld bleibt, was zum Ausfuellen noetig
+ * ist — eine Fehlermeldung, ein Beispielwert, ein kurzer Warnhinweis.
+ *
+ * Das Fragezeichen ist hoeher als die Zeile der Beschriftung; der Versatz
+ * (`-my-0.5`) haelt die Zeile trotzdem so hoch wie ohne — sonst staende ein
+ * Feld mit Erklaerung zwei Pixel tiefer als sein Nachbar.
+ */
+export function FeldTitel({ text, info, htmlFor, id }: {
+  text: string;
+  /** Die Erklaerung im Info-Kaestchen — ohne: nur die Beschriftung */
+  info?: ReactNode;
+  /** Mit `htmlFor` ein <label>, sonst ein <span> (fuer Gruppen mit `aria-labelledby`) */
+  htmlFor?: string;
+  id?: string;
+}) {
+  const titel = htmlFor
+    ? <label htmlFor={htmlFor} id={id} className={info ? FELD_LABEL_ZEILE : FELD_LABEL}>{text}</label>
+    : <span id={id} className={info ? FELD_LABEL_ZEILE : FELD_LABEL}>{text}</span>;
+  if (!info) return titel;
+  return (
+    <span className="mb-1 flex items-center">
+      {titel}
+      <span className="-my-0.5 inline-flex shrink-0"><InfoPunkt titel={text}>{info}</InfoPunkt></span>
+    </span>
+  );
+}
 /**
  * Rahmen eines Felds mit Beispielwert — sichtbar am Feld selbst, ohne dass es
  * die Hoehe aendert. Nur der Rahmen, gestrichelt, keine Farbflaeche: Stehen
@@ -94,7 +121,10 @@ export function ZahlFeld(props: {
   max?: number;
   schritt?: number;
   einheit?: string;
+  /** Ein kurzer Satz unter dem Feld — nur, was zum Ausfuellen noetig ist */
   hilfe?: string;
+  /** Die laengere Erklaerung: im Info-Kaestchen neben der Beschriftung, bei Bedarf */
+  info?: ReactNode;
   id?: string;
   /** Groesseres Feld fuer die eine Zahl, an der alles Weitere haengt. */
   gross?: boolean;
@@ -138,7 +168,7 @@ export function ZahlFeld(props: {
   onVerlassen?: () => void;
 }) {
   const {
-    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, gross, stufen, einheitWahl, vorbelegt,
+    label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, info, gross, stufen, einheitWahl, vorbelegt,
     platzhalter, leerBeiNull, tausenderpunkte, onVerlassen,
   } = props;
   const schritt = props.schritt ?? 1;
@@ -217,7 +247,7 @@ export function ZahlFeld(props: {
 
   return (
     <div>
-      <label htmlFor={id} className={FELD_LABEL}>{label}</label>
+      <FeldTitel text={label} info={info} htmlFor={id} />
       <div className="relative">
         <input
           ref={feld}
@@ -240,7 +270,7 @@ export function ZahlFeld(props: {
           } : undefined}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={[
-            vorbelegt ? `${id}-vorbelegt` : '',
+            hatMarke(vorbelegt) ? `${id}-vorbelegt` : '',
             fehler ? `${id}-fehler` : hilfe ? `${id}-hilfe` : '',
           ].filter(Boolean).join(' ') || undefined}
           className={`ui-feld w-full font-medium tabular-nums ${
@@ -320,7 +350,7 @@ export function ZahlFeld(props: {
 /** Prozenteingabe: zeigt Prozent, speichert Dezimalwerte. */
 export function ProzentFeld(props: {
   label: string; wert: number; onChange: (n: number) => void;
-  min?: number; max?: number; hilfe?: string;
+  min?: number; max?: number; hilfe?: string; info?: ReactNode;
   vorbelegt?: Vorbelegt;
   /**
    * Nachkommastellen der ANZEIGE.
@@ -343,6 +373,7 @@ export function ProzentFeld(props: {
       max={props.max ?? 20}
       einheit="%"
       hilfe={props.hilfe}
+      info={props.info}
       vorbelegt={props.vorbelegt}
     />
   );
@@ -429,6 +460,8 @@ export function DatumFeld(props: {
   wert: string;
   onChange: (s: string) => void;
   hilfe?: ReactNode;
+  /** Die laengere Erklaerung: im Info-Kaestchen neben der Beschriftung */
+  info?: ReactNode;
   zusatz?: ReactNode;
   /**
    * Knoepfe wie am `ZahlFeld`, hier um ein JAHR: Tag und Monat bleiben
@@ -506,7 +539,7 @@ export function DatumFeld(props: {
 
   return (
     <div>
-      <label htmlFor={id} className={FELD_LABEL}>{props.label}</label>
+      <FeldTitel text={props.label} info={props.info} htmlFor={id} />
       <div className="relative">
         <input
           id={id}
@@ -521,7 +554,7 @@ export function DatumFeld(props: {
             if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
           } : undefined}
           aria-invalid={fehler ? true : undefined}
-          aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', fehler ? `${id}-fehler` : '']
+          aria-describedby={[hatMarke(vorbelegt) ? `${id}-vorbelegt` : '', fehler ? `${id}-fehler` : '']
             .filter(Boolean).join(' ') || undefined}
           className={`ui-feld w-full p-2 text-sm tabular-nums ${
             fehler ? FEHLER_RAHMEN : beispielRahmen(vorbelegt)
@@ -565,18 +598,20 @@ export function AuswahlFeld<T extends string>(props: {
   label: string; wert: T; onChange: (v: T) => void;
   optionen: readonly { wert: T; text: string }[];
   hilfe?: string;
+  /** Die laengere Erklaerung: im Info-Kaestchen neben der Beschriftung */
+  info?: ReactNode;
   vorbelegt?: Vorbelegt;
 }) {
   const id = `s${useId()}`;
   const { vorbelegt } = props;
   return (
     <div>
-      <label htmlFor={id} className={FELD_LABEL}>{props.label}</label>
+      <FeldTitel text={props.label} info={props.info} htmlFor={id} />
       <select
         id={id}
         value={props.wert}
         onChange={(e) => props.onChange(e.target.value as T)}
-        aria-describedby={[vorbelegt ? `${id}-vorbelegt` : '', props.hilfe ? `${id}-hilfe` : '']
+        aria-describedby={[hatMarke(vorbelegt) ? `${id}-vorbelegt` : '', props.hilfe ? `${id}-hilfe` : '']
           .filter(Boolean).join(' ') || undefined}
         className={`ui-feld w-full p-2 text-sm ${beispielRahmen(vorbelegt)}`}
       >
@@ -588,25 +623,33 @@ export function AuswahlFeld<T extends string>(props: {
   );
 }
 
-export function Schalter(props: { label: string; wert: boolean; onChange: (b: boolean) => void; vorbelegt?: Vorbelegt }) {
+export function Schalter(props: {
+  label: string; wert: boolean; onChange: (b: boolean) => void; vorbelegt?: Vorbelegt;
+  /** Die Erklaerung im Info-Kaestchen neben dem Schalter */
+  info?: ReactNode;
+}) {
   const id = `c${useId()}`;
+  const marke = hatMarke(props.vorbelegt);
   const schalter = (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-ui-tinte">
       <input
         id={id} type="checkbox" checked={props.wert}
         onChange={(e) => props.onChange(e.target.checked)}
-        aria-describedby={props.vorbelegt ? `${id}-vorbelegt` : undefined}
+        aria-describedby={marke ? `${id}-vorbelegt` : undefined}
         className="h-4 w-4 shrink-0"
       />
       {props.label}
     </label>
   );
-  if (!props.vorbelegt) return schalter;
-  // Die Marke NEBEN dem Label: Ein Knopf darin schaltete sonst den Haken um.
+  if (!marke && !props.info) return schalter;
+  // Marke und Info-Kaestchen NEBEN dem Label: Ein Knopf darin schaltete sonst den Haken um.
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      {schalter}
-      <VorbelegtMarke v={props.vorbelegt} id={`${id}-vorbelegt`} klasse="" />
+      <span className="flex items-center">
+        {schalter}
+        {props.info && <InfoPunkt titel={props.label}>{props.info}</InfoPunkt>}
+      </span>
+      {props.vorbelegt && <VorbelegtMarke v={props.vorbelegt} id={`${id}-vorbelegt`} klasse="" />}
     </span>
   );
 }
@@ -907,7 +950,10 @@ export function InfoPunkt(props: {
         ist. Ohne das Umklappen steht die Blase am oberen Bildschirmrand
         angeschlagen und verdeckt sich selbst.
       */
-      const obenPasst = k.top - b.height - LUFT >= RAND;
+      // Unter einer oben klebenden Kopfleiste beginnt der sichtbare Bereich erst an ihrer Unterkante.
+      const kopf = document.querySelector('header');
+      const kopfUnten = kopf && getComputedStyle(kopf).position === 'sticky' ? kopf.getBoundingClientRect().bottom : 0;
+      const obenPasst = k.top - b.height - LUFT >= Math.max(RAND, kopfUnten + 4);
       const top = obenPasst ? k.top - b.height - LUFT : k.bottom + LUFT;
 
       setLage({ top, left });
@@ -957,7 +1003,12 @@ export function InfoPunkt(props: {
         onMouseLeave={() => setOffen(false)}
         onFocus={() => setOffen(true)}
         onBlur={() => setOffen(false)}
-        className="ml-1 inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-ui-feld-rand bg-white text-[10px] font-medium leading-none text-ui-schiefer hover:border-ui-schiefer hover:text-ui-tinte"
+        /*
+          Groessere Tippflaeche (::after), ohne dass der Punkt waechst — am
+          Telefon trifft der Daumen 18 px nicht. Nach unten nur wenig: Unter
+          einer Beschriftung liegt das Feld, und wer das antippt, will tippen.
+        */
+        className="relative ml-1 inline-flex h-[18px] w-[18px] shrink-0 cursor-help items-center justify-center rounded-full border border-ui-feld-rand bg-white text-[10px] font-medium leading-none text-ui-schiefer after:absolute after:-inset-x-2 after:-bottom-1 after:-top-2 after:content-[''] hover:border-ui-schiefer hover:text-ui-tinte"
       >
         ?
       </button>

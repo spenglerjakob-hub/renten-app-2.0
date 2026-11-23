@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, HelpCircle, Minus, Plus, type LucideIcon } from 'lucide-react';
-import { FELD_LABEL, Titel } from './stil';
-import { VorbelegtMarke, type Vorbelegt } from './Feld';
+import { Titel } from './stil';
+import { FeldTitel, VorbelegtMarke, hatMarke, type Vorbelegt } from './Feld';
 
 /*
  * FRAGE ZUERST — die Bausteine eines Schritts, der mit einer Frage beginnt und
@@ -78,19 +78,21 @@ export function Hilfen({ children }: { children: ReactNode }) {
  * zu treffen als ein Haken, und beide Antworten stehen da, statt in einer
  * Auswahlliste zu stecken.
  */
-export function Wahl<T extends string>({ label, wert, optionen, onChange, hilfe, vorbelegt, reihe = false }: {
+export function Wahl<T extends string>({ label, wert, optionen, onChange, hilfe, info, vorbelegt, reihe = false }: {
   label: string; wert: T; optionen: readonly { wert: T; text: string }[]; onChange: (v: T) => void;
   /** Ein Satz unter den Knoepfen */
   hilfe?: ReactNode;
+  /** Die laengere Erklaerung: im Info-Kaestchen neben der Frage, bei Bedarf */
+  info?: ReactNode;
   /** Vier Antworten: ab der Breite eines Tablets in einer Zeile statt in zwei */
   reihe?: boolean;
-  /** Beispiel- oder Standardwert eines neuen Falls — nur im Rechner */
+  /** Beispielwert eines neuen Falls (Marke mit „Stimmt so“) — nur im Rechner */
   vorbelegt?: Vorbelegt;
 }) {
   const id = useId();
   return (
-    <div role="group" aria-labelledby={id} aria-describedby={vorbelegt ? `${id}-vorbelegt` : undefined}>
-      <span id={id} className={FELD_LABEL}>{label}</span>
+    <div role="group" aria-labelledby={id} aria-describedby={hatMarke(vorbelegt) ? `${id}-vorbelegt` : undefined}>
+      <FeldTitel text={label} info={info} id={id} />
       <div className={`grid grid-cols-2 gap-2 ${reihe ? 'sm:grid-cols-4' : ''}`}>
         {optionen.map((o) => (
           <button
@@ -119,16 +121,18 @@ export function Wahl<T extends string>({ label, wert, optionen, onChange, hilfe,
 export const JA_NEIN = [{ wert: 'ja', text: 'Ja' }, { wert: 'nein', text: 'Nein' }] as const;
 
 /** Eine kleine Anzahl mit Minus und Plus — statt eines Zahlenfelds mit winzigen Pfeilen. */
-export function Zaehler({ label, wert, max, onChange, weniger, mehr, hilfe, vorbelegt }: {
+export function Zaehler({ label, wert, max, onChange, weniger, mehr, hilfe, info, vorbelegt }: {
   label: string; wert: number; max: number; onChange: (n: number) => void; weniger: string; mehr: string;
   hilfe?: ReactNode;
+  /** Die laengere Erklaerung: im Info-Kaestchen neben der Beschriftung */
+  info?: ReactNode;
   vorbelegt?: Vorbelegt;
 }) {
   const id = useId();
   const knopf = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-ui-zweit-rand bg-ui-karte text-ui-tinte hover:bg-ui-hover disabled:opacity-40';
   return (
-    <div role="group" aria-labelledby={id} aria-describedby={vorbelegt ? `${id}-vorbelegt` : undefined}>
-      <span id={id} className={FELD_LABEL}>{label}</span>
+    <div role="group" aria-labelledby={id} aria-describedby={hatMarke(vorbelegt) ? `${id}-vorbelegt` : undefined}>
+      <FeldTitel text={label} info={info} id={id} />
       <div className="flex items-center gap-4">
         <button type="button" onClick={() => onChange(Math.max(0, wert - 1))} disabled={wert <= 0} aria-label={weniger} className={knopf}>
           <Minus className="h-5 w-5" aria-hidden />

@@ -103,9 +103,18 @@ export function KinderZeilen({
 export function KinderHinweis({ a }: { a: AvdParameter }) {
   return (
     <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
+      <KinderHinweisText a={a} />
+    </p>
+  );
+}
+
+/** Derselbe Satz ohne Absatz — fuer das Info-Kaestchen an der Ueberschrift (Angaben im Rechner). */
+export function KinderHinweisText({ a }: { a: AvdParameter }) {
+  return (
+    <>
       Die Kinderzulage läuft, solange Kindergeld fließt: bis {a.kinderzulageBisAlter} —
       und bei Ausbildung oder Studium so lange, wie diese dauert, längstens bis{' '}
       {a.kinderzulageBisAlterAusbildung}.
-    </p>
+    </>
   );
 }

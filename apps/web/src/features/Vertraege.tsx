@@ -6,7 +6,7 @@ import {
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
-import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { KinderZeilen, KinderHinweisText } from '../components/KinderFelder';
 import {
   TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, kenntKapitalwahl, strategieGruppe, typText,
   VERRENTUNG_JAHRE, VERRENTUNG_RENDITE, KINDERPOLICE_WEGE, kinderpoliceText, monatJahr,
@@ -166,7 +166,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             wert={v.kapitalAlternative ?? 0}
             onChange={(n) => vertragAendern(v.id, { kapitalAlternative: n })}
             einheit="€"
-            hilfe="Was der Anbieter stattdessen einmalig zahlen würde." />
+            info="Was der Anbieter stattdessen einmalig zahlen würde." />
         )}
 
         {/*
@@ -223,7 +223,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               onChange={(n) => vertragAendern(v.id, { renditeAnsparphase: n })} />
             <ProzentFeld label="Rendite Entnahmephase" wert={v.renditeEntnahme ?? 0.02}
               onChange={(n) => vertragAendern(v.id, { renditeEntnahme: n })}
-              hilfe="In der Entnahmephase wird meist vorsichtiger angelegt." />
+              info="In der Entnahmephase wird meist vorsichtiger angelegt." />
             <ProzentFeld label="Ausgabeaufschlag" wert={v.ausgabeaufschlag ?? 0}
               onChange={(n) => vertragAendern(v.id, { ausgabeaufschlag: n })} max={10} />
             <ProzentFeld label="Laufende Kosten (TER)" wert={v.ter ?? 0.002}
@@ -232,7 +232,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })} min={1} max={60} einheit="Jahre" />
             <ProzentFeld label="Teilfreistellung" wert={v.teilfreistellung ?? 0.3}
               onChange={(n) => vertragAendern(v.id, { teilfreistellung: n })} max={80}
-              hilfe="Aktienfonds 30 %, Mischfonds 15 %, Rentenfonds 0 %." />
+              info="Aktienfonds 30 %, Mischfonds 15 %, Rentenfonds 0 %." />
           </>
         )}
 
@@ -240,7 +240,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
           <>
             <ZahlFeld label="Beitrag monatlich" wert={v.monatsbeitrag ?? 0}
               onChange={(n) => vertragAendern(v.id, { monatsbeitrag: n })} einheit="€"
-              hilfe="Ab 120 € im Jahr (10 € im Monat) gibt es Zulagen, ab 150 € im Monat die volle Grundzulage." />
+              info="Ab 120 € im Jahr (10 € im Monat) gibt es Zulagen, ab 150 € im Monat die volle Grundzulage." />
             <ProzentFeld label="Beitragsdynamik p. a." wert={v.dynamik ?? 0}
               onChange={(n) => vertragAendern(v.id, { dynamik: n })} />
             <ZahlFeld label="Bereits vorhandenes Kapital" wert={v.kapitalHeute ?? 0}
@@ -253,7 +253,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               onChange={(n) => vertragAendern(v.id, { ter: n })} max={5} />
             <ZahlFeld label="Auszahlungsdauer" wert={v.entnahmedauer ?? 25}
               onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })} min={1} max={60} einheit="Jahre"
-              hilfe="Ein Auszahlplan muss mindestens bis zum 85. Lebensjahr laufen." />
+              info="Ein Auszahlplan muss mindestens bis zum 85. Lebensjahr laufen." />
 
             {/*
               Ohne dieses Feld war die Kinderzulage hier stillschweigend null:
@@ -274,7 +274,11 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 wert={haushaltsKinder.length}
                 onChange={setzeKinderAnzahl}
                 max={15}
-                hilfe="Je Kind ein Euro für jeden eigenen Euro, höchstens 300 € im Jahr."
+                info={<>
+                  Je Kind ein Euro für jeden eigenen Euro, höchstens 300 € im Jahr. <KinderHinweisText a={avdParam} />{' '}
+                  Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch in den Basisdaten
+                  und im Vertrags-TÜV.
+                </>}
               />
               <KinderZeilen
                 kinder={haushaltsKinder}
@@ -282,11 +286,6 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 a={avdParam}
                 jetzt={jetzt}
               />
-              <KinderHinweis a={avdParam} />
-              <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch
-                in den Basisdaten und im Vertrags-TÜV.
-              </p>
             </div>
           </>
         )}
@@ -297,7 +296,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               onChange={(n) => vertragAendern(v.id, { beginnJahr: n })} min={1900} max={2200} />
             <ZahlFeld label="Beitrag monatlich" wert={v.monatsbeitrag ?? 0}
               onChange={(n) => vertragAendern(v.id, { monatsbeitrag: n })} einheit="€"
-              hilfe="Für die Ermittlung des steuerpflichtigen Ertrags." />
+              info="Für die Ermittlung des steuerpflichtigen Ertrags." />
             {/*
               VERTRAGSENDE. Laeuft der Vertrag vor dem Ruhestand ab, fliesst
               das Geld frueher — und wird frueher besteuert. Bis hierher lag
@@ -309,13 +308,13 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
               wert={v.ablaufJahr ?? rentenbeginnJahr}
               onChange={(n) => vertragAendern(v.id, { ablaufJahr: n })}
               min={1900} max={2200}
-              hilfe="Leer lassen heißt: läuft bis zum Rentenbeginn." />
+              info="Leer lassen heißt: läuft bis zum Rentenbeginn." />
             {(v.ablaufJahr ?? rentenbeginnJahr) < rentenbeginnJahr && (
               <ProzentFeld label="Kapital wächst bis zur Rente mit"
                 wert={v.wachstumBisRente ?? 0}
                 onChange={(n) => vertragAendern(v.id, { wachstumBisRente: n })}
                 max={15}
-                hilfe="Der Vertrag ist dann beendet — der Zuwachs trägt Abgeltungsteuer." />
+                info="Der Vertrag ist dann beendet — der Zuwachs trägt Abgeltungsteuer." />
             )}
           </>
         )}
@@ -334,11 +333,11 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
             <ZahlFeld label="Verrentungsdauer" wert={v.entnahmedauer ?? VERRENTUNG_JAHRE}
               onChange={(n) => vertragAendern(v.id, { entnahmedauer: n })}
               min={1} max={60} einheit="Jahre"
-              hilfe="Über wie viele Jahre das ausgezahlte Kapital verbraucht wird." />
+              info="Über wie viele Jahre das ausgezahlte Kapital verbraucht wird." />
             <ProzentFeld label="Rendite in der Auszahlphase"
               wert={v.renditeEntnahme ?? VERRENTUNG_RENDITE}
               onChange={(n) => vertragAendern(v.id, { renditeEntnahme: n })}
-              hilfe="Das noch nicht verbrauchte Kapital wird weiter angelegt." />
+              info="Das noch nicht verbrauchte Kapital wird weiter angelegt." />
           </>
         )}
       </div>

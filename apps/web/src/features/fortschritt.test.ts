@@ -21,10 +21,10 @@ describe('Fortschritt eines Falls', () => {
     expect(ohne[0]).toMatchObject({ erledigt: false, offen: ['nicht angemeldet'] });
   });
 
-  it('Standardwerte blockieren nichts, werden aber genannt', () => {
+  it('Standardwerte blockieren nichts und stehen nicht als offen da', () => {
     const s = geprueft(standardSzenario(), ['personen.A.geburtsdatum']);
     const mandant = fallFortschritt(s, { konto: true }).find((x) => x.id === 'mandant')!;
-    expect(mandant).toMatchObject({ erledigt: true, mitStandard: true });
+    expect(mandant).toMatchObject({ erledigt: true, offen: [] });
   });
 
   it('zaehlt hoch, wenn Beispielwerte ersetzt und Schritte erledigt sind', () => {

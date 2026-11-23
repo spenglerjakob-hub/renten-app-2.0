@@ -197,14 +197,12 @@ export function Seite() {
                   onChange={(v) => setze('bundesland', { bundesland: v })}
                   optionen={laender}
                   hilfe="Für den Kirchensteuersatz."
-                  vorbelegt={angefasst.has('bundesland') ? undefined : { art: 'standard' }}
                 />
                 <div className="flex items-end pb-2">
                   <Schalter
                     label="Kirchensteuerpflichtig"
                     wert={e.kirchensteuer}
                     onChange={(b) => setze('kirchensteuer', { kirchensteuer: b })}
-                    vorbelegt={angefasst.has('kirchensteuer') ? undefined : { art: 'standard' }}
                   />
                 </div>
             </div>

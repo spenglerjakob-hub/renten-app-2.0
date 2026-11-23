@@ -93,7 +93,7 @@ export function EinkommenFelder({
             wert={wert.betrag}
             onChange={(n) => onChange({ betrag: n })}
             einheit="€"
-            hilfe="Gewinn vor Steuern und Sozialabgaben — Betriebsausgaben sind bereits ab."
+            info="Der Gewinn vor Steuern und Sozialabgaben — die Betriebsausgaben sind bereits abgezogen."
             vorbelegt={marke?.('betrag')}
           />
         ) : wert.modus !== 'besoldung' ? (
@@ -107,13 +107,16 @@ export function EinkommenFelder({
             <ZahlFeld label="Betrag monatlich" wert={wert.betrag}
               onChange={(n) => onChange({ betrag: n })} einheit="€"
               vorbelegt={marke?.('betrag')}
-              hilfe={wert.modus === 'netto'
-                ? `Das Netto der Gehaltsabrechnung hängt von der Steuerklasse ab. Bei III/V oder Faktorverfahren ${t.w('besser das Brutto eintragen', undefined, 'tragen Sie besser das Brutto ein')}.`
+              // Ein Warnhinweis, keine Erklaerung: Er bleibt sichtbar, in einer Zeile. Die Begruendung steht im Info-Kaestchen.
+              hilfe={wert.modus === 'netto' ? 'Bei Steuerklasse III/V besser das Brutto eintragen.' : undefined}
+              info={wert.modus === 'netto'
+                ? 'Gerechnet wird über die Jahressteuer. Das Netto der Gehaltsabrechnung hängt aber von der Steuerklasse ab — bei III/V oder Faktorverfahren liegt der monatliche Abzug neben der Jahressteuer.'
                 : undefined} />
             <AuswahlFeld
               label="Auszahlungen pro Jahr"
               wert={String(wert.auszahlungen)}
               onChange={(v) => onChange({ auszahlungen: Number(v) })}
+              info="Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter: Der Betrag daneben ist ein normaler Monat."
               vorbelegt={marke?.('auszahlungen')}
               optionen={[
                 { wert: '12', text: '12 Gehälter' },
@@ -158,24 +161,18 @@ export function EinkommenFelder({
                 ? Math.round(vorschlagBeitragMonat(wert.betrag))
                 : wert.grvBeitragMonat,
             })}
+            info="Die meisten Selbstständigen sind nicht pflichtversichert. Das hat einen steuerlichen Vorteil: Der Höchstbetrag für Altersvorsorgeaufwendungen ist dann nicht durch Rentenbeiträge belegt und steht einer Basisrente in voller Höhe zur Verfügung."
           />
-          {wert.grvPflicht ? (
+          {wert.grvPflicht && (
             <div className="mt-2">
               <ZahlFeld
                 label="Eigener Beitrag monatlich"
                 wert={wert.grvBeitragMonat}
                 onChange={(n) => onChange({ grvBeitragMonat: n })}
                 einheit="€"
-                hilfe={`${t.w('Du trägst', undefined, 'Sie tragen')} ihn allein — es gibt keinen Arbeitgeberanteil. Voller Satz auf ${t.dein('en')} Gewinn wären ${euro(vorschlagBeitragMonat(wert.betrag))}.`}
+                info={`${t.w('Du trägst', undefined, 'Sie tragen')} ihn allein — es gibt keinen Arbeitgeberanteil. Voller Satz auf ${t.dein('en')} Gewinn wären ${euro(vorschlagBeitragMonat(wert.betrag))}.`}
               />
             </div>
-          ) : (
-            <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-              Die meisten Selbstständigen sind nicht pflichtversichert. Das hat einen
-              steuerlichen Vorteil: Der Höchstbetrag für Altersvorsorgeaufwendungen ist dann
-              nicht durch Rentenbeiträge belegt und steht einer Basisrente in voller Höhe
-              zur Verfügung.
-            </p>
           )}
         </div>
       )}
