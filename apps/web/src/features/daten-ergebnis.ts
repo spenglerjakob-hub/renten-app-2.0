@@ -1,6 +1,7 @@
 import { parseDatum } from '@renten/engine';
 import type { SzenarioParsed } from '@renten/schema';
 import { euro } from '../components/Feld';
+import { fehlt } from './vorbelegung';
 
 /**
  * DAS ERGEBNIS EINES SCHRITTS DER ANGABEN IN EINEM SATZ — fuer die Zeile, zu
@@ -8,8 +9,9 @@ import { euro } from '../components/Feld';
  *
  * Die Zeile soll sagen, was eingetragen ist, nicht dass etwas eingetragen
  * ist: „Verheiratet · 2 Kinder · gesetzlich versichert“ laesst sich mit einem
- * Blick pruefen, ein Haken nicht. Ob noch Beispielwerte darin stehen, sagt
- * die Zeile daneben selbst.
+ * Blick pruefen, ein Haken nicht. Eine Angabe, die noch FEHLT, steht nicht
+ * darin — unter ihr liegt nur ein Platzhalter (`features/vorbelegung.ts`);
+ * dass sie fehlt, sagt die Zeile daneben selbst.
  */
 
 type Person = SzenarioParsed['personen'][number];
@@ -28,9 +30,9 @@ export function alterAm(geburtsdatum: string, heute: Date): number | null {
 }
 
 /** „Anna, 41“ — ohne Namen „41 Jahre“, ohne Geburtsdatum nur der Name. */
-function werUndAlter(p: Person, heute: Date): string {
+function werUndAlter(s: SzenarioParsed, p: Person, heute: Date): string {
   const name = (p.vorname ?? '').trim() || p.name.trim();
-  const alter = alterAm(p.geburtsdatum, heute);
+  const alter = fehlt(s, `personen.${p.id}.geburtsdatum`) ? null : alterAm(p.geburtsdatum, heute);
   if (name && alter !== null) return `${name}, ${alter}`;
   if (name) return name;
   return alter !== null ? `${alter} Jahre` : '';
@@ -47,16 +49,18 @@ export function haushaltSatz(s: SzenarioParsed): string {
 
 export function personenSatz(s: SzenarioParsed, heute: Date): string {
   const wer = beteiligte(s);
-  const namen = wer.map((p) => werUndAlter(p, heute)).filter(Boolean);
+  const namen = wer.map((p) => werUndAlter(s, p, heute)).filter(Boolean);
   // Der Anspruch steht nur bei einer Person dabei — bei zweien wuerde die Zeile zur Tabelle.
   const [einzige] = wer;
   const anspruch = wer.length === 1 && einzige
-    ? einzige.art === 'pension' ? 'Pension' : `Rentenanspruch ${euro(einzige.grvBruttoHeute)}`
+    ? einzige.art === 'pension' ? 'Pension'
+      : fehlt(s, `personen.${einzige.id}.grvBruttoHeute`) ? '' : `Rentenanspruch ${euro(einzige.grvBruttoHeute)}`
     : '';
   return [...namen, anspruch].filter(Boolean).join(' · ');
 }
 
-function einkommenText(e: Einkommen): string {
+function einkommenText(e: Einkommen, betragFehlt: boolean): string {
+  if (betragFehlt && e.modus !== 'besoldung') return '';
   switch (e.modus) {
     case 'brutto': return `${euro(e.betrag)} brutto im Monat`;
     case 'netto': return `${euro(e.betrag)} netto im Monat`;
@@ -66,9 +70,10 @@ function einkommenText(e: Einkommen): string {
 }
 
 export function einkommenSatz(s: SzenarioParsed): string {
+  const eigenes = einkommenText(s.einkommenHeute, fehlt(s, 'einkommenHeute.betrag'));
   return s.haushalt.verheiratet && s.einkommenGetrennt
-    ? `${einkommenText(s.einkommenHeute)} · ${einkommenText(s.einkommenPartner)}`
-    : einkommenText(s.einkommenHeute);
+    ? [eigenes, einkommenText(s.einkommenPartner, fehlt(s, 'einkommenPartner.betrag'))].filter(Boolean).join(' · ')
+    : eigenes;
 }
 
 /** @param offen Die Frage nach Vertraegen ist noch nicht beantwortet — dann sagt die Zeile selbst „noch nicht erfasst“. */
@@ -79,11 +84,13 @@ export function vertraegeSatz(s: SzenarioParsed, offen: boolean): string {
 }
 
 export function zielSatz(s: SzenarioParsed): string {
+  if (fehlt(s, 'haushalt.zielNettoHeute')) return '';
   return `${euro(s.haushalt.zielNettoHeute)} netto im Monat, in heutigem Geld`;
 }
 
 /** Die ganze Etappe „Daten & Ziel“ in einer Zeile: wer, und mit welchem Ziel. */
 export function datenSatz(s: SzenarioParsed, heute: Date): string {
-  const namen = beteiligte(s).map((p) => werUndAlter(p, heute)).filter(Boolean);
-  return [...namen, `Ziel ${euro(s.haushalt.zielNettoHeute)} netto`].join(' · ');
+  const namen = beteiligte(s).map((p) => werUndAlter(s, p, heute)).filter(Boolean);
+  const ziel = fehlt(s, 'haushalt.zielNettoHeute') ? '' : `Ziel ${euro(s.haushalt.zielNettoHeute)} netto`;
+  return [...namen, ziel].filter(Boolean).join(' · ');
 }

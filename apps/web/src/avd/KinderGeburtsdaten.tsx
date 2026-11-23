@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { avdKinderzulageBis, parseDatum, type AvdKind, type AvdParameter } from '@renten/engine';
 import { DatumFeld, Schalter } from '../components/Feld';
-import { KinderHinweis } from '../components/KinderFelder';
+import { JahrWahl, KinderHinweis } from '../components/KinderFelder';
 import { KNOPF_KLEIN } from '../components/stil';
 
 /**
@@ -108,15 +108,14 @@ export function KinderGeburtsdaten({ kinder, onAendern, a, jetzt }: {
                     <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}-bis`}>
                       bis Ende
                     </label>
-                    <input
+                    {/* Von 18 bis 24, wie im Rechner — das Gesetz foerdert darueber nicht. */}
+                    <JahrWahl
                       id={`kind-${i}-bis`}
-                      type="number"
-                      value={k.ausbildungBisJahr}
-                      min={d.jahr}
-                      // Hoechstens bis 25 — das Gesetz foerdert darueber nicht.
-                      max={d.jahr + a.kinderzulageBisAlterAusbildung - 1}
-                      onChange={(e) => aendern(i, { ausbildungBisJahr: Number(e.target.value) })}
-                      className="ui-feld w-full p-1.5 text-sm tabular-nums"
+                      wert={k.ausbildungBisJahr ?? d.jahr + a.kinderzulageBisAlter}
+                      von={d.jahr + a.kinderzulageBisAlter}
+                      bis={d.jahr + a.kinderzulageBisAlterAusbildung - 1}
+                      onChange={(jahr) => aendern(i, { ausbildungBisJahr: jahr })}
+                      klasse="w-full p-1.5 text-sm"
                     />
                     <span className="w-24 shrink-0 text-right text-xs text-ui-schiefer">
                       dann {(k.ausbildungBisJahr ?? 0) - d.jahr} J. alt

@@ -11,7 +11,7 @@ import type { FallSchritt, FallSchrittId } from '../features/fortschritt';
  *
  * Eingeklappt auf eine Zeile — auf jedem Geraet. Die sechs Schritte als
  * Pillen standen sonst als weitere Leiste zwischen Kopf und
- * erstem Eingabefeld. Offene Schritte gestrichelt wie ein Beispielwert,
+ * erstem Eingabefeld. Offene Schritte gestrichelt wie eine fehlende Angabe,
  * erledigte mit Haken — ohne Ampelfarben. Sichtbar bleibt der naechste offene Schritt als
  * Sprung; die ganze Liste klappt auf Wunsch auf.
  */

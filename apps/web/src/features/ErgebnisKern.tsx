@@ -38,7 +38,7 @@ export function neuerTeil(zeile: Jahreszeile, vorher: Jahreszeile): { betrag: nu
   return { betrag, imRing, prozent };
 }
 
-/** Titel und Einleitung der Etappe, mit dem Schalter „Nominal | Kaufkraft heute“. */
+/** Titel und Einleitung der Etappe, mit dem Schalter „Kaufkraft heute | Nominal“. */
 export function ErgebnisKopf({ zeile, kaufkraftHeute, onKaufkraftHeute }: {
   zeile: Jahreszeile;
   kaufkraftHeute: boolean;

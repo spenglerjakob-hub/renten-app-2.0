@@ -110,7 +110,7 @@ export function Kassenbon({
   zeile: Jahreszeile;
   szenario: Szenario;
   kaufkraftHeute: boolean;
-  /** Mit Umschalter „Nominal | Kaufkraft heute“ im Kopf der Tabelle */
+  /** Mit Umschalter „Kaufkraft heute | Nominal“ im Kopf der Tabelle */
   onKaufkraftHeute?: (b: boolean) => void;
   /**
    * Gesetzt in der Einzelbetrachtung: der Name der Person, um die es geht.

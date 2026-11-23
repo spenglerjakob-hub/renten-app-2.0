@@ -192,7 +192,7 @@ export interface AblaufEtappe {
   ergebnis?: ReactNode;
   /** WIRKLICH erledigt — nur dann steht ein Haken, sonst die Nummer */
   erledigt: boolean;
-  /** Was noch fehlt („2 Beispielwerte offen“) — dann ein leerer Kreis */
+  /** Was noch fehlt („2 Angaben fehlen“) — dann ein leerer Kreis */
   fehlt?: string;
 }
 
@@ -286,7 +286,7 @@ export interface Stueck extends StueckKern {
   titel: string;
   /** Das Ergebnis in einem Satz — steht in der Zeile, sobald das Stueck zu ist */
   ergebnis?: ReactNode;
-  /** Was noch fehlt („Beispielwerte offen“): dann ein leerer Kreis statt des Hakens */
+  /** Was noch fehlt („Geburtsdatum fehlt“): dann ein leerer Kreis statt des Hakens */
   fehlt?: string;
   inhalt: ReactNode;
   /** Tabellen und Vergleiche duerfen ueber die Spalte hinaus */

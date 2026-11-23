@@ -3,6 +3,7 @@ import { Users, Scale, Check, ChevronRight } from 'lucide-react';
 import { Dialog } from '../components/Dialog';
 import { useSzenario } from '../store/szenario';
 import { EinkommenFelder } from './EinkommenFelder';
+import { offenePfade } from './vorbelegung';
 import { KNOPF, KNOPF_ZWEIT, Marke } from '../components/stil';
 
 /** Eine Wahl als Knopf-Karte, wie die Karten am Anfang der ersten Etappe (App.tsx: StartKarte). */
@@ -19,6 +20,13 @@ const WAHL = 'ui-karte flex w-full items-start gap-4 p-4 text-left transition-co
  */
 export function EhepartnerDialog({ offen, onSchliessen }: { offen: boolean; onSchliessen: () => void }) {
   const partner = useSzenario((s) => s.szenario.einkommenPartner);
+  /*
+    Das Einkommen des Partners gibt niemand vor: Solange es offen ist, steht
+    das Feld leer. Hier ohne `relevant` gefragt — in diesem Fenster wird es
+    eingetragen, BEVOR „getrennt erfassen“ gilt.
+  */
+  const betragOffen = useSzenario((s) => offenePfade(s.szenario).includes('einkommenPartner.betrag'));
+  const leeren = useSzenario((s) => s.leeren);
   const setzeEinkommenPartner = useSzenario((s) => s.setzeEinkommenPartner);
   const setzeEinkommenGetrennt = useSzenario((s) => s.setzeEinkommenGetrennt);
 
@@ -81,7 +89,8 @@ export function EhepartnerDialog({ offen, onSchliessen }: { offen: boolean; onSc
             <h3 className="mb-2 text-base font-medium text-ui-tinte">
               Einkommen des Partners
             </h3>
-            <EinkommenFelder wert={partner} onChange={setzeEinkommenPartner} spalten={2} />
+            <EinkommenFelder wert={partner} onChange={setzeEinkommenPartner} spalten={2}
+              betrag={{ leer: betragOffen, onLeeren: () => leeren('einkommenPartner.betrag') }} />
           </div>
 
           <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-schiefer">

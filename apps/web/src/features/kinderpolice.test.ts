@@ -16,7 +16,7 @@ const sz = () => st().szenario;
 
 /** Eine private Rente mit Pruefung — der Ausgangspunkt jeder Kinderpolice. */
 function privateRente(): string {
-  st().vertragHinzufuegen(3);
+  st().vertragHinzufuegen('prvRente');
   const v = sz().vertraege[sz().vertraege.length - 1]!;
   st().vertragAendern(v.id, { name: 'Kinderpolice Lena', brutto: 600, kapitalAlternative: 150_000 });
   st().tuevHinzufuegen(v.id);

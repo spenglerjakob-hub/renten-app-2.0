@@ -1,15 +1,15 @@
 import type { SzenarioParsed } from '@renten/schema';
-import { eintragVon, offenePfade, relevant } from './vorbelegung';
+import { eintragVon, fehlendePfade, offenePfade, relevant } from './vorbelegung';
 
 /**
  * FORTSCHRITT EINES FALLS — nur aus echten Schritten.
  *
  * Gezaehlt wird, was wirklich getan ist: Das Konto ist angelegt, die
- * Beispielwerte sind ersetzt oder bestaetigt, Vertraege sind erfasst (oder
- * es gibt ausdruecklich keine), das Ergebnis wurde angesehen. Vorbelegte
- * Beispielwerte zaehlen NICHT — sonst stuende ein unberuehrter Fall auf
- * „fast fertig“. Standardwerte blockieren keinen Schritt: Sie sind gueltige
- * Annahmen und werden nicht eigens genannt.
+ * Angaben des Mandanten sind eingetragen, Vertraege sind erfasst (oder es
+ * gibt ausdruecklich keine), das Ergebnis wurde angesehen. Ein neuer Fall
+ * gibt keine dieser Angaben vor — sie fehlen, bis sie jemand eintraegt.
+ * Standardwerte blockieren keinen Schritt: Sie sind gueltige Annahmen und
+ * werden nicht eigens genannt.
  *
  * Nie 0 %: Das Konto ist ein echter, erledigter Schritt. Kommt ein Fall aus
  * dem Vorsorge-Check, sind Mandantendaten, Einkuenfte und Vertraege oft
@@ -22,7 +22,7 @@ export interface FallSchritt {
   id: FallSchrittId;
   text: string;
   erledigt: boolean;
-  /** Was noch fehlt, in Worten: „Beispielwert: Rentenanspruch“ */
+  /** Was noch fehlt, in Worten: „Rentenanspruch fehlt“ */
   offen: string[];
 }
 
@@ -50,13 +50,12 @@ export function fallFortschritt(
   };
 
   const bereich = (id: 'mandant' | 'einkuenfte' | 'ziel', titel: string): FallSchritt => {
-    const hier = offen.filter(GEHOERT_ZU[id]);
-    const beispiele = hier.filter((p) => eintragVon(p)?.art === 'beispiel');
+    const fehlend = fehlendePfade(s).filter(GEHOERT_ZU[id]);
     return {
       id,
       text: titel,
-      erledigt: beispiele.length === 0,
-      offen: beispiele.map((p) => `Beispielwert: ${text(p)}`),
+      erledigt: fehlend.length === 0,
+      offen: fehlend.map((p) => `${text(p)} fehlt`),
     };
   };
 

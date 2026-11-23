@@ -3,7 +3,8 @@ import { Check, FileStack, HeartPulse, Target, UserRound, Wallet, type LucideIco
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { Basisdaten, type BasisTeil } from './Basisdaten';
 import { useSzenario } from '../store/szenario';
-import { eintragVon, offenePfade, relevant } from './vorbelegung';
+import { eintragVon, fehlendeAngaben, fehltSatz, offenePfade, relevant } from './vorbelegung';
+import { personNameAus } from './personen';
 import type { FallSchrittId } from './fortschritt';
 import { KNOPF_ZWEIT } from '../components/stil';
 import { Stuecke, type Stueck } from '../components/Ablauf';
@@ -148,13 +149,13 @@ export function merkeAssistentSchritt(n: number): number {
 /**
  * Wohin ein offener Schritt des Fortschritts fuehrt. Die Einkuenfte stehen
  * in zwei Schritten: die gesetzliche Rente bei der Person, das Gehalt
- * darunter — gesprungen wird dorthin, wo noch ein Beispielwert steht.
+ * darunter — gesprungen wird dorthin, wo noch eine Angabe fehlt.
  */
 export function assistentSchrittFuer(id: FallSchrittId, offen: readonly string[]): number | null {
   switch (id) {
     case 'mandant': return SCHRITTE.findIndex((x) => x.teil === 'personen');
-    // Nur Beispielwerte zaehlen — Standardwerte wie „12 Gehaelter“ fehlen nicht.
-    case 'einkuenfte': return offen.some((p) => p.startsWith('einkommen') && eintragVon(p)?.art === 'beispiel')
+    // Nur Angaben des Mandanten zaehlen — Standardwerte wie „12 Gehaelter“ fehlen nicht.
+    case 'einkuenfte': return offen.some((p) => p.startsWith('einkommen') && eintragVon(p)?.art === 'angabe')
       ? SCHRITTE.findIndex((x) => x.teil === 'einkommen')
       : SCHRITTE.findIndex((x) => x.teil === 'personen');
     case 'vertraege': return SCHRITTE.findIndex((x) => x.teil === 'vertraege');
@@ -193,12 +194,13 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
   const vertraegeOffen = offen.includes('vertraege');
   /*
     Kein Haken nach Position: Ein Schritt, an dem man vorbeigeklickt hat, ist
-    nicht erledigt. Stehen noch Beispielwerte darin (bei den Vertraegen: noch
-    nichts erfasst), traegt seine Zeile einen leeren Kreis und sagt es dazu.
+    nicht erledigt. Fehlt darin noch eine Angabe (bei den Vertraegen: noch
+    nichts erfasst), traegt seine Zeile einen leeren Kreis und sagt, welche.
   */
-  const beispielOffen = (x: AssistentSchritt) => (x.teil === 'vertraege'
-    ? vertraegeOffen
-    : offen.some((p) => PFADE_JE_TEIL[x.teil](p) && eintragVon(p)?.art === 'beispiel'));
+  const nameVon = (id: 'A' | 'B') => personNameAus(szenario.personen, id);
+  const fehltIn = (x: AssistentSchritt): string | undefined => (x.teil === 'vertraege'
+    ? (vertraegeOffen ? 'noch nicht erfasst' : undefined)
+    : fehltSatz(fehlendeAngaben(szenario, nameVon, PFADE_JE_TEIL[x.teil])) || undefined);
   const geheZu = (n: number) => onSchritt(Math.max(0, Math.min(SCHRITTE.length - 1, n)));
   const heute = new Date();
   const ergebnisVon: Record<AssistentSchritt['teil'], () => string> = {
@@ -219,7 +221,7 @@ export function Assistent({ ergebnis, onEhepartnerDialog, vertraege, onFertig, s
     id: x.teil,
     titel: x.titel(t),
     ergebnis: ergebnisVon[x.teil](),
-    fehlt: beispielOffen(x) ? (x.teil === 'vertraege' ? 'noch nicht erfasst' : 'Beispielwerte offen') : undefined,
+    fehlt: fehltIn(x),
     inhalt: (
       // `handy-eingaben`: am Telefon Eingaben in 16 px und daumenhoch (index.css) — wie im Vorsorge-Check.
       <div className="ui-karte handy-eingaben p-5 sm:p-7">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Jahreszeile } from '@renten/engine';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import { sparzielRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 import { gespraechssatz, kaufkraft } from './kaufkraft';
 import { woerter } from '../lib/ansprache';
@@ -32,7 +32,7 @@ describe('Kaufkraft bis zum Rentenbeginn', () => {
   it('die Luecke in heutiger Kaufkraft ist dieselbe Zahl wie im Sparrechner', () => {
     const jetzt = new Date().getFullYear();
     const z = zeile({ jahr: jetzt + 26 });
-    const r = sparzielRechnen(standardSzenario(), z, SPARZIEL_VORGABE)!;
+    const r = sparzielRechnen(musterSzenario(), z, SPARZIEL_VORGABE)!;
     expect(kaufkraft(z)!.lueckeHeute).toBeCloseTo(r.lueckeHeute, 9);
   });
 

@@ -1,16 +1,17 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import {
   parameterFuer, parseDatum, kinderRentenbeginn, istKinderpolice,
-  type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung,
+  type Vertrag, type VertragsTyp, type AvdLauf, type KapitalVerrentung, type PlanerErgebnis,
 } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
-import { ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, Abschnitt, euro } from '../components/Feld';
+import { ZahlFeld, ProzentFeld, TextFeld, DatumFeld, AuswahlFeld, Schalter, euro } from '../components/Feld';
 import { KinderZeilen, KinderHinweisText } from '../components/KinderFelder';
 import {
-  TYPEN, SCHICHT_TITEL, STRATEGIEN, istKapital, kenntKapitalwahl, strategieGruppe, typText,
+  VERTRAGSARTEN, STRATEGIEN, istKapital, kenntKapitalwahl, strategieGruppe, typText,
   VERRENTUNG_JAHRE, VERRENTUNG_RENDITE, KINDERPOLICE_WEGE, kinderpoliceText, monatJahr,
 } from './vertragsarten';
+import { Planer } from './Planer';
 import { personNameAus } from './personen';
 import { KNOPF_ZWEIT } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
@@ -42,7 +43,7 @@ function kopfBetrag(v: Vertrag): string | null {
   return null;
 }
 
-/** Ein Vertrag als Karte — im Rechner je Schicht, in der Vertragspruefung in einer Liste. */
+/** Ein Vertrag als Karte — im Rechner wie in der Vertragspruefung in einer Liste. */
 export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
   v: Vertrag; depot?: DepotAnzeige; auszahlung?: AuszahlungAnzeige; avd?: AvdLauf;
   verrentung?: KapitalVerrentung;
@@ -131,9 +132,10 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
 
       <div className={`border-t border-ui-linie p-3 sm:p-4 ${offen ? 'block' : 'hidden'}`}>
       <div className="mb-3 grid gap-3 sm:grid-cols-2">
+        {/* Alle Arten in einer Liste: Die Schicht zieht der Speicher aus der Art. */}
         <AuswahlFeld label="Vertragsart" wert={v.typ}
           onChange={(t) => vertragAendern(v.id, { typ: t })}
-          optionen={TYPEN[v.schicht]} />
+          optionen={VERTRAGSARTEN} />
         <TextFeld label="Bezeichnung" wert={v.name}
           onChange={(n) => vertragAendern(v.id, { name: n })} platzhalter="z. B. Allianz" />
       </div>
@@ -274,6 +276,7 @@ export function VertragsKarte({ v, depot, auszahlung, avd, verrentung }: {
                 wert={haushaltsKinder.length}
                 onChange={setzeKinderAnzahl}
                 max={15}
+                leerSpaeter
                 info={<>
                   Je Kind ein Euro für jeden eigenen Euro, höchstens 300 € im Jahr. <KinderHinweisText a={avdParam} />{' '}
                   Die Kinder gehören zum Haushalt, nicht zum Vertrag — Änderungen hier gelten auch in den Basisdaten
@@ -482,46 +485,118 @@ export interface AuszahlungAnzeige {
   kvPvGesamt: number;
 }
 
+/** Wert der Frage nach der Vertragsart fuer die Kinderpolice — eine private Rente mit versicherter Person. */
+const KINDERPOLICE = 'kinderpolice';
+
+/**
+ * „UM WAS FUER EINEN VERTRAG HANDELT ES SICH?“ — die eine Frage beim Anlegen.
+ *
+ * Vorher waehlte man erst eine Schicht (drei Reiter) und darin die Art. Die
+ * Schicht ist aber Fachsprache und folgt ohnehin aus der Art: Wer „Riester“
+ * antippt, hat alles gesagt. Sie und die Rechenlogik zieht der Speicher
+ * daraus (`schichtVon`, `vertragHinzufuegen`).
+ *
+ * Alle Antworten stehen als Knoepfe da — ein Tipp, keine Liste zum Aufklappen.
+ */
+function VertragsartFrage({ onWahl, onAbbrechen, mitKinderpolice }: {
+  onWahl: (wert: string) => void;
+  /** Ohne: die Frage steht fest da (leere Liste) */
+  onAbbrechen?: () => void;
+  mitKinderpolice: boolean;
+}) {
+  const id = useId();
+  const arten: { wert: string; text: string }[] = [
+    ...VERTRAGSARTEN,
+    ...(mitKinderpolice ? [{ wert: KINDERPOLICE, text: 'Kinderpolice (für ein Kind oder Enkel)' }] : []),
+  ];
+  return (
+    <div role="group" aria-labelledby={id} className="ui-innen p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p id={id} className="text-sm font-medium text-ui-tinte">Um was für einen Vertrag handelt es sich?</p>
+        {onAbbrechen && (
+          <button type="button" onClick={onAbbrechen}
+            className="shrink-0 text-xs font-medium text-ui-schiefer underline-offset-2 hover:text-ui-tinte hover:underline">
+            Abbrechen
+          </button>
+        )}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {arten.map((x) => (
+          <button
+            key={x.wert}
+            type="button"
+            onClick={() => onWahl(x.wert)}
+            className="rounded-[10px] border border-ui-zweit-rand bg-ui-karte px-3 py-2.5 text-left text-sm font-medium text-ui-tinte transition-colors hover:bg-ui-hover"
+          >
+            {x.text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * DIE BESTEHENDEN VERTRAEGE — eine Liste, ohne Aufteilung in Schichten.
+ *
+ * Im Rechner und in der Vertragspruefung dieselbe: je Vertrag eine Karte,
+ * darunter „Vertrag hinzufügen“ mit der Frage nach der Art. Bei leerer Liste
+ * steht die Frage gleich da.
+ *
+ * DER ENTNAHMEPLANER hatte einen eigenen Reiter neben den Schichten. Er
+ * erscheint jetzt nur, wo er gebraucht wird: sobald ein Vertrag sein Kapital
+ * dorthin gibt (Auszahlungsstrategie) oder ein gespeicherter Fall ihn schon
+ * nutzt — unter den Vertraegen, zu denen er gehoert.
+ */
 export function Vertraege({
-  schicht, depots = [], auszahlungen = [], avdLaeufe = [], verrentungen = [],
+  depots = [], auszahlungen = [], avdLaeufe = [], verrentungen = [], planer, mitKinderpolice = false,
 }: {
-  schicht: 1 | 2 | 3;
   depots?: DepotAnzeige[];
   auszahlungen?: AuszahlungAnzeige[];
   avdLaeufe?: readonly AvdLauf[];
   verrentungen?: readonly KapitalVerrentung[];
+  /** Das Ergebnis des Entnahmeplaners. Ohne die Angabe (Vertragspruefung) gibt es seinen Kasten nicht. */
+  planer?: PlanerErgebnis | null;
+  /** Die Kinderpolice als eigene Antwort — in der Vertragspruefung, die auch Vertraege fuer Kinder prueft */
+  mitKinderpolice?: boolean;
 }) {
-  // WICHTIG: Im Selektor darf nicht gefiltert werden. filter() liefert bei
-  // jedem Aufruf ein NEUES Array; zustand vergleicht mit Object.is, haelt es
-  // deshalb fuer eine Aenderung und rendert endlos neu (React-Fehler #185).
-  // Deshalb die unveraenderte Liste abonnieren und erst hier filtern.
-  const alle = useSzenario((x) => x.szenario.vertraege);
-  const vertraege = useMemo(() => alle.filter((v) => v.schicht === schicht), [alle, schicht]);
+  const vertraege = useSzenario((x) => x.szenario.vertraege);
+  const planerEingabe = useSzenario((x) => x.szenario.planer);
   const vertragHinzufuegen = useSzenario((x) => x.vertragHinzufuegen);
+  const kinderpoliceUmschalten = useSzenario((x) => x.kinderpoliceUmschalten);
+  const [frageOffen, setFrageOffen] = useState(false);
+
+  const hinzufuegen = (wert: string) => {
+    if (wert === KINDERPOLICE) kinderpoliceUmschalten(vertragHinzufuegen('prvRente'), true);
+    else vertragHinzufuegen(wert as VertragsTyp);
+    setFrageOffen(false);
+  };
+  const leer = vertraege.length === 0;
+  const planerGenutzt = planer !== undefined && (
+    vertraege.some((v) => v.strategie === 'planer') || planerEingabe.startkapital > 0 || planerEingabe.insNettoEinrechnen
+  );
 
   return (
-    <Abschnitt titel={SCHICHT_TITEL[schicht]}>
-      <div className="space-y-3">
-        {vertraege.length === 0 && (
-          <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
-            Noch kein Vertrag in dieser Schicht.
-          </p>
+    <div className="space-y-3">
+      {vertraege.map((v) => (
+        <VertragsKarte
+          key={v.id}
+          v={v}
+          depot={depots.find((d) => d.vertragId === v.id)}
+          auszahlung={auszahlungen.find((a) => a.vertragId === v.id)}
+          avd={avdLaeufe.find((a) => a.vertragId === v.id)}
+          verrentung={verrentungen.find((x) => x.vertragId === v.id)}
+        />
+      ))}
+      {leer || frageOffen
+        ? <VertragsartFrage onWahl={hinzufuegen} onAbbrechen={leer ? undefined : () => setFrageOffen(false)} mitKinderpolice={mitKinderpolice} />
+        : (
+          /* Wie „Kind hinzufügen“ in der Beratung: der zweite Knopf mit Plus. */
+          <button type="button" onClick={() => setFrageOffen(true)} className={KNOPF_ZWEIT}>
+            <Plus className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
+          </button>
         )}
-        {vertraege.map((v) => (
-          <VertragsKarte
-            key={v.id}
-            v={v}
-            depot={depots.find((d) => d.vertragId === v.id)}
-            auszahlung={auszahlungen.find((a) => a.vertragId === v.id)}
-            avd={avdLaeufe.find((a) => a.vertragId === v.id)}
-            verrentung={verrentungen.find((x) => x.vertragId === v.id)}
-          />
-        ))}
-        {/* Wie „Kind hinzufügen“ in der Beratung: der zweite Knopf mit Plus. */}
-        <button type="button" onClick={() => vertragHinzufuegen(schicht)} className={KNOPF_ZWEIT}>
-          <Plus className="h-4 w-4" aria-hidden /> Vertrag hinzufügen
-        </button>
-      </div>
-    </Abschnitt>
+      {planerGenutzt && <Planer ergebnis={planer ?? null} />}
+    </div>
   );
 }

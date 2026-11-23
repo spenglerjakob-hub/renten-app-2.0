@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Jahreszeile } from '@renten/engine';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import { sparzielRechnen, wunschbeitragRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 
 /** Eine Zeile des Rentenjahres mit 1.500 € Lücke, 26 Jahre entfernt. */
@@ -17,7 +17,7 @@ describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
   });
 
   it('eine höhere Rendite senkt Kapital und Beitrag', () => {
-    const s = standardSzenario();
+    const s = musterSzenario();
     const mit5 = sparzielRechnen(s, zeile(), { ...SPARZIEL_VORGABE, rendite: 0.05 })!;
     const mit6 = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
     expect(mit6.zielkapital).toBeLessThan(mit5.zielkapital);
@@ -26,7 +26,7 @@ describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
 });
 
 describe('wunschbeitragRechnen — was ein Beitrag von der Lücke schließt', () => {
-  const s = standardSzenario();
+  const s = musterSzenario();
   const voll = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
 
   it('der nötige Beitrag schließt die Lücke ganz — derselbe wie im Sparrechner', () => {

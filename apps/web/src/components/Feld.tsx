@@ -7,28 +7,28 @@ import { parseDatum, toDe } from '@renten/engine';
 import { FELD_LABEL } from './stil';
 
 /**
- * VORBELEGT — der Wert im Feld stammt nicht vom Berater, sondern aus der
- * Vorbelegung eines neuen Falls (siehe `features/vorbelegung.ts`).
+ * BEISPIELWERT — der Wert im Feld ist ein Beispiel oder eine Schaetzung, keine
+ * Angabe des Mandanten. Nur die SCHNELLRECHNUNG arbeitet so: Sie fuehrt an
+ * einem Musterfall vor und zeigt sofort ein Ergebnis.
  *
- * Eine Marke tragen nur BEISPIELWERTE: Sie stehen fuer eine Angabe, die noch
- * fehlt, und lassen sich mit „Stimmt so“ bestaetigen. STANDARDWERTE (uebliche
- * Annahmen wie „12 Gehaelter“) stehen ohne Marke da — unter jedem zweiten Feld
- * das Wort „Standardwert“ machte die Angaben unruhig, ohne mehr zu sagen: Dass
- * ein Feld anpassbar ist, sieht man ihm an.
+ * Der RECHNER gibt seit November 2026 nichts mehr vor: Dort steht ein Feld
+ * leer, solange die Angabe fehlt (`leer` am `ZahlFeld` und `DatumFeld`,
+ * `features/vorbelegung.ts`). Die Marke gibt es deshalb nur noch an diesen
+ * beiden Feldern.
  *
  * Die Marke steht UNTER dem Feld, nicht neben der Beschriftung: Dort braeche
  * sie lange Beschriftungen um, und die Felder einer Zeile staenden nicht
  * mehr auf einer Hoehe.
  */
 export interface Vorbelegt {
-  art: 'beispiel' | 'standard';
+  art: 'beispiel';
   /** Woher der Wert kommt — steht im Tooltip der Marke */
   hinweis?: string;
   /** „Stimmt so“: bestaetigt einen Beispielwert, ohne ihn zu aendern */
   onPruefen?: () => void;
 }
 
-const BEISPIEL_TEXT = 'Ein Beispiel, keine Angabe Ihres Mandanten. Im Gutachten steht es als Beispielwert, bis Sie es ersetzen oder bestätigen.';
+const BEISPIEL_TEXT = 'Ein Beispiel, keine Angabe Ihres Mandanten — ersetzen oder bestätigen Sie es.';
 
 /** Traegt das Feld eine Marke? Nur dann gibt es das Element, auf das `aria-describedby` zeigt. */
 export const hatMarke = (v?: Vorbelegt): v is Vorbelegt => v?.art === 'beispiel';
@@ -159,6 +159,24 @@ export function ZahlFeld(props: {
    */
   leerBeiNull?: boolean;
   /**
+   * DIE ANGABE FEHLT NOCH: Das Feld steht leer, gleich was in `wert` liegt —
+   * bis jemand etwas eintraegt. Ein neuer Fall gibt nichts vor, was dem
+   * Mandanten gehoert (`features/vorbelegung.ts`).
+   */
+  leer?: boolean;
+  /**
+   * Das Feld wurde geleert. Mit diesem Aufruf gilt die Angabe wieder als
+   * fehlend; ohne ihn steht ein leeres Feld wie bisher fuer 0.
+   */
+  onLeeren?: () => void;
+  /**
+   * Ein geleertes Feld meldet seine 0 erst beim VERLASSEN — nicht schon beim
+   * Loeschen. Fuer Felder, an deren Zahl etwas haengt, das eine 0 mitnaehme:
+   * Wer bei „Kinder“ die 1 loescht, um 2 zu tippen, verlor sonst im selben
+   * Augenblick das eingetragene Kind samt Geburtsjahr.
+   */
+  leerSpaeter?: boolean;
+  /**
    * Ganze Euro mit Tausenderpunkt schon beim Tippen: aus „45000“ wird
    * „45.000“, der Cursor bleibt hinter derselben Ziffer. Fuer grosse
    * Betraege, bei denen man sonst Nullen zaehlt (das Jahresgehalt).
@@ -169,7 +187,7 @@ export function ZahlFeld(props: {
 }) {
   const {
     label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, info, gross, stufen, einheitWahl, vorbelegt,
-    platzhalter, leerBeiNull, tausenderpunkte, onVerlassen,
+    platzhalter, leerBeiNull, leer, onLeeren, leerSpaeter, tausenderpunkte, onVerlassen,
   } = props;
   const schritt = props.schritt ?? 1;
   /*
@@ -181,7 +199,7 @@ export function ZahlFeld(props: {
   */
   const eigen = useId();
   const id = props.id ?? `f${eigen}`;
-  const anzeige = (n: number) => (leerBeiNull && n === 0 ? ''
+  const anzeige = (n: number) => (leer || (leerBeiNull && n === 0) ? ''
     : tausenderpunkte ? Math.round(n).toLocaleString('de-DE')
       : String(n).replace('.', ','));
   const [text, setText] = useState(() => anzeige(wert));
@@ -214,13 +232,29 @@ export function ZahlFeld(props: {
     return neu;
   };
 
-  // Kommt ein neuer Wert von aussen (auch nach einem Wechsel der Einheit),
-  // gilt eine alte Fehlermeldung nicht mehr.
-  useEffect(() => { setText(anzeige(wert)); setFehler(null); }, [wert]);
+  /** Wofuer ein leeres Feld steht: 0, oder die Untergrenze. */
+  const leerWert = min > 0 ? min : 0;
+  /*
+    Kommt ein neuer Wert von aussen (auch nach einem Wechsel der Einheit),
+    zeigt das Feld ihn, und eine alte Fehlermeldung gilt nicht mehr.
+
+    AUSNAHME — das gerade GELEERTE Feld bleibt leer: Wer die Zahl loescht, um
+    eine andere zu tippen, meldet damit 0. Stuende die sofort wieder im Feld,
+    liesse sie sich nicht wegloeschen, und aus „0“ und „3“ wuerde „03“. Die 0
+    erscheint erst beim Verlassen des Felds.
+  */
+  useEffect(() => {
+    setText((alt) => (alt.trim() === '' && wert === leerWert ? alt : anzeige(wert)));
+    setFehler(null);
+  }, [wert, leer]);
 
   const uebernehmen = (roh: string) => {
     setText(roh);
-    if (roh.trim() === '') { setFehler(null); onChange(min > 0 ? min : 0); return; }
+    if (roh.trim() === '') {
+      setFehler(null);
+      if (onLeeren) { if (!leer) onLeeren(); } else if (!leerSpaeter) onChange(leerWert);
+      return;
+    }
     const n = Number(roh.replace(/\./g, '').replace(',', '.'));
     if (!Number.isFinite(n)) { setFehler('Bitte eine Zahl eingeben'); return; }
     if (n < min) { setFehler(`Mindestens ${min}`); return; }
@@ -259,7 +293,13 @@ export function ZahlFeld(props: {
           onChange={(e) => uebernehmen(tausenderpunkte
             ? mitPunkten(e.target.value, e.target.selectionStart ?? e.target.value.length)
             : e.target.value)}
-          onBlur={onVerlassen}
+          // Beim Verlassen steht wieder, was gilt — auch die 0 hinter einem geleerten Feld.
+          onBlur={() => {
+            const geleert = leerSpaeter && text.trim() === '' && !onLeeren;
+            if (geleert && wert !== leerWert) onChange(leerWert);
+            if (!fehler) setText(anzeige(geleert ? leerWert : wert));
+            onVerlassen?.();
+          }}
           // Pfeiltasten wie beim nativen Zahlenfeld — nur mit Stufenknoepfen,
           // sonst bleibt das Feld, wie es war. Enter bestaetigt, wo jemand
           // darauf wartet.
@@ -475,26 +515,30 @@ export function DatumFeld(props: {
    * beim Leeren der zuletzt gueltige Wert stehen.
    */
   leerErlaubt?: boolean;
+  /** Die Angabe fehlt noch: Das Feld steht leer, gleich was in `wert` liegt (wie am `ZahlFeld`). */
+  leer?: boolean;
+  /** Das Feld wurde geleert — die Angabe gilt wieder als fehlend. */
+  onLeeren?: () => void;
 }) {
   const id = `d${useId()}`;
-  const { stufen, vorbelegt } = props;
+  const { stufen, vorbelegt, leer } = props;
 
   const anzeige = (roh: string) => {
     const d = parseDatum(roh);
     return d ? toDe(d) : roh;
   };
 
-  const [text, setText] = useState(() => anzeige(props.wert));
+  const [text, setText] = useState(() => (leer ? '' : anzeige(props.wert)));
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Aendert sich der Wert von aussen (Laden, Zuruecksetzen, Automatik),
   // uebernimmt das Feld ihn — aber nicht, waehrend gerade getippt wird und
   // die Eingabe noch unfertig ist.
   useEffect(() => {
-    const formatiert = anzeige(props.wert);
+    const formatiert = leer ? '' : anzeige(props.wert);
     setText((bisher) => (parseDatum(bisher) && toDe(parseDatum(bisher)!) === formatiert ? bisher : formatiert));
     setFehler(null);
-  }, [props.wert]);
+  }, [props.wert, leer]);
 
   const maskieren = (roh: string) => {
     const z = roh.replace(/\D/g, '').slice(0, 8);
@@ -513,6 +557,7 @@ export function DatumFeld(props: {
       // geleert heisst bei einem freiwilligen Feld: zurueck zur Vorgabe.
       setFehler(null);
       if (ziffern.length === 0 && props.leerErlaubt) props.onChange('');
+      if (ziffern.length === 0 && props.onLeeren && !leer) props.onLeeren();
       return;
     }
 
@@ -525,8 +570,8 @@ export function DatumFeld(props: {
     props.onChange(toDe(d));
   };
 
-  // Vom gespeicherten Wert aus, nicht vom halb getippten Text.
-  const basis = parseDatum(props.wert);
+  // Vom gespeicherten Wert aus, nicht vom halb getippten Text — ohne Angabe gibt es nichts zu zaehlen.
+  const basis = leer ? null : parseDatum(props.wert);
   const stufe = (richtung: 1 | -1) => {
     if (!basis) return;
     const jahr = Math.min(2200, Math.max(1900, basis.jahr + richtung));
@@ -600,10 +645,8 @@ export function AuswahlFeld<T extends string>(props: {
   hilfe?: string;
   /** Die laengere Erklaerung: im Info-Kaestchen neben der Beschriftung */
   info?: ReactNode;
-  vorbelegt?: Vorbelegt;
 }) {
   const id = `s${useId()}`;
-  const { vorbelegt } = props;
   return (
     <div>
       <FeldTitel text={props.label} info={props.info} htmlFor={id} />
@@ -611,45 +654,38 @@ export function AuswahlFeld<T extends string>(props: {
         id={id}
         value={props.wert}
         onChange={(e) => props.onChange(e.target.value as T)}
-        aria-describedby={[hatMarke(vorbelegt) ? `${id}-vorbelegt` : '', props.hilfe ? `${id}-hilfe` : '']
-          .filter(Boolean).join(' ') || undefined}
-        className={`ui-feld w-full p-2 text-sm ${beispielRahmen(vorbelegt)}`}
+        aria-describedby={props.hilfe ? `${id}-hilfe` : undefined}
+        className="ui-feld w-full p-2 text-sm"
       >
         {props.optionen.map((o) => <option key={o.wert} value={o.wert}>{o.text}</option>)}
       </select>
-      {vorbelegt && <VorbelegtMarke v={vorbelegt} id={`${id}-vorbelegt`} />}
       {props.hilfe && <p id={`${id}-hilfe`} className="mt-1 text-xs text-ui-schiefer">{props.hilfe}</p>}
     </div>
   );
 }
 
 export function Schalter(props: {
-  label: string; wert: boolean; onChange: (b: boolean) => void; vorbelegt?: Vorbelegt;
+  label: string; wert: boolean; onChange: (b: boolean) => void;
   /** Die Erklaerung im Info-Kaestchen neben dem Schalter */
   info?: ReactNode;
 }) {
   const id = `c${useId()}`;
-  const marke = hatMarke(props.vorbelegt);
   const schalter = (
     <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm text-ui-tinte">
       <input
         id={id} type="checkbox" checked={props.wert}
         onChange={(e) => props.onChange(e.target.checked)}
-        aria-describedby={marke ? `${id}-vorbelegt` : undefined}
         className="h-4 w-4 shrink-0"
       />
       {props.label}
     </label>
   );
-  if (!marke && !props.info) return schalter;
-  // Marke und Info-Kaestchen NEBEN dem Label: Ein Knopf darin schaltete sonst den Haken um.
+  if (!props.info) return schalter;
+  // Das Info-Kaestchen NEBEN dem Label: Ein Knopf darin schaltete sonst den Haken um.
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="flex items-center">
-        {schalter}
-        {props.info && <InfoPunkt titel={props.label}>{props.info}</InfoPunkt>}
-      </span>
-      {props.vorbelegt && <VorbelegtMarke v={props.vorbelegt} id={`${id}-vorbelegt`} klasse="" />}
+    <span className="flex items-center">
+      {schalter}
+      <InfoPunkt titel={props.label}>{props.info}</InfoPunkt>
     </span>
   );
 }

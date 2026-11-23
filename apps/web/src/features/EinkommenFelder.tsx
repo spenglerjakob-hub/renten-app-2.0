@@ -3,7 +3,7 @@ import {
   grvVollerBeitragJahr, parameterFuer,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
-import { ZahlFeld, AuswahlFeld, Schalter, euro, type Vorbelegt } from '../components/Feld';
+import { ZahlFeld, AuswahlFeld, Schalter, euro } from '../components/Feld';
 import { Wahl } from '../components/Frage';
 import { Hinweis } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
@@ -39,7 +39,7 @@ const ARTEN = [
 ] as const;
 
 export function EinkommenFelder({
-  wert, onChange, spalten = 3, marke, artAlsKnoepfe = false,
+  wert, onChange, spalten = 3, betrag, artAlsKnoepfe = false,
 }: {
   wert: Einkommen;
   onChange: (p: Partial<Einkommen>) => void;
@@ -51,8 +51,11 @@ export function EinkommenFelder({
    * Vertrags-TÜV und im Fenster des Ehepartners bleibt die kompakte Liste.
    */
   artAlsKnoepfe?: boolean;
-  /** Vorbelegung je Feld — nur im Rechner, siehe `features/vorbelegung.ts` */
-  marke?: (feld: 'modus' | 'betrag' | 'auszahlungen') => Vorbelegt | undefined;
+  /**
+   * Der Betrag FEHLT noch (nur im Rechner, siehe `features/vorbelegung.ts`):
+   * Das Feld steht leer; wird es geleert, fehlt die Angabe wieder.
+   */
+  betrag?: { leer: boolean; onLeeren: () => void };
 }) {
   const belegt = besoldungstabelle(wert.besoldungsland, new Date().getFullYear()).belegt;
   // Das Einkommen einer Person: auch beim Paar „du“. Ohne Ansprache (Vorsorge-Check) wie bisher per Sie.
@@ -74,7 +77,7 @@ export function EinkommenFelder({
     <>
       {artAlsKnoepfe && (
         <div className="mb-4">
-          <Wahl label="Art des Einkommens" wert={wert.modus} onChange={setzeArt} optionen={ARTEN} reihe vorbelegt={marke?.('modus')} />
+          <Wahl label="Art des Einkommens" wert={wert.modus} onChange={setzeArt} optionen={ARTEN} reihe />
         </div>
       )}
       <div className={`grid gap-3 ${raster}`}>
@@ -84,7 +87,6 @@ export function EinkommenFelder({
             wert={wert.modus}
             onChange={setzeArt}
             optionen={ARTEN}
-            vorbelegt={marke?.('modus')}
           />
         )}
         {wert.modus === 'selbststaendig' ? (
@@ -94,7 +96,7 @@ export function EinkommenFelder({
             onChange={(n) => onChange({ betrag: n })}
             einheit="€"
             info="Der Gewinn vor Steuern und Sozialabgaben — die Betriebsausgaben sind bereits abgezogen."
-            vorbelegt={marke?.('betrag')}
+            {...betrag}
           />
         ) : wert.modus !== 'besoldung' ? (
           <>
@@ -106,7 +108,7 @@ export function EinkommenFelder({
             */}
             <ZahlFeld label="Betrag monatlich" wert={wert.betrag}
               onChange={(n) => onChange({ betrag: n })} einheit="€"
-              vorbelegt={marke?.('betrag')}
+              {...betrag}
               // Ein Warnhinweis, keine Erklaerung: Er bleibt sichtbar, in einer Zeile. Die Begruendung steht im Info-Kaestchen.
               hilfe={wert.modus === 'netto' ? 'Bei Steuerklasse III/V besser das Brutto eintragen.' : undefined}
               info={wert.modus === 'netto'
@@ -117,7 +119,6 @@ export function EinkommenFelder({
               wert={String(wert.auszahlungen)}
               onChange={(v) => onChange({ auszahlungen: Number(v) })}
               info="Weihnachts- und Urlaubsgeld stecken in der Anzahl der Gehälter: Der Betrag daneben ist ein normaler Monat."
-              vorbelegt={marke?.('auszahlungen')}
               optionen={[
                 { wert: '12', text: '12 Gehälter' },
                 { wert: '12.5', text: '12,5 (halbes 13.)' },

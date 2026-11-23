@@ -17,13 +17,13 @@ import {
  * Die Schnellwahl „Kurzfassung“ setzt die Haken wie der fruehere Umfang
  * „kurz“, „Alles“ wie „Ausführlich“.
  */
-export function DruckAuswahlFenster({ seiten, auswahl, onAuswahl, beispielwerte, onAngabenPruefen, onDrucken }: {
+export function DruckAuswahlFenster({ seiten, auswahl, onAuswahl, fehlend, onAngabenPruefen, onDrucken }: {
   /** Alle Seiten, die der Fall hergibt — ungefiltert */
   seiten: GutachtenSeite[];
   auswahl: DruckAuswahl;
   onAuswahl: (a: DruckAuswahl) => void;
-  /** Angaben, die noch Beispielwerte sind — dann ein Hinweis vor dem Druck */
-  beispielwerte: string[];
+  /** Angaben, die noch fehlen — ohne sie gibt es kein Ergebnis und damit nichts zu drucken */
+  fehlend: string[];
   onAngabenPruefen: () => void;
   onDrucken: () => void;
 }) {
@@ -78,11 +78,11 @@ export function DruckAuswahlFenster({ seiten, auswahl, onAuswahl, beispielwerte,
         </ul>
       </fieldset>
 
-      {beispielwerte.length > 0 && (
+      {fehlend.length > 0 && (
         <Hinweis>
-          Diese Angaben sind noch Beispielwerte: <strong className="font-medium text-ui-tinte">{beispielwerte.join(', ')}</strong>.
-          Im Gutachten stehen sie gekennzeichnet.{' '}
-          <button type="button" onClick={onAngabenPruefen} className={LINK}>Angaben prüfen</button>
+          Für das Gutachten {fehlend.length === 1 ? 'fehlt noch eine Angabe' : 'fehlen noch Angaben'}:{' '}
+          <strong className="font-medium text-ui-tinte">{fehlend.join(', ')}</strong>.{' '}
+          <button type="button" onClick={onAngabenPruefen} className={LINK}>Zu den Angaben</button>
         </Hinweis>
       )}
 
@@ -91,7 +91,7 @@ export function DruckAuswahlFenster({ seiten, auswahl, onAuswahl, beispielwerte,
         <p className="text-sm text-ui-schiefer">
           Deckblatt und {gedruckt === 1 ? 'ein Abschnitt' : `${gedruckt} Abschnitte`}
         </p>
-        <button type="button" onClick={onDrucken} className={KNOPF}>
+        <button type="button" onClick={onDrucken} disabled={fehlend.length > 0} className={`${KNOPF} disabled:cursor-not-allowed disabled:opacity-40`}>
           <Printer className="h-4 w-4" aria-hidden /> Drucken
         </button>
       </div>

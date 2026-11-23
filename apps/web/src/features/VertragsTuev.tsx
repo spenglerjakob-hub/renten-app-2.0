@@ -5,7 +5,8 @@ import {
   tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand,
   beiKind, kindName, desKindes, jahreText,
 } from './tuev-berechnung';
-import { kenntKapitalwahl, kinderpoliceText, monatJahr } from './vertragsarten';
+import { kenntKapitalwahl, kinderpoliceText, monatJahr, typText } from './vertragsarten';
+import { useFehlt } from './useFehlt';
 import { EinkommenFelder } from './EinkommenFelder';
 import { personNameAus } from './personen';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
@@ -13,7 +14,7 @@ import {
   ZahlFeld, ProzentFeld, DatumFeld, Schalter, Kennzahl, GegenueberZeile, AkkordeonKarte, euro, euroGenau,
   prozent,
 } from '../components/Feld';
-import { KinderZeilen, KinderHinweis } from '../components/KinderFelder';
+import { KinderZeilen, KinderHinweis, JahrWahl, KIND_HOECHSTALTER } from '../components/KinderFelder';
 import { EINLEITUNG, FELD, Hervor, Kernsatz, Titel } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 
@@ -166,7 +167,7 @@ function WegZeile({ text, rente, kapital, hervor }: {
  * rechnet: was er netto wirklich kostet gegen das, was netto ankommt.
  */
 export function VertragsTuev({
-  ergebnis, szenario, automatischGeprueft = false, einkommen = 'feld',
+  ergebnis, szenario, automatischGeprueft = false, einkommen = 'feld', fehlend = [],
 }: {
   ergebnis: ProjektionsErgebnis | null;
   szenario: SzenarioParsed;
@@ -183,6 +184,14 @@ export function VertragsTuev({
    * oder gar nicht (`ohne`, wenn nur Kinderpolicen geprueft werden).
    */
   einkommen?: 'feld' | 'angaben' | 'ohne';
+  /**
+   * Angaben, die fuer die Pruefung noch FEHLEN (Vertragspruefung, siehe
+   * `features/vorbelegung.ts`). Solange eine fehlt, steht statt der
+   * Auswertung, welche — unter einer fehlenden Angabe liegt nur ein
+   * Platzhalter, und eine Steuerersparnis daraus saehe aus wie eine Auskunft.
+   * Im Rechner zeigt die Etappe das selbst und oeffnet den TUEV erst danach.
+   */
+  fehlend?: readonly string[];
 }) {
   const tuev = useSzenario((x) => x.szenario.tuev);
   const vertraege = useSzenario((x) => x.szenario.vertraege);
@@ -204,6 +213,9 @@ export function VertragsTuev({
   */
   const setzeEinkommen = useSzenario((x) => x.setzeEinkommen);
   const setzeEinkommenPartner = useSzenario((x) => x.setzeEinkommenPartner);
+  // Ein neuer Fall gibt kein Einkommen vor: Das Feld steht leer, bis es eingetragen ist.
+  const angabe = useFehlt();
+  const einkommenFehlt = angabe('einkommenHeute.betrag').leer || angabe('einkommenPartner.betrag').leer;
 
   // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
   const jetzt = new Date().getFullYear();
@@ -273,7 +285,7 @@ export function VertragsTuev({
             </option>
             {nichtGeprueft.map((v) => (
               <option key={v.id} value={v.id}>
-                Schicht {v.schicht} | {v.name || v.typ.toUpperCase()}
+                {v.name ? `${v.name} — ${typText(v.typ)}` : typText(v.typ)}
               </option>
             ))}
           </select>
@@ -303,14 +315,14 @@ export function VertragsTuev({
           offen={einkommenOffen}
           onUmschalten={() => setEinkommenOffen((x) => !x)}
         >
-          <EinkommenFelder wert={szenario.einkommenHeute} onChange={setzeEinkommen} />
+          <EinkommenFelder wert={szenario.einkommenHeute} onChange={setzeEinkommen} betrag={angabe('einkommenHeute.betrag')} />
 
           {szenario.haushalt.verheiratet && szenario.einkommenGetrennt && (
             <div className="mt-4 border-t border-ui-linie pt-3">
               <p className="mb-2 text-xs font-medium text-ui-tinte">
                 {personNameAus(szenario.personen, 'B')}
               </p>
-              <EinkommenFelder wert={szenario.einkommenPartner} onChange={setzeEinkommenPartner} />
+              <EinkommenFelder wert={szenario.einkommenPartner} onChange={setzeEinkommenPartner} betrag={angabe('einkommenPartner.betrag')} />
             </div>
           )}
 
@@ -322,7 +334,7 @@ export function VertragsTuev({
             `nettoZuBrutto` um) — die drei Zahlen koennen deshalb nicht
             auseinanderlaufen.
           */}
-          <div className="ui-innen mt-5 grid grid-cols-3 gap-3 px-4 py-3">
+          {!einkommenFehlt && <div className="ui-innen mt-5 grid grid-cols-3 gap-3 px-4 py-3">
             <Kennzahl
               titel="Ø Brutto im Monat"
               wert={euro(basis.monatsbrutto)}
@@ -363,11 +375,23 @@ export function VertragsTuev({
                 </>
               )}
             />
-          </div>
+          </div>}
         </AkkordeonKarte>
       </div>}
 
-      {tuev.length === 0 ? (
+      {fehlend.length > 0 ? (
+        /* Gestrichelt wie im Rechner: unfertig, aber kein Fehler — ohne Ampelfarbe. */
+        <div role="status" className="rounded-[12px] border border-dashed border-ui-schiefer/60 bg-ui-karte px-5 py-6 text-ui-tinte print:hidden sm:px-7">
+          <p className="text-base font-medium">
+            {fehlend.length === 1 ? 'Für die Prüfung fehlt noch eine Angabe' : `Für die Prüfung fehlen noch ${fehlend.length} Angaben`}
+          </p>
+          <ul className="mt-3 space-y-1 text-sm">
+            {fehlend.map((x) => (
+              <li key={x} className="flex gap-2"><span aria-hidden className="text-ui-asche">—</span><span>{x}</span></li>
+            ))}
+          </ul>
+        </div>
+      ) : tuev.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-8 text-center text-sm text-ui-schiefer">
           {automatischGeprueft
             ? 'Noch kein Vertrag erfasst. Oben einen anlegen — dann steht hier,'
@@ -413,15 +437,15 @@ export function VertragsTuev({
                 <header className="flex items-center justify-between gap-3 border-b border-ui-linie px-5 py-4 sm:px-7">
                   <h3 className="min-w-0">
                     <span className="block text-xs text-ui-schiefer">
-                      Schicht {v.schicht}{kind ? ` · ${kinderpoliceText(v)} — nicht in ${e.dein('er')} Rente` : ''}
+                      {typText(v.typ)}{kind ? ` · ${kinderpoliceText(v)} — nicht in ${e.dein('er')} Rente` : ''}
                     </span>
-                    <span className="block truncate text-lg font-medium tracking-[-0.01em] text-ui-tinte">{v.name || v.typ}</span>
+                    <span className="block truncate text-lg font-medium tracking-[-0.01em] text-ui-tinte">{v.name || 'Ohne Bezeichnung'}</span>
                   </h3>
                   {!automatischGeprueft && (
                     <button
                       type="button"
                       onClick={() => tuevEntfernen(t.id)}
-                      aria-label={`${v.name || v.typ} aus der Prüfung entfernen`}
+                      aria-label={`${v.name || typText(v.typ)} aus der Prüfung entfernen`}
                       className="shrink-0 rounded-full p-2 text-ui-schiefer hover:bg-rose-50 hover:text-rose-700 print:hidden"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden />
@@ -545,14 +569,14 @@ export function VertragsTuev({
                             {t.kinder.map((kind) => (
                               <li key={kind.id} className="flex items-center gap-2">
                                 <label className="sr-only" htmlFor={`kind-${kind.id}`}>Geburtsjahr</label>
-                                <input
+                                <JahrWahl
                                   id={`kind-${kind.id}`}
-                                  type="number"
-                                  value={kind.geburtsjahr}
-                                  min={1900}
-                                  max={2200}
-                                  onChange={(e) => tuevKindAendern(t.id, kind.id, Number(e.target.value))}
-                                  className="ui-feld w-full p-1 text-xs tabular-nums"
+                                  wert={kind.geburtsjahr}
+                                  von={new Date().getFullYear() - KIND_HOECHSTALTER}
+                                  bis={new Date().getFullYear()}
+                                  absteigend
+                                  onChange={(jahr) => tuevKindAendern(t.id, kind.id, jahr)}
+                                  klasse="w-full p-1 text-xs"
                                 />
                                 <span className="shrink-0 text-xs text-ui-schiefer">
                                   {kind.geburtsjahr >= 2008 ? '300 €' : '185 €'}
@@ -592,6 +616,7 @@ export function VertragsTuev({
                             wert={szenario.haushalt.kinder.length}
                             onChange={setzeKinderAnzahl}
                             max={15}
+                            leerSpaeter
                           />
                         </div>
                         <KinderZeilen
