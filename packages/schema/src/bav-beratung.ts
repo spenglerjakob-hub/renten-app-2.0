@@ -247,6 +247,28 @@ export const hochrechnungSchema = z.object({
   renditeAnsparphase: z.number().min(0).max(0.2).default(0.06),
 });
 
+/**
+ * DAS GESPRAECH MIT DEM MITARBEITER. Vorbereitet wird die Beratung ohne ihn,
+ * mit allen Seiten. „Gespräch starten“ waehlt, welche er zu sehen bekommt:
+ * Was der Berater vorab eingetragen hat — die Angaben, die Versorgungsluecke —,
+ * muss er nicht noch einmal zeigen. Ausgeblendet ist nur die Ansicht; die
+ * Daten bleiben, und die Unterlagen drucken wie immer alles.
+ *
+ * `ausgeblendet` nennt die abgewaehlten Seiten als „kennung.seite“
+ * (`mitarbeiter/gespraech.ts`). Ohne Angabe ist noch nie gewaehlt worden —
+ * dann gilt beim Start die zuletzt benutzte Auswahl des Beraters. Was eine
+ * Fassung nicht kennt, zeigt sie: lieber eine Seite zu viel als eine, die
+ * niemand mehr erreicht.
+ *
+ * `.catch`: Ein unbrauchbarer Wert an dieser Stelle darf nicht die ganze
+ * Beratung unlesbar machen (`beratungLesen` fiele sonst auf leere Daten).
+ */
+export const gespraechSchema = z.object({
+  /** true: im Gespraech — nur die gewaehlten Seiten stehen da */
+  aktiv: z.boolean().default(false),
+  ausgeblendet: z.array(z.string().max(40)).max(40).optional(),
+}).default({}).catch({ aktiv: false });
+
 export const beratungDatenSchema = z.object({
   /** 2: sieben Schritte (mit „Ihre Versorgungslücke“) — aeltere Daten hebt `beratungLesen` an */
   version: z.literal(2).default(2),
@@ -271,6 +293,8 @@ export const beratungDatenSchema = z.object({
   hochrechnung: hochrechnungSchema.default({}),
   /** Der zuletzt offene Schritt (0–6) — zum Weitermachen */
   schritt: z.number().int().min(0).max(6).default(0),
+  /** Vorbereitung oder Gespraech, und welche Seiten im Gespraech ausgeblendet sind */
+  gespraech: gespraechSchema,
 });
 
 export type FirmenModellDaten = z.infer<typeof firmenModellSchema>;

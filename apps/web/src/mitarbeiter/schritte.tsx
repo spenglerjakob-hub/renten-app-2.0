@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { CheckCircle2, FileSignature, FileText, Plus, Printer, Trash2, Wand2, XCircle } from 'lucide-react';
 import { BUNDESLAENDER, bavMitarbeiter, type FirmenModell, type MitarbeiterBav } from '@renten/engine';
 import {
@@ -25,7 +25,8 @@ import {
 } from '../components/stil';
 import { LueckenRing, RENTENZIEL_RING } from '../components/LueckenRing';
 import { AnteilsRing } from '../components/AnteilsRing';
-import { Stuecke, type Stueck } from '../components/Ablauf';
+import { Stuecke as AblaufStuecke, type Stueck } from '../components/Ablauf';
+import { stueckAusgeblendet, type Kennung } from './gespraech';
 import { FirmenZeichen, useDrucken } from './bausteine';
 import {
   P, automatischerBeginn, belastungJeVertrag, grvVon, hochrechnung, hochrechnungJeVertrag, lueckeMitBetriebsrente, monatsgehalt,
@@ -104,6 +105,25 @@ function Inhalt({ gesperrt, klasse, children }: { gesperrt: boolean; klasse?: st
 
 /** Name der Liste der Stuecke fuer Screenreader. */
 const stueckeVon = (schritt: string) => `Stücke des Schritts „${schritt}“`;
+
+/**
+ * Die im Gespraech ausgeblendeten Seiten (`gespraech.ts`) — null in der
+ * Vorbereitung: Dann steht jede Seite da. Die Beratung gibt sie vor, die
+ * Schritte lesen sie hier, statt sie durch jeden Aufruf zu reichen.
+ */
+export const GespraechKontext = createContext<ReadonlySet<string> | null>(null);
+
+/**
+ * Die Stuecke eines Schritts — im Gespraech ohne die ausgeblendeten Seiten.
+ * Was fehlt, steht weder als Zeile da noch fuehrt „Weiter“ dorthin; der Weg
+ * schliesst sich um die Luecke. Vertiefungen bleiben, solange ihr Schritt
+ * dasteht.
+ */
+function Stuecke({ kennung, stuecke, beschriftung }: { kennung: Kennung; stuecke: readonly Stueck[]; beschriftung: string }) {
+  const ausgeblendet = useContext(GespraechKontext);
+  const gezeigt = ausgeblendet ? stuecke.filter((x) => !stueckAusgeblendet(ausgeblendet, kennung, x.id)) : stuecke;
+  return <AblaufStuecke kennung={kennung} stuecke={gezeigt} beschriftung={beschriftung} />;
+}
 
 const LAENDER = BUNDESLAENDER.filter((l) => l !== 'Bund').map((l) => ({ wert: l as string, text: l }));
 const KASSEN = [

@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { Lock, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { Hinweis, KNOPF, KNOPF_KLEIN, LINK } from '../components/stil';
+import { FestesKaestchen, Kaestchen } from '../components/Kaestchen';
 import type { GutachtenSeite } from '../druck/Gutachten';
 import {
   ALLES, KURZ, THEMEN, gewaehlt, pruefungStand, themaSetzen, vertragSetzen, type DruckAuswahl, type Thema,
@@ -102,42 +102,9 @@ export function DruckAuswahlFenster({ seiten, auswahl, onAuswahl, fehlend, onAng
 /** Die Schnellwahl, die zur Auswahl passt, steht dunkel — wie der aktive Reiter. */
 const GEDRUECKT = 'aria-pressed:border-ui-dunkel aria-pressed:bg-ui-dunkel aria-pressed:text-white aria-pressed:hover:bg-ui-dunkel';
 
-/** Ein Kaestchen mit Text — die ganze Zeile ist anklickbar. */
-function Kaestchen({ an, onChange, zusatz, eingerueckt = false, halb = false, children }: {
-  an: boolean;
-  onChange: (an: boolean) => void;
-  zusatz?: string;
-  eingerueckt?: boolean;
-  /** Teilweise gewaehlt — das Sammel-Kaestchen */
-  halb?: boolean;
-  children: ReactNode;
-}) {
-  const id = useId();
-  const feld = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (feld.current) feld.current.indeterminate = halb; }, [halb]);
-  return (
-    <label htmlFor={id} className={`flex cursor-pointer items-start gap-3 py-2.5 pr-3 text-sm text-ui-tinte hover:bg-ui-hover ${eingerueckt ? 'pl-10' : 'pl-3'}`}>
-      <input
-        ref={feld} id={id} type="checkbox" checked={an} onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0"
-      />
-      <span className="min-w-0">
-        {children}
-        {zusatz && <span className="block text-xs text-ui-schiefer">{zusatz}</span>}
-      </span>
-    </label>
-  );
-}
-
 /** Deckblatt und Vorbehalt: immer dabei, als Haken ohne Abwahl. */
 function Fest({ text }: { text: string }) {
-  return (
-    <li className="flex items-start gap-3 px-3 py-2.5 text-sm text-ui-schiefer">
-      <input type="checkbox" checked disabled readOnly aria-label={`${text} — immer dabei`} className="mt-0.5 h-4 w-4 shrink-0" />
-      <span className="min-w-0 flex-1">{text}</span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs"><Lock className="h-3 w-3" aria-hidden /> immer dabei</span>
-    </li>
-  );
+  return <li><FestesKaestchen text={text} /></li>;
 }
 
 /** Die Vertrags-Pruefungen: ein Sammel-Kaestchen, darunter jeder Vertrag. */

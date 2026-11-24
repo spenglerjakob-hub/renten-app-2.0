@@ -1,12 +1,13 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Lock, Save } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Lock, Play, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
 import { AblaufGeber, EtappenAblauf, type AblaufEtappe } from '../components/Ablauf';
 import type { StueckeStand } from '../components/ablauf-logik';
-import { KNOPF_ZWEIT, LINK, TIPPFLAECHE } from '../components/stil';
+import { KNOPF, KNOPF_ZWEIT, LINK, Marke, TIPPFLAECHE } from '../components/stil';
+import { Dialog } from '../components/Dialog';
 import { FirmenZeichen, useFirmenlogo } from './bausteine';
 import { useUnterlagenAuftritt } from './agentur-hook';
 import { zeitpunktText } from './unterschrift-daten';
@@ -14,19 +15,21 @@ import {
   automatischerBeginn, beitragsRechnung, kennzahlenRechnung, leistungsRechnung, versorgungslueckeRechnung,
 } from './rechnung';
 import {
-  SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung, SchrittUnterlagen,
+  GespraechKontext, SchrittAngaben, SchrittAngebot, SchrittEntscheidung, SchrittLeistung, SchrittLuecke, SchrittRechnung,
+  SchrittUnterlagen,
 } from './schritte';
+import { GespraechFenster } from './GespraechFenster';
+import {
+  KENNUNGEN, SCHRITTE, auswahlMerken, bereinigt, gezeigterSchritt, letzteAuswahl, schrittSetzen, sichtbareSchritte,
+  stueckAusgeblendet, stueckZeigen, weitSichtbar,
+} from './gespraech';
 import {
   angabenZeile, angebotSatz, entscheidungZeile, leistungZeile, lueckeZeile, rechnungZeile, unterlagenZeile,
 } from './zeilen';
 import type { Ort } from './ort';
 
-export const SCHRITTE = [
-  'Angebot', 'Ihre Angaben', 'Versorgungslücke', 'Ihre Rechnung', 'Leistung im Alter', 'Entscheidung', 'Unterlagen',
-] as const;
-
-/** Unter diesem Namen merkt sich der Ablauf, wo die Stuecke eines Schritts stehen (`Stuecke` in `schritte.tsx`). */
-export const KENNUNGEN = ['angebot', 'angaben', 'luecke', 'rechnung', 'leistung', 'entscheidung', 'unterlagen'] as const;
+// Die Namen der Schritte und ihre Kennungen stehen bei der Auswahl der Seiten (`gespraech.ts`).
+export { KENNUNGEN, SCHRITTE };
 
 /**
  * Eine Beratung: sieben Schritte fuer den geteilten Bildschirm. „Versorgungsluecke“
@@ -50,6 +53,13 @@ export const KENNUNGEN = ['angebot', 'angaben', 'luecke', 'rechnung', 'leistung'
  * bis 6 nur noch zum Ansehen, gespeichert wird nichts mehr (die Datenbank
  * wiese es ab). Wer die Unterschriften aufhebt, kann wieder aendern. Gesperrt
  * ist der Inhalt der Stuecke; ihre Zeilen und „Weiter“ bleiben bedienbar.
+ *
+ * VORBEREITUNG UND GESPRAECH (`gespraech.ts`): Vorbereitet wird ohne den
+ * Mitarbeiter, mit allen Seiten. „Gespräch starten“ waehlt, welche er zu
+ * sehen bekommt; ausgeblendete Schritte stehen dann nicht im Ablauf, die
+ * uebrigen zaehlen neu durch, und „Weiter“ ueberspringt, was fehlt. Der
+ * Stand gehoert zur Beratung und wird mit ihr gespeichert — nach dem
+ * Neuladen laeuft das Gespraech weiter.
  */
 export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string; beratungId: string; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
@@ -83,6 +93,8 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     (kennung: string, stand: StueckeStand) => setStueckeStand((alt) => ({ ...alt, [kennung]: stand })),
     [],
   );
+  // Das Fenster „Gespräch starten“: null ist es zu, sonst die Auswahl, an der gerade gewaehlt wird.
+  const [auswahl, setAuswahl] = useState<string[] | null>(null);
 
   useEffect(() => {
     let aktiv = true;
@@ -122,7 +134,16 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const aufgeschoben = useDeferredValue(daten);
   const f = firma && typeof firma === 'object' ? firma : null;
   const r = useMemo(() => (f && daten ? beitragsRechnung(f.angebot, daten) : null), [f, daten]);
-  const schritt = daten?.schritt ?? 0;
+  /*
+    IM GESPRAECH stehen nur die gewaehlten Seiten da. `ausgeblendet` ist null
+    in der Vorbereitung — dann gilt jeder Schritt und jede Seite.
+  */
+  const imGespraech = daten?.gespraech.aktiv ?? false;
+  const abgewaehlt = daten?.gespraech.ausgeblendet;
+  const ausgeblendet = useMemo(() => (imGespraech ? new Set(bereinigt(abgewaehlt)) : null), [imGespraech, abgewaehlt]);
+  const sichtbar = useMemo(() => (ausgeblendet ? sichtbareSchritte(ausgeblendet) : SCHRITTE.map((_, i) => i)), [ausgeblendet]);
+  // Der gemerkte Schritt kann ausgeblendet sein (die Auswahl hat sich geaendert) — dann der naechste, der dasteht.
+  const schritt = gezeigterSchritt(sichtbar, daten?.schritt ?? 0);
   /*
     Eine Beratung, die man wieder oeffnet, zeigt, wie weit sie ist: mit
     Unterschrift alle Schritte, mit einer Entscheidung bis dorthin. Sonst
@@ -135,8 +156,9 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
     ein frueherer offen ist. Entscheidung und Unterlagen (Schritt 6 und 7)
     drucken alles.
   */
-  const mitLuecke = weit >= 2;
-  const mitLeistung = weit >= 4;
+  // Das Fenster „Gespräch starten“ nennt je Schritt, was vorbereitet ist und was fehlt — dafuer braucht es beide.
+  const mitLuecke = weit >= 2 || auswahl !== null;
+  const mitLeistung = weit >= 4 || auswahl !== null;
   const leistung = useMemo(() => {
     if (!f || !aufgeschoben || !mitLeistung) return null;
     return leistungsRechnung(f.angebot, aufgeschoben, beitragsRechnung(f.angebot, aufgeschoben));
@@ -187,10 +209,25 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   // Erst gespeichert, dann zur Liste. Klappt das Speichern nicht, bleibt man hier — die Meldung steht oben.
   const fertig = () => (geaendert ? void sichern(daten).then((ok) => { if (ok) zurFirma(); }) : zurFirma());
   const setze = (fn: (d: BeratungDaten) => BeratungDaten) => { if (!gesperrt) setDaten((d) => (d ? fn(d) : d)); };
-  /** @param stueck Das Stueck, das im Schritt offen sein soll — etwa das mit dem Feld, das noch fehlt */
+  /**
+   * @param stueck Das Stueck, das im Schritt offen sein soll — etwa das mit dem Feld, das noch fehlt
+   *
+   * Fuehrt ein Verweis im Gespraech auf eine ausgeblendete Seite („es fehlt
+   * noch das Geburtsdatum“), wird sie wieder gezeigt: Wer dorthin will,
+   * braucht sie. Die uebrige Auswahl bleibt.
+   */
   const geheZu = (i: number, stueck?: string) => {
     const ziel = Math.max(0, Math.min(SCHRITTE.length - 1, i));
-    const d = { ...daten, schritt: ziel };
+    const kennungZiel = KENNUNGEN[ziel]!;
+    const seiteWeg = ausgeblendet !== null && stueck !== undefined && stueckAusgeblendet(ausgeblendet, kennungZiel, stueck);
+    const schrittWeg = ausgeblendet !== null && !sichtbar.includes(ziel);
+    const gespraech = ausgeblendet === null || (!seiteWeg && !schrittWeg) ? daten.gespraech : {
+      ...daten.gespraech,
+      ausgeblendet: seiteWeg && stueck !== undefined
+        ? stueckZeigen([...ausgeblendet], kennungZiel, stueck)
+        : schrittSetzen([...ausgeblendet], kennungZiel, true),
+    };
+    const d = { ...daten, gespraech, schritt: ziel };
     setDaten(d);
     void sichern(d);
     setBesucht((n) => Math.max(n, ziel));
@@ -199,6 +236,37 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
       setStueckeStand((alt) => ({ ...alt, [kennung]: { offen: stueck, weit: alt[kennung]?.weit ?? null } }));
     }
     setSprung((n) => n + 1);
+  };
+
+  /*
+    DAS GESPRAECH STARTEN — oder, wenn es laeuft, die Auswahl aendern. Ein
+    neues Gespraech beginnt vorn und baut sich Stueck fuer Stueck auf, wie der
+    Mitarbeiter es sehen soll: Was in der Vorbereitung schon erreicht war,
+    steht nicht als Zeile da. Die Auswahl gilt als Vorgabe fuer das naechste
+    Gespraech (`auswahlMerken`).
+  */
+  const fensterOeffnen = () => setAuswahl(bereinigt(daten.gespraech.ausgeblendet ?? letzteAuswahl()));
+  const starten = () => {
+    if (auswahl === null) return;
+    const neu = bereinigt(auswahl);
+    const dann = sichtbareSchritte(new Set(neu));
+    const ziel = imGespraech ? gezeigterSchritt(dann, daten.schritt) : dann[0] ?? 0;
+    const d = { ...daten, gespraech: { aktiv: true, ausgeblendet: neu }, schritt: ziel };
+    setDaten(d);
+    void sichern(d);
+    auswahlMerken(neu);
+    if (!imGespraech) {
+      setBesucht(ziel);
+      setStueckeStand({});
+    }
+    setSprung((n) => n + 1);
+    setAuswahl(null);
+  };
+  /** Zurueck in die Vorbereitung: Alle Seiten stehen wieder da; die Auswahl bleibt fuer das naechste Mal. */
+  const vorbereiten = () => {
+    const d = { ...daten, gespraech: { ...daten.gespraech, aktiv: false } };
+    setDaten(d);
+    void sichern(d);
   };
 
   const props = { firma: f, logo, daten, setze, r, leistung, geheZu, gesperrt };
@@ -221,9 +289,10 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
   const etappen: AblaufEtappe[] = SCHRITTE.map((name, i) => ({
     name, ...zeilen[i], erledigt: erledigt[i]! && !zeilen[i]!.fehlt,
   }));
-  // „Weiter“ am Ende des Wegs eines Schritts fuehrt zum naechsten — am Ende der Beratung zur Liste.
-  const weiter = schritt < SCHRITTE.length - 1
-    ? { text: <>Weiter: {SCHRITTE[schritt + 1]}</>, onClick: () => geheZu(schritt + 1) }
+  // „Weiter“ am Ende des Wegs eines Schritts fuehrt zum naechsten, der dasteht — am Ende der Beratung zur Liste.
+  const danach = sichtbar[sichtbar.indexOf(schritt) + 1];
+  const weiter = danach !== undefined
+    ? { text: <>Weiter: {SCHRITTE[danach]}</>, onClick: () => geheZu(danach) }
     : { text: 'Fertig — zur Mitarbeiterliste', onClick: fertig };
 
   return (
@@ -261,7 +330,8 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
             className="ui-feld max-w-full py-2 pl-2 pr-8 text-sm text-ui-tinte"
           >
             <option value="" disabled hidden>Springen zu …</option>
-            {SCHRITTE.map((name, i) => <option key={name} value={i}>{i + 1} · {name}</option>)}
+            {/* Im Gespraech nur, was dasteht — nummeriert wie im Ablauf darunter. */}
+            {sichtbar.map((i, n) => <option key={SCHRITTE[i]} value={i}>{n + 1} · {SCHRITTE[i]}</option>)}
           </select>
         </div>
       </div>
@@ -279,8 +349,54 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         </div>
       )}
 
+      {/*
+        VORBEREITUNG ODER GESPRAECH. In der Vorbereitung steht der Knopf, mit
+        dem das Gespraech beginnt, deutlich da — er ist der naechste Schritt.
+        Im Gespraech bleibt nur eine leise Zeile: Der Mitarbeiter schaut mit.
+        Unterschrieben gibt es nichts mehr zu starten; wer dann alles sehen
+        will, kehrt in die Vorbereitung zurueck (nur die Ansicht, gespeichert
+        wird nichts mehr).
+      */}
+      {imGespraech ? (
+        <div role="note" aria-label="Stand des Gesprächs" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <Marke><Play className="h-3 w-3" aria-hidden /> Im Gespräch</Marke>
+          {!gesperrt && <button type="button" onClick={fensterOeffnen} className={`${LINK} ${TIPPFLAECHE}`}>Seiten wählen</button>}
+          <button type="button" onClick={vorbereiten} className={`${LINK} ${TIPPFLAECHE}`}>
+            {gesperrt ? 'Alle Seiten zeigen' : 'Zur Vorbereitung'}
+          </button>
+        </div>
+      ) : !gesperrt && (
+        <div role="note" aria-label="Stand des Gesprächs" className="ui-innen flex flex-wrap items-center gap-3 p-4">
+          <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-ui-tinte">
+            <ClipboardList className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              <strong className="font-medium">Vorbereitung.</strong> Alle Seiten stehen da — tragen Sie ein, was Sie vorab
+              wissen. Für das Gespräch wählen Sie, welche Seiten Sie zeigen.
+            </span>
+          </p>
+          <button type="button" onClick={fensterOeffnen} className={KNOPF}>
+            <Play className="h-4 w-4" aria-hidden /> Gespräch starten
+          </button>
+        </div>
+      )}
+
+      <Dialog
+        offen={auswahl !== null}
+        titel={imGespraech ? 'Seiten wählen' : 'Gespräch starten'}
+        beschreibung="Welche Seiten zeigen Sie? Was Sie abwählen, wird im Gespräch übersprungen. Die Angaben bleiben, und die Unterlagen enthalten weiterhin alles."
+        onSchliessen={() => setAuswahl(null)}
+      >
+        {auswahl !== null && (
+          <GespraechFenster ausgeblendet={auswahl} onAuswahl={setAuswahl} zeilen={zeilen} laeuft={imGespraech} onStart={starten} />
+        )}
+      </Dialog>
+
+      <GespraechKontext.Provider value={ausgeblendet}>
       <AblaufGeber stand={stueckeStand} onStand={merkeStuecke} weiter={weiter} durch={schritt < weit}>
-        <EtappenAblauf etappen={etappen} offen={schritt} weit={weit} sprung={sprung} onOeffnen={geheZu} wort="Schritt">
+        <EtappenAblauf
+          etappen={sichtbar.map((i) => etappen[i]!)} offen={sichtbar.indexOf(schritt)} weit={weitSichtbar(sichtbar, weit)}
+          sprung={sprung} onOeffnen={(n) => geheZu(sichtbar[n] ?? 0)} wort="Schritt"
+        >
           {schritt === 0 && <SchrittAngebot {...props} />}
           {schritt === 1 && <SchrittAngaben {...props} />}
           {schritt === 2 && <SchrittLuecke {...props} luecke={luecke} aktuell={aufgeschoben === daten} />}
@@ -293,6 +409,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
           )}
         </EtappenAblauf>
       </AblaufGeber>
+      </GespraechKontext.Provider>
     </div>
   );
 }
