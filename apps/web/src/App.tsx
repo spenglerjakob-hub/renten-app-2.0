@@ -1136,9 +1136,15 @@ export default function App() {
 
   /*
     VERTRAGS-TUEV & LOESUNGEN IN STUECKEN — in der Reihenfolge des Gespraechs:
-    erst was schon da ist (der TÜV, nur wenn es Vertraege gibt), dann welche
-    Foerderung liegen bleibt (nur mit Befund), dann der Vorschlag — welche
-    Mischung zum Kunden passt —, zuletzt die Angebote; dort wird angenommen.
+    erst was schon da ist (der TÜV, nur wenn es Vertraege gibt), dann der
+    Vorschlag — welche Mischung zum Kunden passt —, zuletzt die Angebote;
+    dort wird angenommen.
+
+    Zum Vertiefen, also Nachschlagen: welche Foerderung heute liegen bleibt
+    (nur mit Befund). Der Foerdercheck stand bis November 2026 auf dem Weg,
+    VOR dem Vorschlag. Seit der Vorschlag die Foerderung selbst einrechnet
+    und je Baustein nennt, was Staat und Arbeitgeber dazugeben, sagt er das
+    Wesentliche — der Check ist die Herleitung dazu, wer sie sehen will.
   */
   const loesungenStand = ansichtSzenario.loesungen;
   const angeboteZahl = loesungenStand.angebote.length;
@@ -1158,12 +1164,6 @@ export default function App() {
       breit: true,
       // Das Einkommen steht in den Angaben — hier stuenden dieselben Felder ein zweites Mal.
       inhalt: <VertragsTuev ergebnis={ergebnis ?? null} szenario={ansichtSzenario} einkommen="angaben" />,
-    }] : []),
-    ...(foerderBefunde > 0 ? [{
-      id: 'foerderung',
-      titel: `Förderung, die ${t.du} nicht ${t.w('nutzt', 'nutzt')}`,
-      ergebnis: foerderBefunde === 1 ? 'Eine Förderung nicht ausgeschöpft' : `${foerderBefunde} Förderungen nicht ausgeschöpft`,
-      inhalt: <Foerdercheck zeile={echteZeile ?? null} />,
     }] : []),
     {
       id: 'vorschlag',
@@ -1194,6 +1194,13 @@ export default function App() {
       ohneWeiter: true,
       inhalt: <Angebote szenario={ansichtSzenario} nettoHeute={nettoHeute} onAnnehmen={() => geheZu('abschluss')} />,
     },
+    ...(foerderBefunde > 0 ? [{
+      id: 'foerderung',
+      titel: `Förderung, die ${t.du} nicht ${t.w('nutzt', 'nutzt')}`,
+      ergebnis: foerderBefunde === 1 ? 'Eine Förderung nicht ausgeschöpft' : `${foerderBefunde} Förderungen nicht ausgeschöpft`,
+      vertiefung: true,
+      inhalt: <Foerdercheck zeile={echteZeile ?? null} />,
+    }] : []),
   ];
 
   return (
@@ -1672,7 +1679,7 @@ export default function App() {
                 {fehltKarte}
               </div>
             )}
-            {/* Auch TÜV und Vergleich rechnen mit Geburtsdatum und Einkommen — ohne sie stuenden dort Zahlen aus Platzhaltern. */}
+            {/* Auch TÜV und Vorschlag rechnen mit Geburtsdatum und Einkommen — ohne sie stuenden dort Zahlen aus Platzhaltern. */}
             {!angabenFehlen && <Stuecke kennung="loesungen" beschriftung="Stücke der Lösungen" stuecke={loesungenStuecke} />}
           </>
         )}
