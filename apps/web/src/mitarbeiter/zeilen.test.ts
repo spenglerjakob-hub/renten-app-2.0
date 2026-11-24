@@ -7,7 +7,7 @@ import {
 } from './rechnung';
 import {
   abrechnungZeile, anbieterSatz, angabenZeile, angebotSatz, angebotVertraege, axaZeile, einkommenUndKvZeile, einkommenZeile, entscheidungZeile,
-  grvZeile, hochrechnungZeile, kennzahlenZeile, kvZeile, leistungZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile,
+  grvZeile, beitragZeile, kennzahlenZeile, kvZeile, leistungZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile,
   rechnungZeile, spaeterZeile, unterlagenZeile, vertragZeile, vorsorgeZeile,
 } from './zeilen';
 
@@ -119,7 +119,12 @@ describe('Rechnung', () => {
     const a = probeabrechnung(firma, d, r);
     expect(abrechnungZeile(a).ergebnis).toBe(`Netto ${euroGenau(a.netto.mit)} statt ${euroGenau(a.netto.ohne)}`);
     const h = hochrechnung(firma, d, r);
-    expect(hochrechnungZeile(h).ergebnis).toBe(`Kapital ${euro(h.kapital)} · Rente ${euro(h.renteMonat)} im Monat, geschätzt`);
+    // Die Hochrechnung steht beim Beitrag — seine Zeile nennt, was daraus werden kann.
+    expect(h.kapital).toBeGreaterThan(0);
+    expect(beitragZeile(r, h).ergebnis).toBe(`${rechnungZeile(r).ergebnis} · geschätzt ${euro(h.kapital)} Kapital`);
+    // Ohne Laufzeit keine Hochrechnung, ohne Betrag fehlt er weiterhin.
+    expect(beitragZeile(r, { ...h, monate: 0 })).toEqual(rechnungZeile(r));
+    expect(beitragZeile(beitragsRechnung(firma, beratung({}, { umwandlungMonat: 0 })), h)).toEqual({ fehlt: 'Noch kein Betrag gewählt' });
     const eins = spaeterBeginnen(h, r.nettoAufwandMonat)[1]!;
     expect(spaeterZeile(eins).ergebnis).toBe(`Ein Jahr warten kostet ${euro(eins.wenigerKapital)} Kapital`);
   });

@@ -45,7 +45,7 @@ import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzei
 import { ScrollBereich } from '../components/ScrollBereich';
 import {
   abrechnungZeile, anbieterSatz, angebotSatz, angebotVertraege, axaZeile, einkommenUndKvZeile, entscheidungZeile, grvZeile,
-  hochrechnungZeile, kennzahlenZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile, rechnungZeile, spaeterZeile,
+  beitragZeile, kennzahlenZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile, spaeterZeile,
   unterlagenZeile, vertragZeile, vorsorgeZeile,
 } from './zeilen';
 
@@ -762,9 +762,20 @@ function ProbeabrechnungKarte({ a }: { a: Probeabrechnung }) {
  * geschaetzt wird — gerechnet wie das ETF-Depot im Rechner. Verstellbar ist
  * allein die Rendite; die uebrigen Annahmen laufen fest im Hintergrund
  * (`HOCHRECHNUNG_FEST`) und stehen bewusst nirgends.
+ *
+ * SIE STEHT DIREKT UNTER DEM BEITRAG (seit November 2026; vorher ein eigenes
+ * Stueck zwei Schritte weiter): Wer am Regler zieht, sieht im selben Blick,
+ * was aus diesem Betrag werden kann. Deshalb das Ergebnis vorn — Kapital und
+ * Rente —, der erste Satz nennt den Netto-Aufwand, aus dem es entsteht, und
+ * auf breiter Flaeche steht die Zusammensetzung daneben statt darunter:
+ * So bleibt die Karte kurz genug, um mit dem Regler auf einen Bildschirm zu
+ * passen.
  */
-function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
-  h: Hochrechnung; rentenbeginn: string | null; setzeRendite: (rendite: number) => void;
+function HochrechnungKarte({ h, nettoMonat, rentenbeginn, setzeRendite }: {
+  h: Hochrechnung;
+  /** Der Netto-Aufwand vom Regler — der Betrag, aus dem die Hochrechnung entsteht */
+  nettoMonat: number;
+  rentenbeginn: string | null; setzeRendite: (rendite: number) => void;
 }) {
   if (h.monate <= 0) return null;
   const teile = [
@@ -777,26 +788,36 @@ function HochrechnungKarte({ h, rentenbeginn, setzeRendite }: {
   return (
     <Karte titel="Beispielhafte Hochrechnung" rechts={<Vermerk>geschätzt</Vermerk>}>
       <p className="text-sm text-ui-schiefer">
-        {euro(h.beitragMonat)} im Monat in Ihre Vorsorge, {laufzeitText(h.monate)} bis zum Rentenbeginn{rentenbeginn ? ` am ${rentenbeginn}` : ''}.
+        Was aus <span className="font-medium tabular-nums text-ui-tinte">{euro(nettoMonat)} netto</span> im Monat werden
+        kann: {euro(h.beitragMonat)} fließen in Ihre Vorsorge, {laufzeitText(h.monate)} bis zum
+        Rentenbeginn{rentenbeginn ? ` am ${rentenbeginn}` : ''}.
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ProzentFeld label="Angenommene Rendite" wert={h.annahmen.renditeAnsparphase} onChange={setzeRendite}
-          hilfe="Wertentwicklung im Jahr bis zum Rentenbeginn." />
-      </div>
-      <div className="ui-innen mt-5 grid grid-cols-2 gap-3 p-4">
+      <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-2">
         <div>
-          <div className={ETIKETT}>Kapital bei Rentenbeginn</div>
-          <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">{euro(h.kapital)}</div>
-        </div>
-        <div>
-          <div className={ETIKETT}>Geschätzte Rente brutto</div>
-          <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">
-            {euro(h.renteMonat)} <span className="text-sm font-normal text-ui-schiefer">/ Monat</span>
+          <div className="ui-innen grid grid-cols-2 gap-3 p-4">
+            <div>
+              <div className={ETIKETT}>Kapital bei Rentenbeginn</div>
+              <div className="mt-0.5 whitespace-nowrap text-2xl font-medium tabular-nums text-ui-tinte">{euro(h.kapital)}</div>
+            </div>
+            <div>
+              <div className={ETIKETT}>Geschätzte Rente brutto</div>
+              {/* Am Telefon steht „im Monat“ unter dem Betrag — daneben braeche es mitten in der Angabe um. */}
+              <div className="mt-0.5 text-2xl font-medium tabular-nums text-ui-tinte">
+                <span className="whitespace-nowrap">{euro(h.renteMonat)}</span>{' '}
+                <span className="block text-sm font-normal text-ui-schiefer sm:inline">im Monat</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 sm:max-w-[16rem]">
+            <ProzentFeld label="Angenommene Rendite" wert={h.annahmen.renditeAnsparphase} onChange={setzeRendite}
+              hilfe="Wertentwicklung im Jahr bis zum Rentenbeginn." />
           </div>
         </div>
+        <div>
+          <p className={ETIKETT}>Woraus das Kapital besteht</p>
+          <Anteile teile={teile} format={euro} />
+        </div>
       </div>
-      <p className={`mt-5 ${ETIKETT}`}>Woraus das Kapital besteht</p>
-      <Anteile teile={teile} format={euro} />
       <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
         Beispielhafte und geschätzte Hochrechnung mit der angenommenen Rendite und gleichbleibenden Beiträgen — keine
         Zusage. Die tatsächliche Leistung hängt von der Wertentwicklung und vom Tarif ab. Die Rente ist brutto, vor
@@ -876,12 +897,17 @@ export function SchrittRechnung(props: SchrittProps) {
     {
       id: 'beitrag',
       titel: 'Ihr Beitrag',
-      ...rechnungZeile(r),
+      ...beitragZeile(r, h),
       // Volle Breite: Die drei grossen Zahlen brauchen sie — in der schmalen Spalte passt ein vierstelliger Betrag nicht.
       breit: true,
       inhalt: (
         <Inhalt gesperrt={gesperrt} klasse="space-y-5 sm:space-y-6">
           <NettoRegler {...props} />
+
+          {/* Was der Rechenkern zum gewaehlten Betrag anmerkt — beim Regler, an dem der Betrag gewaehlt wird. */}
+          {r.hinweise.map((h2) => (
+            <p key={h2} className="ui-karte px-4 py-3 text-xs leading-relaxed text-ui-tinte">{h2}</p>
+          ))}
 
           {/* Drei Zahlen nebeneinander, gross — um sie geht es; die dritte, was in der Vorsorge ankommt, als Akzentkarte. */}
           <section className="grid gap-4 sm:grid-cols-3 lg:gap-5">
@@ -892,10 +918,9 @@ export function SchrittRechnung(props: SchrittProps) {
               unten={r.hebel > 0 ? `je 1 € netto ${r.hebel.toLocaleString('de-DE', { maximumFractionDigits: 1 })} € Vorsorge` : 'jeden Monat'} />
           </section>
 
-          {/* Was der Rechenkern zum gewaehlten Betrag anmerkt — beim Betrag, nicht erst bei der Abrechnung. */}
-          {r.hinweise.map((h2) => (
-            <p key={h2} className="ui-karte px-4 py-3 text-xs leading-relaxed text-ui-tinte">{h2}</p>
-          ))}
+          {/* Direkt darunter, was daraus werden kann — sie rechnet mit jedem Zug am Regler neu. */}
+          <HochrechnungKarte h={h} nettoMonat={r.nettoAufwandMonat} rentenbeginn={rentenbeginnVon(daten.angaben)}
+            setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
         </Inhalt>
       ),
     },
@@ -941,17 +966,6 @@ export function SchrittRechnung(props: SchrittProps) {
         </Inhalt>
       ),
     },
-    ...(h.monate > 0 ? [{
-      id: 'hochrechnung',
-      titel: 'Beispielhafte Hochrechnung',
-      ...hochrechnungZeile(h),
-      inhalt: (
-        <Inhalt gesperrt={gesperrt}>
-          <HochrechnungKarte h={h} rentenbeginn={rentenbeginnVon(daten.angaben)}
-            setzeRendite={(renditeAnsparphase) => setze((d) => ({ ...d, hochrechnung: { ...d.hochrechnung, renditeAnsparphase } }))} />
-        </Inhalt>
-      ),
-    }] : []),
     ...(spaeter[1] ? [{
       id: 'spaeter',
       titel: 'Später beginnen?',
