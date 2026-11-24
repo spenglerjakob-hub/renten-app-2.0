@@ -55,6 +55,21 @@ describe('Abwaertskompatibilitaet', () => {
     expect(zurueck.ok && zurueck.szenario.loesungen.angenommen).toEqual(['a1', 'a2']);
   });
 
+  it('liest Dateien ohne Wünsche zum Vorschlag ein — und behält die Antworten über Export und Import', () => {
+    const r = importiere(JSON.stringify({ ...vollstaendig, loesungen: { nettoMonat: 150 } }));
+    // Keine Antwort ist vorbelegt: Der Vorschlag entsteht erst aus dem, was der Kunde sagt.
+    expect(r.ok && r.szenario.loesungen.wuensche).toEqual({});
+    if (!r.ok) return;
+    const wuensche = { verfuegbar: 'ja' as const, auszahlung: 'offen' as const, foerderung: 'ja' as const };
+    const zurueck = importiere(exportiere({ ...r.szenario, loesungen: { ...r.szenario.loesungen, wuensche } }));
+    expect(zurueck.ok && zurueck.szenario.loesungen.wuensche).toEqual(wuensche);
+    // Eine Antwort, die es nicht gibt, faellt weg — der Plan bleibt lesbar.
+    const kaputt = importiere(JSON.stringify({
+      ...vollstaendig, loesungen: { wuensche: { verfuegbar: 'vielleicht', foerderung: 'ja' } },
+    }));
+    expect(kaputt.ok && kaputt.szenario.loesungen.wuensche).toEqual({ foerderung: 'ja' });
+  });
+
   it('liest Dateien ohne die Liste der offenen Angaben ein — sie bleibt undefiniert', () => {
     // Undefiniert heisst "unbekannt": Die Anwendung leitet die Marken dann ab.
     // Eine leere Liste hiesse "alles geprueft" — das waere eine Behauptung.

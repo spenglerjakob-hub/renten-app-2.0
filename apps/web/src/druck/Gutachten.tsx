@@ -1,6 +1,6 @@
 import { Fragment, useMemo, type CSSProperties, type ReactNode } from 'react';
 import {
-  parameterFuer, versorgungsluecke, foerdercheck, loesungsvergleich,
+  parameterFuer, versorgungsluecke, foerdercheck,
   type ProjektionsErgebnis, type Jahreszeile,
 } from '@renten/engine';
 import type { SzenarioParsed } from '../store/szenario';
@@ -8,8 +8,9 @@ import { euro, prozent } from '../components/Feld';
 import { Rechtsstand } from '../features/Rechtsstand';
 import { akzentVariablen, fusszeileCss, type Auftritt } from '../features/auftritt';
 import {
-  tuevPositionen, foerderBasis, loesungsOptionen, angebotPositionen, type AngebotPosition, type MitAngenommenen,
+  tuevPositionen, foerderBasis, angebotPositionen, type AngebotPosition, type MitAngenommenen,
 } from '../features/tuev-berechnung';
+import { vorschlagStand } from '../features/vorschlag-berechnung';
 import { vertragsBezeichnung } from '../features/vertragsarten';
 import { sparzielRechnen, SPARZIEL_VORGABE } from '../features/sparziel-berechnung';
 import { pkvRechnen } from '../features/pkv-berechnung';
@@ -98,8 +99,6 @@ export function useGutachtenSeiten({
 
   const h = szenario.haushalt;
 
-  const luecke = versorgungsluecke(zeile);
-
   // Die Sparziel-Rechnung: null, wenn es nichts zu schliessen gibt — dann
   // entfallen beide Handlungsseiten, statt eine Null-Empfehlung zu drucken.
   const sparziel = useMemo(
@@ -123,20 +122,20 @@ export function useGutachtenSeiten({
   }, [szenario, ergebnis, zeile]);
 
   /*
-    Der Loesungsvergleich der letzten Etappe — nur, wenn es eine Luecke gibt
-    oder Angebote erfasst sind. Sonst stuende eine Seite ueber Loesungen fuer
-    ein Problem, das es nicht gibt.
+    Der Vorschlag und die Angebote der vierten Etappe. Der Vorschlag steht
+    da, sobald alle Fragen beantwortet sind — dann ist er im Gespraech
+    entstanden; die Angebote, sobald eines gerechnet ist. Ohne beides
+    entfaellt die Seite: Ein Vorschlag aus Vorgaben waere keiner.
   */
   const loesungen = useMemo(() => {
-    if (luecke <= 0 && szenario.loesungen.angebote.length === 0) return null;
-    const l = szenario.loesungen;
-    const betrag = l.vorgabe === 'brutto' ? l.bruttoMonat : l.nettoMonat;
-    return {
-      liste: loesungsvergleich(foerderung.kontext, foerderung.steuerOpt, foerderung.p, betrag, loesungsOptionen(l)),
-      betrag,
-      angebote: angebotPositionen(szenario),
-    };
-  }, [luecke, szenario, foerderung]);
+    const stand = vorschlagStand(szenario, ergebnis ? zeile : null);
+    const vorschlag = stand.mix && stand.wuensche && stand.mix.teile.length > 0
+      ? { mix: stand.mix, wuensche: stand.wuensche, mitArbeitgeber: stand.mitArbeitgeber }
+      : null;
+    const angebote = angebotPositionen(szenario);
+    const gerechnet = angebote.some((a) => a.rente || a.kapital);
+    return vorschlag || gerechnet ? { vorschlag, angebote, gerechnet } : null;
+  }, [szenario, ergebnis, zeile]);
 
   // Das heutige Haushaltsnetto — Bezugsgroesse fuer Startbeitrag und Aufwand (nicht das Netto im Alter).
   const haushaltsNetto = nettoHeuteMonat(ergebnis);
@@ -334,14 +333,12 @@ export function useGutachtenSeiten({
       ...(loesungen ? [{
         thema: 'loesungen' as const,
         // Die Angebote stehen auf eigenem Blatt — und deshalb auch im Verzeichnis.
-        titel: ['Lösungen im Vergleich',
-          ...(loesungen.angebote.some((a) => a.rente || a.kapital) ? [`${an.Dein('e')} Angebote im Vergleich`] : [])],
+        titel: [...(loesungen.vorschlag ? [`${an.Dein()} Vorschlag`] : []),
+          ...(loesungen.gerechnet ? [`${an.Dein('e')} Angebote im Vergleich`] : [])],
         knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Loesungsvergleich
             mitRenteneinkuenften={gedruckt('renteneinkuenfte')}
-            loesungen={loesungen.liste}
-            vorgabe={szenario.loesungen.vorgabe}
-            betragMonat={loesungen.betrag}
+            vorschlag={loesungen.vorschlag}
             angebote={loesungen.angebote}
             nettoHeute={haushaltsNetto}
           />

@@ -59,6 +59,13 @@ export interface Loesung {
   agZuschussMonat: number;
   /** Was im Vertrag landet: Eigenbeitrag plus Zulage plus Arbeitgeber */
   vertragMonat: number;
+  /**
+   * Um so viel sinkt das zu versteuernde Einkommen, im Monat. Der Mix aus
+   * mehreren Loesungen (`loesungsmix`) rechnet damit eine nach der anderen:
+   * Die zweite spart Steuer auf dem Einkommen, das die erste schon gemindert
+   * hat — so ist die Ersparnis zusammen nie groesser als in Wirklichkeit.
+   */
+  zveMinderungMonat: number;
   /** Vertrag je Euro Netto-Aufwand */
   hebel: number;
   /**
@@ -128,7 +135,7 @@ function suche(netto: (beitrag: number) => number, ziel: number, hoechstens: num
 const leer = (id: LoesungId, titel: string, schicht: 1 | 2 | 3, besteuerung: string, grund: string): Loesung => ({
   id, titel, schicht, verfuegbar: false,
   nettoMonat: 0, eigenbeitragMonat: 0, steuerErsparnisMonat: 0, svErsparnisMonat: 0,
-  zulageMonat: 0, agZuschussMonat: 0, vertragMonat: 0, hebel: 0, begrenzt: false,
+  zulageMonat: 0, agZuschussMonat: 0, vertragMonat: 0, zveMinderungMonat: 0, hebel: 0, begrenzt: false,
   besteuerung, hinweise: [grund],
 });
 
@@ -174,7 +181,7 @@ function bavLoesung(
     const pflicht = Math.min(BAV_AG_PFLICHTZUSCHUSS * u, Math.max(0, w.ersparnis + w.verlorenerZuschuss));
     const zuschuss = fest !== null ? (u > 0 ? Math.max(fest, pflicht) : 0)
       : quote > BAV_AG_PFLICHTZUSCHUSS ? zuschussRoh : Math.min(zuschussRoh, pflicht);
-    return { sv, steuer, zuschuss, pflicht, netto: u - sv - steuer };
+    return { sv, steuer, zuschuss, pflicht, zveMinderung, netto: u - sv - steuer };
   };
 
   const hoechstens = steuerGrenze;
@@ -208,6 +215,7 @@ function bavLoesung(
     zulageMonat: 0,
     agZuschussMonat: r.zuschuss / 12,
     vertragMonat: vertrag / 12,
+    zveMinderungMonat: r.zveMinderung / 12,
     hebel: r.netto > 0 ? vertrag / r.netto : 0,
     begrenzt, besteuerung, hinweise,
   };
@@ -222,7 +230,7 @@ function basisLoesung(
   const rechne = (b: number) => {
     const abzug = Math.min(b, rahmen);
     const steuer = Math.max(0, zusatzsteuer(k.zveHeute - abzug, abzug, steuerOpt, p));
-    return { steuer, netto: b - steuer };
+    return { steuer, abzug, netto: b - steuer };
   };
   /*
     Ueber dem freien Hoechstbetrag wirkt ein Beitrag wie eine ungefoerderte
@@ -242,6 +250,7 @@ function basisLoesung(
     steuerErsparnisMonat: r.steuer / 12,
     svErsparnisMonat: 0, zulageMonat: 0, agZuschussMonat: 0,
     vertragMonat: b / 12,
+    zveMinderungMonat: r.abzug / 12,
     hebel: r.netto > 0 ? b / r.netto : 0,
     begrenzt, besteuerung, hinweise,
   };
@@ -268,12 +277,15 @@ function avdLoesung(
     { eigenbeitragJahr: eigen, zulagenJahr: zulage(eigen), zveHeute: k.zveHeute }, steuerOpt, p,
   );
   const sockel = aufwand(vorher);
+  const abzugVon = (a: ReturnType<typeof aufwand>) => (a.guenstigerAlsZulage ? a.abzugsfaehig : 0);
   const rechne = (e: number) => {
     const a = aufwand(vorher + e);
     return {
       netto: a.eigenaufwandNetto - sockel.eigenaufwandNetto,
       zulage: zulage(vorher + e) - zulage(vorher),
       steuer: a.ueberZulagen - sockel.ueberZulagen,
+      // Der Sonderausgabenabzug wirkt nur, wo er mehr bringt als die Zulage.
+      abzug: abzugVon(a) - abzugVon(sockel),
     };
   };
   const frei = Math.max(0, p.avd.hoechstbetragEigenbeitrag - vorher);
@@ -297,6 +309,7 @@ function avdLoesung(
     zulageMonat: r.zulage / 12,
     agZuschussMonat: 0,
     vertragMonat: vertrag / 12,
+    zveMinderungMonat: Math.max(0, r.abzug) / 12,
     hebel: r.netto > 0 ? vertrag / r.netto : 0,
     begrenzt, besteuerung, hinweise,
   };
@@ -309,11 +322,34 @@ function privatLoesung(nettoJahr: number): Loesung {
     eigenbeitragMonat: nettoJahr / 12,
     steuerErsparnisMonat: 0, svErsparnisMonat: 0, zulageMonat: 0, agZuschussMonat: 0,
     vertragMonat: nettoJahr / 12,
+    zveMinderungMonat: 0,
     hebel: nettoJahr > 0 ? 1 : 0,
     begrenzt: false,
     besteuerung: 'Rentenversicherung: Rente nur mit dem Ertragsanteil steuerpflichtig, Kapital mit dem halben Ertrag (nach 12 Jahren, ab 62). Depot: Abgeltungsteuer auf Gewinne. In der KVdR beitragsfrei.',
     hinweise: ['Keine Förderung beim Einzahlen — dafür frei verfügbar und im Alter gering besteuert.'],
   };
+}
+
+/**
+ * EINE Loesung fuer einen Betrag im Monat — dieselbe Rechnung wie im
+ * Vergleich, fuer den Mix (`loesungsmix`), der jede Loesung mit ihrem
+ * eigenen Anteil rechnet.
+ */
+export function loesungFuer(
+  id: LoesungId,
+  k: FoerderKontext,
+  steuerOpt: SteuerOptionen,
+  p: LegalParameters,
+  betragMonat: number,
+  opt: LoesungsOptionen = {},
+): Loesung {
+  const v: Vorgabe = { jahr: Math.max(0, betragMonat) * 12, brutto: opt.vorgabe === 'brutto' };
+  switch (id) {
+    case 'avd': return avdLoesung(k, steuerOpt, p, v);
+    case 'bav': return bavLoesung(k, steuerOpt, p, v, opt);
+    case 'basis': return basisLoesung(k, steuerOpt, p, v);
+    default: return privatLoesung(v.jahr);
+  }
 }
 
 /**

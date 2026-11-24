@@ -35,7 +35,7 @@ const MIT_KONTO = [
   'Fall speichern und Mandanten verwalten',
   'Gutachten als PDF für Ihren Mandanten — mit Ihrem Logo und Ihren Kontaktdaten',
   'Detailauswertung: Besteuerungsanteil, Kranken- und Pflegeversicherung (KVdR), Versorgungsfreibetrag',
-  'Sparrechner, Vertrags-TÜV und Lösungsvergleich mit Ihren Angeboten',
+  'Sparrechner, Vertrags-TÜV, Lösungsvorschlag und Vergleich Ihrer Angebote',
   'Paare, Beamte, Selbstständige und privat Versicherte',
   'Vorsorge-Check: Ihr Mandant trägt seine Angaben per Link selbst ein',
 ];

@@ -1,41 +1,43 @@
 import { Fragment } from 'react';
-import type { Loesung, LoesungId, LoesungsVorgabe } from '@renten/engine';
+import type { LoesungId, Loesungsmix, MixWuensche } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import {
-  auszeichnungen, besteAngebote, besteAngeboteText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText,
+  besteAngebote, besteAngeboteText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText,
   type AngebotPosition,
 } from '../features/tuev-berechnung';
+import {
+  MIX_NAME, WUNSCH_FRAGEN, mixAusgelassenText, mixGrund, wunschAntwort,
+} from '../features/vorschlag-texte';
 import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
 import { useAnsprache } from '../components/Ansprache';
 import { mitTrennstellen } from '../lib/trennstellen';
 
 /**
- * „Lösungen im Vergleich" — die vierte Etappe der Beratung auf Papier.
+ * „Dein Vorschlag" und die Angebote — die vierte Etappe der Beratung auf Papier.
  *
- * Oben die Einzahlseite je Loesung, unten die erfassten Angebote mit Rente
- * netto und Rendite. Dieselben Rechnungen wie am Bildschirm
- * (`loesungsvergleich`, `angebotPositionen`); hier wird nichts neu gerechnet.
+ * Vorn der Vorschlag: was dem Kunden wichtig ist, wie sich sein Beitrag
+ * danach auf die Loesungen verteilt und warum. Dahinter die erfassten
+ * Angebote mit Rente netto und Rendite. Dieselben Rechnungen und dieselben
+ * Saetze wie am Bildschirm (`vorschlagStand`, `vorschlag-texte`,
+ * `angebotPositionen`); hier wird nichts neu gerechnet.
  *
- * DAS ERGEBNIS STEHT VORN: ein Satz mit der Marke „Ergebnis“ ueber der
- * Tabelle und die Marke „★ Meiste“ ueber der Spalte darin — dieselbe
- * Auszeichnung wie am Bildschirm (`auszeichnungen`), damit man es nicht aus
- * den Zahlen herauslesen muss.
+ * Die Antworten stehen mit auf dem Blatt: Der Vorschlag ist nur
+ * nachvollziehbar, wenn man sieht, worauf er antwortet.
  */
+
+/** Der Vorschlag, wie ihn `vorschlagStand` liefert — nur mit allen Antworten. */
+export interface GedruckterVorschlag {
+  mix: Loesungsmix;
+  wuensche: MixWuensche;
+  /** Wurde nach dem Arbeitgeber gefragt? Sonst steht die Frage nicht auf dem Blatt. */
+  mitArbeitgeber: boolean;
+}
 
 const zahl = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cent = (n: number) => euroGenau(Math.round(n * 100) / 100);
 /** Ein Posten, den es bei dieser Loesung nicht gibt, als Strich statt „0 €". */
 const posten = (n: number) => (n < 0.005 ? '—' : cent(n));
-
-/** Fuer den Ergebnissatz — mit Artikel, damit er sich liest. */
-const MIT_ARTIKEL: Record<LoesungId, string> = {
-  avd: 'das Altersvorsorgedepot',
-  bav: 'die Betriebsrente (Entgeltumwandlung)',
-  basis: 'die Basisrente (Rürup)',
-  privat: 'die private Rente bzw. das Depot',
-};
-const namen = (liste: Loesung[]) => liste.map((l) => MIT_ARTIKEL[l.id]).join(' und ');
 
 /**
  * Spaltenkopf mit weichen Trennstellen: "Altersvorsorgedepot" und
@@ -47,11 +49,9 @@ const kopfVon = mitTrennstellen;
 /** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
 const JE_TABELLE = 4;
 
-export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, nettoHeute = 0, mitRenteneinkuenften = true }: {
-  loesungen: Loesung[];
-  /** Wie am Bildschirm: Netto-Aufwand oder Beitrag vorgegeben */
-  vorgabe: LoesungsVorgabe;
-  betragMonat: number;
+export function Loesungsvergleich({ vorschlag, angebote, nettoHeute = 0, mitRenteneinkuenften = true }: {
+  /** Der Vorschlag — null, solange Antworten fehlen: Dann stehen nur die Angebote da */
+  vorschlag: GedruckterVorschlag | null;
   angebote: AngebotPosition[];
   /** Das heutige Haushaltsnetto im Monat — die Bezugsgroesse fuer den Aufwand */
   nettoHeute?: number;
@@ -59,13 +59,6 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
   mitRenteneinkuenften?: boolean;
 }) {
   const an = useAnsprache();
-  const brutto = vorgabe === 'brutto';
-  const sichtbar = loesungen.filter((l) => l.verfuegbar);
-  const auszeichnung = auszeichnungen(loesungen, brutto);
-  const meiste = sichtbar.filter((l) => auszeichnung.meiste.includes(l.id));
-  const guenstigste = sichtbar.filter((l) => auszeichnung.guenstigste.includes(l.id));
-  const markiert = sichtbar.flatMap((l, i) => (meiste.includes(l) || guenstigste.includes(l) ? [i + 1] : []));
-  const dieselben = meiste.length === guenstigste.length && meiste.every((l) => guenstigste.includes(l));
   const gerechnet = angebote.filter((a) => a.rente || a.kapital);
   const gruppen: AngebotPosition[][] = [];
   for (let i = 0; i < gerechnet.length; i += JE_TABELLE) gruppen.push(gerechnet.slice(i, i + JE_TABELLE));
@@ -82,107 +75,13 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
     `${gerechnet.indexOf(a) + 1}. ${a.angebot.name || LOESUNG_KURZ[a.angebot.loesung]}`;
   const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
 
-  const breite = sichtbar.length > 0 ? 64 / sichtbar.length : 64;
   return (
     <>
-      <Seite
-        titel="Lösungen im Vergleich"
-        nummer={brutto ? `Was ${euro(betragMonat)} Beitrag im Monat netto kosten` : `Was aus ${euro(betragMonat)} netto im Monat wird`}
-      >
-        <Text>
-          {brutto
-            ? <>Je Lösung derselbe Beitrag von {euro(betragMonat)} im Monat, was er {an.dich} nach Steuer- und
-              Abgabenersparnis wirklich kostet und was damit im Vertrag landet</>
-            : <>Je Lösung der Beitrag, der {an.dich} nach Steuer- und Abgabenersparnis {euro(betragMonat)} im Monat
-              kostet, und was damit im Vertrag landet</>}
-          {' '}— mit {an.dein('em')} persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss. Gerechnet zusätzlich
-          zu dem, was {an.du} heute schon {an.w('einzahlst', 'einzahlt', 'einzahlen')}.
-        </Text>
-
-        {!brutto && meiste[0] && (
-          <Ergebnis>
-            Am meisten aus {an.dein('em')} Netto-Aufwand {meiste.length > 1 ? 'machen' : 'macht'} <strong>{namen(meiste)}</strong>:
-            {' '}aus {cent(meiste[0].nettoMonat)} netto im Monat werden <strong>{cent(meiste[0].vertragMonat)}</strong> im
-            Vertrag — <strong>{zahl(meiste[0].hebel)}-mal</strong> so viel.
-          </Ergebnis>
-        )}
-        {brutto && (guenstigste[0] || meiste[0]) && (
-          <Ergebnis>
-            {guenstigste[0] && (
-              <>
-                Am günstigsten {guenstigste.length > 1 ? 'sind' : 'ist'} <strong>{namen(guenstigste)}</strong>:
-                {' '}{euro(betragMonat)} Beitrag kosten {an.dich} netto nur <strong>{cent(guenstigste[0].nettoMonat)}</strong> im Monat.
-              </>
-            )}
-            {meiste[0] && (guenstigste[0] && dieselben
-              ? <> Dort landet auch je Netto-Euro am meisten im Vertrag: <strong>{zahl(meiste[0].hebel)}-mal</strong> {an.dein()} Netto-Aufwand.</>
-              : <>
-                  {guenstigste[0] ? ' ' : ''}Am meisten je Netto-Euro {meiste.length > 1 ? 'bringen' : 'bringt'}{' '}
-                  <strong>{namen(meiste)}</strong>: {cent(meiste[0].vertragMonat)} im Vertrag,{' '}
-                  <strong>{zahl(meiste[0].hebel)}-mal</strong> {an.dein()} Netto-Aufwand.
-                </>)}
-          </Ergebnis>
-        )}
-
-        <div className="mt-3">
-          <Tabelle
-            kopf={['', ...sichtbar.map((l) => (
-              <>
-                {kopfVon(l.titel)}
-                {meiste.includes(l) && <Abzeichen>★ Meiste</Abzeichen>}
-                {guenstigste.includes(l) && <Abzeichen>Günstigste</Abzeichen>}
-              </>
-            ))]}
-            spalten={[36, ...sichtbar.map(() => breite)]}
-            markiert={markiert}
-          >
-            {brutto ? (
-              <>
-                <Zeile fett zellen={[`${an.Dein()} Beitrag (bAV: Bruttoumwandlung)`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
-                <Zeile zellen={['− Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
-                <Zeile zellen={['− Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
-                <Zeile fett zellen={[`= Kostet ${an.dich} netto`, ...sichtbar.map((l) => cent(l.nettoMonat))]} />
-                <Gruppenzeile text="Im Vertrag" spalten={sichtbar.length + 1} />
-                <Zeile zellen={[`${an.Dein()} Beitrag`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
-              </>
-            ) : (
-              <>
-                <Zeile zellen={[`${an.Dein()} Netto-Aufwand`, ...sichtbar.map((l) => cent(l.nettoMonat))]} />
-                <Zeile zellen={['+ Steuerersparnis', ...sichtbar.map((l) => posten(l.steuerErsparnisMonat))]} />
-                <Zeile zellen={['+ Sozialabgaben gespart', ...sichtbar.map((l) => posten(l.svErsparnisMonat))]} />
-                <Zeile fett zellen={[`= ${an.Dein()} Beitrag (bAV: Bruttoumwandlung)`, ...sichtbar.map((l) => cent(l.eigenbeitragMonat))]} />
-              </>
-            )}
-            <Zeile zellen={['+ Zulagen', ...sichtbar.map((l) => posten(l.zulageMonat))]} />
-            <Zeile zellen={['+ Arbeitgeberzuschuss', ...sichtbar.map((l) => posten(l.agZuschussMonat))]} />
-            <Zeile fett zellen={['= Im Vertrag', ...sichtbar.map((l) => cent(l.vertragMonat))]} />
-            <Zeile zellen={['Je Euro Netto-Aufwand', ...sichtbar.map((l) => `${zahl(l.hebel)} ×`)]} />
-          </Tabelle>
-        </div>
-        {sichtbar.some((l) => l.begrenzt) && (
-          <Text>
-            {sichtbar.filter((l) => l.begrenzt).map((l) => `${l.titel}: ${l.hinweise.join(' ')}`).join(' ')}
-          </Text>
-        )}
-
-        <Untertitel>Im Alter</Untertitel>
-        <ul className="space-y-0.5 text-[11px] leading-relaxed text-ui-schiefer">
-          {sichtbar.map((l) => (
-            <li key={l.id}><strong className="text-ui-tinte">{l.titel}:</strong> {l.besteuerung}</li>
-          ))}
-        </ul>
-        {loesungen.filter((l) => !l.verfuegbar).map((l) => (
-          <Text key={l.id}>{l.titel}: {l.hinweise[0]}</Text>
-        ))}
-
-        <Text>
-          Eine Modellrechnung, keine Empfehlung für ein Produkt oder einen Anbieter.
-        </Text>
-      </Seite>
+      {vorschlag && <VorschlagSeite {...vorschlag} nettoHeute={nettoHeute} />}
 
       {/*
         DIE ANGEBOTE AUF EIGENEM BLATT. Mit Rente UND Kapital braucht jedes
-        Angebot rund siebzehn Zeilen; zusammen mit der Einzahlseite lief die
+        Angebot rund siebzehn Zeilen; zusammen mit dem Vorschlag liefe die
         Seite schon bei vier Angeboten ueber.
       */}
       {gruppen.length > 0 && (
@@ -285,5 +184,118 @@ export function Loesungsvergleich({ loesungen, vorgabe, betragMonat, angebote, n
         </Seite>
       )}
     </>
+  );
+}
+
+/** Die Namen der Bausteine als Aufzaehlung: „A, B und C". */
+const aufgezaehlt = (namen: string[]) => (namen.length < 2
+  ? namen.join('')
+  : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`);
+
+/** Der Vorschlag auf einem Blatt: die Antworten, die Verteilung, die Gruende. */
+function VorschlagSeite({ mix, wuensche, mitArbeitgeber, nettoHeute }: GedruckterVorschlag & { nettoHeute: number }) {
+  const an = useAnsprache();
+  const teile = mix.teile;
+  const fragen = [
+    WUNSCH_FRAGEN.verfuegbar, WUNSCH_FRAGEN.auszahlung, WUNSCH_FRAGEN.foerderung,
+    ...(mitArbeitgeber ? [WUNSCH_FRAGEN.arbeitgeber] : []),
+  ];
+  const mitSumme = teile.length > 1;
+  const breite = 64 / (teile.length + (mitSumme ? 1 : 0));
+  const reihe = (f: (l: Loesungsmix['teile'][number]['loesung']) => number, summe: number, format: (n: number) => string) =>
+    [...teile.map((x) => format(f(x.loesung))), ...(mitSumme ? [format(summe)] : [])];
+  const anteil = anteilAmNetto(mix.nettoMonat, nettoHeute);
+  const kopf = (id: LoesungId) => kopfVon(MIX_NAME[id]);
+  return (
+    <Seite titel={`${an.Dein()} Vorschlag`} nummer={`Wie sich ${euro(mix.nettoMonat)} im Monat verteilen`}>
+      <Text>
+        Der Vorschlag entsteht aus dem, was {an.dir} bei der Vorsorge wichtig ist, und aus {an.dein('em')} Beitrag
+        {' '}— gerechnet mit {an.dein('em')} persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss,
+        zusätzlich zu dem, was {an.du} heute schon {an.w('einzahlst', 'einzahlt', 'einzahlen')}.
+      </Text>
+
+      <Untertitel>Was {an.dir} wichtig ist</Untertitel>
+      <Tabelle kopf={['', 'Antwort']} spalten={[55, 45]} textSpalten={[1]}>
+        {fragen.map((f) => (
+          <Zeile key={f.id} textSpalten={[1]} zellen={[f.kurz, wunschAntwort(f.id, wuensche[f.id])]} />
+        ))}
+      </Tabelle>
+
+      <div className="mt-3">
+        <Ergebnis>
+          {mix.dazuMonat >= 0.5 ? (
+            <>
+              Aus {cent(mix.nettoMonat)} netto im Monat werden <strong>{cent(mix.vertragMonat)}</strong>
+              {' '}{teile.length > 1 ? 'in den Verträgen' : 'im Vertrag'}: {aufgezaehlt(teile.map((x) => MIX_NAME[x.id]))}.
+            </>
+          ) : (
+            <>{cent(mix.nettoMonat)} im Monat, frei verfügbar und ohne Bindung: {aufgezaehlt(teile.map((x) => MIX_NAME[x.id]))}.</>
+          )}
+        </Ergebnis>
+      </div>
+
+      <div className="mt-3">
+        <Tabelle
+          kopf={['', ...teile.map((x) => kopf(x.id)), ...(mitSumme ? ['Zusammen'] : [])]}
+          spalten={[36, ...teile.map(() => breite), ...(mitSumme ? [breite] : [])]}
+          markiert={mitSumme ? [teile.length + 1] : []}
+        >
+          <Zeile zellen={[`${an.Dein()} Netto-Aufwand`, ...reihe((l) => l.nettoMonat, mix.nettoMonat, cent)]} />
+          <Zeile zellen={['+ Steuerersparnis', ...reihe((l) => l.steuerErsparnisMonat, mix.steuerErsparnisMonat, posten)]} />
+          <Zeile zellen={['+ Sozialabgaben gespart', ...reihe((l) => l.svErsparnisMonat, mix.svErsparnisMonat, posten)]} />
+          <Zeile fett zellen={[`= ${an.Dein()} Beitrag (bAV: Bruttoumwandlung)`,
+            ...reihe((l) => l.eigenbeitragMonat, teile.reduce((s, x) => s + x.loesung.eigenbeitragMonat, 0), cent)]} />
+          <Zeile zellen={['+ Zulagen', ...reihe((l) => l.zulageMonat, mix.zulageMonat, posten)]} />
+          <Zeile zellen={['+ Arbeitgeberzuschuss', ...reihe((l) => l.agZuschussMonat, mix.agZuschussMonat, posten)]} />
+          <Zeile fett zellen={['= Im Vertrag', ...reihe((l) => l.vertragMonat, mix.vertragMonat, cent)]} />
+          <Zeile zellen={[`Anteil an ${an.dein('em')} Beitrag`,
+            ...teile.map((x) => `${Math.round(x.anteil * 100)} %`), ...(mitSumme ? ['100 %'] : [])]} />
+        </Tabelle>
+      </div>
+      {anteil && (
+        <Text>
+          {an.Dein()} Netto-Aufwand von {euro(mix.nettoMonat)} im Monat entspricht {anteil} {an.dein('es')} heutigen Nettos.
+        </Text>
+      )}
+
+      <Untertitel>Warum diese Mischung</Untertitel>
+      <ul className="space-y-0.5 text-[11px] leading-relaxed text-ui-schiefer">
+        {teile.map((x) => (
+          <li key={x.id}><strong className="text-ui-tinte">{MIX_NAME[x.id]}:</strong> {mixGrund(x, mix, wuensche, an)}</li>
+        ))}
+        {mix.ausgelassen.map((a) => (
+          <li key={a.id}><strong className="text-ui-tinte">Nicht dabei — {MIX_NAME[a.id]}:</strong> {mixAusgelassenText(a, wuensche)}</li>
+        ))}
+      </ul>
+      {mix.einVertrag && <Text>Für zwei Verträge ist der Beitrag zu klein — er fließt deshalb in einen.</Text>}
+      {mix.kapitalRegel && (
+        <Text>Kapital im Alter: Voll auszahlen lässt sich nur die private Vorsorge — deshalb bleibt mindestens ein Drittel dort.</Text>
+      )}
+      {mix.uebrigMonat > 0.5 && (
+        <Text>
+          {euro(mix.uebrigMonat)} sind nicht verplant: Die geförderten Verträge sind voll, und für einen weiteren ist der Rest zu klein.
+        </Text>
+      )}
+      {teile.some((x) => x.loesung.hinweise.length > 0 && x.id !== 'privat') && (
+        <Text>
+          {teile.filter((x) => x.id !== 'privat' && x.loesung.hinweise.length > 0)
+            .map((x) => `${MIX_NAME[x.id]}: ${x.loesung.hinweise.join(' ')}`).join(' ')}
+        </Text>
+      )}
+
+      <Untertitel>Im Alter</Untertitel>
+      <ul className="space-y-0.5 text-[11px] leading-relaxed text-ui-schiefer">
+        {teile.map((x) => (
+          <li key={x.id}><strong className="text-ui-tinte">{MIX_NAME[x.id]}:</strong> {x.loesung.besteuerung}</li>
+        ))}
+      </ul>
+
+      <Text>
+        Der Vorschlag folgt festen Regeln: Was verfügbar bleiben soll, fließt in die private Vorsorge; der Rest
+        dorthin, wo Zulagen, Arbeitgeberzuschuss oder Steuervorteile dazukommen, jeweils bis zum geförderten Rahmen.
+        Was im Alter netto ankommt, hängt am Angebot. Eine Modellrechnung, keine Empfehlung für ein Produkt oder
+        einen Anbieter.
+      </Text>
+    </Seite>
   );
 }

@@ -44,7 +44,7 @@ export const PAKETE: readonly Paket[] = [
   {
     id: 'rente',
     name: 'Rentenplanung',
-    kurz: 'Versorgungsanalyse, Lösungsvergleich, Gutachten und Vorsorge-Check.',
+    kurz: 'Versorgungsanalyse, Lösungsvorschlag, Gutachten und Vorsorge-Check.',
     bereiche: ['rente'],
     monat: [39, 35, 33, 31],
   },

@@ -34,7 +34,7 @@ const LEISTUNGEN: Record<PaketId, string[]> = {
   */
   alles: [
     'Netto-Rente, Versorgungslücke und Sparrechner',
-    'Vertrags-TÜV und Lösungsvergleich mit Ihren Angeboten',
+    'Vertrags-TÜV, Lösungsvorschlag und Vergleich Ihrer Angebote',
     'Gutachten als PDF und Vorsorge-Check per Kundenlink',
     'Matching-, Zuschuss- und Festbetrag-Modell',
     'Betriebliche Krankenversicherung als Sachbezug',
@@ -43,7 +43,7 @@ const LEISTUNGEN: Record<PaketId, string[]> = {
   rente: [
     'Netto-Rente nach Steuer und Kranken-/Pflegeversicherung',
     'Versorgungslücke, Sparrechner und Kosten des Wartens',
-    'Vertrags-TÜV und Lösungsvergleich: AVD, bAV, Basis- und Privatrente',
+    'Vertrags-TÜV und Lösungsvorschlag: der passende Mix aus AVD, bAV, Basis- und Privatrente',
     'Angebote vergleichen — als Rente oder als Kapital',
     'Gutachten als PDF für Ihre Kunden',
     'Vorsorge-Check per Kundenlink, mit Upload von Unterlagen',

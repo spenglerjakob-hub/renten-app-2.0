@@ -9,6 +9,7 @@ import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 import { standardSzenario } from './standard';
 import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
 import { schichtVon, strategieGruppe, STRATEGIEN } from '../features/vertragsarten';
+import { angeboteMitVorschlag } from '../features/angebote-liste';
 
 /**
  * Wo der Fall im Browser liegt. Der Rechner nimmt den Standardplatz; eine
@@ -86,6 +87,11 @@ export interface SzenarioStore {
   angebotHinzufuegen: (a: Omit<Angebot, 'id'>) => void;
   angebotAendern: (id: string, p: Partial<Angebot>) => void;
   angebotEntfernen: (id: string) => void;
+  /**
+   * Den Vorschlag als Angebote uebernehmen: je Baustein eines. Unberuehrte
+   * Angebote eines frueheren Vorschlags weichen dem neuen.
+   */
+  vorschlagUebernehmen: (neu: readonly Omit<Angebot, 'id'>[]) => void;
   /** Ein Angebot annehmen oder die Annahme zuruecknehmen — „Lösungen annehmen“. */
   angebotAnnehmen: (id: string, an: boolean) => void;
 
@@ -357,6 +363,20 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     ...s,
     loesungen: { ...s.loesungen, angebote: s.loesungen.angebote.map((x) => (x.id === id ? { ...x, ...p } : x)) },
   })),
+
+  vorschlagUebernehmen: (neu) => get().setze((s) => {
+    const angebote = angeboteMitVorschlag(
+      s.loesungen.angebote, s.loesungen.angenommen, neu.map((a) => ({ ...a, id: neueId('a') })),
+    );
+    return {
+      ...s,
+      loesungen: {
+        ...s.loesungen,
+        angebote,
+        angenommen: s.loesungen.angenommen.filter((id) => angebote.some((a) => a.id === id)),
+      },
+    };
+  }),
 
   angebotEntfernen: (id) => get().setze((s) => ({
     ...s,
