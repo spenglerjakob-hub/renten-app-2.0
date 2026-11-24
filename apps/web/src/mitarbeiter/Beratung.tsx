@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, Lock, Play, Save } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, ClipboardList, Lock, Play, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
@@ -24,7 +24,7 @@ import {
   stueckAusgeblendet, stueckZeigen, weitSichtbar,
 } from './gespraech';
 import {
-  angabenZeile, angebotSatz, entscheidungZeile, leistungZeile, lueckeZeile, rechnungZeile, unterlagenZeile,
+  angabenZeile, angebotSatz, entscheidungZeile, leistungZeile, lueckeZeile, rechnungZeile, unterlagenZeile, vorbereitungStand,
 } from './zeilen';
 import type { Ort } from './ort';
 
@@ -273,6 +273,7 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
   // Jeder Schritt in einem Satz — fuer seine Zeile, sobald er nicht mehr offen ist.
   const heute = new Date();
+  const vorbereitung = vorbereitungStand(daten, heute);
   const zeilen = [
     { ergebnis: angebotSatz(f.angebot) },
     angabenZeile(daten.angaben, heute),
@@ -367,11 +368,20 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         </div>
       ) : !gesperrt && (
         <div role="note" aria-label="Stand des Gesprächs" className="ui-innen flex flex-wrap items-center gap-3 p-4">
+          {/* Derselbe Stand wie in der Mitarbeiterliste: „vorbereitet“, sobald nichts mehr fehlt (`vorbereitungStand`). */}
           <p className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-sm leading-relaxed text-ui-tinte">
-            <ClipboardList className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            {vorbereitung?.art === 'vorbereitet'
+              ? <ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              : <ClipboardList className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
             <span>
-              <strong className="font-medium">Vorbereitung.</strong> Alle Seiten stehen da — tragen Sie ein, was Sie vorab
-              wissen. Für das Gespräch wählen Sie, welche Seiten Sie zeigen.
+              {vorbereitung?.art === 'vorbereitet' ? (
+                <><strong className="font-medium">Vorbereitet.</strong> Die Angaben für die Rechnung sind vollständig. </>
+              ) : vorbereitung?.art === 'fehlt' ? (
+                <><strong className="font-medium">Vorbereitung.</strong> Noch offen: {vorbereitung.text}. </>
+              ) : (
+                <><strong className="font-medium">Vorbereitung.</strong> Alle Seiten stehen da. </>
+              )}
+              Für das Gespräch wählen Sie, welche Seiten Sie zeigen.
             </span>
           </p>
           <button type="button" onClick={fensterOeffnen} className={KNOPF}>

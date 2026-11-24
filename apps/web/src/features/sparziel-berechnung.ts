@@ -23,11 +23,12 @@ export interface SparzielEingaben {
 
 export const SPARZIEL_VORGABE: SparzielEingaben = {
   /*
-    6 % NACH KOSTEN — die Vorgabe fuer Bildschirm und Gutachten. Sie gilt fuer
-    die Sparzeit und fuer die Zeit der Entnahme; wer vorsichtiger rechnen
-    will, aendert sie im Sparrechner unter „Annahmen“.
+    5 % NACH KOSTEN — die Vorgabe fuer Bildschirm und Gutachten (bis November
+    2026 waren es 6 %). Sie gilt fuer die Sparzeit und fuer die Zeit der
+    Entnahme; wer anders rechnen will, aendert sie im Sparrechner unter
+    „Annahmen“.
   */
-  rendite: 0.06,
+  rendite: 0.05,
   /*
     OHNE Beitragsdynamik. Sie war mit 3 % vorbelegt und liess die noetige
     Startrate kleiner aussehen, als sie ist — wer nicht jedes Jahr erhoeht,
@@ -253,10 +254,14 @@ export function wunschbeitragRechnen(
     Vermoegensaufbau.
 
     GESCHLOSSEN auf den Euro: Der Startbeitrag steht als ganze Zahl da
-    („616 €“), gerechnet ist er mit Nachkommastellen. Wer genau diese Zahl
-    eintraegt, hat die Luecke geschlossen — und liest nicht „es fehlen 156 €“.
+    („779 €“), gerechnet ist er mit Nachkommastellen (778,85 €). Wer genau
+    diese Zahl eintraegt, hat die Luecke geschlossen — und liest weder „es
+    fehlen 156 €“ (die angezeigte Zahl ist abgerundet) noch „dazu 90 €
+    Vermögen“ (sie ist aufgerundet). Auf den Euro gleich heisst: genau das
+    Zielkapital.
   */
-  const kapital = noetig > 0 ? r.zielkapital * (beitrag / noetig) : r.zielkapital;
+  const genau = noetig > 0 && Math.round(beitrag) === Math.round(noetig);
+  const kapital = noetig <= 0 || genau ? r.zielkapital : r.zielkapital * (beitrag / noetig);
   const geschlossen = noetig <= 0 || Math.round(beitrag) >= Math.round(noetig);
   return {
     noetig,

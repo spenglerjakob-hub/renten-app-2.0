@@ -8,7 +8,7 @@ import {
 import {
   abrechnungZeile, anbieterSatz, angabenZeile, angebotSatz, angebotVertraege, axaZeile, einkommenUndKvZeile, einkommenZeile, entscheidungZeile,
   grvZeile, beitragZeile, kennzahlenZeile, kvZeile, leistungZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile,
-  rechnungZeile, spaeterZeile, unterlagenZeile, vertragZeile, vorsorgeZeile,
+  rechnungZeile, spaeterZeile, unterlagenZeile, vertragZeile, vorbereitetZaehlen, vorbereitungStand, vorsorgeZeile,
 } from './zeilen';
 
 const HEUTE = new Date(2026, 10, 12); // 12.11.2026
@@ -79,7 +79,7 @@ describe('Angaben', () => {
   it('der ganze Schritt: wer und mit welchem Gehalt, sonst was fehlt', () => {
     expect(angabenZeile(beratung().angaben, HEUTE)).toEqual({ ergebnis: `Anna Beispiel, 41 · ${euro(4500)} brutto im Monat`, fehlt: undefined });
     expect(angabenZeile(beratung({ name: '', geburtsdatum: '', jahresbrutto: 0 }).angaben, HEUTE))
-      .toEqual({ ergebnis: undefined, fehlt: 'Name und Geburtsdatum und Bruttogehalt fehlen' });
+      .toEqual({ ergebnis: undefined, fehlt: 'Name, Geburtsdatum und Bruttogehalt fehlen' });
   });
 });
 
@@ -99,6 +99,41 @@ describe('Versorgungslücke', () => {
   it('die gesetzliche Rente: eingetragen oder geschätzt', () => {
     expect(grvZeile(beratung({ grvRente: 1600 }).angaben, 1432).ergebnis).toBe(`Gesetzliche Rente ${euro(1600)} im Monat, eingetragen`);
     expect(grvZeile(beratung().angaben, 1432).ergebnis).toBe(`Gesetzliche Rente ${euro(1432)} im Monat, geschätzt`);
+  });
+});
+
+describe('Vorbereitung — für die Mitarbeiterliste', () => {
+  const heute = new Date(2026, 10, 24);
+
+  it('vorbereitet, sobald Name, Geburtsdatum und Gehalt da sind', () => {
+    expect(vorbereitungStand(beratung(), heute)).toEqual({ art: 'vorbereitet' });
+  });
+
+  it('sonst steht da, was fehlt', () => {
+    expect(vorbereitungStand(beratung({ jahresbrutto: 0 }), heute)).toEqual({ art: 'fehlt', text: 'Bruttogehalt fehlt' });
+    expect(vorbereitungStand(beratung({ geburtsdatum: '', jahresbrutto: 0 }), heute))
+      .toEqual({ art: 'fehlt', text: angabenZeile(beratung({ geburtsdatum: '', jahresbrutto: 0 }).angaben, heute).fehlt });
+    // Eine neue Beratung: noch nichts da.
+    expect(vorbereitungStand(beratungDatenSchema.parse({}), heute)?.art).toBe('fehlt');
+  });
+
+  it('im Gespräch — auch wenn noch etwas fehlt', () => {
+    expect(vorbereitungStand(beratung({}, { gespraech: { aktiv: true, ausgeblendet: [] } }), heute)).toEqual({ art: 'gespraech' });
+    expect(vorbereitungStand(beratung({ jahresbrutto: 0 }, { gespraech: { aktiv: true } }), heute)).toEqual({ art: 'gespraech' });
+  });
+
+  it('mit der Entscheidung ist die Vorbereitung Geschichte', () => {
+    for (const status of ['teilnahme', 'verzicht'] as const) {
+      const d = beratung();
+      expect(vorbereitungStand({ ...d, entscheidung: { ...d.entscheidung, status } }, heute)).toBeNull();
+    }
+  });
+
+  it('gezählt wird unter den offenen — ein laufendes Gespräch gilt als vorbereitet', () => {
+    expect(vorbereitetZaehlen([
+      { art: 'vorbereitet' }, { art: 'gespraech' }, { art: 'fehlt', text: 'Bruttogehalt fehlt' }, null, null,
+    ])).toEqual({ offen: 3, vorbereitet: 2 });
+    expect(vorbereitetZaehlen([null])).toEqual({ offen: 0, vorbereitet: 0 });
   });
 });
 

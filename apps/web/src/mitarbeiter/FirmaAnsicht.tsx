@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Building2, Lock, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, ClipboardCheck, Lock, Play, Plus, Trash2, Users } from 'lucide-react';
 import { beratungDatenSchema } from '@renten/schema';
 import {
   beratungAnlegen, beratungLoeschen, beratungenLaden, firmaLaden, unterschriebeneLaden, type Beratung, type Firma, type UnterschriftPerson,
@@ -16,6 +16,7 @@ import { useZugang } from '../store/zugang';
 import { betreutText, freigabeText } from './gemeinsam-texte';
 import { Uebersicht } from './Uebersicht';
 import { MODELL_NAME, regelText } from './texte';
+import { vorbereitetZaehlen, vorbereitungStand, type Vorbereitung } from './zeilen';
 import { FIRMEN, type Ort, type Reiter } from './ort';
 
 /** `kurz`: auf dem Telefon — so passen die drei Reiter in eine Zeile. */
@@ -26,6 +27,21 @@ const REITER: { id: Reiter; text: string; kurz: string }[] = [
 ];
 
 const datumText = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE') : '');
+
+/**
+ * Wie weit die Vorbereitung einer offenen Beratung ist (`vorbereitungStand`):
+ * „vorbereitet“ und „im Gespräch“ in Tinte mit Zeichen, wie „unterschrieben“
+ * daneben; was noch fehlt, leise in Worten — das ist die Aufgabe, kein Stand.
+ */
+function VorbereitungMarke({ stand }: { stand: Vorbereitung }) {
+  if (stand.art === 'fehlt') return <span className="text-sm text-ui-schiefer">{stand.text}</span>;
+  const Zeichen = stand.art === 'gespraech' ? Play : ClipboardCheck;
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-ui-tinte">
+      <Zeichen className="h-3.5 w-3.5" aria-hidden /> {stand.art === 'gespraech' ? 'im Gespräch' : 'vorbereitet'}
+    </span>
+  );
+}
 
 /**
  * Eine Firma: ihre Mitarbeiter, ihr Angebot und die Uebersicht fuer den
@@ -87,6 +103,10 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
   }
 
   const liste = Array.isArray(beratungen) ? beratungen : [];
+  // Die Vorbereitung je offener Beratung — unterschrieben ist sie vorbei, auch wenn der Status noch „offen“ hiesse.
+  const heute = new Date();
+  const vorbereitung = new Map(liste.map((b) => [b.id, unterschrieben[b.id] ? null : vorbereitungStand(b.daten, heute)]));
+  const bereit = vorbereitetZaehlen([...vorbereitung.values()]);
   const imBuero = Array.isArray(kollegen) ? kollegen : [];
   const freigegeben = firma.buero !== null;
   const pflegt = firma.eigene ? null : kollegenName(imBuero, firma.besitzer);
@@ -166,6 +186,12 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
                 Noch keine Beratung. Mit „Neue Beratung“ beginnt das Gespräch mit dem ersten Mitarbeiter.
               </p>
             )}
+            {/* Wer mehrere Gespraeche vorbereitet, sieht hier, wie weit er ist — bei einer einzigen sagt es ihre Zeile. */}
+            {bereit.offen > 1 && (
+              <p className="mb-1 text-sm text-ui-schiefer">
+                {bereit.vorbereitet} von {bereit.offen} offenen Beratungen {bereit.vorbereitet === 1 ? 'ist' : 'sind'} vorbereitet.
+              </p>
+            )}
             {liste.length > 0 && (
               <ul className="divide-y divide-ui-linie" aria-label="Beratungen">
                 {liste.map((b) => (
@@ -174,6 +200,7 @@ export function FirmaAnsicht({ firmaId, reiter, gehe }: { firmaId: string; reite
                       className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-left">
                       <span className="min-w-0 break-words text-base font-medium text-ui-tinte">{b.mitarbeiter || 'Ohne Namen'}</span>
                       <StatusChip status={b.status} betrag={b.daten.umwandlungMonat} />
+                      {vorbereitung.get(b.id) && <VorbereitungMarke stand={vorbereitung.get(b.id)!} />}
                       {unterschrieben[b.id] && (
                         <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-ui-tinte">
                           <Lock className="h-3.5 w-3.5" aria-hidden /> unterschrieben

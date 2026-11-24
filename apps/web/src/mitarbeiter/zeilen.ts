@@ -25,7 +25,12 @@ export interface ZeilenText {
   fehlt?: string;
 }
 
-const fehlen = (was: string[]) => (was.length === 0 ? undefined : `${was.join(' und ')} ${was.length > 1 ? 'fehlen' : 'fehlt'}`);
+/** „Bruttogehalt fehlt“, „Name und Geburtsdatum fehlen“, „Name, Geburtsdatum und Bruttogehalt fehlen“. */
+const fehlen = (was: string[]) => {
+  if (was.length === 0) return undefined;
+  if (was.length === 1) return `${was[0]} fehlt`;
+  return `${was.slice(0, -1).join(', ')} und ${was[was.length - 1]} fehlen`;
+};
 
 /* --- 1. Angebot ------------------------------------------------------------ */
 
@@ -113,6 +118,41 @@ export function angabenZeile(a: BeratungAngaben, heute: Date): ZeilenText {
       .filter(Boolean).join(' · ') || undefined,
     fehlt: fehlen([...personFehlt(a, heute), a.jahresbrutto > 0 ? '' : 'Bruttogehalt'].filter(Boolean)),
   };
+}
+
+/**
+ * WIE WEIT DIE VORBEREITUNG IST — fuer die Mitarbeiterliste der Firma und
+ * den Kopf der Beratung. Wer dreissig Gespraeche vorbereitet, soll in der
+ * Liste sehen, welche fertig sind und wo noch etwas fehlt.
+ *
+ * VORBEREITET ist eine Beratung, sobald die Rechnung laufen kann: Name,
+ * Geburtsdatum und Bruttogehalt stehen da (`angabenZeile`). Das ist
+ * abgeleitet, kein Haken zum Setzen — ein Haken liesse sich vergessen, und
+ * er bliebe stehen, wenn jemand das Gehalt wieder loescht. Alles andere
+ * (Steuerklasse, Krankenkasse, der Betrag) hat eine Vorgabe oder entsteht
+ * im Gespraech.
+ *
+ * Nur fuer OFFENE Beratungen: Mit der Entscheidung ist die Vorbereitung
+ * Geschichte — dann sagt der Status, was gilt.
+ */
+export type Vorbereitung =
+  /** Es fehlt noch etwas — `text` nennt es („Geburtsdatum und Bruttogehalt fehlen“) */
+  | { art: 'fehlt'; text: string }
+  | { art: 'vorbereitet' }
+  /** „Gespräch starten“ ist gedrueckt, entschieden ist noch nicht */
+  | { art: 'gespraech' };
+
+export function vorbereitungStand(d: BeratungDaten, heute: Date): Vorbereitung | null {
+  if (d.entscheidung.status !== 'offen') return null;
+  if (d.gespraech.aktiv) return { art: 'gespraech' };
+  const fehlt = angabenZeile(d.angaben, heute).fehlt;
+  return fehlt ? { art: 'fehlt', text: fehlt } : { art: 'vorbereitet' };
+}
+
+/** Wie viele der offenen Beratungen vorbereitet sind — ein laufendes Gespraech zaehlt dazu. */
+export function vorbereitetZaehlen(staende: readonly (Vorbereitung | null)[]): { offen: number; vorbereitet: number } {
+  const offene = staende.filter((s): s is Vorbereitung => s !== null);
+  return { offen: offene.length, vorbereitet: offene.filter((s) => s.art !== 'fehlt').length };
 }
 
 /* --- 3. Versorgungsluecke -------------------------------------------------- */

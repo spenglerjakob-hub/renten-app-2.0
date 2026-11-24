@@ -308,6 +308,8 @@ export function ZahlFeld(props: {
             if (stufen && e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
             if (onVerlassen && e.key === 'Enter') onVerlassen();
           } : undefined}
+          // Die Angabe fehlt noch — daran findet „Zu den Angaben“ das Feld (`lib/aufleuchten.ts`).
+          data-fehlt={leer ? '' : undefined}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={[
             hatMarke(vorbelegt) ? `${id}-vorbelegt` : '',
@@ -598,6 +600,7 @@ export function DatumFeld(props: {
             if (e.key === 'ArrowUp') { e.preventDefault(); stufe(1); }
             if (e.key === 'ArrowDown') { e.preventDefault(); stufe(-1); }
           } : undefined}
+          data-fehlt={leer ? '' : undefined}
           aria-invalid={fehler ? true : undefined}
           aria-describedby={[hatMarke(vorbelegt) ? `${id}-vorbelegt` : '', fehler ? `${id}-fehler` : '']
             .filter(Boolean).join(' ') || undefined}

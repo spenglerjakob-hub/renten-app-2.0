@@ -12,14 +12,14 @@ const zeile = (luecke = 1500): Jahreszeile => ({
 }) as unknown as Jahreszeile;
 
 describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
-  it('6 % Rendite nach Kosten, kein steigender Beitrag, 25 Jahre Auszahlung', () => {
-    expect(SPARZIEL_VORGABE).toEqual({ rendite: 0.06, dynamik: 0, auszahldauer: 25 });
+  it('5 % Rendite nach Kosten, kein steigender Beitrag, 25 Jahre Auszahlung', () => {
+    expect(SPARZIEL_VORGABE).toEqual({ rendite: 0.05, dynamik: 0, auszahldauer: 25 });
   });
 
   it('eine höhere Rendite senkt Kapital und Beitrag', () => {
     const s = musterSzenario();
-    const mit5 = sparzielRechnen(s, zeile(), { ...SPARZIEL_VORGABE, rendite: 0.05 })!;
-    const mit6 = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
+    const mit5 = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
+    const mit6 = sparzielRechnen(s, zeile(), { ...SPARZIEL_VORGABE, rendite: 0.06 })!;
     expect(mit6.zielkapital).toBeLessThan(mit5.zielkapital);
     expect(mit6.gewaehlt.startbeitrag).toBeLessThan(mit5.gewaehlt.startbeitrag);
   });
@@ -90,8 +90,23 @@ describe('wunschbeitragRechnen — was ein Beitrag von der Lücke schließt', ()
       const w = wunschbeitragRechnen(s, zeile(), SPARZIEL_VORGABE, Math.round(noetig))!;
       expect(w.geschlossen).toBe(true);
       expect(w.kapitalFehlt).toBe(0);
-      // Hoechstens die Rundung eines halben Euro Beitrag.
-      expect(w.kapitalMehr).toBeLessThan(voll.zielkapital * (0.5 / noetig) + 1e-6);
+      // Auf den Euro gleich ist genau das Zielkapital — gleich, ob die angezeigte Zahl auf- oder abgerundet ist.
+      expect(w.kapitalMehr).toBe(0);
+      expect(w.kapital).toBe(voll.zielkapital);
+    });
+
+    it('… auch wenn die angezeigte Zahl aufgerundet ist: kein „dazu 90 € Vermögen“', () => {
+      // Mit 6 % liegt der Startbeitrag knapp ueber, mit 5 % knapp unter einer ganzen Zahl — beide Richtungen.
+      for (const rendite of [0.04, 0.05, 0.06, 0.07]) {
+        const e = { ...SPARZIEL_VORGABE, rendite };
+        const r = sparzielRechnen(s, zeile(), e)!;
+        const w = wunschbeitragRechnen(s, zeile(), e, Math.round(r.gewaehlt.startbeitrag))!;
+        expect(w).toMatchObject({ geschlossen: true, kapitalFehlt: 0, kapitalMehr: 0 });
+        // Ein Euro mehr ist mehr.
+        expect(wunschbeitragRechnen(s, zeile(), e, Math.round(r.gewaehlt.startbeitrag) + 1)!.kapitalMehr).toBeGreaterThan(0);
+        // Ein Euro weniger fehlt.
+        expect(wunschbeitragRechnen(s, zeile(), e, Math.round(r.gewaehlt.startbeitrag) - 1)!.kapitalFehlt).toBeGreaterThan(0);
+      }
     });
 
     it('das Doppelte spart das Doppelte an: das Zielkapital für die Altersvorsorge, ebenso viel Vermögensaufbau', () => {
