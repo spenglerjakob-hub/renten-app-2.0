@@ -44,7 +44,11 @@ export function Dialog({
         aria-describedby={beschreibung ? 'dialog-text' : undefined}
         className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
       >
-        <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-ui-linie bg-white px-4 py-3 sm:px-6 sm:py-4">
+        {/*
+          Ein div, kein header: Ausserhalb von Artikel und Abschnitt ist ein header die Kopfzeile der SEITE —
+          mit offenem Fenster haette sie zwei davon. Titel und Beschreibung benennen das Fenster schon.
+        */}
+        <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-ui-linie bg-white px-4 py-3 sm:px-6 sm:py-4">
           <div>
             <h2 id="dialog-titel" className="ui-titel text-lg font-normal text-ui-tinte sm:text-xl">{titel}</h2>
             {beschreibung && (
@@ -63,7 +67,7 @@ export function Dialog({
               <X className="h-5 w-5" aria-hidden />
             </button>
           )}
-        </header>
+        </div>
         <div className="px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </div>
     </div>

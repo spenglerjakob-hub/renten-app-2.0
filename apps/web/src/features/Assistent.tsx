@@ -164,6 +164,16 @@ export function assistentSchrittFuer(id: FallSchrittId, offen: readonly string[]
   }
 }
 
+/**
+ * Der erste Schritt, in dem eine der genannten Angaben steht — dorthin fuehrt
+ * „Zu den Angaben“. Der erste, nicht irgendeiner: Die Angaben werden von oben
+ * nach unten ausgefuellt, und das Ziel misst sich am Einkommen davor.
+ */
+export function assistentSchrittFuerPfade(pfade: readonly string[]): number | null {
+  const n = SCHRITTE.findIndex((x) => pfade.some((p) => PFADE_JE_TEIL[x.teil](p)));
+  return n >= 0 ? n : null;
+}
+
 /** Welche offenen Pfade zu einem Schritt des Assistenten gehoeren. */
 const PFADE_JE_TEIL: Record<AssistentSchritt['teil'], (p: string) => boolean> = {
   haushalt: (p) => p.startsWith('haushalt.') && p !== 'haushalt.zielNettoHeute',

@@ -9,11 +9,12 @@ import {
   type Jahreszeile, type PersonId,
 } from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from './store/szenario';
-import { eintragVon, fehlendeAngaben, offenePfade, rechenbar } from './features/vorbelegung';
+import { eintragVon, fehlendeAngaben, fehlendePfade, offenePfade, rechenbar } from './features/vorbelegung';
+import { fehlendeFelderZeigen } from './lib/aufleuchten';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
 import {
-  Assistent, assistentSchrittFuer, ladeAssistentSchritt, merkeAssistentSchritt,
+  Assistent, assistentSchrittFuer, assistentSchrittFuerPfade, ladeAssistentSchritt, merkeAssistentSchritt,
 } from './features/Assistent';
 import { datenErledigt, fallFortschritt, type FallSchrittId } from './features/fortschritt';
 import { FallFortschritt } from './components/FallFortschritt';
@@ -76,7 +77,7 @@ import { fallNameAus, personName, personNameAus } from './features/personen';
 import { AnspracheGeben } from './components/Ansprache';
 import { vornamen, woerter, type Ansprache } from './lib/ansprache';
 import { AkkordeonKarte, euro, prozent } from './components/Feld';
-import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, Pillen, Titel } from './components/stil';
+import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_GEFAHR, KNOPF_ZWEIT, Karte, Pillen, Titel } from './components/stil';
 
 type Ansicht = 'kassenbon' | 'verlauf';
 
@@ -332,6 +333,17 @@ export default function App() {
   const [gesehen, setGesehen] = useState<ReadonlySet<Schritt>>(() => new Set([ladeEtappe()]));
   // Zaehlt jeden Sprung — auch den auf die schon offene Etappe: Dann kommt sie wieder ins Bild.
   const [sprung, setSprung] = useState(0);
+  /*
+    VON VORN BEGONNEN („Neu beginnen“ mit denselben Angaben): Die Beratung
+    baut sich wieder Etappe fuer Etappe auf — auch wenn der Fall schon
+    Angebote oder angenommene Loesungen hat, die sonst zeigen, wie weit er
+    ist (`weit`). Nur im Arbeitsspeicher: Nach dem Neuladen zeigt ein Fall
+    wieder, was er hergibt.
+  */
+  const [vonVorn, setVonVorn] = useState(false);
+  const [neuOffen, setNeuOffen] = useState(false);
+  // Zaehlt jedes „Zu den Angaben“ — danach leuchten die Felder auf, in denen noch etwas fehlt.
+  const [zeigeFehlend, setZeigeFehlend] = useState(0);
   const geheZu = useCallback((s: Schritt) => {
     setSchritt(s);
     setBesucht((n) => Math.max(n, etappeNr(s)));
@@ -607,7 +619,7 @@ export default function App() {
     Etappen, mit Angeboten bis zu den Loesungen, mit angesehenem Ergebnis bis
     dorthin. Ein frischer Fall beginnt mit der ersten Etappe allein.
   */
-  const weit = Math.max(
+  const weit = vonVorn ? besucht : Math.max(
     besucht,
     mitHaushalt.loesungen.length > 0 ? etappeNr('abschluss')
       : szenario.loesungen.angebote.length > 0 ? etappeNr('loesungen')
@@ -619,6 +631,8 @@ export default function App() {
     if (id === 'konto') { setKontoOffen(true); return; }
     setBasisOffen(true);
     geheZu('daten');
+    // Wo dort noch eine Angabe fehlt, leuchtet ihr Feld auf — wie bei „Zu den Angaben“.
+    if (id !== 'vertraege') setZeigeFehlend((n) => n + 1);
     if (eingabeArt === 'assistent') {
       const n = assistentSchrittFuer(id, offenePfade(szenario));
       if (n !== null && n >= 0) assistentZu(n);
@@ -732,7 +746,51 @@ export default function App() {
     Kreis in der Zeile der Etappe: unfertig, aber kein Fehler — ohne
     Ampelfarbe. Dasselbe sagt das Druckfenster.
   */
-  const zuDenAngaben = () => { setBasisOffen(true); geheZu('daten'); };
+  /*
+    „Zu den Angaben“ fuehrt an die Stelle, an der etwas fehlt: im Assistenten
+    in den ersten Abschnitt mit einer fehlenden Angabe, und dort ans Feld —
+    es kommt ins Bild, bekommt den Fokus und leuchtet kurz auf
+    (`lib/aufleuchten.ts`). Im Formular stehen alle Felder auf einer Seite;
+    dort genuegt das Feld.
+  */
+  const zuDenAngaben = () => {
+    setBasisOffen(true);
+    geheZu('daten');
+    if (eingabeArt === 'assistent') {
+      const n = assistentSchrittFuerPfade(fehlendePfade(ansichtSzenario));
+      if (n !== null) assistentZu(n);
+    }
+    setZeigeFehlend((n) => n + 1);
+  };
+  useEffect(() => {
+    if (zeigeFehlend === 0) return undefined;
+    // Erst wenn der Abschnitt eingeblendet ist (`Einblenden` im Ablauf) — auf ein unsichtbares Feld liesse sich nichts zeigen.
+    const t = window.setTimeout(() => fehlendeFelderZeigen(), 420);
+    return () => window.clearTimeout(t);
+  }, [zeigeFehlend]);
+
+  /*
+    NEU BEGINNEN — die Strecke von vorn, mit oder ohne die Angaben.
+    Mit den Angaben: Der Fall ist vorbereitet und wird jetzt dem Kunden
+    gezeigt; alles bleibt, nur der Weg beginnt wieder bei „Daten & Ziel“ und
+    baut sich Etappe fuer Etappe auf. Ohne: ein neuer Fall — alle Eingaben
+    weg, wie bisher „Alle Eingaben zurücksetzen“ (das ohne Rueckfrage
+    loeschte).
+  */
+  const neuBeginnen = (leeren: boolean) => {
+    if (leeren) zuruecksetzen();
+    setVonVorn(!leeren);
+    setSchritt('daten');
+    setBesucht(0);
+    setGesehen(new Set<Schritt>(['daten']));
+    setStueckeStand({});
+    assistentZu(0);
+    setBasisOffen(true);
+    setSprung((n) => n + 1);
+    try { localStorage.setItem(SPEICHER_ETAPPE, 'daten'); } catch { /* Speicher gesperrt */ }
+    setNeuOffen(false);
+    window.scrollTo({ top: 0 });
+  };
   const fehltKarte = angabenFehlen && (
     <div role="status" className="rounded-[12px] border border-dashed border-ui-schiefer/60 bg-ui-karte px-5 py-6 text-ui-tinte print:hidden sm:px-7 sm:py-8">
       <p className="text-base font-medium">
@@ -783,6 +841,13 @@ export default function App() {
     { id: 'journey', text: '5. Abschluss', symbol: <ClipboardCheck className="h-4 w-4" aria-hidden />, beiSprung: () => geheZu('abschluss') },
   ];
   const werkzeuge: Werkzeug[] = [
+    // Vorn: Es gehoert zum Weg darueber, nicht zu den Einstellungen dahinter.
+    {
+      text: 'Neu beginnen',
+      zusatz: 'Die Beratung von vorn — mit oder ohne die Angaben',
+      symbol: <RotateCcw className="h-4 w-4" aria-hidden />,
+      onOeffnen: () => setNeuOffen(true),
+    },
     {
       text: 'Konto',
       zusatz: angemeldet ? `Angemeldet als ${angemeldet}` : 'Pläne speichern und laden',
@@ -1344,14 +1409,17 @@ export default function App() {
                   <Download className="h-3.5 w-3.5 shrink-0" aria-hidden /> Speichern
                 </button>
                 <DruckKnopf onOeffnen={() => setDruckOffen(true)} />
+                {/* Am Telefon und auf breitem Schirm mit Wort, dazwischen nur das Zeichen — die Kopfzeile ist dort eng. */}
                 <button
                   type="button"
-                  onClick={zuruecksetzen}
-                  aria-label="Alle Eingaben zurücksetzen"
-                  title="Alle Eingaben zurücksetzen"
-                  className="rounded-full p-2 text-ui-schiefer transition-colors hover:bg-ui-innen hover:text-ui-tinte"
+                  onClick={() => setNeuOffen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Neu beginnen"
+                  title="Neu beginnen — mit oder ohne die Angaben"
+                  className={`${KOPF_TEXT} flex-1 sm:flex-none`}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="md:hidden xl:inline">Neu beginnen</span>
                 </button>
               </div>
             </div>
@@ -1779,6 +1847,34 @@ export default function App() {
           <Antraege berater={beraterZeile} />
         </Dialog>
       )}
+
+      <Dialog
+        offen={neuOffen}
+        titel="Neu beginnen"
+        beschreibung="Die Beratung beginnt wieder bei „Daten & Ziel“ und baut sich Schritt für Schritt auf."
+        onSchliessen={() => setNeuOffen(false)}
+      >
+        <div className="space-y-3">
+          <div className="ui-innen flex flex-wrap items-center gap-3 p-4">
+            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-ui-tinte">
+              <strong className="font-medium">Mit diesen Angaben.</strong> Alle Angaben, Verträge und Angebote bleiben —
+              nur der Weg beginnt von vorn. Für einen vorbereiteten Fall, den Sie jetzt zeigen.
+            </p>
+            <button type="button" onClick={() => neuBeginnen(false)} className={KNOPF_ZWEIT}>
+              <RotateCcw className="h-4 w-4" aria-hidden /> Von vorn, Angaben behalten
+            </button>
+          </div>
+          <div className="ui-innen flex flex-wrap items-center gap-3 p-4">
+            <p className="min-w-0 flex-1 basis-64 text-sm leading-relaxed text-ui-tinte">
+              <strong className="font-medium">Neuer Fall.</strong> Alle Eingaben werden gelöscht — Angaben, Verträge,
+              Antworten und Angebote. Das lässt sich nicht rückgängig machen; vorher gespeicherte Pläne bleiben.
+            </p>
+            <button type="button" onClick={() => neuBeginnen(true)} className={KNOPF_GEFAHR}>
+              Neuer Fall, alles löschen
+            </button>
+          </div>
+        </div>
+      </Dialog>
 
       <Dialog
         offen={druckOffen}

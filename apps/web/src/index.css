@@ -178,6 +178,23 @@
     background: #fff; border: 2px solid rgb(var(--ui-regler));
   }
   .ui-regler:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  /*
+   * Ein Feld leuchtet kurz auf: „Zu den Angaben“ zeigt so, wo die Angabe
+   * fehlt (lib/aufleuchten.ts setzt die Klasse und nimmt sie nach zwei
+   * Sekunden wieder weg). Ein Rahmen in der Signalfarbe, der zweimal
+   * pulsiert. Wer Bewegung abgeschaltet hat, sieht den Rahmen still stehen —
+   * die Regel darunter kuerzt die Animation auf nichts, der Rahmen bleibt.
+   */
+  .ui-aufleuchten {
+    box-shadow: 0 0 0 3px rgb(var(--ui-regler) / 0.5);
+    background-color: rgb(var(--ui-regler) / 0.08);
+    animation: ui-aufleuchten 0.8s ease-in-out 2;
+  }
+  @keyframes ui-aufleuchten {
+    0%, 100% { box-shadow: 0 0 0 3px rgb(var(--ui-regler) / 0.5); }
+    50% { box-shadow: 0 0 0 8px rgb(var(--ui-regler) / 0.12); }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
