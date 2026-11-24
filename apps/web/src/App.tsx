@@ -9,7 +9,7 @@ import {
   type Jahreszeile, type PersonId,
 } from '@renten/engine';
 import { useSzenario, type SzenarioParsed } from './store/szenario';
-import { eintragVon, offeneBeispiele, offenePfade } from './features/vorbelegung';
+import { eintragVon, fehlendeAngaben, offenePfade, rechenbar } from './features/vorbelegung';
 import { useProjektion } from './worker/useProjektion';
 import { Basisdaten } from './features/Basisdaten';
 import {
@@ -18,7 +18,6 @@ import {
 import { datenErledigt, fallFortschritt, type FallSchrittId } from './features/fortschritt';
 import { FallFortschritt } from './components/FallFortschritt';
 import { Vertraege } from './features/Vertraege';
-import { Planer } from './features/Planer';
 import { Sparrechner } from './features/Sparrechner';
 import { PkvRechner } from './features/PkvRechner';
 import { Kassenbon } from './features/Kassenbon';
@@ -74,17 +73,9 @@ import { fallNameAus, personName, personNameAus } from './features/personen';
 import { AnspracheGeben } from './components/Ansprache';
 import { vornamen, woerter, type Ansprache } from './lib/ansprache';
 import { AkkordeonKarte, euro, prozent } from './components/Feld';
-import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, LINK, Pillen, Titel } from './components/stil';
+import { EINLEITUNG, ETIKETT, FEHLER, Hervor, KNOPF_ZWEIT, Karte, Pillen, Titel } from './components/stil';
 
-type Reiter = 's1' | 's2' | 's3' | 'planer';
 type Ansicht = 'kassenbon' | 'verlauf';
-
-const REITER: { id: Reiter; text: string }[] = [
-  { id: 's1', text: 'Schicht 1' },
-  { id: 's2', text: 'Schicht 2' },
-  { id: 's3', text: 'Schicht 3' },
-  { id: 'planer', text: 'Planer' },
-];
 
 const QUOTEN = [0, 0.01, 0.015, 0.02, 0.025];
 
@@ -307,9 +298,13 @@ export default function App() {
   const zuruecksetzen = useSzenario((s) => s.zuruecksetzen);
   const setzeAnnahmen = useSzenario((s) => s.setzeAnnahmen);
 
-  const [reiter, setReiter] = useState<Reiter>('s1');
   const [ansicht, setAnsicht] = useState<Ansicht>('kassenbon');
-  const [kaufkraftHeute, setKaufkraftHeute] = useState(false);
+  /*
+    IN HEUTIGER KAUFKRAFT als Vorgabe: Ein Betrag „im Geld des Jahres 2052“
+    sagt einem Kunden wenig — was er sich davon heute kaufen koennte, schon.
+    Nominal bleibt einen Tipp entfernt.
+  */
+  const [kaufkraftHeute, setKaufkraftHeute] = useState(true);
   /*
     Die Kopfleiste startet EINGEKLAPPT: Annahmen und Laden/Speichern braucht
     man selten, und eingeklappt bleibt mehr Platz fuer den Fall. Konto und
@@ -363,7 +358,7 @@ export default function App() {
 
   /*
     DER MUSTERFALL aus der Schnellrechnung (`lib/musterfall.ts`). Ist der
-    Fall in diesem Browser noch unberuehrt — alle Beispielwerte offen —, wird
+    Fall in diesem Browser noch unberuehrt — keine Angabe eingetragen —, wird
     er still geladen; sonst fragt ein Band, mit zwei gleichwertigen Knoepfen.
     Ein eingetragener Fall wird nie ungefragt ersetzt.
   */
@@ -380,7 +375,7 @@ export default function App() {
     if (!musterfall) return;
     const offen = offenePfade(useSzenario.getState().szenario);
     const unberuehrt = STANDARD_OFFEN
-      .filter((p) => eintragVon(p)?.art === 'beispiel')
+      .filter((p) => eintragVon(p)?.art === 'angabe')
       .every((p) => offen.includes(p));
     if (unberuehrt) musterfallLaden(musterfall);
   }, [musterfall, musterfallLaden]);
@@ -518,7 +513,24 @@ export default function App() {
     [szenario, einzeln, wer],
   );
 
-  const { ergebnis, rechnet, fehler } = useProjektion(ansichtSzenario);
+  /*
+    EIN NEUER FALL GIBT NICHTS VOR — also fehlen zuerst Angaben
+    (`features/vorbelegung.ts`), und ohne sie gibt es KEIN ERGEBNIS: Unter
+    einer fehlenden Angabe liegt nur ein Platzhalter, und eine Luecke daraus
+    saehe aus wie eine Auskunft.
+
+    Zwei Stufen. Gerechnet wird, sobald Geburtsdatum und Einkommen da sind —
+    das heutige Netto braucht der Vorschlag fuer das Ziel (`ergebnisRoh`, nur
+    fuer die Angaben). Gezeigt wird das Ergebnis erst, wenn nichts mehr fehlt.
+  */
+  const fehlendeTexte = useMemo(
+    () => fehlendeAngaben(ansichtSzenario, (id) => personNameAus(szenario.personen, id)),
+    [ansichtSzenario, szenario.personen],
+  );
+  const angabenFehlen = fehlendeTexte.length > 0;
+  const kannRechnen = useMemo(() => rechenbar(ansichtSzenario), [ansichtSzenario]);
+  const { ergebnis: ergebnisRoh, rechnet, fehler } = useProjektion(kannRechnen ? ansichtSzenario : null);
+  const ergebnis = angabenFehlen ? null : ergebnisRoh;
 
   /*
     DAS ERGEBNIS MIT DEN ANGENOMMENEN LOESUNGEN — fuer die Etappe
@@ -531,7 +543,7 @@ export default function App() {
     () => ansichtMitAngenommenen(mitHaushalt, einzeln ? wer : null),
     [mitHaushalt, einzeln, wer],
   );
-  const { ergebnis: ergebnisMit } = useProjektion(mitAnsicht?.szenario ?? null);
+  const { ergebnis: ergebnisMit } = useProjektion(angabenFehlen ? null : mitAnsicht?.szenario ?? null);
   const positionenMit = useMemo(
     () => angenommenePositionen(ansichtSzenario, mitAnsicht),
     [ansichtSzenario, mitAnsicht],
@@ -712,26 +724,24 @@ export default function App() {
     setDruckAngefordert(true);
   };
   /*
-    NOCH BEISPIELWERTE IM FALL? Dann sagt es das Druckfenster — ein
-    Gutachten geht an den Kunden, und danach ist es zu spaet. Gedruckt werden
-    darf trotzdem, die Werte stehen im Gutachten als Beispielwert gekennzeichnet.
+    FEHLEN NOCH ANGABEN, steht in jeder rechnenden Etappe statt eines
+    Ergebnisses, WELCHE — mit dem Weg dorthin. Gestrichelt wie der leere
+    Kreis in der Zeile der Etappe: unfertig, aber kein Fehler — ohne
+    Ampelfarbe. Dasselbe sagt das Druckfenster.
   */
-  const offeneBeispielTexte = offeneBeispiele(ansichtSzenario, (id) => personNameAus(szenario.personen, id));
-
-  /*
-    Solange Beispielwerte im Fall stehen, sagt es jede rechnende Etappe —
-    sonst wirkte ein Ergebnis aus dem Beispiel wie eines aus dem Mandanten.
-    Gestrichelt wie die Marke „Beispielwert“ am Feld: vorlaeufig, aber
-    kein Fehler — ohne Ampelfarbe.
-  */
-  const beispielHinweis = offeneBeispielTexte.length > 0 && (
-    <div role="status" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-[8px] border border-dashed border-ui-schiefer/60 bg-ui-karte px-4 py-2.5 text-sm text-ui-tinte print:hidden">
-      <span>
-        Das Ergebnis rechnet noch mit {offeneBeispielTexte.length === 1 ? 'einem Beispielwert' : `${offeneBeispielTexte.length} Beispielwerten`}:{' '}
-        {offeneBeispielTexte.join(', ')}.
-      </span>
-      <button type="button" onClick={() => { setBasisOffen(true); geheZu('daten'); }} className={LINK}>
-        Zu den Angaben <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+  const zuDenAngaben = () => { setBasisOffen(true); geheZu('daten'); };
+  const fehltKarte = angabenFehlen && (
+    <div role="status" className="rounded-[12px] border border-dashed border-ui-schiefer/60 bg-ui-karte px-5 py-6 text-ui-tinte print:hidden sm:px-7 sm:py-8">
+      <p className="text-base font-medium">
+        {fehlendeTexte.length === 1 ? 'Für das Ergebnis fehlt noch eine Angabe' : `Für das Ergebnis fehlen noch ${fehlendeTexte.length} Angaben`}
+      </p>
+      <ul className="mt-3 space-y-1 text-sm">
+        {fehlendeTexte.map((x) => (
+          <li key={x} className="flex gap-2"><span aria-hidden className="text-ui-asche">—</span><span>{x}</span></li>
+        ))}
+      </ul>
+      <button type="button" onClick={zuDenAngaben} className={`mt-5 ${KNOPF_ZWEIT}`}>
+        Zu den Angaben <ArrowRight className="h-4 w-4" aria-hidden />
       </button>
     </div>
   );
@@ -907,35 +917,20 @@ export default function App() {
   );
 
   /*
-    DIE VERSORGUNGSSCHICHTEN: Reiter als Pillen wie in der Beratung, darunter
-    die Vertraege der Schicht. Ohne eigenen Kasten — der Assistent und das
-    Formular stellen sie in ihre Karte; ein Kasten darin waere einer zu viel.
+    DIE BESTEHENDEN VERTRAEGE: eine Liste, gefragt wird nur die Vertragsart —
+    Schicht und Rechenlogik folgen daraus (`features/Vertraege.tsx`). Ohne
+    eigenen Kasten — der Assistent und das Formular stellen sie in ihre
+    Karte; ein Kasten darin waere einer zu viel.
   */
-  const schichten = (
-    <div id="vertraege" className="scroll-mt-28 space-y-5">
-      {/*
-        Am Telefon passen vier Pillen mit „Schicht …“ nicht in eine Reihe —
-        dort nur die Ziffer (die Ueberschrift darunter nennt die Schicht), der
-        Vorlesetext behaelt den ganzen Namen.
-      */}
-      <Pillen
-        reiter={REITER.map((r) => ({
-          id: r.id,
-          inhalt: r.id === 'planer' ? r.text : (
-            <><span aria-hidden className="sm:hidden">{r.text.replace('Schicht ', '')}</span><span className="sr-only sm:not-sr-only">{r.text}</span></>
-          ),
-        }))}
-        aktiv={reiter}
-        onWechsel={setReiter}
-        beschriftung="Versorgungsschichten"
-        kennung={(id) => ({ reiter: `schicht-reiter-${id}`, bereich: 'schicht-bereich' })}
+  const vertragsListe = (
+    <div id="vertraege" className="scroll-mt-28">
+      <Vertraege
+        depots={ergebnis?.depots ?? []}
+        auszahlungen={ergebnis?.kapitalauszahlungen ?? []}
+        avdLaeufe={ergebnis?.avd ?? []}
+        verrentungen={ergebnis?.verrentungen ?? []}
+        planer={ergebnis?.planer ?? null}
       />
-      <div role="tabpanel" id="schicht-bereich" aria-labelledby={`schicht-reiter-${reiter}`}>
-        {reiter === 's1' && <Vertraege schicht={1} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-        {reiter === 's2' && <Vertraege schicht={2} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-        {reiter === 's3' && <Vertraege schicht={3} depots={ergebnis?.depots ?? []} auszahlungen={ergebnis?.kapitalauszahlungen ?? []} avdLaeufe={ergebnis?.avd ?? []} verrentungen={ergebnis?.verrentungen ?? []} />}
-        {reiter === 'planer' && <Planer ergebnis={ergebnis?.planer ?? null} />}
-      </div>
     </div>
   );
 
@@ -949,9 +944,11 @@ export default function App() {
 
   // Hat der Foerdercheck etwas zu sagen? Nur dann ist er ein Stueck der Loesungen.
   const foerderBefunde = useMemo(() => {
+    // Ohne Geburtsdatum und Einkommen gibt es nichts zu pruefen — nur Platzhalter.
+    if (angabenFehlen) return 0;
     const b = foerderBasis(szenario, echteZeile ?? null);
     return foerdercheck(b.kontext, b.steuerOpt, b.p).length;
-  }, [szenario, echteZeile]);
+  }, [szenario, echteZeile, angabenFehlen]);
   // Dieselbe Rechnung wie der Sparrechner mit seinen Vorgaben — fuer dessen Zeile, solange er noch nicht offen war.
   const sparziel = useMemo(
     () => (echteZeile ? sparzielRechnen(szenario, echteZeile, SPARZIEL_VORGABE) : null),
@@ -999,11 +996,11 @@ export default function App() {
     }
   };
   // Was den Angaben noch fehlt — steht in der Zeile der ersten Etappe, mit leerem Kreis statt Haken.
-  const beispieleOffen = fallSchritte
+  const angabenOffen = fallSchritte
     .filter((x) => x.id === 'mandant' || x.id === 'einkuenfte' || x.id === 'ziel')
     .reduce((n, x) => n + x.offen.length, 0);
   const datenFehlt = [
-    beispieleOffen === 1 ? '1 Beispielwert offen' : beispieleOffen > 1 ? `${beispieleOffen} Beispielwerte offen` : '',
+    angabenOffen === 1 ? '1 Angabe fehlt' : angabenOffen > 1 ? `${angabenOffen} Angaben fehlen` : '',
     fallSchritte.some((x) => x.id === 'vertraege' && !x.erledigt) ? 'Verträge noch nicht erfasst' : '',
   ].filter(Boolean).join(', ') || undefined;
 
@@ -1023,12 +1020,16 @@ export default function App() {
   const zuDenAngeboten = () => { zeigeStueck('loesungen', 'angebote'); geheZu('loesungen'); };
 
   /*
-    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, gleich danach die
-    Kaufkraft — sie erklaert, warum aus dem eingetragenen Ziel im Ring ein
-    hoeherer Betrag geworden ist —, dann woher das Netto kommt. „Weiter“
-    fuehrt von dort zum Sparrechner: Was die Luecke kostet, steht dort und
-    nicht mehr schon hier. Steuer und Rechtsstand sind Nachschlagen:
-    Vertiefungen.
+    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, dann woher das Netto
+    kommt. „Weiter“ fuehrt von dort zum Sparrechner: Was die Luecke kostet,
+    steht dort und nicht mehr schon hier.
+
+    Zum Vertiefen, also Nachschlagen: Kaufkraft, Steuer, Rechtsstand. Die
+    Kaufkraft stand bis November 2026 auf dem Weg — sie erklaerte, warum aus
+    dem eingetragenen Ziel im Ring ein hoeherer Betrag geworden war. Seit
+    die Betraege in heutiger Kaufkraft stehen, zeigt der Ring das Ziel, wie
+    es eingetragen wurde, und die Erklaerung braucht nur noch, wer auf
+    „Nominal“ umschaltet.
   */
   const kk = kaufkraft(zeile);
   const ergebnisStuecke: Stueck[] = !ergebnis ? [] : [
@@ -1041,18 +1042,6 @@ export default function App() {
       // Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz.
       inhalt: <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} breit />,
     },
-    ...(kk ? [{
-      id: 'kaufkraft',
-      titel: 'Kaufkraft bis zum Rentenbeginn',
-      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
-      inhalt: (
-        <KaufkraftKarte
-          zeile={zeile}
-          inflation={szenario.annahmen.inflation}
-          standard={offenePfade(szenario).includes('annahmen.inflation')}
-        />
-      ),
-    }] : []),
     {
       id: 'netto',
       titel: `Woher ${t.dein()} Netto kommt`,
@@ -1075,7 +1064,7 @@ export default function App() {
           </div>
 
           {/*
-            Der Schalter „Nominal | Kaufkraft heute“ steht im Titel und
+            Der Schalter „Kaufkraft heute | Nominal“ steht im Titel und
             in der Fussleiste; der Kassenbon nennt nur, in welchem Geld
             er rechnet — ein dritter Schalter waere einer zu viel.
           */}
@@ -1096,6 +1085,19 @@ export default function App() {
         </div>
       ),
     },
+    ...(kk ? [{
+      id: 'kaufkraft',
+      vertiefung: true,
+      titel: 'Kaufkraft bis zum Rentenbeginn',
+      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
+      inhalt: (
+        <KaufkraftKarte
+          zeile={zeile}
+          inflation={szenario.annahmen.inflation}
+          standard={offenePfade(szenario).includes('annahmen.inflation')}
+        />
+      ),
+    }] : []),
     {
       id: 'steuer',
       vertiefung: true,
@@ -1527,9 +1529,9 @@ export default function App() {
 
             {eingabeArt === 'assistent' ? (
               <Assistent
-                ergebnis={ergebnis ?? null}
+                ergebnis={ergebnisRoh ?? null}
                 onEhepartnerDialog={() => setEhepartnerDialog(true)}
-                vertraege={schichten}
+                vertraege={vertragsListe}
                 onFertig={() => geheZu('ergebnis')}
                 schritt={assistentSchritt}
                 onSchritt={assistentZu}
@@ -1559,7 +1561,7 @@ export default function App() {
                           symbol={<User className="h-4 w-4 text-ui-schiefer" aria-hidden />}
                         >
                           <Basisdaten
-                            ergebnis={ergebnis ?? null}
+                            ergebnis={ergebnisRoh ?? null}
                             onEhepartnerDialog={() => setEhepartnerDialog(true)}
                           />
                         </AkkordeonKarte>
@@ -1573,7 +1575,7 @@ export default function App() {
                               <Check className="h-4 w-4" aria-hidden /> Keine bestehenden Verträge
                             </button>
                           )}
-                          {schichten}
+                          {vertragsListe}
                         </Karte>
                       </div>
                     </div>
@@ -1608,10 +1610,12 @@ export default function App() {
                   {jahrRegler}
                 </div>
               )}
-              {beispielHinweis}
+              {fehltKarte}
             </div>
             {/* Eins nach dem anderen: die Luecke, woher das Netto kommt, die Kaufkraft, was zu tun waere. */}
-            <Stuecke kennung="ergebnis" beschriftung="Stücke des Ergebnisses" stuecke={ergebnis ? ergebnisStuecke : wartet} />
+            {!angabenFehlen && (
+              <Stuecke kennung="ergebnis" beschriftung="Stücke des Ergebnisses" stuecke={ergebnis ? ergebnisStuecke : wartet} />
+            )}
           </>
         )}
 
@@ -1631,11 +1635,11 @@ export default function App() {
                 text={`Wie viel ${t.du} ab heute monatlich zurücklegen ${t.w('müsstest', 'müsstet')}, damit die Versorgungslücke geschlossen ist — und was es kostet, damit zu warten.`}
               />
               {paarUmschalter}
-              {beispielHinweis}
+              {fehltKarte}
             </div>
             {ergebnis
-              ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} />
-              : <Stuecke kennung="sparen" beschriftung="Stücke des Sparrechners" stuecke={wartet} />}
+              ? <Sparrechner zeile={zeile} onStartbeitrag={setSparrate} nettoHeute={nettoHeute} kaufkraftHeute={kaufkraftHeute} />
+              : !angabenFehlen && <Stuecke kennung="sparen" beschriftung="Stücke des Sparrechners" stuecke={wartet} />}
           </>
         )}
 
@@ -1647,18 +1651,36 @@ export default function App() {
               als Titel mit („Was wird aus 100 € netto im Monat?“) — „Vertrags-TÜV
               & Lösungen“ steht schon in der Zeile darueber.
             */}
-            {(paarUmschalter || beispielHinweis) && (
+            {(paarUmschalter || angabenFehlen) && (
               <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+                {/* Ohne Stuecke fehlte der Etappe sonst jede Ueberschrift. */}
+                {angabenFehlen && (
+                  <EtappenKopf
+                    titel="Vertrags-TÜV & Lösungen"
+                    text={`Was ${t.dein('e')} bestehenden Verträge leisten und womit sich die Lücke schließen lässt.`}
+                  />
+                )}
                 {paarUmschalter}
-                {beispielHinweis}
+                {fehltKarte}
               </div>
             )}
-            <Stuecke kennung="loesungen" beschriftung="Stücke der Lösungen" stuecke={loesungenStuecke} />
+            {/* Auch TÜV und Vergleich rechnen mit Geburtsdatum und Einkommen — ohne sie stuenden dort Zahlen aus Platzhaltern. */}
+            {!angabenFehlen && <Stuecke kennung="loesungen" beschriftung="Stücke der Lösungen" stuecke={loesungenStuecke} />}
           </>
         )}
 
         {/* ---------- 5. ABSCHLUSS ---------- */}
-        {schritt === 'abschluss' && (
+        {schritt === 'abschluss' && angabenFehlen && (
+          <div className={`${SPALTE} space-y-6 sm:space-y-8`}>
+            <EtappenKopf
+              titel="Abschluss"
+              text={`${t.Dein()} Plan mit den gewählten Lösungen — und was als Nächstes zu tun ist.`}
+            />
+            {paarUmschalter}
+            {fehltKarte}
+          </div>
+        )}
+        {schritt === 'abschluss' && !angabenFehlen && (
           <Abschluss
             mit={mitAnsicht}
             positionen={positionenMit}
@@ -1668,7 +1690,7 @@ export default function App() {
             onKaufkraftHeute={setKaufkraftHeute}
             person={einzeln ? personNameAus(szenario.personen, wer) : undefined}
             inhaberName={paar && !einzeln ? nameVon : undefined}
-            vorspann={(paarUmschalter || beispielHinweis) && <>{paarUmschalter}{beispielHinweis}</>}
+            vorspann={paarUmschalter}
             onZuLoesungen={zuDenAngeboten}
             onWeitereLoesung={() => { zeigeStueck('loesungen', 'vergleich'); geheZu('loesungen'); }}
             danach={[
@@ -1753,8 +1775,8 @@ export default function App() {
           seiten={gutachtenSeiten}
           auswahl={druckAuswahl}
           onAuswahl={setDruckAuswahl}
-          beispielwerte={offeneBeispielTexte}
-          onAngabenPruefen={() => { setDruckOffen(false); setBasisOffen(true); geheZu('daten'); }}
+          fehlend={fehlendeTexte}
+          onAngabenPruefen={() => { setDruckOffen(false); zuDenAngaben(); }}
           onDrucken={druckeJetzt}
         />
       </Dialog>
@@ -1780,14 +1802,12 @@ export default function App() {
       </footer>
 
       {/*
-        FESTE FUSSLEISTE — in Schritt 1 erst, wenn keine Beispielwerte mehr
-        offen sind. Vorher rechnete sie mit dem Musterfall und zeigte schon
-        beim ersten Feld eine rote Luecke, die mit dem Mandanten nichts zu
-        tun hat; am Telefon lag sie dazu ueber den Feldern. In den
-        rechnenden Etappen bleibt sie, dort sagt `beispielHinweis`, womit
-        gerechnet wird.
+        FESTE FUSSLEISTE — erst, wenn keine Angabe mehr fehlt: Ziel, Netto
+        und Luecke gibt es vorher nicht. (Mit den frueheren Beispielwerten
+        zeigte sie schon beim ersten Feld eine Luecke, die mit dem Mandanten
+        nichts zu tun hatte.)
       */}
-      {zeile && !(schritt === 'daten' && offeneBeispielTexte.length > 0) && !ringOffen && (
+      {zeile && !angabenFehlen && !ringOffen && (
         /*
           Hell wie die Karten, mit Haarlinie und einem leichten Schatten nach
           oben. Die Luecke steht als einzige Kachel dunkel — hervorgehoben

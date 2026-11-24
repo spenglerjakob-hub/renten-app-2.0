@@ -1,11 +1,11 @@
 import { Coins } from 'lucide-react';
 
 /**
- * „Nominal | Kaufkraft heute“ — derselbe Zustand an zwei Stellen: im
- * Kassenbon und in der Fussleiste. Vorher sass der Schalter nur in der
- * Kopfleiste, und die ist jetzt meist eingeklappt. Ueberall als Pillen wie
- * die Reiter der Beratung; die dunkle Fassung fuer die Fussleiste entfiel
- * mit der dunklen Leiste.
+ * „Kaufkraft heute | Nominal“ — derselbe Zustand an zwei Stellen: im
+ * Kassenbon und in der Fussleiste. Die Vorgabe (heutige Kaufkraft) steht
+ * vorn. Vorher sass der Schalter nur in der Kopfleiste, und die ist jetzt
+ * meist eingeklappt. Ueberall als Pillen wie die Reiter der Beratung; die
+ * dunkle Fassung fuer die Fussleiste entfiel mit der dunklen Leiste.
  *
  * `kompakt` zeigt nur das Symbol als Umschalter — fuer die Fussleiste am
  * Telefon, wo neben drei Zahlen kein Platz fuer zwei Woerter ist.
@@ -41,11 +41,11 @@ export function KaufkraftSchalter({ wert, onChange, kompakt = false, klasse = ''
       aria-label="Beträge"
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-linie bg-ui-karte p-1 text-sm font-medium ${klasse}`}
     >
-      <button type="button" aria-pressed={!wert} onClick={() => onChange(false)} className={knopf(!wert)}>
-        Nominal
-      </button>
       <button type="button" aria-pressed={wert} onClick={() => onChange(true)} className={knopf(wert)}>
         Kaufkraft heute
+      </button>
+      <button type="button" aria-pressed={!wert} onClick={() => onChange(false)} className={knopf(!wert)}>
+        Nominal
       </button>
     </div>
   );

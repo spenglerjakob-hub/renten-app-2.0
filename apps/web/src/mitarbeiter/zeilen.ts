@@ -87,6 +87,17 @@ export function kvZeile(a: BeratungAngaben): ZeilenText {
   return { ergebnis: ['gesetzlich', a.krankenkasse, `${prozent(a.zusatzbeitrag, 2)} Zusatzbeitrag`].filter(Boolean).join(' · ') };
 }
 
+/**
+ * Einkommen, Steuer und Krankenversicherung stehen in EINEM Stueck — seine
+ * Zeile nennt das Einkommen und dahinter nur, wie jemand versichert ist. Die
+ * Kasse und ihr Satz stuenden sonst als vierte und fuenfte Angabe in der Zeile.
+ */
+export function einkommenUndKvZeile(a: BeratungAngaben): ZeilenText {
+  const e = einkommenZeile(a);
+  if (!e.ergebnis) return e;
+  return { ergebnis: `${e.ergebnis} · ${a.kv === 'privat' ? 'privat versichert' : 'gesetzlich versichert'}` };
+}
+
 export function vorsorgeZeile(a: BeratungAngaben): ZeilenText {
   return {
     ergebnis: a.bavBestandMonat > 0

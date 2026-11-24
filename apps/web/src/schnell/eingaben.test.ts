@@ -3,7 +3,8 @@ import {
   alterExakt, heute, parameterFuer, parseDatum, projiziere, regelaltersrentenbeginn, schaetzeEntgeltpunkte,
 } from '@renten/engine';
 import { szenarioSchema } from '@renten/schema';
-import { STANDARD_OFFEN, standardSzenario } from '../store/standard';
+import { standardSzenario } from '../store/standard';
+import { fehlendeAngaben } from '../features/vorbelegung';
 import { musterfallMerken, musterfallVerwerfen, offenerMusterfall } from '../lib/musterfall';
 import { SCHNELL_BEISPIEL, renteGeschaetzt, schnellRechnen } from './eingaben';
 
@@ -44,18 +45,22 @@ describe('Schnellrechnung', () => {
     expect(r.szenario.haushalt.zielNettoHeute).toBe(r.zielHeute);
   });
 
-  it('unberuehrt bleibt alles offen; angefasst wird geprueft — Schaetzung und Faustregel bleiben Beispielwerte', () => {
-    expect(schnellRechnen(SCHNELL_BEISPIEL)!.szenario.offen).toEqual([...STANDARD_OFFEN]);
-    const angefasst = new Set(['geburtsdatum', 'brutto', 'rente', 'ziel'] as const);
-    const offen = schnellRechnen({ ...SCHNELL_BEISPIEL, bruttoMonat: 5000 }, angefasst)!.szenario.offen!;
-    expect(offen).not.toContain('personen.A.geburtsdatum');
-    expect(offen).not.toContain('einkommenHeute.betrag');
-    // rente und ziel sind null: geschaetzt bzw. Faustregel — keine Angaben des Mandanten.
-    expect(offen).toContain('personen.A.grvBruttoHeute');
-    expect(offen).toContain('haushalt.zielNettoHeute');
-    const eigene = schnellRechnen({ ...SCHNELL_BEISPIEL, rente: 1700, ziel: 2400 }, angefasst)!.szenario.offen!;
-    expect(eigene).not.toContain('personen.A.grvBruttoHeute');
-    expect(eigene).not.toContain('haushalt.zielNettoHeute');
+  it('im Musterfall gilt als eingetragen, was hier zu sehen war — im Rechner fehlt dann nichts', () => {
+    // Auch unberuehrt, geschaetzt und aus der Faustregel: Wer den Fall speichert, rechnet im Rechner damit weiter.
+    const unberuehrt = schnellRechnen(SCHNELL_BEISPIEL)!.szenario;
+    expect(fehlendeAngaben(unberuehrt)).toEqual([]);
+    expect(unberuehrt.offen).not.toContain('personen.A.geburtsdatum');
+    expect(unberuehrt.offen).not.toContain('personen.A.grvBruttoHeute');
+    // Die Standardwerte und die beiden Schritte bleiben offen — wie bei einem neuen Fall.
+    expect(unberuehrt.offen).toEqual(expect.arrayContaining(['haushalt.bundesland', 'annahmen.inflation', 'vertraege', 'auswertung']));
+    // Das Einkommen eines Partners hat hier niemand gesehen: Es fehlt, sobald es einen gibt.
+    expect(unberuehrt.offen).toContain('einkommenPartner.betrag');
+
+    const angefasst = new Set(['bundesland', 'kirchensteuer'] as const);
+    const offen = schnellRechnen({ ...SCHNELL_BEISPIEL, bundesland: 'Bayern' }, angefasst)!.szenario.offen!;
+    expect(offen).not.toContain('haushalt.bundesland');
+    expect(offen).not.toContain('haushalt.kirchensteuer');
+    expect(offen).toContain('haushalt.kvStatus');
   });
 });
 

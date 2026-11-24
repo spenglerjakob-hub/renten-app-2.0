@@ -6,7 +6,7 @@ import {
   spaeterBeginnen, versorgungslueckeRechnung,
 } from './rechnung';
 import {
-  abrechnungZeile, anbieterSatz, angabenZeile, angebotSatz, angebotVertraege, axaZeile, einkommenZeile, entscheidungZeile,
+  abrechnungZeile, anbieterSatz, angabenZeile, angebotSatz, angebotVertraege, axaZeile, einkommenUndKvZeile, einkommenZeile, entscheidungZeile,
   grvZeile, hochrechnungZeile, kennzahlenZeile, kvZeile, leistungZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile,
   rechnungZeile, spaeterZeile, unterlagenZeile, vertragZeile, vorsorgeZeile,
 } from './zeilen';
@@ -62,6 +62,13 @@ describe('Angaben', () => {
     expect(kvZeile(beratung({ krankenkasse: 'Musterkasse', zusatzbeitrag: 0.029 }).angaben).ergebnis)
       .toBe('gesetzlich · Musterkasse · 2,90 % Zusatzbeitrag');
     expect(kvZeile(beratung({ kv: 'privat', pkvPraemieMonat: 450 }).angaben).ergebnis).toBe(`privat · ${euro(450)} im Monat`);
+  });
+
+  it('Einkommen, Steuer und Krankenversicherung in einer Zeile — ohne Gehalt steht nur, dass es fehlt', () => {
+    expect(einkommenUndKvZeile(beratung().angaben).ergebnis).toBe(`${euro(4500)} brutto im Monat · Steuerklasse I · gesetzlich versichert`);
+    expect(einkommenUndKvZeile(beratung({ kv: 'privat', pkvPraemieMonat: 450 }).angaben).ergebnis)
+      .toBe(`${euro(4500)} brutto im Monat · Steuerklasse I · privat versichert`);
+    expect(einkommenUndKvZeile(beratung({ jahresbrutto: 0 }).angaben)).toEqual({ fehlt: 'Bruttogehalt fehlt' });
   });
 
   it('bisherige Vorsorge', () => {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { projiziere, versorgungsluecke, nurPerson } from '@renten/engine';
 import { szenarioSchema } from '@renten/schema';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import { useSzenario, type SzenarioParsed } from '../store/szenario';
 import { angebotPositionen, ansichtMitAngenommenen, mitAngenommenen } from './tuev-berechnung';
 
@@ -12,7 +12,7 @@ import { angebotPositionen, ansichtMitAngenommenen, mitAngenommenen } from './tu
  */
 
 const mitAngeboten = (angenommen: string[] = []): SzenarioParsed => {
-  const s = standardSzenario();
+  const s = musterSzenario();
   return szenarioSchema.parse({
     ...s,
     haushalt: { ...s.haushalt, zielNettoHeute: 3000 },

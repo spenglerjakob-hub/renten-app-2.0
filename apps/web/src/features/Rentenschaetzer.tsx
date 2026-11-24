@@ -6,6 +6,7 @@ import {
 import { useSzenario } from '../store/szenario';
 import { ZahlFeld, euro } from '../components/Feld';
 import { KNOPF_ZWEIT } from '../components/stil';
+import { fehlt } from './vorbelegung';
 import { useAnsprache } from '../components/Ansprache';
 
 /**
@@ -30,6 +31,14 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   const tarifIndex = useSzenario((s) => s.szenario.annahmen.tarifIndex);
   const einkommen = useSzenario((s) => s.szenario.einkommenHeute);
   const setzePerson = useSzenario((s) => s.setzePerson);
+  /*
+    Ein neuer Fall gibt weder Geburtsdatum noch Gehalt vor. Ohne Gehalt
+    beginnt das Feld hier leer (vorher standen 48.000 € aus dem Beispiel da);
+    ohne Geburtsdatum gibt es nichts zu schaetzen — das Alter traegt die
+    ganze Rechnung.
+  */
+  const geburtFehlt = useSzenario((s) => fehlt(s.szenario, `personen.${personId}.geburtsdatum`));
+  const einkommenFehlt = useSzenario((s) => fehlt(s.szenario, 'einkommenHeute.betrag'));
 
   const [offen, setOffen] = useState(false);
   /*
@@ -40,11 +49,11 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
   */
   const selbststaendig = einkommen.modus === 'selbststaendig';
   const p0 = parameterFuer(heute().jahr, { indexRate: tarifIndex });
-  const [gehalt, setGehalt] = useState(() =>
-    selbststaendig
-      ? Math.round((einkommen.grvBeitragMonat * 12) / p0.rvSatzGesamt)
-      : Math.round((einkommen.betrag || 4000) * (einkommen.auszahlungen || 12)),
-  );
+  // Aus dem Einkommen abgeleitet, bis hier jemand eine eigene Zahl eintraegt.
+  const [eigenesGehalt, setEigenesGehalt] = useState<number | null>(null);
+  const gehalt = eigenesGehalt ?? (selbststaendig
+    ? Math.round((einkommen.grvBeitragMonat * 12) / p0.rvSatzGesamt)
+    : einkommenFehlt ? 0 : Math.round(einkommen.betrag * (einkommen.auszahlungen || 12)));
 
   if (!person) return null;
 
@@ -65,8 +74,8 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
     );
   }
 
-  const geburt = parseDatum(person.geburtsdatum);
-  const rentenbeginn = parseDatum(person.rentenbeginn);
+  const geburt = geburtFehlt ? null : parseDatum(person.geburtsdatum);
+  const rentenbeginn = geburtFehlt && !person.rentenbeginnManuell ? null : parseDatum(person.rentenbeginn);
   const jetzt = heute();
 
   const p = parameterFuer(jetzt.jahr, { indexRate: tarifIndex });
@@ -97,16 +106,25 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
         <div className="ui-innen p-3 sm:p-4 print:hidden">
           <h4 className="mb-3 text-sm font-medium text-ui-tinte">Karriere-Schätzer</h4>
 
+          {!geburt && (
+            <p className="mb-3 text-xs leading-relaxed text-ui-tinte">
+              Für die Schätzung fehlt noch das Geburtsdatum — es steht im Feld darüber.
+            </p>
+          )}
+
           <ZahlFeld
             label={selbststaendig ? 'Beitragspflichtiges Entgelt im Jahr' : 'Heutiges Bruttojahresgehalt'}
             wert={gehalt}
-            onChange={setGehalt}
+            onChange={setEigenesGehalt}
+            leerBeiNull
             einheit="€"
             hilfe={selbststaendig
               ? `Aus ${t.dein('em')} Beitrag zurückgerechnet (${euro(einkommen.grvBeitragMonat)} im Monat geteilt durch den Beitragssatz).`
               : undefined}
           />
 
+          {/* Ohne Geburtsdatum kein Alter — und ohne Alter keine Zahl, die etwas sagte. */}
+          {geburt && (<>
           <dl className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <dt className="text-xs text-ui-schiefer">Entgeltpunkte</dt>
@@ -134,6 +152,7 @@ export function Rentenschaetzer({ personId }: { personId: 'A' | 'B' }) {
           <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
             {schaetzung.hinweis}
           </p>
+          </>)}
         </div>
       )}
     </div>

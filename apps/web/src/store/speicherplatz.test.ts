@@ -42,7 +42,7 @@ describe('Speicherplatz der Vertragsprüfung', () => {
     // … und die Vertragspruefung beginnt leer, mit eigenem Platz
     szenarioSpeicherWaehlen(PRUEFUNG);
     expect(useSzenario.getState().szenario.personen[0]?.vorname ?? '').toBe('');
-    const id = useSzenario.getState().vertragHinzufuegen(3, 'prvRente');
+    const id = useSzenario.getState().vertragHinzufuegen('prvRente');
     useSzenario.getState().kinderpoliceUmschalten(id, true);
     useSzenario.getState().setzePerson('A', { vorname: 'Opa', name: 'Opa' });
 
@@ -60,15 +60,33 @@ describe('Speicherplatz der Vertragsprüfung', () => {
     expect(speicher.get(RECHNER)).toBe(rechnerVorher);
   });
 
-  it('vertragHinzufuegen legt die gewünschte Vertragsart an und gibt die ID zurück', async () => {
+  it('vertragHinzufuegen legt die gewünschte Vertragsart an, zieht die Schicht daraus und gibt die ID zurück', async () => {
     const { useSzenario, szenarioSpeicherWaehlen } = await import('./szenario');
     szenarioSpeicherWaehlen(PRUEFUNG);
     const st = useSzenario.getState();
-    const riester = st.vertragHinzufuegen(2, 'riester');
-    const ohne = st.vertragHinzufuegen(1);
-    const v = useSzenario.getState().szenario.vertraege;
-    expect(v.find((x) => x.id === riester)).toMatchObject({ schicht: 2, typ: 'riester' });
-    expect(v.find((x) => x.id === ohne)).toMatchObject({ schicht: 1, typ: 'basis' });
+    const riester = st.vertragHinzufuegen('riester');
+    const basis = st.vertragHinzufuegen('basis');
+    const depot = st.vertragHinzufuegen('etf');
+    const v = () => useSzenario.getState().szenario.vertraege;
+    expect(v().find((x) => x.id === riester)).toMatchObject({ schicht: 2, typ: 'riester' });
+    expect(v().find((x) => x.id === basis)).toMatchObject({ schicht: 1, typ: 'basis' });
+    expect(v().find((x) => x.id === depot)).toMatchObject({ schicht: 3, typ: 'etf' });
+  });
+
+  it('wechselt die Vertragsart, zieht die Schicht mit — und ein Auszahlungsweg, den die neue Art nicht kennt, wird zur Rente', async () => {
+    const { useSzenario, szenarioSpeicherWaehlen } = await import('./szenario');
+    szenarioSpeicherWaehlen(PRUEFUNG);
+    const st = useSzenario.getState();
+    const id = st.vertragHinzufuegen('bav');
+    st.vertragAendern(id, { strategie: 'verrenten' });
+    st.vertragAendern(id, { typ: 'prvRente' });
+    const v = () => useSzenario.getState().szenario.vertraege.find((x) => x.id === id);
+    // Die private Rente kennt die Verrentung ebenfalls: Der Weg bleibt.
+    expect(v()).toMatchObject({ schicht: 3, typ: 'prvRente', strategie: 'verrenten' });
+    st.vertragAendern(id, { typ: 'riester' });
+    expect(v()).toMatchObject({ schicht: 2, typ: 'riester', strategie: 'rente' });
+    st.vertragAendern(id, { typ: 'basis' });
+    expect(v()).toMatchObject({ schicht: 1, typ: 'basis' });
   });
 });
 

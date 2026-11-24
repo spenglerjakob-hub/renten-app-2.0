@@ -8,6 +8,7 @@ import {
 import type { Szenario, Vertrag, Person, AvdKind } from '@renten/engine';
 import { standardSzenario } from './standard';
 import { geprueft, offenePfade, pfadeAus, wiederOffen } from '../features/vorbelegung';
+import { schichtVon, strategieGruppe, STRATEGIEN } from '../features/vertragsarten';
 
 /**
  * Wo der Fall im Browser liegt. Der Rechner nimmt den Standardplatz; eine
@@ -88,8 +89,8 @@ export interface SzenarioStore {
   /** Ein Angebot annehmen oder die Annahme zuruecknehmen — „Lösungen annehmen“. */
   angebotAnnehmen: (id: string, an: boolean) => void;
 
-  /** Legt einen Vertrag an — in der Vertragsart, sonst der ersten der Schicht — und gibt seine ID zurueck. */
-  vertragHinzufuegen: (schicht: 1 | 2 | 3, typ?: Vertrag['typ']) => string;
+  /** Legt einen Vertrag der Vertragsart an und gibt seine ID zurueck. Die Schicht folgt aus der Art. */
+  vertragHinzufuegen: (typ: Vertrag['typ']) => string;
   vertragAendern: (id: string, p: Partial<Vertrag>) => void;
   vertragEntfernen: (id: string) => void;
   /**
@@ -100,11 +101,15 @@ export interface SzenarioStore {
   kinderpoliceUmschalten: (id: string, an: boolean) => void;
 
   /**
-   * Eine vorbelegte Angabe als geprueft markieren, ohne sie zu aendern —
-   * „Stimmt so“ am Feld, „Keine bestehenden Vertraege“ im Assistenten.
-   * Siehe `features/vorbelegung.ts`.
+   * Etwas Offenes als erledigt markieren, ohne einen Wert zu aendern —
+   * „Keine bestehenden Vertraege“ im Assistenten. Siehe `features/vorbelegung.ts`.
    */
   pruefen: (pfad: string) => void;
+  /**
+   * Eine Angabe wieder zuruecknehmen: Das Feld wurde geleert, sie FEHLT
+   * wieder — statt als 0 weiterzurechnen.
+   */
+  leeren: (pfad: string) => void;
   /** Das Ergebnis wurde angesehen — der letzte Schritt des Fortschritts. */
   ausgewertet: () => void;
 
@@ -218,8 +223,8 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     const neu = { ...s, einkommenGetrennt: b };
     /*
       Das Einkommen des Partners steht beim ersten Einschalten noch auf der
-      Vorgabe des Schemas — ein Beispielwert wie jeder andere. Wer es schon
-      einmal eingetragen hat, behaelt es ohne Marke.
+      Vorgabe des Schemas — eingetragen hat es niemand, es fehlt also. Wer
+      es schon einmal eingetragen hat, behaelt es.
     */
     const unberuehrt = JSON.stringify(s.einkommenPartner) === JSON.stringify(einkommenHeuteSchema.parse({}));
     return b && unberuehrt ? wiederOffen(neu, ['einkommenPartner.betrag']) : neu;
@@ -239,7 +244,13 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
         return { ...neu, rentenbeginnManuell: true };
       }
 
-      if (p.geburtsdatum !== undefined && p.geburtsdatum !== x.geburtsdatum && !neu.rentenbeginnManuell) {
+      /*
+        Auch wenn das getippte Datum zufaellig dem Platzhalter gleicht: Fehlte
+        das Geburtsdatum bis eben, wird der Rentenbeginn jetzt aus ihm gezogen
+        — beim Partner laege sonst der von A darunter.
+      */
+      const geburtFehlte = offenePfade(s).includes(`personen.${id}.geburtsdatum`);
+      if (p.geburtsdatum !== undefined && (p.geburtsdatum !== x.geburtsdatum || geburtFehlte) && !neu.rentenbeginnManuell) {
         const auto = automatischerRentenbeginn(neu.geburtsdatum);
         if (auto) return { ...neu, rentenbeginn: auto };
       }
@@ -263,16 +274,19 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     if (s.personen.some((p) => p.id === 'B')) return s;
     const a = s.personen[0]!;
     /*
-      Person B beginnt als Kopie von A. Ihre Angaben sind damit Beispiele —
-      niemand hat sie fuer B geprueft.
+      Person B beginnt als Kopie von A (Versicherung, Besoldung). Geburtsdatum
+      und Rentenanspruch hat fuer B niemand eingetragen: Sie fehlen.
     */
     return wiederOffen({
       ...s,
-      personen: [...s.personen, { ...a, id: 'B' as const, name: '', geburtsdatum: a.geburtsdatum, rentenbeginn: a.rentenbeginn }],
-    }, [
-      'personen.B.geburtsdatum', 'personen.B.grvBruttoHeute',
-      ...(a.rentenbeginnManuell ? [] : ['personen.B.rentenbeginn']),
-    ]);
+      /*
+        Ein von Hand gesetzter Rentenbeginn von A gilt nicht fuer B: Dessen
+        Rentenbeginn ergibt sich aus dem eigenen Geburtsdatum, sobald es da ist.
+      */
+      personen: [...s.personen, {
+        ...a, id: 'B' as const, name: '', geburtsdatum: a.geburtsdatum, rentenbeginn: a.rentenbeginn, rentenbeginnManuell: false,
+      }],
+    }, ['personen.B.geburtsdatum', 'personen.B.grvBruttoHeute', 'personen.B.rentenbeginn']);
   }),
 
   tuevHinzufuegen: (vertragId) => get().setze((s) => {
@@ -363,12 +377,12 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     return { ...s, loesungen: { ...s.loesungen, angenommen: neu } };
   }),
 
-  vertragHinzufuegen: (schicht, typ) => {
+  vertragHinzufuegen: (typ) => {
     const id = neueId('v');
     get().setze((s) => {
       const neu: Vertrag = {
         id,
-        inhaber: 'A', schicht, typ: typ ?? (schicht === 1 ? 'basis' : schicht === 2 ? 'bav' : 'prvRente'),
+        inhaber: 'A', schicht: schichtVon(typ), typ,
         name: '', brutto: 0,
         strategie: 'rente', altvertrag: false,
       };
@@ -383,7 +397,21 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     const vorher = get().szenario.vertraege.find((v) => v.id === id);
     if (vorher?.versichertePerson && p.typ !== undefined && p.typ !== 'prvRente') get().kinderpoliceUmschalten(id, false);
     get().setze((s) => ({
-      ...s, vertraege: s.vertraege.map((v) => (v.id === id ? { ...v, ...p } : v)),
+      ...s,
+      vertraege: s.vertraege.map((v) => {
+        if (v.id !== id) return v;
+        const neu = { ...v, ...p };
+        /*
+          DIE SCHICHT FOLGT DER VERTRAGSART — gefragt wird nur noch die Art.
+          Kennt die neue Art den gewaehlten Auszahlungsweg nicht (etwa
+          „verrenten“ bei Riester), gilt wieder die laufende Rente.
+        */
+        if (p.typ !== undefined && p.typ !== v.typ) {
+          neu.schicht = schichtVon(p.typ);
+          if (!STRATEGIEN[strategieGruppe(p.typ)].some((x) => x.wert === neu.strategie)) neu.strategie = 'rente';
+        }
+        return neu;
+      }),
     }));
   },
 
@@ -418,6 +446,7 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
   })),
 
   pruefen: (pfad) => get().setze((s) => geprueft(s, [pfad])),
+  leeren: (pfad) => get().setze((s) => wiederOffen(s, [pfad])),
 
   // Nur wenn es noch offen ist: Der Aufruf kommt aus einem Effekt, und ein
   // neues Szenario-Objekt bei jedem Zeichnen liesse die Projektion kreisen.

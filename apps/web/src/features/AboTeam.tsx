@@ -407,7 +407,7 @@ function Betreiber({ echt }: { echt: Zugang }) {
   return (
     /*
       Der Bereich des Betreibers hebt sich durch den gestrichelten Rand ab,
-      nicht durch eine eigene Farbe — wie der Hinweis auf Beispielwerte im
+      nicht durch eine eigene Farbe — wie der Hinweis auf fehlende Angaben im
       Rechner: Er gehoert nicht zu dem, was Kunden sehen.
     */
     <section className="py-5 last:pb-0">

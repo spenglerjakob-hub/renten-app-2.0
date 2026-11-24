@@ -189,6 +189,21 @@ export interface Wunschbeitrag {
   restMonat: number;
   /** Anteil der Luecke, 0 bis 1 — mehr als geschlossen ist geschlossen */
   anteil: number;
+  /*
+    DASSELBE ALS KAPITAL — so zeigt es der Sparrechner: Eine Summe laesst sich
+    greifen, „x % der Luecke“ nicht. Alle vier sind Geld des Rentenjahres, wie
+    `zielkapital` in der Rechnung darueber.
+  */
+  /** Das Kapital, das die ganze Luecke braucht */
+  zielkapital: number;
+  /** Was der Wunschbeitrag bis zum Rentenbeginn anspart — auch ueber das Zielkapital hinaus */
+  kapital: number;
+  /** Ist die Luecke geschlossen? Auf den Euro genau wie der angezeigte Startbeitrag. */
+  geschlossen: boolean;
+  /** Was zum Zielkapital fehlt — 0, sobald die Luecke geschlossen ist */
+  kapitalFehlt: number;
+  /** Was ueber das Zielkapital hinaus entsteht, der Vermoegensaufbau — 0, solange noch etwas fehlt */
+  kapitalMehr: number;
 }
 
 /**
@@ -232,11 +247,27 @@ export function wunschbeitragRechnen(
     }
     gedecktMonat = (unten + oben) / 2;
   }
+  /*
+    Die Sparrate ist dem Kapital proportional: Das Doppelte des noetigen
+    Beitrags baut das Doppelte des Zielkapitals auf. Was darueber liegt, ist
+    Vermoegensaufbau.
+
+    GESCHLOSSEN auf den Euro: Der Startbeitrag steht als ganze Zahl da
+    („616 €“), gerechnet ist er mit Nachkommastellen. Wer genau diese Zahl
+    eintraegt, hat die Luecke geschlossen — und liest nicht „es fehlen 156 €“.
+  */
+  const kapital = noetig > 0 ? r.zielkapital * (beitrag / noetig) : r.zielkapital;
+  const geschlossen = noetig <= 0 || Math.round(beitrag) >= Math.round(noetig);
   return {
     noetig,
     gedecktMonat,
     gedecktHeute: gedecktMonat / zeile.kaufkraftfaktor,
     restMonat: Math.max(0, r.luecke - gedecktMonat),
     anteil: r.luecke > 0 ? Math.min(1, gedecktMonat / r.luecke) : 1,
+    zielkapital: r.zielkapital,
+    kapital,
+    geschlossen,
+    kapitalFehlt: geschlossen ? 0 : Math.max(0, r.zielkapital - kapital),
+    kapitalMehr: geschlossen ? Math.max(0, kapital - r.zielkapital) : 0,
   };
 }

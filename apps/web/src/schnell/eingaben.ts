@@ -4,6 +4,7 @@ import {
 } from '@renten/engine';
 import { szenarioSchema, type SzenarioParsed } from '@renten/schema';
 import { STANDARD_OFFEN, standardSzenario } from '../store/standard';
+import { eintragVon } from '../features/vorbelegung';
 import { nettoHeuteMonat } from '../features/bezug';
 
 /**
@@ -33,7 +34,11 @@ export interface SchnellEingaben {
   ziel: number | null;
 }
 
-/** Das Beispiel beim ersten Aufruf — dasselbe wie ein neuer Fall im Rechner. */
+/**
+ * Das Beispiel beim ersten Aufruf. Die Schnellrechnung ist eine Vorfuehrung:
+ * Sie zeigt sofort ein Ergebnis, an einem Musterfall. Ein neuer Fall im
+ * RECHNER gibt dagegen nichts vor (`store/standard.ts`).
+ */
 export const SCHNELL_BEISPIEL: SchnellEingaben = {
   geburtsdatum: '01.01.1985',
   bundesland: 'Baden-Württemberg',
@@ -46,7 +51,7 @@ export const SCHNELL_BEISPIEL: SchnellEingaben = {
 /** Faustregel fuer das Ziel, wie der Vorschlag im Rechner: 80 % des heutigen Nettos, auf 50 EUR. */
 export const ZIEL_FAUSTREGEL = 0.8;
 
-/** Welcher Pfad des Szenarios zu welchem Feld gehoert — fuer die Marken im Musterfall. */
+/** Welcher Pfad des Szenarios zu welchem Feld gehoert — fuer `offen` im Musterfall. */
 const PFAD: Record<SchnellFeld, string> = {
   geburtsdatum: 'personen.A.geburtsdatum',
   bundesland: 'haushalt.bundesland',
@@ -75,13 +80,19 @@ function szenario(e: SchnellEingaben, zielHeute: number, rente: number, angefass
   const geburtsdatum = parseDatum(e.geburtsdatum) ? e.geburtsdatum : SCHNELL_BEISPIEL.geburtsdatum;
   const rentenbeginn = toDe(regelaltersrentenbeginn(parseDatum(geburtsdatum)!));
   /*
-    Was angefasst wurde, ist geprueft; der Rest bleibt Beispiel- oder
-    Standardwert — auch im Musterfall nach der Anmeldung. Eine GESCHAETZTE
-    Rente und das Ziel aus der Faustregel bleiben Beispielwerte: Sie sind
-    nicht die Angaben des Mandanten.
+    WAS HIER ZU SEHEN WAR, GILT IM MUSTERFALL ALS EINGETRAGEN — Geburtsdatum,
+    Einkommen, Rente und Ziel, ob getippt, aus dem Beispiel oder geschaetzt.
+    Im Rechner FEHLT eine offene Angabe des Mandanten (leeres Feld, kein
+    Ergebnis): Wer „Fall speichern“ waehlt, soll dort aber weiterrechnen
+    koennen, mit den Zahlen, die er hier gesehen hat. Dass Rente und Ziel
+    geschaetzt sein koennen, steht hier am Feld; im Rechner uebernimmt der
+    Karriere-Schaetzer seinen Wert genauso.
+
+    Offen bleiben die Standardwerte, die niemand angefasst hat, und die
+    beiden Schritte (Vertraege, Auswertung).
   */
-  const gesetzt = [...angefasst].filter((f) => (f === 'rente' ? e.rente !== null : f === 'ziel' ? e.ziel !== null : true));
-  const offen = STANDARD_OFFEN.filter((p) => !gesetzt.some((f) => PFAD[f] === p));
+  const gezeigt = Object.values(PFAD).filter((p) => eintragVon(p)?.art === 'angabe');
+  const offen = STANDARD_OFFEN.filter((p) => !gezeigt.includes(p) && ![...angefasst].some((f) => PFAD[f] === p));
   return szenarioSchema.parse({
     ...s,
     haushalt: { ...s.haushalt, bundesland: e.bundesland, kirchensteuer: e.kirchensteuer, zielNettoHeute: zielHeute },

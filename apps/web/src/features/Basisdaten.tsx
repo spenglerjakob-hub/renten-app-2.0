@@ -18,7 +18,7 @@ import { KinderZeilen, KinderHinweisText } from '../components/KinderFelder';
 import { personName, personNameAus } from './personen';
 import { mitName, namensTeile } from '../lib/namen';
 import { KRANKENKASSEN, KASSEN_STAND, kasseNach } from './krankenkassen';
-import { useVorbelegt } from './useVorbelegt';
+import { useFehlt } from './useFehlt';
 import { nettoHeuteMonat as nettoHeute } from './bezug';
 
 /**
@@ -68,7 +68,12 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
   const setzeKinderAnzahl = useSzenario((x) => x.setzeKinderAnzahl);
   const setzeKind = useSzenario((x) => x.setzeKind);
   const setzeZielAnteil = useSzenario((x) => x.setzeZielAnteil);
-  const marke = useVorbelegt();
+  /*
+    Ein neuer Fall gibt nichts vor, was dem Mandanten gehoert: Solange eine
+    Angabe fehlt, steht ihr Feld leer (`features/vorbelegung.ts`).
+  */
+  const angabe = useFehlt();
+  const zielFehlt = angabe('haushalt.zielNettoHeute').leer;
 
   // Die Altersgrenzen 18 und 25 stehen im Rechtsstand, nicht im Markup.
   const jetzt = new Date().getFullYear();
@@ -118,14 +123,16 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             )}
             <DatumFeld label="Geburtsdatum" wert={p.geburtsdatum}
               onChange={(v) => setzePerson(p.id, { geburtsdatum: v })}
-              vorbelegt={marke(`personen.${p.id}.geburtsdatum`)} />
+              {...angabe(`personen.${p.id}.geburtsdatum`)} />
+            {/* Ohne Geburtsdatum gibt es noch keinen Rentenbeginn — das Feld fuellt sich mit ihm. */}
             <DatumFeld
               label="Rentenbeginn"
               wert={p.rentenbeginn}
               onChange={(v) => setzePerson(p.id, { rentenbeginn: v })}
-              vorbelegt={marke(`personen.${p.id}.rentenbeginn`)}
+              leer={angabe(`personen.${p.id}.geburtsdatum`).leer && !p.rentenbeginnManuell}
               info={<>
-                Ergibt sich aus dem Geburtsdatum: die Regelaltersgrenze, {regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}.
+                Ergibt sich aus dem Geburtsdatum: die Regelaltersgrenze
+                {angabe(`personen.${p.id}.geburtsdatum`).leer ? '' : `, ${regelaltersgrenzeText(p.geburtsdatum) ?? '67 Jahre'}`}.
                 Wer früher oder später in Rente geht, trägt das Datum von Hand ein.
               </>}
               zusatz={p.rentenbeginnManuell ? (
@@ -155,7 +162,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
                 <ZahlFeld label="Heutiger Rentenanspruch monatlich" wert={p.grvBruttoHeute}
                   onChange={(n) => setzePerson(p.id, { grvBruttoHeute: n })} einheit="€"
                   info={<>Der Betrag aus der Renteninformation der Deutschen Rentenversicherung, dort unter <em>„Höhe Ihrer künftigen Regelaltersrente“</em>.</>}
-                  vorbelegt={marke(`personen.${p.id}.grvBruttoHeute`)} />
+                  {...angabe(`personen.${p.id}.grvBruttoHeute`)} />
                 <Rentenschaetzer personId={p.id} />
               </>
             ) : (
@@ -260,7 +267,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
               setzeHaushalt({ verheiratet: b });
               if (b) { partnerHinzufuegen(); onEhepartnerDialog?.(); }
             }}
-            vorbelegt={marke('haushalt.verheiratet')}
             info="Mit Ehepartner wird mit dem Splittingtarif gerechnet, und der Planer fragt auch dessen Angaben ab."
           />
         </div>
@@ -277,7 +283,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             wert={s.haushalt.bundesland}
             onChange={(v) => setzeHaushalt({ bundesland: v })}
             optionen={laenderOptionen}
-            vorbelegt={marke('haushalt.bundesland')}
           />
           {/* Neben dem Bundesland: Es bestimmt den Satz (8 oder 9 %), diese Antwort, ob er anfaellt. */}
           <Wahl
@@ -285,7 +290,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             wert={s.haushalt.kirchensteuer ? 'ja' : 'nein'}
             optionen={JA_NEIN}
             onChange={(v) => setzeHaushalt({ kirchensteuer: v === 'ja' })}
-            vorbelegt={marke('haushalt.kirchensteuer')}
           />
           {/*
             ZWEI FRAGEN, nicht eine. Bis hierher galt die Angabe fuer beide
@@ -305,7 +309,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
               { wert: 'freiwillig', text: 'Gesetzlich freiwillig versichert' },
               { wert: 'pkv', text: 'Privat versichert' },
             ]}
-            vorbelegt={marke('haushalt.kvStatus')}
           />
 
           {/*
@@ -379,7 +382,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             max={10}
             stellen={2}
             info={`Die Auswahl der Krankenkasse trägt ihren Satz hier ein (${KASSEN_STAND}). Findet sich ${t.dein('e')} Kasse nicht, den Satz von Hand eintragen. Der gesetzliche Durchschnitt liegt bei ${prozent(durchschnittlicherZusatzbeitrag(jetzt), 2)}${s.haushalt.zusatzbeitrag === undefined ? ' — damit ist das Feld vorbelegt' : ''}.`}
-            vorbelegt={marke('haushalt.zusatzbeitrag')}
           />
           {/*
             „Heute" ist hier woertlich zu nehmen: Die Abschlaege enden mit dem
@@ -396,7 +398,6 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             weniger="Ein Kind weniger"
             mehr="Ein Kind mehr"
             info="Ab dem 2. Kind sinkt der Pflegeversicherungsbeitrag — bis zum 25. Geburtstag des Kindes. Danach steigt er wieder; die Rechnung berücksichtigt das über die Geburtsjahre."
-            vorbelegt={marke('haushalt.kinderUnter25')}
           />
         </div>
 
@@ -408,7 +409,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
         {/* Die Praemie wird gebraucht, sobald EINE der beiden Phasen privat
             ist — sonst koennte man sie bei getrennten Angaben nicht eintragen. */}
         {(s.haushalt.kvStatus === 'pkv' || s.haushalt.kvErwerb === 'pkv') && (
-          <PkvFelder vorbelegt={marke('haushalt.pkv')} />
+          <PkvFelder beitrag={angabe('haushalt.pkv')} />
         )}
 
         {s.haushalt.kinder.length > 0 && (
@@ -456,7 +457,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
         einklappbar={einklappbar}
       >
         <EinkommenFelder wert={s.einkommenHeute} onChange={setzeEinkommen} artAlsKnoepfe
-          marke={(f) => marke(`einkommenHeute.${f}`)} />
+          betrag={angabe('einkommenHeute.betrag')} />
 
         {s.haushalt.verheiratet && (
           <div className="mt-4 border-t border-ui-linie pt-3">
@@ -473,7 +474,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
       {zeige('einkommen') && s.haushalt.verheiratet && s.einkommenGetrennt && (
         <Abschnitt titel={`Einkommen — ${nameVon('B')}`} einklappbar={einklappbar}>
           <EinkommenFelder wert={s.einkommenPartner} onChange={setzeEinkommenPartner} artAlsKnoepfe
-            marke={(f) => marke(`einkommenPartner.${f}`)} />
+            betrag={angabe('einkommenPartner.betrag')} />
         </Abschnitt>
       )}
 
@@ -523,7 +524,8 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
                     um sie zu schließen. Die beiden Beträge sind <strong>Anteile am gemeinsamen Budget</strong>; in der
                     Einzelbetrachtung gilt jeder unverändert als Ziel der jeweiligen Person.
                   </>}
-                  vorbelegt={marke('haushalt.zielNettoHeute')}
+                  // Beide Anteile stehen leer, bis einer eingetragen ist — der andere beginnt dann bei 0.
+                  leer={zielFehlt}
                 />
               ))}
             </div>
@@ -540,10 +542,10 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
             einheit="€"
             gross
             info="Im Monat, in heutiger Kaufkraft — die Preissteigerung bis zum Ruhestand rechnet der Planer selbst hinzu. An dieser Zahl misst sich alles Weitere: Bedarf, Versorgungslücke und die Sparrate, die nötig wäre, um sie zu schließen."
-            vorbelegt={marke('haushalt.zielNettoHeute')}
+            {...angabe('haushalt.zielNettoHeute')}
           />
         )}
-        {zielAnteil !== null && (
+        {zielAnteil !== null && !zielFehlt && (
           <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
             Das sind <strong className="font-medium text-ui-tinte">{prozent(zielAnteil, 0)}</strong> {t.dein('es')}{' '}
             heutigen Haushaltsnettos von {euro(nettoHeuteMonat)}.
@@ -555,7 +557,7 @@ export function Basisdaten({ ergebnis, onEhepartnerDialog, teil, ohneNamen = fal
           Summe zweier Anteile, und welcher Anteil wie gross sein soll, sagt
           keine Faustregel.
         */}
-        {!paar && zielVorschlag !== null && zielVorschlag > 0 && zielVorschlag !== s.haushalt.zielNettoHeute && (
+        {!paar && zielVorschlag !== null && zielVorschlag > 0 && (zielFehlt || zielVorschlag !== s.haushalt.zielNettoHeute) && (
           <button
             type="button"
             onClick={() => setzeHaushalt({ zielNettoHeute: zielVorschlag })}

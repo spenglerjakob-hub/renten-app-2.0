@@ -151,10 +151,10 @@ const GEFOERDERT: readonly VertragsTyp[] = ['bav', 'bavUkasse', 'basis', 'rieste
 /**
  * Baut aus den Antworten ein Szenario.
  *
- * Fehlt ein Geburtsdatum, bleibt die Vorgabe des Rechners (01.01.1985) —
- * `personSchema` verlangt ein gueltiges Datum. Die Uebersicht des Checks
- * nennt diesen Schritt als offen; die Zahl wird also nicht stillschweigend
- * zur Auskunft.
+ * Fehlt ein Geburtsdatum, steht darunter der Platzhalter eines neuen Falls
+ * (01.01.1985) — `personSchema` verlangt ein gueltiges Datum. Die Angabe
+ * steht in `offen` und damit im Rechner als FEHLEND: Ihr Feld ist leer, und
+ * ohne sie gibt es kein Ergebnis (`features/vorbelegung.ts`).
  */
 export function szenarioAusCheck(x: Antworten): SzenarioParsed {
   const person = (id: 'A' | 'B', p: PersonAntwort) => {
@@ -243,9 +243,10 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
     }));
 
   /*
-    WAS DER KUNDE OFFEN GELASSEN HAT, bleibt im Rechner als Beispielwert
-    markiert (siehe `features/vorbelegung.ts`). Bisher wurden 01.01.1985 und
-    2.000 EUR still eingesetzt und sahen im Rechner aus wie eine Auskunft.
+    WAS DER KUNDE OFFEN GELASSEN HAT, FEHLT im Rechner (siehe
+    `features/vorbelegung.ts`): Das Feld steht leer, bis der Berater die
+    Angabe nachtraegt. Ganz frueher wurden 01.01.1985 und 2.000 EUR still
+    eingesetzt und sahen im Rechner aus wie eine Auskunft.
     Die Annahmen fragt der Check nicht — sie bleiben Standardwerte.
   */
   const offen: string[] = ['annahmen.inflation', 'annahmen.rentendynamik', 'auswertung'];
@@ -281,7 +282,8 @@ export function szenarioAusCheck(x: Antworten): SzenarioParsed {
       // `praemieEnthaeltBet` verhindert, dass das Schema den Entlastungstarif
       // ein zweites Mal aufaddiert.
       pkv: x.pkv,
-      zielNettoHeute: x.zielNettoHeute > 0 ? x.zielNettoHeute : 2000,
+      // Ohne Antwort 0 als Platzhalter — die Angabe steht dann in `offen` und fehlt.
+      zielNettoHeute: Math.max(0, x.zielNettoHeute),
     },
     // Dieselben Annahmen wie ein neuer Fall im Rechner (store/standard.ts).
     annahmen: { ...STANDARD_ANNAHMEN },

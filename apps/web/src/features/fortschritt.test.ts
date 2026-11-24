@@ -12,7 +12,9 @@ describe('Fortschritt eines Falls', () => {
     const schritte = fallFortschritt(standardSzenario(), { konto: true });
     expect(schritte.map((x) => x.id)).toEqual(['konto', 'mandant', 'einkuenfte', 'vertraege', 'ziel', 'auswertung']);
     expect(schritte.filter((x) => x.erledigt).map((x) => x.id)).toEqual(['konto']);
-    expect(schritte.find((x) => x.id === 'einkuenfte')!.offen).toEqual(['Beispielwert: Rentenanspruch', 'Beispielwert: Einkommen']);
+    expect(schritte.find((x) => x.id === 'einkuenfte')!.offen).toEqual(['Rentenanspruch fehlt', 'Einkommen fehlt']);
+    expect(schritte.find((x) => x.id === 'mandant')!.offen).toEqual(['Geburtsdatum fehlt']);
+    expect(schritte.find((x) => x.id === 'ziel')!.offen).toEqual(['Zielnetto fehlt']);
   });
 
   it('nie 0 mit Konto — und ohne Konto steht dort ehrlich „nicht angemeldet“', () => {
@@ -27,7 +29,7 @@ describe('Fortschritt eines Falls', () => {
     expect(mandant).toMatchObject({ erledigt: true, offen: [] });
   });
 
-  it('zaehlt hoch, wenn Beispielwerte ersetzt und Schritte erledigt sind', () => {
+  it('zaehlt hoch, wenn Angaben eingetragen und Schritte erledigt sind', () => {
     let s = geprueft(standardSzenario(), ['personen.A.geburtsdatum', 'personen.A.grvBruttoHeute', 'einkommenHeute.betrag']);
     expect(zaehle(s)).toBe(3);
     s = geprueft(s, ['vertraege', 'haushalt.zielNettoHeute']);
@@ -69,6 +71,6 @@ describe('Fortschritt eines Falls', () => {
     };
     const mandant = fallFortschritt(paar, { konto: true, nameVon: (id) => (id === 'A' ? 'Anna' : 'Ben') })
       .find((x) => x.id === 'mandant')!;
-    expect(mandant.offen).toEqual(['Beispielwert: Geburtsdatum (Anna)', 'Beispielwert: Geburtsdatum (Ben)']);
+    expect(mandant.offen).toEqual(['Geburtsdatum (Anna) fehlt', 'Geburtsdatum (Ben) fehlt']);
   });
 });

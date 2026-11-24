@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjektionsErgebnis } from '@renten/engine';
 import { szenarioSchema } from '@renten/schema';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import { anteilAmNetto, anteilAnLuecke, nettoHeuteMonat } from './bezug';
 import { angebotPositionen, ohneEigenaufwand } from './tuev-berechnung';
 
@@ -31,7 +31,7 @@ describe('Bezugsgroessen', () => {
 
 describe('Angebote: welchen Teil der Luecke sie schliessen', () => {
   const mitAngebot = (zielNettoHeute: number) => {
-    const s = standardSzenario();
+    const s = musterSzenario();
     return szenarioSchema.parse({
       ...s,
       haushalt: { ...s.haushalt, zielNettoHeute },
@@ -59,7 +59,7 @@ describe('Angebote: welchen Teil der Luecke sie schliessen', () => {
 
 describe('Angebote ohne Eigenbeitrag: rein arbeitgeberfinanzierte bAV', () => {
   const nurArbeitgeber = () => {
-    const s = standardSzenario();
+    const s = musterSzenario();
     return szenarioSchema.parse({
       ...s,
       haushalt: { ...s.haushalt, zielNettoHeute: 2000 },

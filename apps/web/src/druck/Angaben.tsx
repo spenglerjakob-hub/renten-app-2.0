@@ -4,7 +4,7 @@ import type { SzenarioParsed } from '../store/szenario';
 import { euro, prozent } from '../components/Feld';
 import { Untertitel, Angabe, Zweispaltig, Text } from './Bausteine';
 import { personName, personNameAus } from '../features/personen';
-import { eintragVon, offeneBeispiele, offenePfade, relevant } from '../features/vorbelegung';
+import { fehlt } from '../features/vorbelegung';
 
 const KV_TEXT = {
   kvdr: 'Pflichtversichert (KVdR)',
@@ -55,16 +55,14 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
   const gerechnete = szenario.personen.filter((p) => p.id === 'A' || h.verheiratet);
 
   /*
-    BEISPIELWERTE SIND KEINE ANGABEN DES MANDANTEN. Wer druckt, ohne sie zu
-    ersetzen, bekommt sie hier gekennzeichnet — ein Gutachten, das ein
-    Geburtsdatum aus der Vorbelegung als Auskunft fuehrt, waere fuer eine
-    Beratungsdokumentation nicht vertretbar. Standardannahmen stehen
-    darunter ohnehin als „Annahmen“.
+    EINE FEHLENDE ANGABE IST KEINE ANGABE DES MANDANTEN — unter ihr liegt nur
+    ein Platzhalter (`features/vorbelegung.ts`). Gedruckt wird ein Gutachten
+    erst, wenn nichts mehr fehlt; sollte diese Seite trotzdem einmal mit einer
+    Luecke gezeichnet werden, steht dort „nicht angegeben“ und nie der
+    Platzhalter. Ein Gutachten, das ein Geburtsdatum aus dem Platzhalter als
+    Auskunft fuehrt, waere fuer eine Beratungsdokumentation nicht vertretbar.
   */
-  const beispiele = new Set(offenePfade(szenario)
-    .filter((p) => eintragVon(p)?.art === 'beispiel' && relevant(szenario, p)));
-  const bsp = (pfad: string, wert: string) => (beispiele.has(pfad) ? `${wert} — Beispielwert` : wert);
-  const offeneTexte = offeneBeispiele(szenario, (id) => personNameAus(szenario.personen, id));
+  const bsp = (pfad: string, wert: string) => (fehlt(szenario, pfad) ? 'nicht angegeben' : wert);
 
   const einkommen = (e: SzenarioParsed['einkommenHeute'], pfad: string) => bsp(pfad,
     e.modus === 'besoldung'
@@ -84,11 +82,6 @@ export function Angaben({ szenario, avd }: { szenario: SzenarioParsed; avd: AvdP
 
   return (
     <>
-      {offeneTexte.length > 0 && (
-        <div className="mb-2 break-inside-avoid rounded-[8px] border border-dashed border-ui-schiefer/60 px-3 py-2 text-[12px] leading-snug text-ui-tinte">
-          <strong>Noch nicht anhand von Unterlagen geprüft (Beispielwerte):</strong> {offeneTexte.join(', ')}.
-        </div>
-      )}
       <Untertitel>Haushalt</Untertitel>
       <Zweispaltig>
         <Angabe feld="Familienstand" wert={h.verheiratet ? 'Verheiratet (Splitting)' : 'Alleinstehend'} />

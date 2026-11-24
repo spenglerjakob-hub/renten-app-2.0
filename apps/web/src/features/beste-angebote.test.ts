@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { szenarioSchema } from '@renten/schema';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import {
   angebotPositionen, besteAngebote, besteAngeboteText, type AngebotPosition,
 } from './tuev-berechnung';
@@ -86,7 +86,7 @@ describe('besteAngebote — am gerechneten Fall', () => {
    * neben einer Betriebsrente ohne Kapital. Das Kapital der privaten rentiert pro
    * Jahr hoeher als jede Rente — und entschied bisher die Auszeichnung.
    */
-  const s = standardSzenario();
+  const s = musterSzenario();
   const szenario = szenarioSchema.parse({
     ...s,
     loesungen: {

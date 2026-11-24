@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { musterSzenario } from '../test/musterfall';
 import { standardSzenario } from '../store/standard';
 import { euro } from '../components/Feld';
 import {
@@ -7,9 +8,9 @@ import {
 
 const HEUTE = new Date(2026, 10, 11); // 11.11.2026
 
-/** Der Standardfall mit Namen und, auf Wunsch, einem Ehepartner. */
+/** Der Musterfall (alle Angaben eingetragen) mit Namen und, auf Wunsch, einem Ehepartner. */
 function fall(paar = false) {
-  const s = standardSzenario();
+  const s = musterSzenario();
   s.personen[0]!.vorname = 'Anna';
   s.personen[0]!.name = 'Anna Beispiel';
   if (paar) {
@@ -49,7 +50,7 @@ describe('Ergebnis-Sätze der Angaben', () => {
   });
 
   it('ohne Namen steht das Alter in Jahren — kein „Person A“', () => {
-    const s = standardSzenario();
+    const s = musterSzenario();
     expect(personenSatz(s, HEUTE)).toBe(`41 Jahre · Rentenanspruch ${euro(1500)}`);
   });
 
@@ -84,6 +85,9 @@ describe('Ergebnis-Sätze der Angaben', () => {
     const s = fall(true);
     s.einkommenGetrennt = true;
     s.einkommenPartner = { ...s.einkommenHeute, modus: 'netto', betrag: 2100 };
+    // Solange das Einkommen des Partners als fehlend gefuehrt wird, steht nur das eigene da.
+    expect(einkommenSatz(s)).toBe(`${euro(4000)} brutto im Monat`);
+    s.offen = s.offen!.filter((p) => p !== 'einkommenPartner.betrag');
     expect(einkommenSatz(s)).toBe(`${euro(4000)} brutto im Monat · ${euro(2100)} netto im Monat`);
   });
 
@@ -95,6 +99,19 @@ describe('Ergebnis-Sätze der Angaben', () => {
     expect(vertraegeSatz(s, false)).toBe('1 Vertrag');
     s.vertraege.push({} as never);
     expect(vertraegeSatz(s, false)).toBe('2 Verträge');
+  });
+
+  it('ein neuer Fall: Was fehlt, steht nicht da — auch kein Platzhalter', () => {
+    const s = standardSzenario();
+    s.personen[0]!.vorname = 'Anna';
+    // Kein Alter aus dem Platzhalter-Geburtsdatum, kein „Rentenanspruch 0 €“.
+    expect(personenSatz(s, HEUTE)).toBe('Anna');
+    expect(einkommenSatz(s)).toBe('');
+    expect(zielSatz(s)).toBe('');
+    expect(datenSatz(s, HEUTE)).toBe('Anna');
+    // Beamte: Die Besoldung kommt aus der Tabelle — sie fehlt nicht.
+    s.einkommenHeute.modus = 'besoldung';
+    expect(einkommenSatz(s)).toBe('Besoldung A13, Stufe 4');
   });
 
   it('Ziel und die Zeile der ganzen Etappe', () => {

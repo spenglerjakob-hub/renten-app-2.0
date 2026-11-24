@@ -10,17 +10,20 @@ import { szenarioSchema, type SzenarioParsed } from '@renten/schema';
  */
 
 /**
- * Was an einem frischen Fall OFFEN ist: die vorbelegten Angaben und die
- * beiden Schritte, die es bei einem neuen Fall noch nicht gibt.
+ * Was an einem frischen Fall OFFEN ist: die Angaben, die noch fehlen, die
+ * ueblichen Annahmen und die beiden Schritte, die es bei einem neuen Fall
+ * noch nicht gibt.
  *
  * Bedeutung und Art je Pfad stehen in `features/vorbelegung.ts`; ein Test
  * dort prueft, dass jeder Pfad hier einen Eintrag hat.
  */
 export const STANDARD_OFFEN: readonly string[] = [
-  // Gehoeren dem Mandanten und stimmen fast nie: Beispielwerte.
+  // Gehoeren dem Mandanten: Sie FEHLEN, bis sie jemand eintraegt.
   'personen.A.geburtsdatum',
   'personen.A.grvBruttoHeute',
   'einkommenHeute.betrag',
+  // Zaehlt erst, wenn es einen Partner mit eigenem Einkommen gibt (`relevant`).
+  'einkommenPartner.betrag',
   'haushalt.zielNettoHeute',
   // Uebliche Annahmen und typische Angaben: Standardwerte.
   'personen.A.rentenbeginn',
@@ -53,23 +56,34 @@ export const STANDARD_ANNAHMEN: Readonly<SzenarioParsed['annahmen']> = {
   inflation: 0.02, rentendynamik: 0.015, tarifIndex: 0.015, gehaltsdynamik: 0.02,
 };
 
+/**
+ * DER NEUE FALL GIBT NICHTS VOR, was dem Mandanten gehoert: kein Gehalt,
+ * kein Geburtsdatum, keinen Rentenanspruch, kein Ziel. Diese Angaben stehen
+ * in `STANDARD_OFFEN` und damit als FEHLEND im Fall — ihre Felder sind leer,
+ * und ohne sie gibt es kein Ergebnis (`features/vorbelegung.ts`).
+ *
+ * Was hier trotzdem steht, sind PLATZHALTER, weil das Schema ein gueltiges
+ * Datum und Zahlen verlangt: die Betraege 0, und ein Geburtsdatum mit dem
+ * dazu passenden Rentenbeginn. Zu sehen ist davon nichts.
+ */
 export function standardSzenario(): SzenarioParsed {
   const jahr = new Date().getFullYear();
   return szenarioSchema.parse({
     schemaVersion: 1,
     haushalt: {
       verheiratet: false, bundesland: 'Baden-Württemberg', kirchensteuer: false,
-      hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr', pkvPraemieMonat: 600,
-      zielNettoHeute: 2000,
+      hatKinder: false, kinderUnter25: 0, kvStatus: 'kvdr',
+      zielNettoHeute: 0,
     },
     annahmen: { ...STANDARD_ANNAHMEN },
     einkommenHeute: {
-      modus: 'brutto', betrag: 4000, auszahlungen: 12,
+      modus: 'brutto', betrag: 0, auszahlungen: 12,
       besoldungsgruppe: 'A13', besoldungsstufe: 4, besoldungsland: 'Baden-Württemberg',
     },
+    einkommenPartner: { betrag: 0 },
     personen: [{
       id: 'A', name: '', geburtsdatum: '01.01.1985', rentenbeginn: `01.01.${1985 + 67}`,
-      art: 'grv', grvBruttoHeute: 1500,
+      art: 'grv', grvBruttoHeute: 0,
       besoldungsgruppe: 'A13', besoldungsstufe: 8, ruhegehaltssatz: 71.75,
       dienstbeginn: `01.01.${jahr - 5}`, teilzeitphasen: [],
     }],

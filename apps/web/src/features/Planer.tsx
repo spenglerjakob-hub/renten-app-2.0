@@ -4,9 +4,12 @@ import { useSzenario } from '../store/szenario';
 import { ZahlFeld, ProzentFeld, Schalter, euro } from '../components/Feld';
 
 /**
- * Auszahlungs-Planer: Ein Kapitalstock wird ueber eine feste Zahl von Jahren
+ * Entnahmeplaner: Ein Kapitalstock wird ueber eine feste Zahl von Jahren
  * dynamisch entnommen. Verträge mit der Strategie "Kapital in den
  * Entnahmeplaner" fliessen zusaetzlich hier ein.
+ *
+ * Kein eigener Reiter mehr: Der Kasten steht unter den Vertraegen, sobald
+ * einer sein Kapital hierher gibt (`features/Vertraege.tsx`).
  */
 export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
   const planer = useSzenario((x) => x.szenario.planer);
@@ -17,12 +20,15 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
       <div className="rounded-[10px] border border-ui-linie bg-ui-karte p-4">
         <h3 className="mb-4 flex items-center gap-2 text-base font-medium text-ui-tinte">
           <Wallet className="h-4 w-4 text-ui-schiefer" aria-hidden />
-          Dynamische Verrentung
+          Entnahmeplaner
         </h3>
+        <p className="-mt-2 mb-4 text-xs leading-relaxed text-ui-schiefer">
+          Verteilt das Kapital der Verträge mit der Auszahlungsstrategie „Kapital in den Entnahmeplaner“ über feste Jahre.
+        </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <ZahlFeld
-            label="Startkapital"
+            label="Weiteres Kapital"
             wert={planer.startkapital}
             onChange={(n) => setzePlaner({ startkapital: n })}
             einheit="€"
@@ -93,8 +99,7 @@ export function Planer({ ergebnis }: { ergebnis: PlanerErgebnis | null }) {
         </div>
       ) : (
         <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
-          Noch kein Kapital erfasst. Ein Startkapital eintragen oder einen Vertrag auf
-          „Kapital in den Entnahmeplaner“ umstellen.
+          Noch kein Kapital im Entnahmeplaner — es erscheint hier, sobald das Ergebnis gerechnet ist.
         </p>
       )}
     </div>

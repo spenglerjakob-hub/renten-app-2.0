@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Printer, RotateCcw, Save } from 'lucide-react';
-import { istKinderpolice, type VertragsTyp } from '@renten/engine';
+import { istKinderpolice } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { useAuth } from '../store/auth';
 import { useAuftritt } from '../store/auftritt';
@@ -14,21 +14,18 @@ import { vornamen, woerter, type Ansprache } from '../lib/ansprache';
 import { namensTeile, mitName } from '../lib/namen';
 import { musterfallMerken } from '../lib/musterfall';
 import { NamenFelder } from '../components/Feld';
-import { EINLEITUNG, FELD, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, Karte, Titel } from '../components/stil';
-import { VertragsKarte } from '../features/Vertraege';
+import { EINLEITUNG, KNOPF, KNOPF_KLEIN, KNOPF_ZWEIT, Karte, Titel } from '../components/stil';
+import { Vertraege } from '../features/Vertraege';
 import { VertragsTuev } from '../features/VertragsTuev';
 import { Basisdaten } from '../features/Basisdaten';
 import { Konto } from '../features/Konto';
 import { tuevPositionen } from '../features/tuev-berechnung';
-import { SCHICHT_TITEL, TYPEN } from '../features/vertragsarten';
-import { fallNameAus } from '../features/personen';
+import { fallNameAus, personNameAus } from '../features/personen';
+import { fehlendeAngaben } from '../features/vorbelegung';
 import { VertragspruefungDruck } from '../druck/Vertragspruefung';
 
 /** Der Fall der Vertragspruefung liegt getrennt vom Fall im Rechner. */
 export const SPEICHER_VERTRAGSPRUEFUNG = 'rentenplaner.vertragspruefung.v1';
-
-/** Wert der Auswahl „Vertrag hinzufügen“ fuer die Kinderpolice — eine private Rente mit versicherter Person. */
-const KINDERPOLICE = 'kinderpolice';
 
 /**
  * DIE VERTRAGSPRUEFUNG — bestehende Vertraege pruefen, ohne Rentenluecke
@@ -47,8 +44,6 @@ const KINDERPOLICE = 'kinderpolice';
 export function Seite() {
   const szenario = useSzenario((x) => x.szenario);
   const setzePerson = useSzenario((x) => x.setzePerson);
-  const vertragHinzufuegen = useSzenario((x) => x.vertragHinzufuegen);
-  const kinderpoliceUmschalten = useSzenario((x) => x.kinderpoliceUmschalten);
   const tuevHinzufuegen = useSzenario((x) => x.tuevHinzufuegen);
   const zuruecksetzen = useSzenario((x) => x.zuruecksetzen);
 
@@ -59,15 +54,28 @@ export function Seite() {
     }
   }, [szenario.vertraege, szenario.tuev, tuevHinzufuegen]);
 
-  const { ergebnis } = useProjektion(szenario);
+  // Steuer und Abgaben zaehlen nur fuer eigene Vertraege — eine Kinderpolice versteuert das Kind.
+  const hatEigene = szenario.vertraege.some((v) => !istKinderpolice(v));
+  /*
+    EIN NEUER FALL GIBT NICHTS VOR (`features/vorbelegung.ts`): Geburtsdatum,
+    Rentenanspruch und Einkommen fehlen zuerst. Geprueft wird ein eigener
+    Vertrag erst, wenn sie da sind — an ihnen haengen Steuerersparnis und
+    Steuer im Alter. Das Ziel fragt diese Seite nicht; fuer eine Kinderpolice
+    braucht es keine der Angaben.
+  */
+  const fehlend = useMemo(
+    () => (hatEigene
+      ? fehlendeAngaben(szenario, (id) => personNameAus(szenario.personen, id), (p) => p !== 'haushalt.zielNettoHeute')
+      : []),
+    [szenario, hatEigene],
+  );
+  const { ergebnis } = useProjektion(fehlend.length > 0 ? null : szenario);
   const zeile = ergebnis?.zeilen.find((z) => z.jahr === ergebnis.ruhestandsjahr) ?? null;
   const positionen = useMemo(
     () => tuevPositionen(szenario, zeile, ergebnis?.kapitalauszahlungen ?? []),
     [szenario, zeile, ergebnis],
   );
 
-  // Steuer und Abgaben zaehlen nur fuer eigene Vertraege — eine Kinderpolice versteuert das Kind.
-  const hatEigene = szenario.vertraege.some((v) => !istKinderpolice(v));
   const paar = szenario.haushalt.verheiratet && szenario.personen.length > 1;
   const ansprache = useMemo<Ansprache>(() => ({
     form: 'du',
@@ -109,17 +117,6 @@ export function Seite() {
     window.location.href = '/';
   };
 
-  const hinzufuegen = (wert: string) => {
-    if (!wert) return;
-    if (wert === KINDERPOLICE) {
-      kinderpoliceUmschalten(vertragHinzufuegen(3, 'prvRente'), true);
-      return;
-    }
-    const typ = wert as VertragsTyp;
-    const schicht = ([1, 2, 3] as const).find((s) => TYPEN[s].some((x) => x.wert === typ)) ?? 3;
-    vertragHinzufuegen(schicht, typ);
-  };
-
   const a = szenario.personen.find((p) => p.id === 'A');
   const b = szenario.personen.find((p) => p.id === 'B');
 
@@ -134,7 +131,9 @@ export function Seite() {
               <button type="button" onClick={() => setKontoOffen(true)} className={KNOPF_KLEIN} aria-label="Speichern und öffnen">
                 <Save className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Speichern</span>
               </button>
-              <button type="button" onClick={drucken} className={KNOPF_KLEIN} aria-label="Drucken">
+              <button type="button" onClick={drucken} disabled={fehlend.length > 0}
+                title={fehlend.length > 0 ? 'Erst die fehlenden Angaben eintragen' : undefined}
+                className={`${KNOPF_KLEIN} disabled:cursor-not-allowed disabled:opacity-40`} aria-label="Drucken">
                 <Printer className="h-3.5 w-3.5" aria-hidden /> <span className="hidden sm:inline">Drucken</span>
               </button>
             </div>
@@ -170,41 +169,20 @@ export function Seite() {
             </div>
           </Karte>
 
+          {/* Dieselbe Liste wie im Rechner — hier mit der Kinderpolice als eigener Antwort. */}
           <Karte titel="Verträge">
-            <div className="space-y-3">
-              {szenario.vertraege.length === 0 && (
-                <p className="rounded-[10px] border border-dashed border-ui-feld-rand px-4 py-6 text-center text-sm text-ui-schiefer">
-                  Noch kein Vertrag. Unten einen hinzufügen — er steht dann sofort in der Prüfung.
-                </p>
-              )}
-              {szenario.vertraege.map((v) => (
-                <VertragsKarte
-                  key={v.id}
-                  v={v}
-                  depot={ergebnis?.depots.find((d) => d.vertragId === v.id)}
-                  auszahlung={ergebnis?.kapitalauszahlungen.find((x) => x.vertragId === v.id)}
-                  avd={ergebnis?.avd.find((x) => x.vertragId === v.id)}
-                  verrentung={ergebnis?.verrentungen.find((x) => x.vertragId === v.id)}
-                />
-              ))}
-              <div className="max-w-sm">
-                <label htmlFor="vertrag-neu" className="sr-only">Vertrag hinzufügen</label>
-                <select
-                  id="vertrag-neu"
-                  value=""
-                  onChange={(e) => hinzufuegen(e.target.value)}
-                  className={`${FELD} cursor-pointer font-medium`}
-                >
-                  <option value="">Vertrag hinzufügen …</option>
-                  {([1, 2, 3] as const).map((s) => (
-                    <optgroup key={s} label={SCHICHT_TITEL[s]}>
-                      {TYPEN[s].map((x) => <option key={x.wert} value={x.wert}>{x.text}</option>)}
-                      {s === 3 && <option value={KINDERPOLICE}>Kinderpolice (für ein Kind oder Enkel)</option>}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-            </div>
+            {szenario.vertraege.length === 0 && (
+              <p className="mb-3 text-sm text-ui-schiefer">
+                Noch kein Vertrag. Sobald einer angelegt ist, steht er in der Prüfung.
+              </p>
+            )}
+            <Vertraege
+              depots={ergebnis?.depots ?? []}
+              auszahlungen={ergebnis?.kapitalauszahlungen ?? []}
+              avdLaeufe={ergebnis?.avd ?? []}
+              verrentungen={ergebnis?.verrentungen ?? []}
+              mitKinderpolice
+            />
           </Karte>
 
           {/*
@@ -232,6 +210,7 @@ export function Seite() {
             szenario={szenario}
             automatischGeprueft
             einkommen={hatEigene ? 'feld' : 'ohne'}
+            fehlend={fehlend}
           />
 
           {/* Weiter in den Rechner — oder von vorn mit dem naechsten Kunden. */}

@@ -21,6 +21,25 @@ export const TYPEN: Record<1 | 2 | 3, { wert: VertragsTyp; text: string }[]> = {
   ],
 };
 
+/**
+ * ALLE VERTRAGSARTEN IN EINER LISTE — so fragt die Eingabe: „Um was fuer
+ * einen Vertrag handelt es sich?“. Die Schicht nennt dort niemand mehr; sie
+ * folgt aus der Art (`schichtVon`) und mit ihr die Rechenlogik.
+ *
+ * Die Reihenfolge ist die des Gespraechs: was Kunden am haeufigsten
+ * mitbringen, steht vorn. Die Woerter kommen aus `TYPEN` — eine Quelle.
+ */
+const REIHENFOLGE: readonly VertragsTyp[] = ['bav', 'riester', 'basis', 'prvRente', 'etf', 'immobilie', 'bavUkasse', 'avd'];
+export const VERTRAGSARTEN: readonly { wert: VertragsTyp; text: string }[] = REIHENFOLGE.map((wert) => ({
+  wert,
+  text: [...TYPEN[1], ...TYPEN[2], ...TYPEN[3]].find((x) => x.wert === wert)!.text,
+}));
+
+/** Die Schicht einer Vertragsart — fuer die Aufstellung nach Schichten im Ergebnis. */
+export function schichtVon(t: VertragsTyp): 1 | 2 | 3 {
+  return ([1, 2, 3] as const).find((s) => TYPEN[s].some((x) => x.wert === t)) ?? 3;
+}
+
 export const SCHICHT_TITEL: Record<1 | 2 | 3, string> = {
   1: 'Schicht 1 — Basisversorgung',
   2: 'Schicht 2 — Betrieblich und gefördert',

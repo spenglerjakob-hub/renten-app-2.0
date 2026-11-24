@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Jahreszeile } from '@renten/engine';
-import { standardSzenario } from '../store/standard';
+import { musterSzenario } from '../test/musterfall';
 import { sparzielRechnen, wunschbeitragRechnen, SPARZIEL_VORGABE } from './sparziel-berechnung';
 
 /** Eine Zeile des Rentenjahres mit 1.500 € Lücke, 26 Jahre entfernt. */
@@ -17,7 +17,7 @@ describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
   });
 
   it('eine höhere Rendite senkt Kapital und Beitrag', () => {
-    const s = standardSzenario();
+    const s = musterSzenario();
     const mit5 = sparzielRechnen(s, zeile(), { ...SPARZIEL_VORGABE, rendite: 0.05 })!;
     const mit6 = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
     expect(mit6.zielkapital).toBeLessThan(mit5.zielkapital);
@@ -26,7 +26,7 @@ describe('SPARZIEL_VORGABE — womit Sparrechner und Gutachten rechnen', () => {
 });
 
 describe('wunschbeitragRechnen — was ein Beitrag von der Lücke schließt', () => {
-  const s = standardSzenario();
+  const s = musterSzenario();
   const voll = sparzielRechnen(s, zeile(), SPARZIEL_VORGABE)!;
 
   it('der nötige Beitrag schließt die Lücke ganz — derselbe wie im Sparrechner', () => {
@@ -72,5 +72,42 @@ describe('wunschbeitragRechnen — was ein Beitrag von der Lücke schließt', ()
 
   it('ohne Lücke gibt es nichts zu rechnen', () => {
     expect(wunschbeitragRechnen(s, zeile(0), SPARZIEL_VORGABE, 100)).toBeNull();
+  });
+
+  describe('als Kapital — angespart, was fehlt, und was darüber hinaus Vermögensaufbau ist', () => {
+    const noetig = voll.gewaehlt.startbeitrag;
+
+    it('unter dem nötigen Beitrag: angespart und fehlend ergeben zusammen das Zielkapital', () => {
+      const w = wunschbeitragRechnen(s, zeile(), SPARZIEL_VORGABE, noetig / 2)!;
+      expect(w.geschlossen).toBe(false);
+      expect(w.zielkapital).toBe(voll.zielkapital);
+      expect(w.kapital).toBeCloseTo(voll.zielkapital / 2, 6);
+      expect(w.kapital + w.kapitalFehlt).toBeCloseTo(voll.zielkapital, 6);
+      expect(w.kapitalMehr).toBe(0);
+    });
+
+    it('der nötige Beitrag, auf den Euro wie angezeigt, schließt die Summe — nichts fehlt, nichts ist darüber', () => {
+      const w = wunschbeitragRechnen(s, zeile(), SPARZIEL_VORGABE, Math.round(noetig))!;
+      expect(w.geschlossen).toBe(true);
+      expect(w.kapitalFehlt).toBe(0);
+      // Hoechstens die Rundung eines halben Euro Beitrag.
+      expect(w.kapitalMehr).toBeLessThan(voll.zielkapital * (0.5 / noetig) + 1e-6);
+    });
+
+    it('das Doppelte spart das Doppelte an: das Zielkapital für die Altersvorsorge, ebenso viel Vermögensaufbau', () => {
+      const w = wunschbeitragRechnen(s, zeile(), SPARZIEL_VORGABE, noetig * 2)!;
+      expect(w.geschlossen).toBe(true);
+      expect(w.kapital).toBeCloseTo(voll.zielkapital * 2, 6);
+      expect(w.kapitalMehr).toBeCloseTo(voll.zielkapital, 6);
+      expect(w.kapitalFehlt).toBe(0);
+      // Die Lücke bleibt geschlossen — mehr als ganz gibt es dort nicht.
+      expect(w.anteil).toBe(1);
+    });
+
+    it('kein Beitrag: nichts angespart, das ganze Zielkapital fehlt', () => {
+      const w = wunschbeitragRechnen(s, zeile(), SPARZIEL_VORGABE, 0)!;
+      expect(w.kapital).toBe(0);
+      expect(w.kapitalFehlt).toBe(voll.zielkapital);
+    });
   });
 });

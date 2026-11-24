@@ -2,26 +2,32 @@ import type { SzenarioParsed } from '@renten/schema';
 import { STANDARD_OFFEN, standardSzenario } from '../store/standard';
 
 /**
- * VORBELEGUNG — welche Angaben eines Falls noch nicht vom Berater stammen.
+ * WAS AN EINEM FALL NOCH OFFEN IST — fehlende Angaben und uebliche Annahmen.
  *
- * Ein neuer Fall ist vollstaendig vorbelegt: Er rechnet ab der ersten
- * Sekunde, und der Berater prueft und korrigiert, statt bei null zu
- * beginnen. Damit daraus keine stille Behauptung wird, traegt jede
- * Vorbelegung eine Marke — am Feld, im Fortschritt und im Gutachten.
+ * Ein neuer Fall gibt NICHTS vor, was dem Mandanten gehoert: Geburtsdatum,
+ * Einkommen, Rentenanspruch und Ziel stehen leer da, bis sie jemand
+ * eintraegt. (Bis November 2026 standen dort Beispielwerte — Jahrgang 1985,
+ * 4.000 € brutto —, mit denen der Fall von der ersten Sekunde an rechnete.
+ * Das sah nach einer Auskunft aus und war keine.)
  *
  * ZWEI ARTEN, weil sie Verschiedenes bedeuten:
- *   - BEISPIEL: gehoert dem Mandanten und stimmt fast nie (Geburtsdatum,
- *     Einkommen, Rentenanspruch, Ziel). Bleibt er stehen, steht er im
- *     Gutachten als Beispielwert.
+ *   - ANGABE: gehoert dem Mandanten (Geburtsdatum, Einkommen,
+ *     Rentenanspruch, Ziel). Solange sie offen ist, FEHLT sie: Das Feld
+ *     steht leer, und ohne sie gibt es kein Ergebnis.
  *   - STANDARD: eine uebliche Annahme oder typische Angabe (Inflation,
- *     Rentenanpassung, KVdR). Passt sie, darf sie bleiben — sie ist nur
- *     sichtbar als Annahme gekennzeichnet.
+ *     Rentenanpassung, KVdR). Passt sie, darf sie bleiben — sie blockiert
+ *     nichts.
  *
  * Gespeichert wird das im Szenario selbst (`offen`), damit es mit dem Fall
  * reist: ins Konto, in die Datei, aus dem Vorsorge-Check.
+ *
+ * WAS UNTER EINER FEHLENDEN ANGABE LIEGT, ist ein technischer Platzhalter
+ * (`store/standard.ts`): Das Schema verlangt ein gueltiges Datum und Zahlen.
+ * Gezeigt und gerechnet wird damit nie — dafuer sorgen `fehlt` am Feld und
+ * `fehlendeAngaben` am Ergebnis.
  */
 
-export type VorbelegungsArt = 'beispiel' | 'standard';
+export type VorbelegungsArt = 'angabe' | 'standard';
 
 export interface VorbelegungsEintrag {
   art: VorbelegungsArt;
@@ -33,21 +39,21 @@ export interface VorbelegungsEintrag {
 
 /** Je Person mit `*` statt der Kennung: 'personen.*.geburtsdatum' gilt fuer A und B. */
 const EINTRAEGE: Record<string, VorbelegungsEintrag> = {
-  'personen.*.geburtsdatum': { art: 'beispiel', text: 'Geburtsdatum' },
-  'personen.*.grvBruttoHeute': { art: 'beispiel', text: 'Rentenanspruch' },
+  'personen.*.geburtsdatum': { art: 'angabe', text: 'Geburtsdatum' },
+  'personen.*.grvBruttoHeute': { art: 'angabe', text: 'Rentenanspruch' },
   'personen.*.rentenbeginn': { art: 'standard', text: 'Rentenbeginn', hinweis: 'Regelaltersgrenze nach Jahrgang.' },
-  'einkommenHeute.betrag': { art: 'beispiel', text: 'Einkommen' },
-  'einkommenPartner.betrag': { art: 'beispiel', text: 'Einkommen Partner' },
+  'einkommenHeute.betrag': { art: 'angabe', text: 'Einkommen' },
+  'einkommenPartner.betrag': { art: 'angabe', text: 'Einkommen Partner' },
   'einkommenHeute.modus': { art: 'standard', text: 'Art des Einkommens' },
   'einkommenHeute.auszahlungen': { art: 'standard', text: 'Gehälter im Jahr' },
-  'haushalt.zielNettoHeute': { art: 'beispiel', text: 'Zielnetto' },
+  'haushalt.zielNettoHeute': { art: 'angabe', text: 'Zielnetto' },
   'haushalt.verheiratet': { art: 'standard', text: 'Familienstand' },
   'haushalt.bundesland': { art: 'standard', text: 'Bundesland' },
   'haushalt.kirchensteuer': { art: 'standard', text: 'Kirchensteuer' },
   'haushalt.kvStatus': { art: 'standard', text: 'Krankenversicherung' },
   'haushalt.zusatzbeitrag': { art: 'standard', text: 'Zusatzbeitrag', hinweis: 'Gesetzlicher Durchschnitt.' },
   'haushalt.kinderUnter25': { art: 'standard', text: 'Kinder' },
-  'haushalt.pkv': { art: 'beispiel', text: 'PKV-Beitrag' },
+  'haushalt.pkv': { art: 'angabe', text: 'PKV-Beitrag' },
   'annahmen.inflation': { art: 'standard', text: 'Inflation', hinweis: 'Vorsichtige Annahme: 2 % pro Jahr.' },
   'annahmen.rentendynamik': {
     art: 'standard', text: 'Rentenanpassung',
@@ -87,9 +93,9 @@ const gleich = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(
 
 /*
   ALTE FAELLE tragen kein `offen`. Abgeleitet wird es aus dem Vergleich mit
-  einem frischen Fall: Was dort genauso steht, ist vermutlich noch die
-  Vorbelegung. Ohne das stuende jeder alte Fall — auch der unberuehrte
-  Beispielfall im Speicher — auf „alles erledigt“.
+  einem frischen Fall: Was dort genauso steht, hat vermutlich niemand
+  eingetragen. Ohne das stuende jeder alte Fall — auch ein unberuehrter im
+  Speicher — auf „alles erledigt“.
 
   Je Szenario-Objekt einmal: Die Felder fragen bei jedem Zeichnen, und ein
   frischer Fall kostet eine Schema-Pruefung.
@@ -107,14 +113,14 @@ function ableiten(s: SzenarioParsed): string[] {
     if (pfad === 'auswertung') continue;
     pruefe(pfad, pfad);
   }
-  // Person B kopiert beim Anlegen die Angaben von A — gleich dem Standard heisst Beispiel.
+  // Person B kopiert beim Anlegen die Angaben von A — gleich dem Platzhalter heisst: fehlt.
   if (s.haushalt.verheiratet && s.personen.some((p) => p.id === 'B')) {
     for (const feld of ['geburtsdatum', 'grvBruttoHeute', 'rentenbeginn']) {
       pruefe(`personen.B.${feld}`, `personen.A.${feld}`);
     }
   }
   // Ausgewertet ist ein alter Fall vermutlich, wenn er echte Angaben traegt.
-  if (offen.some((p) => eintragVon(p)?.art === 'beispiel' && relevant(s, p))) offen.push('auswertung');
+  if (offen.some((p) => eintragVon(p)?.art === 'angabe' && relevant(s, p))) offen.push('auswertung');
   return offen;
 }
 
@@ -142,16 +148,52 @@ export function wiederOffen(s: SzenarioParsed, pfade: readonly string[]): Szenar
   return { ...s, offen: [...alt, ...pfade.filter((p) => !alt.includes(p))] };
 }
 
-/** Die offenen Beispielwerte als Bezeichnungen, je Person mit Namen, wenn es zwei sind. */
-export function offeneBeispiele(s: SzenarioParsed, nameVon?: (id: 'A' | 'B') => string): string[] {
+/** Die Pfade der Angaben, die noch fehlen: offen, eine Angabe des Mandanten, und im Fall ueberhaupt gefragt. */
+export function fehlendePfade(s: SzenarioParsed): string[] {
+  return offenePfade(s).filter((p) => eintragVon(p)?.art === 'angabe' && relevant(s, p));
+}
+
+/** Fehlt diese eine Angabe noch? Dann steht ihr Feld leer. */
+export function fehlt(s: SzenarioParsed, pfad: string): boolean {
+  return eintragVon(pfad)?.art === 'angabe' && offenePfade(s).includes(pfad) && relevant(s, pfad);
+}
+
+/**
+ * Die fehlenden Angaben als Bezeichnungen, je Person mit Namen, wenn es zwei sind.
+ * @param nur Nur diese Pfade — etwa die eines Schritts der Angaben
+ */
+export function fehlendeAngaben(
+  s: SzenarioParsed,
+  nameVon?: (id: 'A' | 'B') => string,
+  nur: (pfad: string) => boolean = () => true,
+): string[] {
   const paar = s.haushalt.verheiratet && s.personen.length > 1;
-  return offenePfade(s)
-    .filter((p) => eintragVon(p)?.art === 'beispiel' && relevant(s, p))
-    .map((p) => {
-      const text = eintragVon(p)!.text;
-      const m = PERSON.exec(p);
-      return m && paar && nameVon ? `${text} (${nameVon(m[1] as 'A' | 'B')})` : text;
-    });
+  return fehlendePfade(s).filter(nur).map((p) => {
+    const text = eintragVon(p)!.text;
+    const m = PERSON.exec(p);
+    return m && paar && nameVon ? `${text} (${nameVon(m[1] as 'A' | 'B')})` : text;
+  });
+}
+
+/** „Geburtsdatum fehlt“, „Geburtsdatum und Einkommen fehlen“ — leer, wenn nichts fehlt. */
+export function fehltSatz(texte: readonly string[]): string {
+  if (texte.length === 0) return '';
+  if (texte.length === 1) return `${texte[0]} fehlt`;
+  return `${texte.slice(0, -1).join(', ')} und ${texte[texte.length - 1]} fehlen`;
+}
+
+/**
+ * KANN DER RECHENKERN UEBERHAUPT LAUFEN? Ohne Geburtsdatum und Einkommen
+ * (und den PKV-Beitrag, wo es einen gibt) gibt es auch kein heutiges Netto.
+ *
+ * Rentenanspruch und Ziel gehoeren NICHT dazu: Das heutige Netto haengt an
+ * ihnen nicht, und der Vorschlag fuer das Ziel („80 % des heutigen Nettos“)
+ * braucht es, bevor das Ziel eingetragen ist. Ein ERGEBNIS gibt es trotzdem
+ * erst, wenn nichts mehr fehlt (`fehlendePfade`).
+ */
+const FUER_DAS_NETTO = /^(personen\.[AB]\.geburtsdatum|einkommen(Heute|Partner)\.betrag|haushalt\.pkv)$/;
+export function rechenbar(s: SzenarioParsed): boolean {
+  return !fehlendePfade(s).some((p) => FUER_DAS_NETTO.test(p));
 }
 
 /**

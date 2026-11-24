@@ -1,6 +1,45 @@
 import { avdKinderzulageBis, type AvdKind, type AvdParameter } from '@renten/engine';
 import { Schalter } from './Feld';
 
+/** So alt darf ein Kind in der Auswahl des Geburtsjahrs hoechstens sein — darueber gibt es weder Kindergeld noch Zulage. */
+export const KIND_HOECHSTALTER = 25;
+
+/**
+ * EIN JAHR AUS EINER LISTE — wie die Auswahl der Krankenkasse.
+ *
+ * Vorher ein Zahlenfeld: Wer das Jahr loeschte, um ein anderes zu tippen,
+ * bekam eine „0“, die sich nicht wegloeschen liess (der Browser setzt sie in
+ * ein leeres Zahlenfeld zurueck), und aus „0“ und „2019“ wurde „02019“. Eine
+ * Liste kennt keine halben Eingaben — und bietet nur Jahre an, die es fuer
+ * diese Angabe gibt.
+ *
+ * Ein gespeichertes Jahr AUSSERHALB der Spanne bleibt als eigener Eintrag
+ * stehen: Sonst zeigte die Auswahl ein anderes Jahr, als gerechnet wird.
+ */
+export function JahrWahl({ id, wert, von, bis, onChange, absteigend = false, klasse = '' }: {
+  id: string;
+  wert: number;
+  von: number;
+  bis: number;
+  onChange: (jahr: number) => void;
+  /** Das juengste Jahr zuerst — fuer Geburtsjahre */
+  absteigend?: boolean;
+  klasse?: string;
+}) {
+  const jahre = Array.from({ length: Math.max(0, bis - von + 1) }, (_, i) => (absteigend ? bis - i : von + i));
+  return (
+    <select
+      id={id}
+      value={wert}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className={`ui-feld cursor-pointer tabular-nums ${klasse}`}
+    >
+      {!jahre.includes(wert) && <option value={wert}>{wert}</option>}
+      {jahre.map((j) => <option key={j} value={j}>{j}</option>)}
+    </select>
+  );
+}
+
 /**
  * Eine Zeile je Kind: Geburtsjahr, Haken "in Ausbildung", und bei gesetztem
  * Haken das Jahr, in dem die Ausbildung endet.
@@ -39,14 +78,20 @@ export function KinderZeilen({
               <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}`}>
                 {i + 1}. Kind, geb.
               </label>
-              <input
+              {/* Heute 0 bis 25 Jahre alt. Das Ende der Ausbildung wandert mit — es meint ein Alter, kein Kalenderjahr. */}
+              <JahrWahl
                 id={`kind-${i}`}
-                type="number"
-                value={kind.geburtsjahr}
-                min={1900}
-                max={2200}
-                onChange={(e) => onKind(i, { geburtsjahr: Number(e.target.value) })}
-                className="ui-feld min-w-[5.5rem] flex-1 p-1.5 text-sm tabular-nums"
+                wert={kind.geburtsjahr}
+                von={jetzt - KIND_HOECHSTALTER}
+                bis={jetzt}
+                absteigend
+                onChange={(jahr) => onKind(i, {
+                  geburtsjahr: jahr,
+                  ...(kind.ausbildungBisJahr !== undefined
+                    ? { ausbildungBisJahr: kind.ausbildungBisJahr + jahr - kind.geburtsjahr }
+                    : {}),
+                })}
+                klasse="min-w-[5.5rem] flex-1 p-1.5 text-sm"
               />
               <span className="ml-auto shrink-0 text-right text-xs text-ui-schiefer sm:w-24">
                 {jahre <= 0 ? 'kein Anspruch' : jahre === 1 ? 'noch 1 Jahr' : `noch ${jahre} Jahre`}
@@ -73,16 +118,18 @@ export function KinderZeilen({
                 <label className="w-24 shrink-0 text-xs text-ui-tinte/80" htmlFor={`kind-${i}-bis`}>
                   bis Ende
                 </label>
-                <input
+                {/*
+                  Von 18 bis 24: Bis 18 laeuft die Zulage ohnehin, und ab 25
+                  foerdert das Gesetz nicht mehr — die Liste bietet kein Jahr
+                  an, das nichts aendert.
+                */}
+                <JahrWahl
                   id={`kind-${i}-bis`}
-                  type="number"
-                  value={kind.ausbildungBisJahr}
-                  min={kind.geburtsjahr}
-                  // Hoechstens bis 25 — das Feld soll kein Jahr anbieten, das
-                  // das Gesetz ohnehin nicht mehr foerdert.
-                  max={kind.geburtsjahr + a.kinderzulageBisAlterAusbildung - 1}
-                  onChange={(e) => onKind(i, { ausbildungBisJahr: Number(e.target.value) })}
-                  className="ui-feld min-w-[5.5rem] flex-1 p-1.5 text-sm tabular-nums"
+                  wert={kind.ausbildungBisJahr ?? kind.geburtsjahr + a.kinderzulageBisAlter}
+                  von={kind.geburtsjahr + a.kinderzulageBisAlter}
+                  bis={kind.geburtsjahr + a.kinderzulageBisAlterAusbildung - 1}
+                  onChange={(jahr) => onKind(i, { ausbildungBisJahr: jahr })}
+                  klasse="min-w-[5.5rem] flex-1 p-1.5 text-sm"
                 />
                 <span className="ml-auto shrink-0 text-right text-xs text-ui-schiefer sm:w-24">
                   dann {(kind.ausbildungBisJahr ?? 0) - kind.geburtsjahr} J. alt
