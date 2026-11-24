@@ -25,8 +25,9 @@ create temp table ergebnis(nr int, pruefung text, erwartet text, tatsaechlich te
 create temp table werte(k text primary key, v text) on commit drop;
 grant all on ergebnis, werte to anon, authenticated, service_role;
 
--- Sicher vor dem Start: Abo-Pflicht aus.
-update privat.einstellungen set abo_pflicht_ab = null where id;
+-- Sicher vor dem Start: Abo-Pflicht aus. Die Erwartungen unten rechnen mit
+-- 14 Testtagen — nur in dieser Transaktion, was auch immer eingestellt ist.
+update privat.einstellungen set abo_pflicht_ab = null, testtage = 14 where id;
 
 -- ---------- Vor dem Start ----------
 set local role authenticated;

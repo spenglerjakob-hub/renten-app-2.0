@@ -411,7 +411,8 @@ select 45, 'Auch der Betreiber geht: die Firmen bleiben und gehen an W', '5 Firm
   from public.bav_firmen f where f.agentur is not null;
 
 -- ---------- Zugang nach dem Start der Abo-Pflicht ----------
-update privat.einstellungen set abo_pflicht_ab = now() - interval '30 days';
+-- Mit 14 Testtagen, nur in dieser Transaktion: Die Testphase ist dann sicher vorbei.
+update privat.einstellungen set abo_pflicht_ab = now() - interval '30 days', testtage = 14;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"60000000-0000-4000-8000-0000000a9006"}';
 insert into ergebnis

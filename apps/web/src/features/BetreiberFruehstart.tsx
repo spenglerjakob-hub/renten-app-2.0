@@ -63,6 +63,10 @@ const LINK_KLEIN = 'inline-flex items-center gap-1 text-xs font-medium text-ui-t
  * Anfragen von der Preisseite. „Zusagen“ legt den persoenlichen Link an und
  * bereitet eine E-Mail vor — abgeschickt wird sie aus dem eigenen
  * Mailprogramm; das System schreibt Interessenten nicht an.
+ *
+ * Das Formular der Preisseite gibt es nicht mehr (Early Adopter ist nur noch
+ * ein stilles Werkzeug: persoenliche Links). Die Liste bleibt fuer die
+ * Anfragen, die bis dahin kamen, bis sie nach 180 Tagen geloescht sind.
  */
 function Anfragen() {
   const [liste, setListe] = useState<FruehstartAnfrage[] | null>(null);
@@ -97,7 +101,8 @@ function Anfragen() {
   return (
     <div className="space-y-4">
       <p className="text-xs leading-relaxed text-ui-schiefer">
-        Anfragen von der Preisseite. „Zusagen“ erstellt den persönlichen Link und bereitet eine E-Mail an den
+        Anfragen aus der Zeit, als die Preisseite ein Formular dafür hatte — neue kommen nicht mehr dazu.
+        „Zusagen“ erstellt den persönlichen Link und bereitet eine E-Mail an den
         Interessenten vor; abschicken tun Sie sie aus Ihrem Mailprogramm. Der Link darin führt immer auf
         js-rentenplaner.de. Anfragen werden nach 180 Tagen gelöscht.
       </p>

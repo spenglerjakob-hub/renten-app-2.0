@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
 import { CreditCard, Minus, Plus } from 'lucide-react';
 import {
-  PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, gesamtpreis, ersparnis,
+  PAKETE, MAX_NUTZER, JAHR_MONATE, UST_HINWEIS, paketVon, preisJeNutzer, regulaerJeNutzer, gesamtpreis, ersparnis,
+  einsteigerGilt, einsteigerBisText,
   type Intervall, type PaketId,
 } from '@renten/schema/preise';
 import { FEHLER, KNOPF } from './stil';
@@ -29,6 +30,39 @@ export const preisText = (n: number) => (Number.isInteger(n) ? euroFormat : euro
  * Grund kann der Berater selbst pruefen, ob er auf ihn zutrifft.
  */
 export const EMPFOHLEN_GRUND = 'wenn Sie Privat- und Firmenkunden beraten';
+
+/**
+ * Der regulaere Preis neben dem Einsteigerpreis — durchgestrichen, fuer
+ * Vorlesende mit „statt“ davor. Nichts, sobald der Einsteigerpreis endet.
+ */
+export function StattRegulaer({ id, intervall, nutzer, klasse = '', dunkel = false }: {
+  id: PaketId; intervall: Intervall; nutzer: number; klasse?: string;
+  /** Auf getoenter Flaeche (die hervorgehobene Zeile der Staffeltabelle): Schiefer waere dort zu blass. */
+  dunkel?: boolean;
+}) {
+  if (!einsteigerGilt()) return null;
+  return (
+    <span className={`whitespace-nowrap tabular-nums ${dunkel ? 'text-ui-tinte' : 'text-ui-schiefer'} ${klasse}`}>
+      <span className="sr-only">statt regulär </span>
+      <s>{preisText(regulaerJeNutzer(id, intervall, nutzer))}</s>
+    </span>
+  );
+}
+
+/**
+ * Bis wann der Einsteigerpreis gilt und was danach kommt — ein Satz, ueberall
+ * derselbe: unter den Paketen der Preisseite und vor „Weiter zur Zahlung“.
+ */
+export function EinsteigerHinweis({ klasse = '' }: { klasse?: string }) {
+  if (!einsteigerGilt()) return null;
+  return (
+    <p className={klasse}>
+      <strong className="font-medium text-ui-tinte">Einsteigerpreis bis {einsteigerBisText()}.</strong>{' '}
+      Danach gilt der reguläre Preis — bei monatlicher Zahlung ab dem nächsten Monat, bei jährlicher ab der
+      nächsten Verlängerung.
+    </p>
+  );
+}
 
 export function IntervallSchalter({ wert, onWechsel }: { wert: Intervall; onWechsel: (i: Intervall) => void }) {
   const gratis = 12 - JAHR_MONATE;
@@ -114,10 +148,14 @@ export function PaketPreis({ id, intervall, nutzer, akzent = false }: {
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
   return (
     <div>
+      {einsteigerGilt() && (
+        <p className="mb-2 text-xs font-medium text-ui-tinte">Einsteigerpreis bis {einsteigerBisText()}</p>
+      )}
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="ui-titel text-[40px] font-normal leading-none tabular-nums text-ui-tinte">
           {akzent ? <span className="ui-hervor">{preisText(je)}</span> : preisText(je)}
         </span>
+        <StattRegulaer id={id} intervall={intervall} nutzer={nutzer} klasse="text-lg" />
         <span className="text-sm text-ui-schiefer">je Nutzer und {zeitraum}</span>
       </p>
       {intervall === 'jahr' && (
@@ -203,7 +241,10 @@ export function PaketBuchung({
                 <span className="ui-titel text-[28px] font-normal leading-none tabular-nums text-ui-tinte">
                   {preisText(preisJeNutzer(p.id, intervall, nutzer))}
                 </span>
-                <span className="mt-1 text-xs text-ui-schiefer">je Nutzer und {zeitraum}</span>
+                <span className="mt-1 text-xs text-ui-schiefer">
+                  je Nutzer und {zeitraum}
+                  <StattRegulaer id={p.id} intervall={intervall} nutzer={nutzer} klasse="ml-1.5" />
+                </span>
               </span>
             </button>
           );
@@ -220,6 +261,7 @@ export function PaketBuchung({
             Mengenrabatt: <span className="font-medium text-ui-tinte">{preisText(spart)}</span> gespart im {zeitraum}
           </p>
         )}
+        <EinsteigerHinweis klasse="mt-2 text-xs leading-relaxed text-ui-schiefer" />
       </div>
 
       <button
