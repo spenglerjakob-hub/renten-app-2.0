@@ -147,8 +147,15 @@ export function abrechnungZeile(a: Probeabrechnung): ZeilenText {
   return { ergebnis: `Netto ${euroGenau(a.netto.mit)} statt ${euroGenau(a.netto.ohne)}` };
 }
 
-export function hochrechnungZeile(h: Hochrechnung): ZeilenText {
-  return { ergebnis: `Kapital ${euro(h.kapital)} · Rente ${euro(h.renteMonat)} im Monat, geschätzt` };
+/**
+ * Das Stueck „Ihr Beitrag“: der Betrag und — seit die Hochrechnung dort
+ * steht — was daraus werden kann. Ohne Laufzeit bis zum Rentenbeginn gibt es
+ * keine Hochrechnung; dann bleibt es beim Betrag.
+ */
+export function beitragZeile(r: MitarbeiterBav, h: Hochrechnung): ZeilenText {
+  const z = rechnungZeile(r);
+  if (!z.ergebnis || h.monate <= 0) return z;
+  return { ergebnis: `${z.ergebnis} · geschätzt ${euro(h.kapital)} Kapital` };
 }
 
 export function spaeterZeile(einJahr: SpaeterZeile): ZeilenText {
