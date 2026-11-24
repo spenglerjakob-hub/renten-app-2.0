@@ -16,7 +16,7 @@ export {
 } from './preise.js';
 export {
   firmenModellSchema, firmenAngebotSchema, beratungAngabenSchema, versichererWerteSchema,
-  entscheidungSchema, axaAngabenSchema, hochrechnungSchema, beratungDatenSchema, angebotLesen, beratungLesen,
+  entscheidungSchema, axaAngabenSchema, hochrechnungSchema, gespraechSchema, beratungDatenSchema, angebotLesen, beratungLesen,
   MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS, AXA_KANAELE,
   STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, RENTENZIELE, steuerklasseAus, type SteuerklasseBeratung,
   FREI_STUFEN_MAX,

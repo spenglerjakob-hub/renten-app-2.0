@@ -18,6 +18,7 @@ import {
   ZUG_BREITE, codeText, dokumenteFuer, dokumenteText, nachweisZeilen, tinteGenug, zeitpunktText, zugAusStrichen, zugGueltig,
   type Strich,
 } from './unterschrift-daten';
+import { SCHRITTE } from './gespraech';
 
 /*
  * UNTERSCHRIFT — einfache elektronische Signatur. Der Mitarbeiter
@@ -438,7 +439,7 @@ export function UnterschriftenKarte({
           <ul className="mt-1 space-y-1">
             {offeneLuecken.map((l) => (
               <li key={l.text}>
-                — {l.text} <button type="button" onClick={() => geheZu(l.schritt, l.stueck)} className={`${LINK} text-sm`}>zu Schritt {l.schritt + 1} →</button>
+                — {l.text} <button type="button" onClick={() => geheZu(l.schritt, l.stueck)} className={`${LINK} text-sm`}>zu „{SCHRITTE[l.schritt]}“ →</button>
               </li>
             ))}
           </ul>

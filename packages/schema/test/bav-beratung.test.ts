@@ -97,6 +97,21 @@ describe('Daten einer Beratung', () => {
     expect(beratungLesen({ version: 2, schritt: 2 }).schritt).toBe(2);
   });
 
+  it('Gespräch: frühere Beratungen sind in der Vorbereitung, ohne gewählte Seiten', () => {
+    const d = beratungLesen({ version: 2, schritt: 3, angaben: { name: 'Anna' } });
+    expect(d.gespraech).toEqual({ aktiv: false });
+    // Gewaehlt bleibt gewaehlt — auch die leere Auswahl („alle Seiten“) ist eine.
+    expect(beratungLesen({ gespraech: { aktiv: true, ausgeblendet: [] } }).gespraech).toEqual({ aktiv: true, ausgeblendet: [] });
+    expect(beratungLesen({ gespraech: { aktiv: true, ausgeblendet: ['angaben.person', 'luecke.luecke'] } }).gespraech)
+      .toEqual({ aktiv: true, ausgeblendet: ['angaben.person', 'luecke.luecke'] });
+  });
+
+  it('Gespräch: ein unbrauchbarer Wert kostet nicht die ganze Beratung', () => {
+    const d = beratungLesen({ version: 2, umwandlungMonat: 200, angaben: { name: 'Anna' }, gespraech: { aktiv: 'ja', ausgeblendet: 7 } });
+    expect(d).toMatchObject({ umwandlungMonat: 200, angaben: { name: 'Anna' }, gespraech: { aktiv: false } });
+    expect(beratungLesen({ umwandlungMonat: 200, gespraech: 'kaputt' })).toMatchObject({ umwandlungMonat: 200, gespraech: { aktiv: false } });
+  });
+
   it('lesen: frühere Felder der Hochrechnung werden verworfen, die Rendite bleibt', () => {
     const d = beratungLesen({ version: 2, schritt: 3, beispielZins: 0.05, umwandlungMonat: 200, angaben: { name: 'Anna' } });
     expect(d).toMatchObject({ schritt: 3, umwandlungMonat: 200, angaben: { name: 'Anna' } });
