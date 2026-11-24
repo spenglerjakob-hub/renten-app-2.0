@@ -134,8 +134,12 @@ export {
   type BkvEingaben, type BkvErgebnis, type BkvWeg, type BkvWegId, type BkvGehalt,
 } from './analyse/bkv.js';
 export {
-  loesungsvergleich, type Loesung, type LoesungId, type LoesungsOptionen, type LoesungsVorgabe,
+  loesungsvergleich, loesungFuer, type Loesung, type LoesungId, type LoesungsOptionen, type LoesungsVorgabe,
 } from './analyse/loesungen.js';
+export {
+  loesungsmix, MIX_VERFUEGBAR, MIX_KAPITAL_MINDESTENS, MIX_MINDESTBEITRAG, MIX_BASIS_AB_STEUERQUOTE,
+  type Loesungsmix, type MixTeil, type MixWuensche, type MixGrund, type MixAusgelassen,
+} from './analyse/loesungsmix.js';
 export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,
   type FoerderKontext, type FoerderBefund,

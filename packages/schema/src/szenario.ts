@@ -540,9 +540,27 @@ export const angebotSchema = z.object({
 });
 
 /**
- * Der Loesungsvergleich: welcher Netto-Aufwand verglichen wird und die
- * erfassten Angebote. `.default({})`, damit frueher gespeicherte Dateien
- * weiter laden.
+ * Was dem Kunden bei der Vorsorge wichtig ist — die vier Fragen vor dem
+ * Vorschlag (`loesungsmix` im Rechenkern). Jede Antwort fehlt, bis sie
+ * gegeben ist: Ein Vorschlag aus vorbelegten Antworten waere keiner, der
+ * zum Kunden passt. Ein unbrauchbarer Wert faellt weg, statt den ganzen
+ * Plan unlesbar zu machen.
+ */
+export const mixWuenscheSchema = z.object({
+  /** Vor der Rente an das Geld kommen: nein, einen Teil, moeglichst alles */
+  verfuegbar: z.enum(['nein', 'teil', 'ja']).optional().catch(undefined),
+  /** Im Alter: lebenslange Rente, offen, Kapital */
+  auszahlung: z.enum(['rente', 'offen', 'kapital']).optional().catch(undefined),
+  /** Zulagen und Steuervorteile mitnehmen */
+  foerderung: z.enum(['ja', 'nein']).optional().catch(undefined),
+  /** Den Arbeitgeber einbinden (Betriebsrente) */
+  arbeitgeber: z.enum(['ja', 'nein']).optional().catch(undefined),
+});
+
+/**
+ * Die Loesungen: der Beitrag, die Wuensche des Kunden, aus denen der
+ * Vorschlag entsteht, und die erfassten Angebote. `.default({})`, damit
+ * frueher gespeicherte Dateien weiter laden.
  */
 export const loesungenSchema = z.object({
   /**
@@ -561,6 +579,8 @@ export const loesungenSchema = z.object({
   /** Arbeitgeberzuschuss als fester Betrag im Monat — mindestens gilt der Pflichtzuschuss */
   agZuschussFestMonat: z.number().min(0).max(10_000).default(0),
   lebenserwartung: z.number().int().min(60).max(120).default(85),
+  /** Was dem Kunden wichtig ist — `.default({})`: frueher gespeicherte Plaene haben noch keine Antworten */
+  wuensche: mixWuenscheSchema.default({}),
   angebote: z.array(angebotSchema).max(12).default([]),
   /**
    * Die angenommenen Angebote, als IDs aus `angebote`. Mit „Lösungen

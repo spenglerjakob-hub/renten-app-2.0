@@ -56,7 +56,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
 
   /*
     DER WUNSCHBEITRAG ist der Netto-Aufwand der Loesungen: Was hier gewaehlt
-    wird, steht im Vergleich danach als „Was wird aus … € netto im Monat?“.
+    wird, verteilt der Vorschlag danach auf die Loesungen (`Vorschlag.tsx`).
     Ein Speicher, keine zweite Zahl.
   */
   const wunsch = szenario.loesungen.nettoMonat;
@@ -345,7 +345,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
             Die ganze Lücke kostet {euro(w.noetig)} im Monat. Es muss nicht alles auf einmal sein — und mehr geht
             auch: Was darüber liegt, baut zusätzlich Vermögen auf. Mit dem Betrag, den {t.du} hier{' '}
-            {t.w('wählst', 'wählt')}, geht es in den Vergleich der Lösungen.
+            {t.w('wählst', 'wählt')}, entsteht danach {t.dein()} Vorschlag.
           </p>
 
           <div className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-start">
@@ -427,7 +427,7 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
             Kapital bei Rentenbeginn, gerechnet wie die Lücke darüber: {prozent(eingaben.rendite)} Rendite nach Kosten,{' '}
             {eingaben.dynamik > 0 ? `${prozent(eingaben.dynamik)} Beitragsdynamik` : 'gleichbleibender Beitrag'}, ohne
             Förderung. Mit Zulagen, Steuerersparnis oder dem Zuschuss des Arbeitgebers reicht derselbe Aufwand
-            weiter — das zeigt der Vergleich der Lösungen.
+            weiter — das zeigt der Vorschlag danach.
           </p>
         </section>
       ),

@@ -41,7 +41,10 @@ import { useAuth } from './store/auth';
 import { aboSichtbar, aboZusatz, rueckmeldungFaellig, useZugang, wirksam } from './store/zugang';
 import { supabaseKonfiguriert } from './lib/supabase';
 import { VertragsTuev } from './features/VertragsTuev';
-import { Angebote, Loesungen } from './features/Loesungen';
+import { Angebote } from './features/Loesungen';
+import { Vorschlag } from './features/Vorschlag';
+import { vorschlagStand } from './features/vorschlag-berechnung';
+import { mixKurz } from './features/vorschlag-texte';
 import { Abschluss } from './features/Abschluss';
 import { Antragsangaben } from './features/Antragsangaben';
 import { Antraege } from './features/Antraege';
@@ -1009,7 +1012,7 @@ export default function App() {
   const weiterEtappe = naechsteEtappe && {
     text: schritt === 'daten' ? 'Zum Ergebnis'
       : schritt === 'ergebnis' && luecke > 0 ? 'Was kostet es, die Lücke zu schließen?'
-        : schritt === 'sparen' ? 'Womit? Lösungen vergleichen'
+        : schritt === 'sparen' ? `Womit? ${t.Dein()} Vorschlag`
           : <>Weiter: {naechsteEtappe.text}</>,
     onClick: () => geheZu(naechsteEtappe.id),
   };
@@ -1134,14 +1137,19 @@ export default function App() {
   /*
     VERTRAGS-TUEV & LOESUNGEN IN STUECKEN — in der Reihenfolge des Gespraechs:
     erst was schon da ist (der TÜV, nur wenn es Vertraege gibt), dann welche
-    Foerderung liegen bleibt (nur mit Befund), dann was jede Schicht aus dem
-    Beitrag macht, zuletzt die Angebote — dort wird angenommen.
+    Foerderung liegen bleibt (nur mit Befund), dann der Vorschlag — welche
+    Mischung zum Kunden passt —, zuletzt die Angebote; dort wird angenommen.
   */
   const loesungenStand = ansichtSzenario.loesungen;
   const angeboteZahl = loesungenStand.angebote.length;
   const angenommenZahl = mitAnsicht?.loesungen.length ?? 0;
   const vertraegeZahl = ansichtSzenario.vertraege.length;
   const geprueftZahl = ansichtSzenario.tuev.filter((x) => ansichtSzenario.vertraege.some((v) => v.id === x.vertragId)).length;
+  // Der Vorschlag fuer die Zeile des Stuecks — derselbe wie im Stueck selbst (`vorschlagStand`).
+  const vorschlag = useMemo(
+    () => (ergebnis ? vorschlagStand(ansichtSzenario, zeile) : null),
+    [ergebnis, ansichtSzenario, zeile],
+  );
   const loesungenStuecke: Stueck[] = [
     ...(vertraegeZahl > 0 ? [{
       id: 'tuev',
@@ -1158,20 +1166,20 @@ export default function App() {
       inhalt: <Foerdercheck zeile={echteZeile ?? null} />,
     }] : []),
     {
-      id: 'vergleich',
-      titel: 'Lösungen vergleichen',
-      ergebnis: loesungenStand.vorgabe === 'brutto'
-        ? `${euro(loesungenStand.bruttoMonat)} Beitrag im Monat, in jeder Schicht`
-        : `${euro(loesungenStand.nettoMonat)} netto im Monat, in jeder Schicht`,
+      id: 'vorschlag',
+      titel: `${t.Dein()} Vorschlag`,
+      ergebnis: vorschlag?.mix && vorschlag.mix.teile.length > 0
+        ? mixKurz(vorschlag.mix)
+        : `${euro(loesungenStand.nettoMonat)} im Monat — noch nicht verteilt`,
       breit: true,
       inhalt: (
-        <Loesungen
+        <Vorschlag
           zeile={ergebnis ? zeile : null}
           szenario={ansichtSzenario}
           sparrate={sparrate}
           nettoHeute={nettoHeute}
-          // Das erfasste Angebot wartet bei den Angeboten auf die Rente des Anbieters.
-          onErfasst={() => zeigeStueck('loesungen', 'angebote')}
+          // Die Bausteine warten bei den Angeboten auf die Rente des Anbieters.
+          onUebernommen={() => zeigeStueck('loesungen', 'angebote')}
         />
       ),
     },
@@ -1648,7 +1656,7 @@ export default function App() {
           <>
             {/*
               KEIN EIGENER TITEL: Jedes Stueck dieser Etappe bringt seine Frage
-              als Titel mit („Was wird aus 100 € netto im Monat?“) — „Vertrags-TÜV
+              als Titel mit („Welche Mischung passt zu dir?“) — „Vertrags-TÜV
               & Lösungen“ steht schon in der Zeile darueber.
             */}
             {(paarUmschalter || angabenFehlen) && (
@@ -1692,7 +1700,7 @@ export default function App() {
             inhaberName={paar && !einzeln ? nameVon : undefined}
             vorspann={paarUmschalter}
             onZuLoesungen={zuDenAngeboten}
-            onWeitereLoesung={() => { zeigeStueck('loesungen', 'vergleich'); geheZu('loesungen'); }}
+            onWeitereLoesung={() => { zeigeStueck('loesungen', 'vorschlag'); geheZu('loesungen'); }}
             danach={[
               // Die Angaben fuer den Antrag — sobald etwas angenommen ist, fuer den ganzen Haushalt.
               ...(mitHaushalt.loesungen.length > 0 ? [{
