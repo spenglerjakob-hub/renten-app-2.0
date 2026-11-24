@@ -2,13 +2,12 @@ import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import {
   PAKETE, STAFFEL_AB, TESTTAGE, MAX_NUTZER, UST_HINWEIS,
-  preisJeNutzer, staffelIndex, type Intervall, type PaketId,
+  preisJeNutzer, staffelIndex, einsteigerGilt, einsteigerBisText, type Intervall, type PaketId,
 } from '@renten/schema/preise';
 import { SeitenKopf } from '../components/SeitenKopf';
-import { FruehstartAnfrage } from './FruehstartAnfrage';
 import { RechtsLinks } from '../components/RechtsLinks';
 import {
-  EMPFOHLEN_GRUND, IntervallSchalter, NutzerWahl, PaketPreis, preisText,
+  EMPFOHLEN_GRUND, EinsteigerHinweis, IntervallSchalter, NutzerWahl, PaketPreis, StattRegulaer, preisText,
 } from '../components/PaketWahl';
 import {
   EINLEITUNG, FELD_LABEL, Hinweise, KNOPF, KNOPF_ZWEIT, LINK, Titel, Zahl,
@@ -23,6 +22,10 @@ import { ScrollBereich } from '../components/ScrollBereich';
  * dahin sieht die Seite nur, wer die Adresse kennt.
  *
  * Alle Zahlen kommen aus `@renten/schema` (preise.ts); hier steht keine.
+ *
+ * EINSTEIGERPREIS: Bis EINSTEIGER_BIS steht er gross da, der regulaere
+ * durchgestrichen daneben — in den Karten wie in der Staffeltabelle. Danach
+ * verschwindet alles dazu von selbst, und die Seite nennt den regulaeren.
  */
 
 /** Was jedes Paket enthaelt — in der Sprache der Berater, nicht der Technik. */
@@ -92,6 +95,12 @@ const FRAGEN: { frage: string; antwort: string }[] = [
     antwort: `${TESTTAGE} Tage lang alle Funktionen (All inklusive), ohne Zahlungsdaten. Die Testphase endet `
       + 'von selbst — Kosten entstehen erst, wenn Sie ein Paket buchen.',
   },
+  ...(einsteigerGilt() ? [{
+    frage: 'Was ist der Einsteigerpreis?',
+    antwort: `Bis zum ${einsteigerBisText()} zahlen Sie in jedem Paket und jeder Staffel den Einsteigerpreis statt `
+      + 'des regulären Preises. Danach gilt der reguläre Preis, der durchgestrichen daneben steht: bei monatlicher '
+      + 'Zahlung ab dem nächsten Monat, bei jährlicher ab der nächsten Verlängerung.',
+  }] : []),
   {
     frage: 'Wie funktioniert der Mengenrabatt?',
     antwort: 'Der Preis richtet sich nach der Zahl der Nutzer in Ihrem Büro und gilt für alle: ab 3, ab 5 und '
@@ -177,6 +186,7 @@ export function Seite() {
   const [nutzer, setNutzer] = useState(3);
   const staffel = staffelIndex(nutzer);
   const zeitraum = intervall === 'jahr' ? 'Jahr' : 'Monat';
+  const einstieg = einsteigerGilt();
 
   return (
     <div className="min-h-screen bg-ui-flaeche text-ui-tinte">
@@ -188,14 +198,12 @@ export function Seite() {
           <Titel gross>Preise</Titel>
           <p className={`mt-3 ${EINLEITUNG}`}>
             Für Finanz- und Versicherungsberater. {TESTTAGE} Tage kostenlos testen — ohne Zahlungsdaten, mit
-            allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt.
+            allen Funktionen. Danach wählen Sie das Paket, das zu Ihrer Beratung passt
+            {einstieg ? <> — bis {einsteigerBisText()} zum Einsteigerpreis.</> : '.'}
           </p>
           <p className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
             <a href="/schnellrechnung" className={LINK}>
               Erst ausprobieren? Schnellrechnung ohne Anmeldung →
-            </a>
-            <a href="#early-adopter" className={LINK}>
-              Vor dem Start: Early Adopter werden →
             </a>
           </p>
         </div>
@@ -247,17 +255,19 @@ export function Seite() {
               </section>
             ))}
           </div>
-          <p className="text-xs text-ui-schiefer">Alle Preise netto, {UST_HINWEIS}</p>
+          <div className="space-y-1 text-xs leading-relaxed text-ui-schiefer">
+            <p>Alle Preise netto, {UST_HINWEIS}</p>
+            <EinsteigerHinweis />
+          </div>
 
           <ZeitRechnung />
         </section>
-
-        <FruehstartAnfrage />
 
         <section aria-labelledby="staffel">
           <Titel als="h2" id="staffel">Mengenrabatt</Titel>
           <p className={`mt-2 ${EINLEITUNG}`}>
             Preis je Nutzer und {zeitraum} — der Preis der erreichten Staffel gilt für alle Nutzer im Büro.
+            {einstieg && <> Oben der Einsteigerpreis bis {einsteigerBisText()}, darunter der reguläre.</>}
           </p>
           <ScrollBereich name="Tabelle: Mengenrabatt" klasse="ui-karte mt-5">
             <table className="w-full text-left text-sm">
@@ -283,6 +293,10 @@ export function Seite() {
                     {PAKETE.map((p) => (
                       <td key={p.id} className="px-4 py-3 text-right tabular-nums sm:px-7">
                         {preisText(preisJeNutzer(p.id, intervall, STAFFEL_AB[i]!))}
+                        <StattRegulaer
+                          id={p.id} intervall={intervall} nutzer={STAFFEL_AB[i]!}
+                          klasse="block text-xs font-normal" dunkel={i === staffel}
+                        />
                       </td>
                     ))}
                   </tr>

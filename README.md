@@ -215,6 +215,24 @@ Functions mit Stripe (`supabase/functions/abo-*`, ohne SDK, API-Version fest):
 Preise stehen nur in `packages/schema/src/preise.ts`. Nach einer Aenderung dort
 in "Abo & Team" die Preise abgleichen; laufende Abos behalten ihren Preis.
 
+**Einsteigerpreis bis 31.12.2027** (`EINSTEIGER_BIS`, je Paket `einsteiger`):
+Bis dahin rechnen Preisseite, Buchung und der Abgleich mit Stripe mit dem
+Einsteigerpreis; der regulaere steht durchgestrichen daneben. Ab dem 1.1.2028
+nennt die Seite von selbst den regulaeren Preis. **Stripe zieht nicht von
+selbst nach** — Anfang Januar 2028:
+
+1. in "Abo & Team" die Preise abgleichen (neue Buchungen kosten dann regulaer),
+2. die laufenden Abos auf den neuen Preis umstellen: monatliche zum naechsten
+   Zeitraum, jaehrliche zur naechsten Verlaengerung (so steht es in den
+   Nutzungsbedingungen, Abschnitt 4 "Einsteigerpreis"). Dafuer gibt es noch
+   kein Werkzeug; bis dahin im Stripe-Dashboard je Abo.
+
+Die Testphase dauert 30 Tage: `TESTTAGE` in preise.ts und
+`privat.einstellungen.testtage` muessen zusammenpassen.
+
+Early Adopter ist nur noch ein stilles Werkzeug des Betreibers (persoenliche
+Links unter "Abo & Team"); auf der Preisseite steht das Angebot nicht mehr.
+
 Secrets unter Supabase → Edge Functions → Secrets:
 
 | Secret | Woher |

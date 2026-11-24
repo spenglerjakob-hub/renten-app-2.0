@@ -14,6 +14,11 @@ import { Hinweis } from '../components/stil';
  * Anwalts oder eines Generators mit Abmahnschutz. Der Vermerk oben bleibt,
  * bis `ENTWURF` auf false steht.
  *
+ * Zahlen des Abos (Testtage, Ende des Einsteigerpreises) stehen hier als
+ * Text, nicht als Import aus preise.ts: Auf `live` fehlt der Abschnitt 4
+ * noch (siehe unten), ein Import bliebe dort ungenutzt. Dass Text und
+ * preise.ts zusammenpassen, prueft `preise-im-text.test.ts`.
+ *
  * Aendert sich die Verarbeitung (neuer Dienst, neue Daten), muss die
  * Datenschutzerklaerung mitgezogen werden. Aendern sich die
  * Nutzungsbedingungen, auch NUTZUNGSBEDINGUNGEN_FASSUNG in
@@ -402,10 +407,11 @@ function Datenschutz() {
         über Ihre Kunden hinein.
       </P>
       <P>
-        Auf der Preisseite können Sie eine Teilnahme als <strong>Early Adopter</strong> anfragen. Dafür verarbeiten
-        wir Ihren Namen, Ihre E-Mail-Adresse und — wenn Sie sie angeben — Ihr Büro und die Zahl der Berater, um
+        Bis November 2026 konnten Sie auf der Preisseite eine Teilnahme als <strong>Early Adopter</strong>{' '}
+        anfragen; das Formular gibt es nicht mehr. Aus den Anfragen, die bis dahin eingingen, verarbeiten
+        wir Ihren Namen, Ihre E-Mail-Adresse und — wenn Sie sie angegeben haben — Ihr Büro und die Zahl der Berater, um
         Ihre Anfrage zu prüfen und zu beantworten (Art. 6 Abs. 1 lit. b DSGVO, vorvertragliche Maßnahme). Die
-        Anfrage liegt bei Supabase in der EU; wir erhalten sie zusätzlich per E-Mail, versandt über unser Postfach
+        Anfrage liegt bei Supabase in der EU; wir haben sie zusätzlich per E-Mail erhalten, versandt über unser Postfach
         bei Hostinger. Eine automatische Antwort an die eingetragene Adresse schicken wir nicht. Nach 180 Tagen
         wird die Anfrage gelöscht, unabhängig von ihrem Ausgang.
       </P>
@@ -598,7 +604,7 @@ function Nutzungsbedingungen() {
       </P>
       <Liste>
         <li>
-          <strong>Testphase.</strong> Neue Konten nutzen alle Funktionen ab dem Start des Abos 14 Tage kostenlos.
+          <strong>Testphase.</strong> Neue Konten nutzen alle Funktionen ab dem Start des Abos 30 Tage kostenlos.
           Die Testphase endet von selbst; es entstehen keine Kosten, und Zahlungsdaten sind dafür nicht nötig.
         </li>
         <li>
@@ -607,6 +613,13 @@ function Nutzungsbedingungen() {
           sind. Alle Preise verstehen sich je Nutzer und zuzüglich der gesetzlichen Umsatzsteuer. Der Preis je
           Nutzer richtet sich nach der Zahl der gebuchten Plätze; der Preis der erreichten Staffel gilt für alle
           Plätze des Büros.
+        </li>
+        <li>
+          <strong>Einsteigerpreis.</strong> Für Zeiträume, die bis zum 31. Dezember 2027 beginnen, gilt der
+          auf der Preisseite genannte Einsteigerpreis. Für Zeiträume, die danach beginnen, gilt der reguläre
+          Preis, der bei der Buchung daneben genannt ist — bei monatlicher Zahlung ab dem nächsten Monat, bei
+          jährlicher ab der nächsten Verlängerung. Einer gesonderten Ankündigung bedarf es dafür nicht; Ihr
+          Recht, zum Ende des laufenden Zeitraums zu kündigen, bleibt unberührt. [Prüfen lassen.]
         </li>
         <li>
           <strong>Büro und Plätze.</strong> Gebucht wird für ein Büro. Wer bucht, verwaltet das Abo und kann

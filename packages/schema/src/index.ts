@@ -9,8 +9,9 @@ export {
   type ImportErgebnis,
 } from './migration.js';
 export {
-  PAKETE, STAFFEL_AB, JAHR_MONATE, TESTTAGE, MAX_NUTZER, UST_HINWEIS,
-  paketVon, staffelIndex, preisJeNutzer, gesamtpreis, ersparnis, jahresvorteil,
+  PAKETE, STAFFEL_AB, JAHR_MONATE, TESTTAGE, MAX_NUTZER, UST_HINWEIS, EINSTEIGER_BIS,
+  paketVon, staffelIndex, preisJeNutzer, regulaerJeNutzer, gesamtpreis, ersparnis, jahresvorteil,
+  einsteigerGilt, einsteigerBisText,
   lookupKey, stripeStaffeln, paketDeckt,
   type Paket, type PaketId, type Bereich, type Intervall,
 } from './preise.js';
