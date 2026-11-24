@@ -1020,12 +1020,16 @@ export default function App() {
   const zuDenAngeboten = () => { zeigeStueck('loesungen', 'angebote'); geheZu('loesungen'); };
 
   /*
-    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, gleich danach die
-    Kaufkraft — sie erklaert, warum aus dem eingetragenen Ziel im Ring ein
-    hoeherer Betrag geworden ist —, dann woher das Netto kommt. „Weiter“
-    fuehrt von dort zum Sparrechner: Was die Luecke kostet, steht dort und
-    nicht mehr schon hier. Steuer und Rechtsstand sind Nachschlagen:
-    Vertiefungen.
+    DAS ERGEBNIS IN STUECKEN. Auf dem Weg: die Luecke, dann woher das Netto
+    kommt. „Weiter“ fuehrt von dort zum Sparrechner: Was die Luecke kostet,
+    steht dort und nicht mehr schon hier.
+
+    Zum Vertiefen, also Nachschlagen: Kaufkraft, Steuer, Rechtsstand. Die
+    Kaufkraft stand bis November 2026 auf dem Weg — sie erklaerte, warum aus
+    dem eingetragenen Ziel im Ring ein hoeherer Betrag geworden war. Seit
+    die Betraege in heutiger Kaufkraft stehen, zeigt der Ring das Ziel, wie
+    es eingetragen wurde, und die Erklaerung braucht nur noch, wer auf
+    „Nominal“ umschaltet.
   */
   const kk = kaufkraft(zeile);
   const ergebnisStuecke: Stueck[] = !ergebnis ? [] : [
@@ -1038,18 +1042,6 @@ export default function App() {
       // Das eine schwebende Stueck der Etappe: Ring, Netto, Luecke und der Kernsatz.
       inhalt: <ErgebnisRing zeile={zeile} kaufkraftHeute={kaufkraftHeute} breit />,
     },
-    ...(kk ? [{
-      id: 'kaufkraft',
-      titel: 'Kaufkraft bis zum Rentenbeginn',
-      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
-      inhalt: (
-        <KaufkraftKarte
-          zeile={zeile}
-          inflation={szenario.annahmen.inflation}
-          standard={offenePfade(szenario).includes('annahmen.inflation')}
-        />
-      ),
-    }] : []),
     {
       id: 'netto',
       titel: `Woher ${t.dein()} Netto kommt`,
@@ -1093,6 +1085,19 @@ export default function App() {
         </div>
       ),
     },
+    ...(kk ? [{
+      id: 'kaufkraft',
+      vertiefung: true,
+      titel: 'Kaufkraft bis zum Rentenbeginn',
+      ergebnis: `${euro(kk.bedarfHeute)} heute entsprechen ${kk.jahr} ${euro(kk.bedarfNominal)}`,
+      inhalt: (
+        <KaufkraftKarte
+          zeile={zeile}
+          inflation={szenario.annahmen.inflation}
+          standard={offenePfade(szenario).includes('annahmen.inflation')}
+        />
+      ),
+    }] : []),
     {
       id: 'steuer',
       vertiefung: true,

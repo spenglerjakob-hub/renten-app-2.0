@@ -44,8 +44,8 @@ import { unterlageErfassen } from './festschreiben';
 import { UnterschriftenKarte, festgeschriebenDrucken, type Luecke, type Unterzeichner } from './Unterschrift';
 import { ScrollBereich } from '../components/ScrollBereich';
 import {
-  abrechnungZeile, anbieterSatz, angebotSatz, angebotVertraege, axaZeile, einkommenZeile, entscheidungZeile, grvZeile,
-  hochrechnungZeile, kennzahlenZeile, kvZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile, rechnungZeile, spaeterZeile,
+  abrechnungZeile, anbieterSatz, angebotSatz, angebotVertraege, axaZeile, einkommenUndKvZeile, entscheidungZeile, grvZeile,
+  hochrechnungZeile, kennzahlenZeile, lueckeMitZeile, lueckeZeile, ortZeile, personZeile, rechnungZeile, spaeterZeile,
   unterlagenZeile, vertragZeile, vorsorgeZeile,
 } from './zeilen';
 
@@ -163,8 +163,14 @@ export function SchrittAngebot({ firma, logo }: SchrittProps) {
         </div>
       ),
     },
+    /*
+      ZUM VERTIEFEN, nicht auf dem Weg: eine Liste von Bedingungen, bevor der
+      Mitarbeiter seine eigenen Zahlen gesehen hat, haelt nur auf. Sie steht
+      unter dem Angebot als Zeile und in den gedruckten Unterlagen.
+    */
     {
       id: 'bedingungen',
+      vertiefung: true,
       titel: 'Anbieter und Bedingungen',
       ergebnis: anbieterSatz(a),
       inhalt: (
@@ -246,12 +252,17 @@ export function SchrittAngaben({ firma, daten, setze, gesperrt }: SchrittProps) 
         </Inhalt>
       ),
     },
+    /*
+      EINKOMMEN, STEUER UND KRANKENVERSICHERUNG in einem Stueck: Die
+      Krankenversicherung war ein eigenes — fuer zwei Felder ein „Weiter“
+      mehr. Zwei Karten untereinander, eine Zeile im Ablauf.
+    */
     {
       id: 'einkommen',
-      titel: 'Einkommen und Steuer',
-      ...einkommenZeile(a),
+      titel: 'Einkommen, Steuer und Krankenversicherung',
+      ...einkommenUndKvZeile(a),
       inhalt: (
-        <Inhalt gesperrt={gesperrt}>
+        <Inhalt gesperrt={gesperrt} klasse="space-y-5 sm:space-y-6">
           <Karte titel="Einkommen und Steuer">
             <div className="space-y-3">
               {/* Das Monatsgehalt wie auf der Abrechnung; gespeichert wird das Jahr mit Sonderzahlungen. */}
@@ -303,15 +314,6 @@ export function SchrittAngaben({ firma, daten, setze, gesperrt }: SchrittProps) 
               </div>
             </div>
           </Karte>
-        </Inhalt>
-      ),
-    },
-    {
-      id: 'kv',
-      titel: 'Krankenversicherung',
-      ...kvZeile(a),
-      inhalt: (
-        <Inhalt gesperrt={gesperrt}>
           <Karte titel="Krankenversicherung">
             <div className="space-y-3">
               <div className={ZWEI}>
@@ -1285,8 +1287,14 @@ export function SchrittLeistung({ firma, daten, setze, r, leistung, kennzahlen, 
       breit: true,
       inhalt: <LueckeMitBetriebsrenteKarte luecke={luecke} x={geschlossen} aktuell={aktuell} />,
     }] : []),
+    /*
+      ZUM VERTIEFEN: Netto-Hebel, Nettorendite und Amortisation sind Zahlen
+      fuer den Berater. Fuer den Mitarbeiter endet der Weg mit dem Stueck
+      davor — was von seiner Luecke die Betriebsrente schliesst.
+    */
     ...(kennzahlen ? [{
       id: 'kennzahlen',
+      vertiefung: true,
       titel: 'Kennzahlen und Fazit',
       ...kennzahlenZeile(kennzahlen),
       breit: true,
