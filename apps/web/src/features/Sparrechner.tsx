@@ -3,8 +3,8 @@ import type { Jahreszeile } from '@renten/engine';
 import { useSzenario } from '../store/szenario';
 import { AkkordeonKarte, ZahlFeld, ProzentFeld, euro, prozent } from '../components/Feld';
 import { useSchmal } from '../components/useSchmal';
-import { anteilAmNetto, anteilAnLuecke } from './bezug';
-import { Hervor, Karte, Kernsatz, Posten, Regler, SCHWEBEND } from '../components/stil';
+import { anteilAmNetto } from './bezug';
+import { Hervor, Karte, Kernsatz, Posten, Regler, SCHWEBEND, Zahl } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
 import {
   sparzielRechnen, wunschbeitragRechnen, SPARZIEL_VORGABE, type SparzielEingaben,
@@ -24,7 +24,7 @@ import { Stuecke, type Stueck } from '../components/Ablauf';
  * In drei Stuecken (`components/Ablauf`): was die Luecke kostet (mit den
  * Annahmen darunter und, zum Aufklappen, was die Beitragsdynamik aendert),
  * was Warten kostet — und zuletzt die Frage, mit der es in die Loesungen
- * geht: Was willst du zuruecklegen, und wie viel der Luecke schliesst das?
+ * geht: Was willst du zuruecklegen, und welches Kapital entsteht daraus?
  */
 export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHeute = true }: {
   zeile: Jahreszeile;
@@ -66,6 +66,10 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
     () => wunschbeitragRechnen(szenario, zeile, eingaben, wunsch),
     [szenario, zeile, eingaben, wunsch],
   );
+
+  // Der Regler reicht bis zum Doppelten des noetigen Beitrags; der Balken misst am groesseren von Ziel und Angespartem.
+  const reglerMax = w ? Math.max(100, Math.ceil((2 * w.noetig) / 50) * 50) : 100;
+  const balkenBasis = w ? Math.max(w.zielkapital, w.kapital, 1) : 1;
 
   const setze = (teil: Partial<SparzielEingaben>) =>
     setEingaben((x) => ({ ...x, ...teil }));
@@ -313,27 +317,38 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
     }] : []),
     /*
       DIE BRUECKE ZU DEN LOESUNGEN. Bis hierher steht, was die ganze Luecke
-      kostet — oft mehr, als jemand zuruecklegen will. Hier waehlt der Kunde
-      seinen Betrag und sieht, wie viel der Luecke er schliesst; mit diesem
-      Betrag rechnet der Vergleich der Loesungen weiter.
+      kostet — oft mehr, als jemand zuruecklegen will, manchmal weniger. Hier
+      waehlt der Kunde seinen Betrag; mit ihm rechnet der Vergleich der
+      Loesungen weiter.
+
+      DAS ERGEBNIS STEHT ALS KAPITAL DA, nicht als Anteil der Luecke: Eine
+      Summe laesst sich greifen. Links, was der Beitrag anspart; rechts, was
+      zur Rentenluecke noch fehlt; darunter die Summe, die die ganze Luecke
+      braucht. Der Regler reicht bis zum DOPPELTEN des noetigen Beitrags: Ist
+      die Luecke geschlossen, steht links das Kapital fuer die Altersvorsorge,
+      rechts kommt hinzu, was darueber hinaus Vermoegen aufbaut, und darunter
+      die Gesamtsumme.
     */
     ...(w ? [{
       id: 'wunsch',
       titel: `Was ${t.w('willst du', 'wollt ihr')} zurücklegen?`,
-      ergebnis: w.anteil >= 0.995
-        ? `${euro(wunsch)} im Monat schließen die Lücke ganz`
-        : `${euro(wunsch)} im Monat schließen ${anteilAnLuecke(w.anteil)} der Lücke`,
+      ergebnis: !w.geschlossen
+        ? `${euro(wunsch)} im Monat · ${euro(w.kapital)} Kapital, ${euro(w.kapitalFehlt)} fehlen zur Lücke`
+        : w.kapitalMehr >= 1
+          ? `${euro(wunsch)} im Monat · Lücke geschlossen, dazu ${euro(w.kapitalMehr)} Vermögensaufbau`
+          : `${euro(wunsch)} im Monat schließen die Lücke ganz`,
       inhalt: (
         <section aria-labelledby="wunsch-titel" className={`${SCHWEBEND} p-5 sm:p-7`}>
           <h3 id="wunsch-titel" className="text-lg font-medium tracking-[-0.01em] text-ui-tinte sm:text-xl">
             Was {t.w('willst du', 'wollt ihr')} zurücklegen?
           </h3>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ui-schiefer">
-            Die ganze Lücke kostet {euro(w.noetig)} im Monat. Es muss nicht alles auf einmal sein: Mit dem
-            Betrag, den {t.du} hier {t.w('wählst', 'wählt')}, geht es in den Vergleich der Lösungen.
+            Die ganze Lücke kostet {euro(w.noetig)} im Monat. Es muss nicht alles auf einmal sein — und mehr geht
+            auch: Was darüber liegt, baut zusätzlich Vermögen auf. Mit dem Betrag, den {t.du} hier{' '}
+            {t.w('wählst', 'wählt')}, geht es in den Vergleich der Lösungen.
           </p>
 
-          <div className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-center">
+          <div className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] sm:items-start">
             <ZahlFeld
               label={`${t.Dein()} Beitrag im Monat`}
               wert={wunsch}
@@ -342,50 +357,74 @@ export function Sparrechner({ zeile, onStartbeitrag, nettoHeute = 0, kaufkraftHe
               schritt={25}
               max={10_000}
             />
-            {/* Bis zum vollen Beitrag, aufgerundet — mehr laesst sich im Feld eintragen. */}
-            <Regler
-              wert={wunsch}
-              max={Math.max(100, Math.ceil(w.noetig / 50) * 50)}
-              schritt={5}
-              onChange={setzeWunsch}
-              beschriftung="Beitrag im Monat"
-              wertText={`${wunsch} Euro im Monat`}
-              klasse="sm:mt-5"
-            />
+            {/* Bis zum Doppelten des noetigen Beitrags, aufgerundet — mehr laesst sich im Feld eintragen. */}
+            <div className="sm:mt-8">
+              <Regler
+                wert={wunsch}
+                max={reglerMax}
+                schritt={5}
+                onChange={setzeWunsch}
+                beschriftung="Beitrag im Monat"
+                wertText={`${wunsch} Euro im Monat`}
+              />
+              {/* Wo die Luecke schliesst: in der Mitte des Reglers. Nur zur Orientierung — der Satz darunter sagt es ohnehin. */}
+              <div aria-hidden className="relative mt-2 h-4 text-xs text-ui-schiefer">
+                <span className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${(w.noetig / reglerMax) * 100}%` }}>
+                  {euro(w.noetig)} schließt die Lücke
+                </span>
+                <span className="absolute right-0 whitespace-nowrap tabular-nums">{euro(reglerMax)}</span>
+              </div>
+            </div>
           </div>
 
           <Kernsatz klasse="mt-6">
-            {w.anteil >= 0.995
-              ? <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke <Hervor>ganz</Hervor>.</>
-              : <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} <Hervor>{anteilAnLuecke(w.anteil)}</Hervor> der Lücke.</>}
+            {!w.geschlossen
+              ? <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('sparst du', 'spart ihr')} bis {zeile.jahr} <Hervor>{euro(w.kapital)}</Hervor> an.</>
+              : w.kapitalMehr >= 1
+                ? <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke — und {t.w('baust', 'baut')} dazu <Hervor>{euro(w.kapitalMehr)}</Hervor> Vermögen auf.</>
+                : <>Mit <Hervor>{euro(wunsch)}</Hervor> im Monat {t.w('schließt du', 'schließt ihr')} die Lücke <Hervor>ganz</Hervor>.</>}
           </Kernsatz>
 
-          {/* Der Anteil als Balken — geschlossen in Tinte, offen im Stein der Luecke. */}
+          {/*
+            Das Kapital als Balken, in den Farben der beiden Zahlen darunter:
+            angespart in Tinte, was fehlt im Stein der Luecke — und sobald sie
+            geschlossen ist, der Vermoegensaufbau daneben in Grau.
+          */}
           <div
             role="img"
-            aria-label={`${Math.round(w.anteil * 100)} % der Lücke geschlossen`}
-            className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-ui-luecke"
+            aria-label={w.geschlossen
+              ? `Die Lücke ist geschlossen, dazu ${euro(w.kapitalMehr)} Vermögensaufbau`
+              : `${euro(w.kapital)} von ${euro(w.zielkapital)} angespart`}
+            className="mt-5 flex h-2.5 w-full overflow-hidden rounded-full bg-ui-luecke"
           >
-            <div className="h-full rounded-full bg-ui-tinte transition-all duration-500" style={{ width: `${w.anteil * 100}%` }} />
+            <div className="h-full bg-ui-tinte transition-all duration-500" style={{ width: `${(Math.min(w.kapital, w.zielkapital) / balkenBasis) * 100}%` }} />
+            {w.kapitalMehr > 0 && (
+              <div className="h-full bg-ui-daten-2 transition-all duration-500" style={{ width: `${(w.kapitalMehr / balkenBasis) * 100}%` }} />
+            )}
           </div>
-          <dl className="mt-3 text-sm">
-            {kaufkraftHeute ? (
+          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            {w.geschlossen ? (
               <>
-                <Posten text="Davon geschlossen, in heutiger Kaufkraft" wert={`${euro(w.gedecktHeute)} im Monat`} />
-                <Posten text="Bleibt offen" wert={`${euro(w.restMonat / zeile.kaufkraftfaktor)} im Monat`} />
+                <Zahl punkt="bg-ui-tinte" etikett="Kapital für die Altersvorsorge" wert={euro(w.zielkapital)} unter="schließt die Rentenlücke" />
+                <Zahl punkt="bg-ui-daten-2" etikett="+ Vermögensaufbau" wert={euro(w.kapitalMehr)} unter="zusätzliches Kapital, über die Lücke hinaus" />
               </>
             ) : (
               <>
-                <Posten text={`Davon geschlossen, im Jahr ${zeile.jahr}`} wert={`${euro(w.gedecktMonat)} im Monat`} />
-                <Posten text="Bleibt offen" wert={`${euro(w.restMonat)} im Monat`} />
+                <Zahl punkt="bg-ui-tinte" etikett="Damit angespart" wert={euro(w.kapital)} unter={`bis zum Rentenbeginn ${zeile.jahr}`} />
+                <Zahl punkt="bg-ui-luecke" etikett="Fehlt zur Rentenlücke" wert={euro(w.kapitalFehlt)} unter={`mit ${euro(w.noetig)} im Monat wäre sie geschlossen`} />
               </>
             )}
+          </dl>
+          <dl className="mt-4 text-sm">
+            {w.geschlossen
+              ? <Posten summe text={`Gesamtsumme bis ${zeile.jahr}`} wert={euro(w.zielkapital + w.kapitalMehr)} />
+              : <Posten summe text="Kapital für die ganze Rentenlücke" wert={euro(w.zielkapital)} />}
             {anteilAmNetto(wunsch, nettoHeute) && (
-              <Posten text={`Anteil an ${t.dein('em')} heutigen Netto`} wert={anteilAmNetto(wunsch, nettoHeute)} />
+              <Posten text={`Anteil an ${t.dein('em')} heutigen Netto`} wert={<span className="whitespace-nowrap">{anteilAmNetto(wunsch, nettoHeute)}</span>} />
             )}
           </dl>
           <p className="mt-4 text-xs leading-relaxed text-ui-schiefer">
-            Gerechnet wie die Lücke darüber: {prozent(eingaben.rendite)} Rendite nach Kosten,{' '}
+            Kapital bei Rentenbeginn, gerechnet wie die Lücke darüber: {prozent(eingaben.rendite)} Rendite nach Kosten,{' '}
             {eingaben.dynamik > 0 ? `${prozent(eingaben.dynamik)} Beitragsdynamik` : 'gleichbleibender Beitrag'}, ohne
             Förderung. Mit Zulagen, Steuerersparnis oder dem Zuschuss des Arbeitgebers reicht derselbe Aufwand
             weiter — das zeigt der Vergleich der Lösungen.
