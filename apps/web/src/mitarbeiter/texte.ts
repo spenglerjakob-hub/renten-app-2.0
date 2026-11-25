@@ -1,6 +1,11 @@
 import { GEHAELTER_IM_JAHR, type FirmenAngebot, type FirmenModellDaten, type SteuerklasseBeratung } from '@renten/schema';
 import { freiStufenGeordnet, type Mindestzuschuss, type MitarbeiterVertrag } from '@renten/engine';
 import type { KennzahlenErgebnis, ReglerGrenzen } from './rechnung';
+import type { Sprache } from '../lib/sprache';
+import {
+  GEHAELTER_OPTIONEN_EN, STEUERKLASSE_OPTIONEN_EN, fazitTextEn, festePunkteEn, lohnsteuerHinweisEn, mindestzuschussTextEn,
+  nettolohnGrundlageEn, regelKernEn, regelTextEn, reglerErklaerungEn, traegerTextEn, vertragNameEn,
+} from './texte-en';
 
 /**
  * Die Saetze der Mitarbeiterberatung — einmal hier, damit Bildschirm,
@@ -9,12 +14,16 @@ import type { KennzahlenErgebnis, ReglerGrenzen } from './rechnung';
  * Fachlich bewusst vorsichtig: Was die Versorgungsordnung der Firma
  * abweichend regeln kann (etwa eine kuerzere Unverfallbarkeit), steht mit
  * diesem Vorbehalt da. Die eigenen Hinweise der Firma kommen dazu.
+ *
+ * SPRACHE: Wo eine Funktion `sprache` nimmt, gibt es den Satz auch auf
+ * Englisch (`texte-en.ts`) — fuer den Bildschirm einer Beratung auf Englisch.
+ * Ohne Angabe Deutsch: So rufen die Unterlagen, die deutsch bleiben.
  */
 
 const euroFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 /** 100 € statt 100,00 €, aber 12,50 € */
 export const euroText = (n: number) => euroFormat.format(Math.round(n * 100) / 100).replace(/,00(\s)/, '$1');
-const prozentText = (q: number) => `${Math.round(q * 1000) / 10} %`.replace('.', ',');
+export const prozentText = (q: number) => `${Math.round(q * 1000) / 10} %`.replace('.', ',');
 
 /** Die Steuerklasse in roemischen Ziffern, wie auf der Gehaltsabrechnung. */
 export const KLASSE_ROEMISCH: Record<SteuerklasseBeratung, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V' };
@@ -28,10 +37,16 @@ export const STEUERKLASSE_OPTIONEN: { wert: string; text: string }[] = [
   { wert: '5', text: 'V – verheiratet, Partner in III' },
 ];
 
+/** Die Auswahl der Steuerklasse in der Sprache der Beratung. */
+export const steuerklasseOptionen = (sprache: Sprache) => (sprache === 'en' ? STEUERKLASSE_OPTIONEN_EN : STEUERKLASSE_OPTIONEN);
+
 /** Gehaelter im Jahr wie im Rechner („Auszahlungen pro Jahr“). */
 export const GEHAELTER_OPTIONEN: { wert: string; text: string }[] = GEHAELTER_IM_JAHR.map((g) => ({
   wert: String(g), text: g === 12.5 ? '12,5 (halbes 13.)' : `${g} Gehälter`,
 }));
+
+/** Die Auswahl der Gehaelter im Jahr in der Sprache der Beratung. */
+export const gehaelterOptionen = (sprache: Sprache) => (sprache === 'en' ? GEHAELTER_OPTIONEN_EN : GEHAELTER_OPTIONEN);
 
 /** „12,5“ statt „12.5“ */
 export const gehaelterText = (g: number) => g.toLocaleString('de-DE');
@@ -41,7 +56,8 @@ export const gehaelterText = (g: number) => g.toLocaleString('de-DE');
  * Klasse — bei V im Grundtarif wie IV, denn den hohen Abzug der Klasse V
  * gleicht die Steuererklaerung aus (`nettolohnHeute`, Basis `jahr`).
  */
-export function nettolohnGrundlage(k: SteuerklasseBeratung, gehaelter: number): string {
+export function nettolohnGrundlage(k: SteuerklasseBeratung, gehaelter: number, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return nettolohnGrundlageEn(k, gehaelter);
   const klasse = k === 5 ? 'bei Steuerklasse V im Grundtarif wie IV' : `mit der Lohnsteuer der Steuerklasse ${KLASSE_ROEMISCH[k]}`;
   return `${klasse}${gehaelter > 12 ? `, im Monatsdurchschnitt mit ${gehaelterText(gehaelter)} Gehältern` : ''}`;
 }
@@ -50,7 +66,8 @@ export function nettolohnGrundlage(k: SteuerklasseBeratung, gehaelter: number): 
  * Die Fussnote zur Steuer im Monat: Lohnsteuer der Klasse, genaehert — bei
  * III und V weicht der Monat vom Jahresergebnis ab.
  */
-export function lohnsteuerHinweis(k: SteuerklasseBeratung): string {
+export function lohnsteuerHinweis(k: SteuerklasseBeratung, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return lohnsteuerHinweisEn(k);
   return `Lohnsteuer der Steuerklasse ${KLASSE_ROEMISCH[k]}, genähert — auf der Gehaltsabrechnung kann sie um wenige Euro abweichen.`
     + (k === 3 || k === 5 ? ' Bei III und V gleicht die Steuererklärung das über das Jahr aus.' : '');
 }
@@ -72,12 +89,14 @@ export const WEG_NAME: Record<FirmenAngebot['durchfuehrungsweg'], string> = {
 };
 
 /** Der Name eines Vertrags im Gespraech: „Direktversicherung“ oder „Unterstützungskasse“. */
-export function vertragName(weg: MitarbeiterVertrag['weg'], a: FirmenAngebot): string {
+export function vertragName(weg: MitarbeiterVertrag['weg'], a: FirmenAngebot, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return vertragNameEn(weg, a);
   return weg === 'ukasse' ? 'Unterstützungskasse' : WEG_NAME[a.durchfuehrungsweg];
 }
 
 /** Wer den Vertrag fuehrt: Versicherer und Tarif bzw. die Unterstuetzungskasse — leer, wenn nichts eingetragen ist. */
-export function traegerText(weg: MitarbeiterVertrag['weg'], a: FirmenAngebot): string {
+export function traegerText(weg: MitarbeiterVertrag['weg'], a: FirmenAngebot, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return traegerTextEn(weg, a);
   if (weg === 'ukasse') return a.ukasse.trim();
   return [a.versicherer.trim(), a.tarif.trim()].filter(Boolean).join(', Tarif ');
 }
@@ -95,7 +114,8 @@ export function freiStufenText(m: FreiModell): string {
 }
 
 /** Die Regel der Firma in einem Satz, aus Sicht des Mitarbeiters. */
-export function regelText(m: FirmenModellDaten): string {
+export function regelText(m: FirmenModellDaten, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return regelTextEn(m);
   if (m.art === 'zuschuss') {
     return m.deckelMonat > 0
       ? `Ihr Arbeitgeber gibt ${prozentText(m.quote)} Ihres Beitrags dazu, höchstens ${euroText(m.deckelMonat)} im Monat.`
@@ -127,7 +147,8 @@ export function regelText(m: FirmenModellDaten): string {
  * Der Kern der Regel — das Wort, das in der Ueberschrift hervorgehoben wird
  * (`regelText` enthaelt ihn immer woertlich).
  */
-export function regelKern(m: FirmenModellDaten): string {
+export function regelKern(m: FirmenModellDaten, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return regelKernEn(m);
   if (m.art === 'zuschuss') return `${prozentText(m.quote)} Ihres Beitrags`;
   if (m.art === 'frei') {
     return m.quote > 0 ? `${prozentText(m.quote)} Ihres Beitrags`
@@ -172,7 +193,8 @@ export function regelFuerVereinbarung(m: FirmenModellDaten): string {
  * steht, ob die Regel der Firma dafuer reicht oder er sie uebersteigt, etwa
  * ein Festbetrag von 50 € ab rund 334 € Umwandlung. Schritt 4 und Protokoll.
  */
-export function mindestzuschussText(z: Mindestzuschuss, m: FirmenModellDaten): string {
+export function mindestzuschussText(z: Mindestzuschuss, m: FirmenModellDaten, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return mindestzuschussTextEn(z, m);
   const mindest = euroText(z.mindestMonat);
   // „soweit“: Ueber dem Rahmen frei von Sozialabgaben spart der Arbeitgeber nichts mehr dazu.
   const begrenzt = z.quoteMonat > z.ersparnisMonat + 0.005 && z.mindestMonat < z.quoteMonat - 0.005;
@@ -210,7 +232,11 @@ export function mindestzuschussText(z: Mindestzuschuss, m: FirmenModellDaten): s
  * Was der Regler in Schritt 4 abdeckt: bis zur Markierung frei von
  * Sozialabgaben (4 % der BBG), bis zum Ende steuerfrei (8 %).
  */
-export function reglerErklaerung(g: Pick<ReglerGrenzen, 'rahmenUmwandlung' | 'maxUmwandlung' | 'rahmenMonat' | 'steuerRahmenMonat'>, m: FirmenModellDaten): string {
+export function reglerErklaerung(
+  g: Pick<ReglerGrenzen, 'rahmenUmwandlung' | 'maxUmwandlung' | 'rahmenMonat' | 'steuerRahmenMonat'>, m: FirmenModellDaten,
+  sprache: Sprache = 'de',
+): string {
+  if (sprache === 'en') return reglerErklaerungEn(g, m);
   const ukasse = m.art === 'matching' && m.weg === 'ukasse';
   const mit = m.art !== 'matching' ? ' für Umwandlung und Arbeitgeberbeitrag zusammen'
     : m.weg === 'dv' ? ' für Umwandlung und gesetzlichen Zuschuss zusammen' : '';
@@ -240,7 +266,8 @@ export function firmenHinweise(a: FirmenAngebot): string[] {
  * Was jeder Mitarbeiter wissen sollte — am Bildschirm in Schritt 1 und im
  * Protokoll unter „Hinweise und Risiken“.
  */
-export function festePunkte(a: FirmenAngebot): string[] {
+export function festePunkte(a: FirmenAngebot, sprache: Sprache = 'de'): string[] {
+  if (sprache === 'en') return festePunkteEn(a);
   const m = a.modell;
   const direkt = m.art !== 'matching' || m.weg === 'dv';
   const p: string[] = [
@@ -277,7 +304,8 @@ const dezimal = (x: number, stellen: number) =>
 const ganzeEuro = (x: number) => euroText(Math.round(x));
 
 /** Das Fazit der Kennzahlen in Saetzen — der Vertrag allein, wie im Vertrags-TUEV. */
-export function fazitText(k: KennzahlenErgebnis): string {
+export function fazitText(k: KennzahlenErgebnis, sprache: Sprache = 'de'): string {
+  if (sprache === 'en') return fazitTextEn(k);
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return '';
   const mit = haupt.art === 'prognose' ? (k.geschaetzt ? 'mit der geschätzten Rente aus der Hochrechnung' : 'mit der prognostizierten Rente')

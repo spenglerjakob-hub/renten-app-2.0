@@ -809,11 +809,17 @@ export function belastungsTreppe(
    * so rechnet die Mitarbeiterberatung, deren Unterlagen unveraendert bleiben.
    */
   t: AnspracheWoerter = woerter(SIE),
+  /**
+   * Englisch nur fuer die Mitarbeiterberatung (`lib/sprache.tsx`): dieselben
+   * Zeilen, dieselben Betraege in deutscher Schreibweise.
+   */
+  sprache: 'de' | 'en' = 'de',
 ): {
   zufluss: number;
   zeilen: TreppenZeile[];
   aufwand: number;
 } {
+  const en = sprache === 'en';
   const zulagen = Math.max(0, r.zulageMonat);
   const agZuschuss = Math.max(0, r.agZuschussMonat);
   const zufluss = r.beitragMonat + zulagen;
@@ -821,22 +827,29 @@ export function belastungsTreppe(
 
   if (zulagen > 0) {
     zeilen.push({
-      text: '− Zulagen vom Staat',
+      text: en ? '− State allowances' : '− Zulagen vom Staat',
       betrag: zulagen,
       art: 'abzug',
-      erklaerung: `${euroText(zulagen * 12)} im Jahr, die der Staat dem Vertrag gutschreibt — `
-        + `unabhängig von ${t.dein('em')} Steuersatz. Sie erhöhen das Kapital und senken ${t.dein('en')} eigenen `
-        + 'Beitrag nicht; deshalb stehen sie oben im Zufluss und gehen hier wieder ab.',
+      erklaerung: en
+        ? `${euroText(zulagen * 12)} a year that the state credits to the contract — regardless of your tax rate. `
+          + 'They increase the capital and do not reduce your own contribution; that is why they are part of the '
+          + 'total above and are deducted again here.'
+        : `${euroText(zulagen * 12)} im Jahr, die der Staat dem Vertrag gutschreibt — `
+          + `unabhängig von ${t.dein('em')} Steuersatz. Sie erhöhen das Kapital und senken ${t.dein('en')} eigenen `
+          + 'Beitrag nicht; deshalb stehen sie oben im Zufluss und gehen hier wieder ab.',
     });
   }
   if (agZuschuss > 0) {
     zeilen.push({
-      text: '− Arbeitgeberzuschuss',
+      text: en ? '− Employer contribution' : '− Arbeitgeberzuschuss',
       betrag: agZuschuss,
       art: 'abzug',
-      erklaerung: `Was ${t.dein()} Arbeitgeber zum Vertrag beisteuert. Bei Entgeltumwandlung sind `
-        + 'mindestens 15 % Pflicht (§ 1a Abs. 1a BetrAVG), weil er Sozialabgaben spart; '
-        + 'viele zahlen mehr.',
+      erklaerung: en
+        ? 'What your employer pays into the contract. With salary conversion, at least 15 % is mandatory '
+          + '(§ 1a (1a) BetrAVG) because the employer saves social security contributions; many pay more.'
+        : `Was ${t.dein()} Arbeitgeber zum Vertrag beisteuert. Bei Entgeltumwandlung sind `
+          + 'mindestens 15 % Pflicht (§ 1a Abs. 1a BetrAVG), weil er Sozialabgaben spart; '
+          + 'viele zahlen mehr.',
     });
   }
 
@@ -849,20 +862,20 @@ export function belastungsTreppe(
   const eigeneAbzuege: TreppenZeile[] = [];
   if (sv > 0) {
     eigeneAbzuege.push({
-      text: '− SV-Ersparnis',
+      text: en ? '− Social security saved' : '− SV-Ersparnis',
       betrag: sv,
       art: 'abzug',
-      erklaerung: fuerErklaerung && svErklaerung(sv, fuerErklaerung, t),
+      erklaerung: fuerErklaerung && svErklaerung(sv, fuerErklaerung, t, en),
     });
   }
   if (r.steuerersparnisMonat > 0) {
     eigeneAbzuege.push({
-      text: '− Steuerersparnis',
+      text: en ? '− Tax saved' : '− Steuerersparnis',
       betrag: r.steuerersparnisMonat,
       art: 'abzug',
       // Das zu versteuernde Einkommen mindert der eigene Beitrag — nicht der Zuschuss des Arbeitgebers
       erklaerung: fuerErklaerung
-        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat - agZuschuss, fuerErklaerung, t),
+        && steuerErklaerung(r.steuerersparnisMonat, r.beitragMonat - agZuschuss, fuerErklaerung, t, en),
     });
   }
 
@@ -876,7 +889,8 @@ export function belastungsTreppe(
       // "Entgeltumwandlung" trifft es nur dort, wo ein Zuschuss fliesst: Den
       // gibt es nach § 1a Abs. 1a BetrAVG gerade deshalb, weil der
       // Beschaeftigte Entgelt umwandelt.
-      text: agZuschuss > 0 ? `= ${t.Dein('e')} Entgeltumwandlung` : `= ${t.Dein()} Eigenbeitrag`,
+      text: en ? (agZuschuss > 0 ? '= Your salary conversion' : '= Your own contribution')
+        : agZuschuss > 0 ? `= ${t.Dein('e')} Entgeltumwandlung` : `= ${t.Dein()} Eigenbeitrag`,
       betrag: zufluss - zulagen - agZuschuss,
       art: 'summe',
     });
@@ -891,8 +905,19 @@ function svErklaerung(
   svMonat: number,
   k: { p: LegalParameters; beamter: boolean; selbststaendig: boolean; privatVersichert: boolean },
   t: AnspracheWoerter,
+  en = false,
 ): string {
   const frei = SV_FREI_QUOTE * k.p.bbgRvJahr / 12;
+  if (en) {
+    const part = k.privatVersichert
+      ? 'pension and unemployment insurance — your private health insurance depends on the contract, not on your '
+        + 'salary, and therefore saves nothing'
+      : 'pension, unemployment, health and long-term care insurance';
+    return `Converted salary is exempt from contributions up to ${euroText(frei)} a month — 4 % of the contribution `
+      + 'assessment ceiling (§ 1 (1) no. 9 SvEV), for the employer\'s and the employee\'s share together; the '
+      + `employer's share counts first. What you save is your EMPLOYEE share of ${part}: ${euroText(svMonat)} a month. `
+      + 'Anything above the 4 % carries full social security contributions.';
+  }
   const teil = k.privatVersichert
     ? `Renten- und Arbeitslosenversicherung — ${t.dein('e')} private Krankenversicherung richtet sich `
       + 'nach dem Vertrag, nicht nach dem Gehalt, und spart deshalb nichts'
@@ -912,10 +937,19 @@ function steuerErklaerung(
   beitragMonat: number,
   k: { zve: number; p: LegalParameters; splitting?: boolean; steuerklasse?: Steuerklasse },
   t: AnspracheWoerter,
+  en = false,
 ): string {
   const grenz = k.steuerklasse
     ? grenzLohnsteuersatz(k.zve, k.steuerklasse, k.p)
     : grenzsteuersatz(k.zve, k.splitting ?? false, k.p);
+  if (en) {
+    const tax = k.steuerklasse ? `wage tax in tax class ${ROEMISCH[k.steuerklasse]}` : 'annual income tax';
+    return `The contribution reduces your taxable income of ${euroText(k.zve)}. What is calculated is the DIFFERENCE `
+      + `in your ${tax} with and without the contribution — not an average rate: the last euro of your income costs `
+      + `about ${(grenz * 100).toLocaleString('de-DE', { maximumFractionDigits: 0 })} % tax, and that is exactly where `
+      + `the contribution applies. Of ${euroText(beitragMonat)}, ${euroText(steuerMonat)} a month are thus not paid to `
+      + 'the tax office.';
+  }
   const steuer = k.steuerklasse ? `Lohnsteuer in Steuerklasse ${ROEMISCH[k.steuerklasse]}` : 'Jahressteuer';
   return `Der Beitrag mindert ${t.dein()} zu versteuerndes Einkommen von ${euroText(k.zve)}. Gerechnet `
     + `wird die DIFFERENZ ${t.dein('er')} ${steuer} mit und ohne Beitrag — nicht ein `
@@ -947,12 +981,13 @@ export function laufendeZulageJahr(r: TuevErgebnis): number {
 /** „1 Jahr“, „49 Jahre“ */
 export const jahreText = (n: number) => (n === 1 ? '1 Jahr' : `${n} Jahre`);
 
-export function laufzeitText(monate: number): string {
+export function laufzeitText(monate: number, sprache: 'de' | 'en' = 'de'): string {
+  const en = sprache === 'en';
   const j = Math.floor(monate / 12);
   const m = monate % 12;
-  const jahre = j === 1 ? '1 Jahr' : `${j} Jahre`;
+  const jahre = en ? (j === 1 ? '1 year' : `${j} years`) : j === 1 ? '1 Jahr' : `${j} Jahre`;
   if (m === 0) return jahre;
-  const mon = m === 1 ? '1 Monat' : `${m} Monate`;
+  const mon = en ? (m === 1 ? '1 month' : `${m} months`) : m === 1 ? '1 Monat' : `${m} Monate`;
   return j === 0 ? mon : `${jahre}, ${mon}`;
 }
 

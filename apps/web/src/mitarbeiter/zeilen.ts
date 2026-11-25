@@ -5,6 +5,7 @@ import { euro, euroGenau, prozent } from '../components/Feld';
 import { alterAm } from '../features/daten-ergebnis';
 import { KLASSE_ROEMISCH, regelText, traegerText, vertragName } from './texte';
 import { zeitpunktText } from './unterschrift-daten';
+import { wahl, type Sprache } from '../lib/sprache';
 import {
   monatsgehalt, rentenbeginnVon,
   type Hochrechnung, type KennzahlenErgebnis, type Leistung, type LueckeMitBetriebsrente, type Probeabrechnung,
@@ -19,6 +20,10 @@ import {
  * ist: „Lücke 612 € im Monat“ laesst sich mit einem Blick pruefen, ein Haken
  * nicht. Fehlt etwas, das die Beratung braucht, steht es als `fehlt` da —
  * dann traegt die Zeile den leeren Kreis statt des Hakens.
+ *
+ * SPRACHE: Jede Zeile gibt es auf Deutsch und auf Englisch (`s`, zuletzt und
+ * mit Deutsch als Vorgabe). Was der BERATER liest — die Mitarbeiterliste,
+ * der Kopf der Beratung, das Fenster „Gespräch starten“ — ruft ohne Sprache.
  */
 export interface ZeilenText {
   ergebnis?: string;
@@ -26,8 +31,9 @@ export interface ZeilenText {
 }
 
 /** „Bruttogehalt fehlt“, „Name und Geburtsdatum fehlen“, „Name, Geburtsdatum und Bruttogehalt fehlen“. */
-const fehlen = (was: string[]) => {
+const fehlen = (was: string[], s: Sprache = 'de') => {
   if (was.length === 0) return undefined;
+  if (s === 'en') return was.length === 1 ? `${was[0]} missing` : `${was.slice(0, -1).join(', ')} and ${was[was.length - 1]} missing`;
   if (was.length === 1) return `${was[0]} fehlt`;
   return `${was.slice(0, -1).join(', ')} und ${was[was.length - 1]} fehlen`;
 };
@@ -41,55 +47,67 @@ export function angebotVertraege(a: FirmenAngebot): MitarbeiterVertrag['weg'][] 
 }
 
 /** Die Regel der Firma — der Satz aus dem Angebot, ohne Punkt. */
-export const angebotSatz = (a: FirmenAngebot) => regelText(a.modell).replace(/\.$/, '');
+export const angebotSatz = (a: FirmenAngebot, s: Sprache = 'de') => regelText(a.modell, s).replace(/\.$/, '');
 
 /** „Direktversicherung — Musterleben, Tarif Klassik“; ohne Eintrag nur der Weg. */
-export function anbieterSatz(a: FirmenAngebot): string {
+export function anbieterSatz(a: FirmenAngebot, s: Sprache = 'de'): string {
   return angebotVertraege(a)
-    .map((w) => [vertragName(w, a), traegerText(w, a)].filter(Boolean).join(' — '))
+    .map((v) => [vertragName(v, a, s), traegerText(v, a, s)].filter(Boolean).join(' — '))
     .join(' · ');
 }
 
 /* --- 2. Angaben ------------------------------------------------------------ */
 
-function werUndAlter(a: BeratungAngaben, heute: Date): string {
+function werUndAlter(a: BeratungAngaben, heute: Date, s: Sprache = 'de'): string {
   const name = a.name.trim();
   const alter = alterAm(a.geburtsdatum, heute);
   if (name && alter !== null) return `${name}, ${alter}`;
   if (name) return name;
-  return alter !== null ? `${alter} Jahre` : '';
+  return alter !== null ? wahl(s)(`${alter} Jahre`, `${alter} years old`) : '';
 }
 
-const personFehlt = (a: BeratungAngaben, heute: Date) => [
+const personFehlt = (a: BeratungAngaben, heute: Date, s: Sprache = 'de') => [
   a.name.trim() ? '' : 'Name',
-  alterAm(a.geburtsdatum, heute) === null ? 'Geburtsdatum' : '',
+  alterAm(a.geburtsdatum, heute) === null ? wahl(s)('Geburtsdatum', 'Date of birth') : '',
 ].filter(Boolean);
 
-export function personZeile(a: BeratungAngaben, heute: Date): ZeilenText {
+export function personZeile(a: BeratungAngaben, heute: Date, s: Sprache = 'de'): ZeilenText {
   const beginn = rentenbeginnVon(a);
   return {
-    ergebnis: [werUndAlter(a, heute), beginn ? `Rentenbeginn ${beginn}` : ''].filter(Boolean).join(' · ') || undefined,
-    fehlt: fehlen(personFehlt(a, heute)),
+    ergebnis: [werUndAlter(a, heute, s), beginn ? wahl(s)(`Rentenbeginn ${beginn}`, `Retirement on ${beginn}`) : '']
+      .filter(Boolean).join(' · ') || undefined,
+    fehlt: fehlen(personFehlt(a, heute, s), s),
   };
 }
 
-export function einkommenZeile(a: BeratungAngaben): ZeilenText {
-  if (a.jahresbrutto <= 0) return { fehlt: 'Bruttogehalt fehlt' };
+export function einkommenZeile(a: BeratungAngaben, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
+  if (a.jahresbrutto <= 0) return { fehlt: w('Bruttogehalt fehlt', 'Gross salary missing') };
   const kinder = a.kinder.length;
   return {
     ergebnis: [
-      `${euro(monatsgehalt(a))} brutto im Monat`,
-      `Steuerklasse ${KLASSE_ROEMISCH[a.steuerklasse]}`,
-      kinder === 1 ? '1 Kind' : kinder > 1 ? `${kinder} Kinder` : '',
+      w(`${euro(monatsgehalt(a))} brutto im Monat`, `${euro(monatsgehalt(a))} gross a month`),
+      w(`Steuerklasse ${KLASSE_ROEMISCH[a.steuerklasse]}`, `Tax class ${KLASSE_ROEMISCH[a.steuerklasse]}`),
+      kinder === 1 ? w('1 Kind', '1 child') : kinder > 1 ? w(`${kinder} Kinder`, `${kinder} children`) : '',
     ].filter(Boolean).join(' · '),
   };
 }
 
-export function kvZeile(a: BeratungAngaben): ZeilenText {
+export function kvZeile(a: BeratungAngaben, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   if (a.kv === 'privat') {
-    return { ergebnis: a.pkvPraemieMonat > 0 ? `privat · ${euro(a.pkvPraemieMonat)} im Monat` : 'privat' };
+    return {
+      ergebnis: a.pkvPraemieMonat > 0
+        ? w(`privat · ${euro(a.pkvPraemieMonat)} im Monat`, `private · ${euro(a.pkvPraemieMonat)} a month`)
+        : w('privat', 'private'),
+    };
   }
-  return { ergebnis: ['gesetzlich', a.krankenkasse, `${prozent(a.zusatzbeitrag, 2)} Zusatzbeitrag`].filter(Boolean).join(' · ') };
+  return {
+    ergebnis: [
+      w('gesetzlich', 'statutory'), a.krankenkasse,
+      w(`${prozent(a.zusatzbeitrag, 2)} Zusatzbeitrag`, `${prozent(a.zusatzbeitrag, 2)} additional contribution`),
+    ].filter(Boolean).join(' · '),
+  };
 }
 
 /**
@@ -97,26 +115,34 @@ export function kvZeile(a: BeratungAngaben): ZeilenText {
  * Zeile nennt das Einkommen und dahinter nur, wie jemand versichert ist. Die
  * Kasse und ihr Satz stuenden sonst als vierte und fuenfte Angabe in der Zeile.
  */
-export function einkommenUndKvZeile(a: BeratungAngaben): ZeilenText {
-  const e = einkommenZeile(a);
+export function einkommenUndKvZeile(a: BeratungAngaben, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
+  const e = einkommenZeile(a, s);
   if (!e.ergebnis) return e;
-  return { ergebnis: `${e.ergebnis} · ${a.kv === 'privat' ? 'privat versichert' : 'gesetzlich versichert'}` };
+  return {
+    ergebnis: `${e.ergebnis} · ${a.kv === 'privat'
+      ? w('privat versichert', 'privately insured') : w('gesetzlich versichert', 'statutory health insurance')}`,
+  };
 }
 
-export function vorsorgeZeile(a: BeratungAngaben): ZeilenText {
+export function vorsorgeZeile(a: BeratungAngaben, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   return {
     ergebnis: a.bavBestandMonat > 0
-      ? `Bestehende Betriebsrente ${euro(a.bavBestandMonat)} im Monat`
-      : 'Keine bestehende Betriebsrente',
+      ? w(`Bestehende Betriebsrente ${euro(a.bavBestandMonat)} im Monat`, `Existing company pension ${euro(a.bavBestandMonat)} a month`)
+      : w('Keine bestehende Betriebsrente', 'No existing company pension'),
   };
 }
 
 /** Der ganze Schritt: wer, und mit welchem Gehalt — was die Rechnung braucht, steht als fehlend da. */
-export function angabenZeile(a: BeratungAngaben, heute: Date): ZeilenText {
+export function angabenZeile(a: BeratungAngaben, heute: Date, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   return {
-    ergebnis: [werUndAlter(a, heute), a.jahresbrutto > 0 ? `${euro(monatsgehalt(a))} brutto im Monat` : '']
-      .filter(Boolean).join(' · ') || undefined,
-    fehlt: fehlen([...personFehlt(a, heute), a.jahresbrutto > 0 ? '' : 'Bruttogehalt'].filter(Boolean)),
+    ergebnis: [
+      werUndAlter(a, heute, s),
+      a.jahresbrutto > 0 ? w(`${euro(monatsgehalt(a))} brutto im Monat`, `${euro(monatsgehalt(a))} gross a month`) : '',
+    ].filter(Boolean).join(' · ') || undefined,
+    fehlt: fehlen([...personFehlt(a, heute, s), a.jahresbrutto > 0 ? '' : w('Bruttogehalt', 'Gross salary')].filter(Boolean), s),
   };
 }
 
@@ -158,33 +184,43 @@ export function vorbereitetZaehlen(staende: readonly (Vorbereitung | null)[]): {
 /* --- 3. Versorgungsluecke -------------------------------------------------- */
 
 /** Ohne Rechnung (es fehlen Geburtsdatum oder Gehalt) steht nichts da. */
-export function lueckeZeile(l: Versorgungsluecke | null): ZeilenText {
+export function lueckeZeile(l: Versorgungsluecke | null, s: Sprache = 'de'): ZeilenText {
   if (!l) return {};
+  const w = wahl(s);
   return {
     ergebnis: l.lueckeMonat < 0.5
-      ? `Rentenziel von ${l.zielProzent} % erreicht`
-      : `Lücke ${euro(l.lueckeMonat)} im Monat · ${l.lueckeProzent} % des Nettolohns`,
+      ? w(`Rentenziel von ${l.zielProzent} % erreicht`, `Pension target of ${l.zielProzent} % reached`)
+      : w(`Lücke ${euro(l.lueckeMonat)} im Monat · ${l.lueckeProzent} % des Nettolohns`,
+        `Gap of ${euro(l.lueckeMonat)} a month · ${l.lueckeProzent} % of net pay`),
   };
 }
 
 /** Die gesetzliche Rente, mit der gerechnet wird — eingetragen oder aus dem Gehalt geschaetzt. */
-export function grvZeile(a: BeratungAngaben, schaetzungMonat: number): ZeilenText {
+export function grvZeile(a: BeratungAngaben, schaetzungMonat: number, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   return {
     ergebnis: a.grvRente > 0
-      ? `Gesetzliche Rente ${euro(a.grvRente)} im Monat, eingetragen`
-      : `Gesetzliche Rente ${euro(schaetzungMonat)} im Monat, geschätzt`,
+      ? w(`Gesetzliche Rente ${euro(a.grvRente)} im Monat, eingetragen`, `Statutory pension ${euro(a.grvRente)} a month, entered`)
+      : w(`Gesetzliche Rente ${euro(schaetzungMonat)} im Monat, geschätzt`, `Statutory pension ${euro(schaetzungMonat)} a month, estimated`),
   };
 }
 
 /* --- 4. Rechnung ------------------------------------------------------------ */
 
-export function rechnungZeile(r: MitarbeiterBav): ZeilenText {
-  if (r.umwandlungMonat <= 0.005) return { fehlt: 'Noch kein Betrag gewählt' };
-  return { ergebnis: `${euro(r.nettoAufwandMonat)} netto im Monat · ${euroGenau(r.gesamtMonat)} in Ihre Vorsorge` };
+export function rechnungZeile(r: MitarbeiterBav, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
+  if (r.umwandlungMonat <= 0.005) return { fehlt: w('Noch kein Betrag gewählt', 'No amount chosen yet') };
+  return {
+    ergebnis: w(`${euro(r.nettoAufwandMonat)} netto im Monat · ${euroGenau(r.gesamtMonat)} in Ihre Vorsorge`,
+      `${euro(r.nettoAufwandMonat)} net a month · ${euroGenau(r.gesamtMonat)} into your pension`),
+  };
 }
 
-export function abrechnungZeile(a: Probeabrechnung): ZeilenText {
-  return { ergebnis: `Netto ${euroGenau(a.netto.mit)} statt ${euroGenau(a.netto.ohne)}` };
+export function abrechnungZeile(a: Probeabrechnung, s: Sprache = 'de'): ZeilenText {
+  return {
+    ergebnis: wahl(s)(`Netto ${euroGenau(a.netto.mit)} statt ${euroGenau(a.netto.ohne)}`,
+      `Net pay ${euroGenau(a.netto.mit)} instead of ${euroGenau(a.netto.ohne)}`),
+  };
 }
 
 /**
@@ -192,42 +228,59 @@ export function abrechnungZeile(a: Probeabrechnung): ZeilenText {
  * steht — was daraus werden kann. Ohne Laufzeit bis zum Rentenbeginn gibt es
  * keine Hochrechnung; dann bleibt es beim Betrag.
  */
-export function beitragZeile(r: MitarbeiterBav, h: Hochrechnung): ZeilenText {
-  const z = rechnungZeile(r);
+export function beitragZeile(r: MitarbeiterBav, h: Hochrechnung, s: Sprache = 'de'): ZeilenText {
+  const z = rechnungZeile(r, s);
   if (!z.ergebnis || h.monate <= 0) return z;
-  return { ergebnis: `${z.ergebnis} · geschätzt ${euro(h.kapital)} Kapital` };
+  return { ergebnis: wahl(s)(`${z.ergebnis} · geschätzt ${euro(h.kapital)} Kapital`, `${z.ergebnis} · an estimated ${euro(h.kapital)} in capital`) };
 }
 
-export function spaeterZeile(einJahr: SpaeterZeile): ZeilenText {
-  return { ergebnis: `Ein Jahr warten kostet ${euro(einJahr.wenigerKapital)} Kapital` };
+export function spaeterZeile(einJahr: SpaeterZeile, s: Sprache = 'de'): ZeilenText {
+  return {
+    ergebnis: wahl(s)(`Ein Jahr warten kostet ${euro(einJahr.wenigerKapital)} Kapital`,
+      `Waiting one year costs ${euro(einJahr.wenigerKapital)} in capital`),
+  };
 }
 
 /* --- 5. Leistung im Alter -------------------------------------------------- */
 
-const FEHLENDE_WERTE = 'Werte aus dem Angebot fehlen';
+const fehlendeWerte = (s: Sprache) => wahl(s)('Werte aus dem Angebot fehlen', 'Figures from the offer missing');
 
 /** Ein Vertrag: was netto bleibt — die Prognose, sonst die garantierte Rente, sonst das Kapital. */
-export function vertragZeile(l: VertragsLeistung | null, ausHochrechnung: boolean): ZeilenText {
+export function vertragZeile(l: VertragsLeistung | null, ausHochrechnung: boolean, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   if (l?.prognose) {
-    return { ergebnis: `${euro(l.prognose.nettoMonat)} netto im Monat, ${ausHochrechnung ? 'Prognose geschätzt' : 'Prognose'}` };
+    return {
+      ergebnis: w(`${euro(l.prognose.nettoMonat)} netto im Monat, ${ausHochrechnung ? 'Prognose geschätzt' : 'Prognose'}`,
+        `${euro(l.prognose.nettoMonat)} net a month, ${ausHochrechnung ? 'estimated projection' : 'projection'}`),
+    };
   }
-  if (l?.garantiert) return { ergebnis: `${euro(l.garantiert.nettoMonat)} netto im Monat, garantiert` };
-  if (l?.kapital) return { ergebnis: `${euro(l.kapital.netto)} Kapital netto` };
-  return { fehlt: FEHLENDE_WERTE };
+  if (l?.garantiert) {
+    return { ergebnis: w(`${euro(l.garantiert.nettoMonat)} netto im Monat, garantiert`, `${euro(l.garantiert.nettoMonat)} net a month, guaranteed`) };
+  }
+  if (l?.kapital) return { ergebnis: w(`${euro(l.kapital.netto)} Kapital netto`, `${euro(l.kapital.netto)} lump sum, net`) };
+  return { fehlt: fehlendeWerte(s) };
 }
 
-export function lueckeMitZeile(x: LueckeMitBetriebsrente): ZeilenText {
+export function lueckeMitZeile(x: LueckeMitBetriebsrente, s: Sprache = 'de'): ZeilenText {
   const haupt = x.prognose ?? x.garantiert;
   if (!haupt) return {};
-  return { ergebnis: haupt.anteil >= 1 ? 'Schließt die Versorgungslücke ganz' : `Schließt ${haupt.prozent} % der Versorgungslücke` };
+  const w = wahl(s);
+  return {
+    ergebnis: haupt.anteil >= 1
+      ? w('Schließt die Versorgungslücke ganz', 'Closes the pension gap completely')
+      : w(`Schließt ${haupt.prozent} % der Versorgungslücke`, `Closes ${haupt.prozent} % of the pension gap`),
+  };
 }
 
 const zahl = (x: number) => x.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function kennzahlenZeile(k: KennzahlenErgebnis): ZeilenText {
+export function kennzahlenZeile(k: KennzahlenErgebnis, s: Sprache = 'de'): ZeilenText {
   const haupt = k.prognose ?? k.garantiert ?? k.kapital;
   if (!haupt) return {};
-  return { ergebnis: `Nettorendite ${zahl(haupt.rendite * 100)} % · Netto-Hebel ${zahl(haupt.nettoHebel)} ×` };
+  return {
+    ergebnis: wahl(s)(`Nettorendite ${zahl(haupt.rendite * 100)} % · Netto-Hebel ${zahl(haupt.nettoHebel)} ×`,
+      `Net return ${zahl(haupt.rendite * 100)} % · net leverage ${zahl(haupt.nettoHebel)} ×`),
+  };
 }
 
 /**
@@ -235,53 +288,68 @@ export function kennzahlenZeile(k: KennzahlenErgebnis): ZeilenText {
  * Prognose aus der geschaetzten Hochrechnung, sagt es auch diese Zeile —
  * wie ueberall, wo der Wert steht.
  */
-export function leistungZeile(leistung: Leistung | null, r: MitarbeiterBav, d: BeratungDaten): ZeilenText {
-  if (r.vertraege.length === 0) return { fehlt: 'Ohne Umwandlung kein Vertrag' };
+export function leistungZeile(leistung: Leistung | null, r: MitarbeiterBav, d: BeratungDaten, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
+  if (r.vertraege.length === 0) return { fehlt: w('Ohne Umwandlung kein Vertrag', 'No contract without a conversion') };
   const renten = (leistung?.vertraege ?? []).map((v) => v.prognose ?? v.garantiert)
     .filter((w): w is NonNullable<typeof w> => w !== null);
   if (renten.length > 0) {
     const allePrognose = (leistung?.vertraege ?? []).every((v) => v.prognose !== null);
     const geschaetzt = r.vertraege.some((v) => d.versicherer[v.weg].ausHochrechnung);
-    const summe = renten.reduce((s, w) => s + w.nettoMonat, 0);
+    const summe = renten.reduce((x, rente) => x + rente.nettoMonat, 0);
     return {
-      ergebnis: `Betriebsrente ${euro(summe)} netto im Monat${allePrognose ? (geschaetzt ? ', Prognose geschätzt' : ', Prognose') : ''}`,
+      ergebnis: w(
+        `Betriebsrente ${euro(summe)} netto im Monat${allePrognose ? (geschaetzt ? ', Prognose geschätzt' : ', Prognose') : ''}`,
+        `Company pension ${euro(summe)} net a month${allePrognose ? (geschaetzt ? ', estimated projection' : ', projection') : ''}`,
+      ),
     };
   }
-  const kapital = (leistung?.vertraege ?? []).reduce((s, v) => s + (v.kapital?.netto ?? 0), 0);
-  return kapital > 0 ? { ergebnis: `${euro(kapital)} Kapital netto` } : { fehlt: FEHLENDE_WERTE };
+  const kapital = (leistung?.vertraege ?? []).reduce((summe, v) => summe + (v.kapital?.netto ?? 0), 0);
+  return kapital > 0
+    ? { ergebnis: w(`${euro(kapital)} Kapital netto`, `${euro(kapital)} lump sum, net`) }
+    : { fehlt: fehlendeWerte(s) };
 }
 
 /* --- 6. Entscheidung -------------------------------------------------------- */
 
 /** @param autoBeginn Der vorbelegte Beginn — gilt, solange keiner eingetragen ist */
-export function entscheidungZeile(d: BeratungDaten, r: MitarbeiterBav, autoBeginn: string): ZeilenText {
+export function entscheidungZeile(d: BeratungDaten, r: MitarbeiterBav, autoBeginn: string, s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   const e = d.entscheidung;
   if (e.status === 'teilnahme') {
-    return { ergebnis: `Teilnahme · ${euroGenau(r.umwandlungMonat)} im Monat ab ${e.beginn || autoBeginn}` };
+    return {
+      ergebnis: w(`Teilnahme · ${euroGenau(r.umwandlungMonat)} im Monat ab ${e.beginn || autoBeginn}`,
+        `Taking part · ${euroGenau(r.umwandlungMonat)} a month from ${e.beginn || autoBeginn}`),
+    };
   }
-  return { ergebnis: e.status === 'verzicht' ? 'Verzicht' : 'Noch offen' };
+  return { ergebnis: e.status === 'verzicht' ? w('Verzicht', 'Waiver') : w('Noch offen', 'Still open') };
 }
 
 /** @param fehlend Was fuer AXA-Antrag oder -Protokoll noch fehlt (`axaFehlt`) */
-export function axaZeile(fehlend: readonly string[]): ZeilenText {
-  if (fehlend.length === 0) return { ergebnis: 'Vollständig' };
-  return { fehlt: fehlend.length === 1 ? '1 Angabe fehlt' : `${fehlend.length} Angaben fehlen` };
+export function axaZeile(fehlend: readonly string[], s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
+  if (fehlend.length === 0) return { ergebnis: w('Vollständig', 'Complete') };
+  return {
+    fehlt: fehlend.length === 1 ? w('1 Angabe fehlt', '1 detail missing')
+      : w(`${fehlend.length} Angaben fehlen`, `${fehlend.length} details missing`),
+  };
 }
 
-export function ortZeile(e: BeratungDaten['entscheidung']): ZeilenText {
+export function ortZeile(e: BeratungDaten['entscheidung'], s: Sprache = 'de'): ZeilenText {
   const ort = e.ort.trim();
   return {
     ergebnis: [ort, e.datum].filter(Boolean).join(', ') || undefined,
-    fehlt: ort ? undefined : 'Ort fehlt',
+    fehlt: ort ? undefined : wahl(s)('Ort fehlt', 'Place missing'),
   };
 }
 
 /* --- 7. Unterlagen ---------------------------------------------------------- */
 
-export function unterlagenZeile(unterlagen: Unterlagen | null | 'fehler'): ZeilenText {
+export function unterlagenZeile(unterlagen: Unterlagen | null | 'fehler', s: Sprache = 'de'): ZeilenText {
+  const w = wahl(s);
   return {
     ergebnis: unterlagen && unterlagen !== 'fehler'
-      ? `Unterschrieben am ${zeitpunktText(unterlagen.erstelltAm)}`
-      : 'Noch nicht unterschrieben',
+      ? w(`Unterschrieben am ${zeitpunktText(unterlagen.erstelltAm)}`, `Signed on ${zeitpunktText(unterlagen.erstelltAm, 'en')}`)
+      : w('Noch nicht unterschrieben', 'Not yet signed'),
   };
 }

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { parseDatum, toDe } from '@renten/engine';
 import { FELD_LABEL } from './stil';
+import { useW } from '../lib/sprache';
 
 /**
  * BEISPIELWERT — der Wert im Feld ist ein Beispiel oder eine Schaetzung, keine
@@ -185,6 +186,8 @@ export function ZahlFeld(props: {
   /** Das Feld wird verlassen oder mit Enter bestaetigt. */
   onVerlassen?: () => void;
 }) {
+  // Meldungen und Vorlesetexte in der Sprache der Mitarbeiterberatung — sonst Deutsch (`lib/sprache.tsx`).
+  const w = useW();
   const {
     label, wert, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, einheit, hilfe, info, gross, stufen, einheitWahl, vorbelegt,
     platzhalter, leerBeiNull, leer, onLeeren, leerSpaeter, tausenderpunkte, onVerlassen,
@@ -256,9 +259,9 @@ export function ZahlFeld(props: {
       return;
     }
     const n = Number(roh.replace(/\./g, '').replace(',', '.'));
-    if (!Number.isFinite(n)) { setFehler('Bitte eine Zahl eingeben'); return; }
-    if (n < min) { setFehler(`Mindestens ${min}`); return; }
-    if (n > max) { setFehler(`Höchstens ${max}`); return; }
+    if (!Number.isFinite(n)) { setFehler(w('Bitte eine Zahl eingeben', 'Please enter a number')); return; }
+    if (n < min) { setFehler(w(`Mindestens ${min}`, `At least ${min}`)); return; }
+    if (n > max) { setFehler(w(`Höchstens ${max}`, `At most ${max}`)); return; }
     setFehler(null);
     onChange(n);
   };
@@ -324,7 +327,7 @@ export function ZahlFeld(props: {
             : einheit ? (gross ? 'pr-12' : 'pr-10') : ''}`}
         />
         {einheitWahl && (
-          <span role="radiogroup" aria-label={`${label}: Einheit`}
+          <span role="radiogroup" aria-label={`${label}: ${w('Einheit', 'unit')}`}
             className="absolute inset-y-1 right-1 flex gap-0.5 rounded bg-ui-linie/70 p-0.5">
             {einheitWahl.optionen.map((o) => (
               <button
@@ -362,7 +365,7 @@ export function ZahlFeld(props: {
             <button
               type="button"
               tabIndex={-1}
-              aria-label={`${label} um ${String(schritt).replace('.', ',')} erhöhen`}
+              aria-label={w(`${label} um ${String(schritt).replace('.', ',')} erhöhen`, `Increase ${label} by ${String(schritt).replace('.', ',')}`)}
               disabled={wert >= max}
               onClick={() => stufe(1)}
               className="flex flex-1 items-center justify-center bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
@@ -372,7 +375,7 @@ export function ZahlFeld(props: {
             <button
               type="button"
               tabIndex={-1}
-              aria-label={`${label} um ${String(schritt).replace('.', ',')} verringern`}
+              aria-label={w(`${label} um ${String(schritt).replace('.', ',')} verringern`, `Decrease ${label} by ${String(schritt).replace('.', ',')}`)}
               disabled={wert <= min}
               onClick={() => stufe(-1)}
               className="flex flex-1 items-center justify-center border-t border-ui-linie bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
@@ -433,13 +436,15 @@ export const NAMENSTEIL_MAX = 59;
  * darf der Browser ihn vorschlagen. Fuer Kunden und Mitarbeiter nicht: Er
  * truege sonst den Namen des Beraters ein.
  */
-export function NamenFelder({ vorname, nachname, onChange, beschriftung = ['Vorname', 'Nachname'], platzhalter, eigener = false }: {
+export function NamenFelder({ vorname, nachname, onChange, beschriftung: eigene, platzhalter, eigener = false }: {
   vorname: string; nachname: string;
   onChange: (teile: { vorname: string; nachname: string }) => void;
   beschriftung?: readonly [string, string];
   platzhalter?: readonly [string, string];
   eigener?: boolean;
 }) {
+  const w = useW();
+  const beschriftung = eigene ?? ([w('Vorname', 'First name'), w('Nachname', 'Last name')] as const);
   return (
     <>
       <TextFeld label={beschriftung[0]} wert={vorname} onChange={(v) => onChange({ vorname: v, nachname })}
@@ -522,6 +527,7 @@ export function DatumFeld(props: {
   /** Das Feld wurde geleert — die Angabe gilt wieder als fehlend. */
   onLeeren?: () => void;
 }) {
+  const w = useW();
   const id = `d${useId()}`;
   const { stufen, vorbelegt, leer } = props;
 
@@ -565,7 +571,7 @@ export function DatumFeld(props: {
 
     const d = parseDatum(maskiert);
     if (!d) {
-      setFehler('Dieses Datum gibt es nicht');
+      setFehler(w('Dieses Datum gibt es nicht', 'This date does not exist'));
       return;
     }
     setFehler(null);
@@ -593,7 +599,7 @@ export function DatumFeld(props: {
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="TT.MM.JJJJ"
+          placeholder={w('TT.MM.JJJJ', 'DD.MM.YYYY')}
           value={text}
           onChange={(e) => uebernehmen(e.target.value)}
           onKeyDown={stufen ? (e) => {
@@ -613,7 +619,7 @@ export function DatumFeld(props: {
             <button
               type="button"
               tabIndex={-1}
-              aria-label={`${props.label} um ein Jahr später`}
+              aria-label={w(`${props.label} um ein Jahr später`, `${props.label}: one year later`)}
               disabled={!basis || basis.jahr >= 2200}
               onClick={() => stufe(1)}
               className="flex flex-1 items-center justify-center bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
@@ -623,7 +629,7 @@ export function DatumFeld(props: {
             <button
               type="button"
               tabIndex={-1}
-              aria-label={`${props.label} um ein Jahr früher`}
+              aria-label={w(`${props.label} um ein Jahr früher`, `${props.label}: one year earlier`)}
               disabled={!basis || basis.jahr <= 1900}
               onClick={() => stufe(-1)}
               className="flex flex-1 items-center justify-center border-t border-ui-linie bg-ui-innen text-ui-schiefer hover:bg-ui-linie/60 hover:text-ui-tinte disabled:cursor-not-allowed disabled:opacity-30"
@@ -931,6 +937,7 @@ export function InfoPunkt(props: {
   children: ReactNode;
 }) {
   const [offen, setOffen] = useState(false);
+  const w = useW();
   const eigen = useId();
   const id = `info${eigen}`;
   const knopfRef = useRef<HTMLButtonElement>(null);
@@ -1022,7 +1029,7 @@ export function InfoPunkt(props: {
       <button
         ref={knopfRef}
         type="button"
-        aria-label={`Erklärung: ${props.titel}`}
+        aria-label={`${w('Erklärung', 'Explanation')}: ${props.titel}`}
         aria-expanded={offen}
         aria-controls={offen ? id : undefined}
         /*

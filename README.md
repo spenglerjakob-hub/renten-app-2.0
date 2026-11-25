@@ -143,6 +143,30 @@ Die begleitenden Agent-Skills sind nicht eingecheckt, sondern aus
 npx skills add supabase/agent-skills
 ```
 
+## Mitarbeiterberatung auf Englisch
+
+Eine Beratung laeuft auf Deutsch oder Englisch — gewaehlt je Beratung, im Kopf
+neben "Springen zu" (`daten.sprache`, Vorgabe Deutsch).
+
+- **Uebersetzt ist, was der Mitarbeiter am Bildschirm liest:** die sieben
+  Schritte mit ihren Zeilen, die Unterschrift und die Seite `/unterschrift`
+  (der Link traegt dann `?lang=en`).
+- **Deutsch bleibt,** was der Berater bedient (Kopf, "Gespräch starten",
+  Mitarbeiterliste), der Wortlaut der AXA (Belehrung, Fragen zur Gesundheit) —
+  und **die Unterlagen**: Protokoll, Vereinbarung, Verzicht, AXA-Antrag. Sie
+  sind die verbindliche Fassung; die Beratung sagt das vor dem Unterschreiben.
+- **Zahlen und Daten** stehen in beiden Sprachen in deutscher Schreibweise
+  (1.234,56 €, 01.07.2027), wie auf der Gehaltsabrechnung und in den Unterlagen.
+
+Im Code steht der englische Text neben dem deutschen:
+`w('Zur Person', 'About you')` (`apps/web/src/lib/sprache.tsx`). Saetze, die
+sich aus Teilen zusammensetzen, haben eine eigene englische Funktion
+(`mitarbeiter/texte-en.ts`). Fuer eine weitere Sprache bekommt `Wort` ein
+drittes Argument — dann zeigt der Compiler jede Stelle, an der sie fehlt.
+`mitarbeiter/englisch.test.ts` prueft, dass im englischen Satz kein deutsches
+Wort stehen bleibt; der Umlaut-Waechter (`lib/umlaute.test.ts`) laesst die
+englischen Stellen aus.
+
 ## Bekannte Luecken
 
 - **Besoldungstabellen.** Fuer Beamte liegen noch keine amtlichen Tabellen

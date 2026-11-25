@@ -3,6 +3,7 @@ import {
 } from 'react';
 import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react';
 import { KNOPF } from './stil';
+import { useW } from '../lib/sprache';
 import {
   erreichteEtappen, nachOeffnen, stueckeLage, STUECKE_ANFANG, type StueckKern, type StueckeStand,
 } from './ablauf-logik';
@@ -155,6 +156,8 @@ function Zeile({ zeichen, nr, vorlese, titel, ergebnis, fehlt, gross = false, on
   gross?: boolean;
   onClick: () => void;
 }) {
+  // In der Mitarbeiterberatung in der Sprache der Beratung; ueberall sonst Deutsch (`lib/sprache.tsx`).
+  const w = useW();
   return (
     <button
       type="button"
@@ -178,7 +181,7 @@ function Zeile({ zeichen, nr, vorlese, titel, ergebnis, fehlt, gross = false, on
           </span>
         )}
       </span>
-      <span className="hidden shrink-0 text-xs font-medium text-ui-schiefer group-hover:text-ui-tinte sm:inline">Öffnen</span>
+      <span className="hidden shrink-0 text-xs font-medium text-ui-schiefer group-hover:text-ui-tinte sm:inline">{w('Öffnen', 'Open')}</span>
       <ChevronDown className="h-4 w-4 shrink-0 text-ui-schiefer group-hover:text-ui-tinte" aria-hidden />
     </button>
   );
@@ -219,13 +222,14 @@ export function EtappenZeile({ nr, name, ergebnis, erledigt, fehlt, wort = 'Absc
 
 /** Ueber dem Titel der offenen Etappe: welcher Abschnitt das ist und wie viele es gibt. */
 export function EtappenZaehler({ nr, von, name, wort = 'Abschnitt' }: { nr: number; von: number; name: string; wort?: string }) {
+  const w = useW();
   return (
     <p className="flex items-center gap-2.5 text-sm text-ui-schiefer">
       <span aria-hidden className={`${KREIS} bg-ui-tinte text-white`}>{nr}</span>
       <span>
         <span className="font-medium text-ui-tinte">{name}</span>
         <span className="mx-1.5" aria-hidden>·</span>
-        {wort} {nr} von {von}
+        {wort} {nr} {w('von', 'of')} {von}
       </span>
     </p>
   );
@@ -253,6 +257,7 @@ export function EtappenAblauf({ etappen, offen, weit, sprung, onOeffnen, wort, c
   children: ReactNode;
 }) {
   const offene = useRef<HTMLLIElement>(null);
+  const w = useW();
   useLayoutEffect(() => {
     const el = offene.current;
     if (sprung === 0 || !el) return;
@@ -261,7 +266,7 @@ export function EtappenAblauf({ etappen, offen, weit, sprung, onOeffnen, wort, c
     el.focus({ preventScroll: true });
   }, [sprung]);
   return (
-    <ol aria-label="Ablauf der Beratung" className="space-y-3">
+    <ol aria-label={w('Ablauf der Beratung', 'Steps of the consultation')} className="space-y-3">
       {etappen.slice(0, erreichteEtappen(etappen.length, offen, weit)).map((e, i) => (i !== offen ? (
         <li key={e.name} className={SPALTE}>
           <EtappenZeile nr={i + 1} {...e} wort={wort} onOeffnen={() => onOeffnen(i)} />
@@ -340,6 +345,7 @@ export function Stuecke({ kennung, stuecke, beschriftung, offen: gefuehrt, onOef
   weiter?: AblaufWeiter | null;
 }) {
   const geber = useContext(AblaufKontext);
+  const w = useW();
   const [lokal, setLokal] = useState<StueckeStand>(STUECKE_ANFANG);
   const gemerkt = geber?.stand[kennung] ?? lokal;
   const stand = gefuehrt !== undefined ? { ...gemerkt, offen: gefuehrt } : gemerkt;
@@ -374,7 +380,7 @@ export function Stuecke({ kennung, stuecke, beschriftung, offen: gefuehrt, onOef
     if (n) {
       return (
         <button type="button" onClick={() => oeffne(n.id)} className={KNOPF}>
-          Weiter: {n.titel} <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+          {w('Weiter', 'Next')}: {n.titel} <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
         </button>
       );
     }
@@ -411,8 +417,8 @@ export function Stuecke({ kennung, stuecke, beschriftung, offen: gefuehrt, onOef
       </ol>
       {lage.amEnde && lage.tiefer.length > 0 && (
         <>
-          <p className={`${SPALTE} pt-3 text-sm text-ui-schiefer`}>Zum Vertiefen</p>
-          <ol aria-label={`${beschriftung} — zum Vertiefen`} className="space-y-3">
+          <p className={`${SPALTE} pt-3 text-sm text-ui-schiefer`}>{w('Zum Vertiefen', 'More detail')}</p>
+          <ol aria-label={`${beschriftung} — ${w('zum Vertiefen', 'more detail')}`} className="space-y-3">
             {lage.tiefer.map(punkt)}
           </ol>
         </>

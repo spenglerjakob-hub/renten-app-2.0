@@ -22,10 +22,19 @@
  * nicht zur Wahl: Sie liegen ohnehin nicht auf dem Weg und oeffnen sich nur
  * auf Wunsch — solange ihr Schritt gezeigt wird.
  */
+import type { Sprache } from '../lib/sprache';
 
 export const SCHRITTE = [
   'Angebot', 'Ihre Angaben', 'Versorgungslücke', 'Ihre Rechnung', 'Leistung im Alter', 'Entscheidung', 'Unterlagen',
 ] as const;
+
+/** Dieselben sieben auf Englisch — fuer den Bildschirm einer Beratung auf Englisch (`lib/sprache.tsx`). */
+export const SCHRITTE_EN = [
+  'Your offer', 'Your details', 'Pension gap', 'Your calculation', 'Benefits in retirement', 'Decision', 'Documents',
+] as const;
+
+/** Die Namen der Schritte, wie der Mitarbeiter sie liest. Die Auswahl der Seiten (Berater) bleibt deutsch. */
+export const schrittNamen = (sprache: Sprache): readonly string[] => (sprache === 'en' ? SCHRITTE_EN : SCHRITTE);
 
 /** Unter diesem Namen merkt sich der Ablauf, wo die Stuecke eines Schritts stehen (`Stuecke` in `schritte.tsx`). */
 export const KENNUNGEN = ['angebot', 'angaben', 'luecke', 'rechnung', 'leistung', 'entscheidung', 'unterlagen'] as const;

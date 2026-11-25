@@ -259,29 +259,39 @@ function mindestzuschussPruefen(
   };
 }
 
-/** Hinweise, die den MITARBEITER angehen — aus den Zahlen, nicht aus den Texten der Modelle. */
-function mitarbeiterHinweise(
+/**
+ * Hinweise, die den MITARBEITER angehen — aus den Zahlen, nicht aus den Texten der Modelle.
+ *
+ * @param sprache Deutsch ist die Vorgabe (so stehen sie in `MitarbeiterBav.hinweise` und in den
+ *   Unterlagen); die Mitarbeiterberatung holt sie fuer den Bildschirm auch auf Englisch. Betraege
+ *   bleiben in deutscher Schreibweise.
+ */
+export function mitarbeiterHinweise(
   modell: FirmenModell,
   m: MitarbeiterEingaben,
   r: Omit<MitarbeiterBav, 'hinweise'>,
   p: LegalParameters,
+  sprache: 'de' | 'en' = 'de',
 ): string[] {
+  const en = sprache === 'en';
   const h: string[] = [];
   const u = r.umwandlungMonat;
   if (u <= 0) return h;
   // Ob der gesetzliche Zuschuss die Regel uebersteigt, zeigt die Pruefung (`mindestzuschuss`) — dann
   // waere „gedeckelt“ irrefuehrend: Der Arbeitgeber zahlt mehr als den Deckel.
   if (modell.art === 'zuschuss' && modell.deckelMonat > 0 && modell.quote * u > modell.deckelMonat + 0.005 && !r.mindestzuschuss?.aufgestockt) {
-    h.push(
-      `Der Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
-      + 'jeder weitere Euro Umwandlung wird nicht mehr bezuschusst.',
-    );
+    h.push(en
+      ? `Your employer's contribution is capped at ${euro(modell.deckelMonat)} a month — `
+        + 'every further euro you convert is no longer topped up.'
+      : `Der Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
+        + 'jeder weitere Euro Umwandlung wird nicht mehr bezuschusst.');
   }
   if (modell.art === 'festbetrag' && u + 0.005 < modell.mindestUmwandlungMonat) {
-    h.push(
-      `Den Festbetrag von ${euro(modell.festbetragMonat)} gibt Ihr Arbeitgeber ab ${euro(modell.mindestUmwandlungMonat)} `
-      + 'Umwandlung im Monat. Darunter gibt es nur den gesetzlichen Zuschuss von 15 %, soweit er Sozialabgaben spart.',
-    );
+    h.push(en
+      ? `Your employer adds the fixed amount of ${euro(modell.festbetragMonat)} once you convert ${euro(modell.mindestUmwandlungMonat)} `
+        + 'a month or more. Below that you only get the statutory 15 % subsidy, to the extent your employer saves social security contributions.'
+      : `Den Festbetrag von ${euro(modell.festbetragMonat)} gibt Ihr Arbeitgeber ab ${euro(modell.mindestUmwandlungMonat)} `
+        + 'Umwandlung im Monat. Darunter gibt es nur den gesetzlichen Zuschuss von 15 %, soweit er Sozialabgaben spart.');
   }
   if (modell.art === 'frei') {
     // Die naechste Stufe, wenn sie mehr bringt: der Satz, der im Gespraech zaehlt.
@@ -289,35 +299,41 @@ function mitarbeiterHinweise(
     const jetzt = freiStufe(stufen, u)?.betragMonat ?? 0;
     const naechste = stufen.find((s) => s.abMonat > u + 0.005 && s.betragMonat > jetzt + 0.005);
     if (naechste) {
-      h.push(
-        `Ab ${euro(naechste.abMonat)} Umwandlung im Monat gibt Ihr Arbeitgeber ${euro(naechste.betragMonat)} fest dazu`
-        + `${jetzt > 0 ? ` statt ${euro(jetzt)}` : ''}.`,
-      );
+      h.push(en
+        ? `From ${euro(naechste.abMonat)} converted a month, your employer adds a fixed ${euro(naechste.betragMonat)}`
+          + `${jetzt > 0 ? ` instead of ${euro(jetzt)}` : ''}.`
+        : `Ab ${euro(naechste.abMonat)} Umwandlung im Monat gibt Ihr Arbeitgeber ${euro(naechste.betragMonat)} fest dazu`
+          + `${jetzt > 0 ? ` statt ${euro(jetzt)}` : ''}.`);
     }
     if (modell.deckelMonat > 0 && modell.quote * u > modell.deckelMonat + 0.005 && !r.mindestzuschuss?.aufgestockt) {
-      h.push(
-        `Der prozentuale Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
-        + 'jeder weitere Euro Umwandlung erhöht ihn nicht mehr.',
-      );
+      h.push(en
+        ? `Your employer's percentage contribution is capped at ${euro(modell.deckelMonat)} a month — `
+          + 'every further euro you convert no longer increases it.'
+        : `Der prozentuale Zuschuss Ihres Arbeitgebers ist bei ${euro(modell.deckelMonat)} im Monat gedeckelt — `
+          + 'jeder weitere Euro Umwandlung erhöht ihn nicht mehr.');
     }
   }
   if (r.svPflichtigMonat > 0.5) {
-    h.push(
-      `Beitragsfrei sind 4 % der Beitragsbemessungsgrenze, ${euro(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat — `
-      + 'der Beitrag des Arbeitgebers zählt zuerst. Auf '
-      + `${euro(r.svPflichtigMonat)} Ihrer Umwandlung zahlen Sie deshalb weiter Sozialabgaben.`,
-    );
+    h.push(en
+      ? `Exempt from social security contributions are 4 % of the contribution assessment ceiling, ${euro(SV_FREI_QUOTE * p.bbgRvJahr / 12)} a month — `
+        + `your employer's contribution counts first. On ${euro(r.svPflichtigMonat)} of your conversion you therefore `
+        + 'still pay social security contributions.'
+      : `Beitragsfrei sind 4 % der Beitragsbemessungsgrenze, ${euro(SV_FREI_QUOTE * p.bbgRvJahr / 12)} im Monat — `
+        + 'der Beitrag des Arbeitgebers zählt zuerst. Auf '
+        + `${euro(r.svPflichtigMonat)} Ihrer Umwandlung zahlen Sie deshalb weiter Sozialabgaben.`);
   }
   if (m.privatVersichert) {
-    h.push(
-      'Privat versichert: Die Umwandlung spart Renten- und Arbeitslosenversicherung, aber keine Kranken- '
-      + 'und Pflegebeiträge.',
-    );
+    h.push(en
+      ? 'Privately insured: the conversion saves pension and unemployment insurance contributions, but no health '
+        + 'or long-term care contributions.'
+      : 'Privat versichert: Die Umwandlung spart Renten- und Arbeitslosenversicherung, aber keine Kranken- '
+        + 'und Pflegebeiträge.');
   } else if (m.jahresbrutto > p.bbgKvJahr) {
-    h.push(
-      'Ihr Gehalt liegt über der Beitragsbemessungsgrenze der Krankenversicherung: Dort spart die '
-      + 'Umwandlung keine Beiträge, nur noch bei Renten- und Arbeitslosenversicherung.',
-    );
+    h.push(en
+      ? 'Your salary is above the contribution assessment ceiling for health insurance: there the conversion '
+        + 'saves no contributions, only for pension and unemployment insurance.'
+      : 'Ihr Gehalt liegt über der Beitragsbemessungsgrenze der Krankenversicherung: Dort spart die '
+        + 'Umwandlung keine Beiträge, nur noch bei Renten- und Arbeitslosenversicherung.');
   }
   return h;
 }

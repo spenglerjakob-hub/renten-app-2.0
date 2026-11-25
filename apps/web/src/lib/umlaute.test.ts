@@ -21,6 +21,13 @@ import { describe, expect, it } from 'vitest';
  *
  * Schlaegt der Test bei einem richtigen Wort an (ein Name, ein Fremdwort),
  * gehoert es in ERLAUBT — mit dem Grund.
+ *
+ * ENGLISCHE TEXTE prueft er nicht: „gross salary“ und „goes“ sind richtig.
+ * Englisch steht in der Mitarbeiterberatung an festen Stellen
+ * (`lib/sprache.tsx`) — als zweites Argument von `w('Deutsch', 'English')`,
+ * im Ja-Zweig von `en ? … : …`, in Namen auf `_EN` oder `En` und in Dateien
+ * auf `-en.ts`. Genau diese Stellen laesst der Test aus; das Deutsche daneben
+ * prueft er weiter.
  */
 
 const WURZEL = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -84,7 +91,7 @@ function* dateien(ordner: string): Generator<string> {
     const pfad = join(ordner, name);
     if (statSync(pfad).isDirectory()) {
       if (name !== 'legacy' && name !== 'node_modules' && name !== 'dist') yield* dateien(pfad);
-    } else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !name.endsWith('.d.ts')) {
+    } else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !name.endsWith('.d.ts') && !/-en\.tsx?$/.test(name)) {
       yield pfad;
     }
   }
@@ -97,6 +104,17 @@ const VERGLEICH = new Set(['includes', 'startsWith', 'endsWith', 'indexOf', 'mat
 
 interface Text { datei: string; zeile: number; text: string }
 
+/** `w(…)` aus `useW()`/`wahl(s)` oder direkt `wahl(s)(…)` — Deutsch zuerst, Englisch danach. */
+const istWort = (e: ts.Expression): boolean =>
+  (ts.isIdentifier(e) && e.text === 'w') || (ts.isCallExpression(e) && ts.isIdentifier(e.expression) && e.expression.text === 'wahl');
+/** Ein Name, der Englisches traegt: `SCHRITTE_EN`, `regelTextEn`, die Eigenschaft `en`. */
+const ENGLISCHER_NAME = /(_EN|[a-z]En)$|^en$/;
+/** Die Bedingung „auf Englisch“: `en` oder `sprache === 'en'`. */
+const istEnglisch = (b: ts.Expression): boolean =>
+  (ts.isIdentifier(b) && b.text === 'en')
+  || (ts.isBinaryExpression(b) && b.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    && ts.isStringLiteral(b.right) && b.right.text === 'en');
+
 function texteVon(datei: string): Text[] {
   const quelle = readFileSync(datei, 'utf8');
   const sf = ts.createSourceFile(datei, quelle, ts.ScriptTarget.Latest, true, datei.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
@@ -107,6 +125,14 @@ function texteVon(datei: string): Text[] {
   const besuche = (n: ts.Node): void => {
     if (ts.isImportDeclaration(n) || ts.isExportDeclaration(n) || ts.isTypeNode(n)) return;
     if (ts.isJsxAttribute(n) && KEIN_TEXT.has(n.name.getText(sf))) return;
+    // Englisch auslassen, das Deutsche daneben weiter pruefen (siehe oben).
+    if (ts.isCallExpression(n) && n.arguments.length === 2 && istWort(n.expression)) { besuche(n.arguments[0]!); return; }
+    if (ts.isConditionalExpression(n) && istEnglisch(n.condition)) { besuche(n.whenFalse); return; }
+    if (ts.isIfStatement(n) && istEnglisch(n.expression)) { if (n.elseStatement) besuche(n.elseStatement); return; }
+    // `{s === 'en' && <p>…</p>}` im JSX
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken && istEnglisch(n.left)) return;
+    if ((ts.isVariableDeclaration(n) || ts.isPropertyAssignment(n) || ts.isFunctionDeclaration(n)) && n.name
+      && ENGLISCHER_NAME.test(n.name.getText(sf))) return;
     if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
       const ziel = n.expression.expression.getText(sf);
       if (ziel === 'console' || VERGLEICH.has(n.expression.name.text)) { besuche(n.expression); return; }
