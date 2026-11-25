@@ -35,9 +35,10 @@ export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
  * Lesebreite, Listen mit Gedankenstrich wie die Hinweise der Beratung.
  *
  * Gestaltet wird nur hier, in Rahmen und Helfern (H1, H2, P, Liste) — nicht
- * in den Texten selbst: Auf `live` haelt ein eigener Commit die
- * Nutzungsbedingungen in einer aelteren Fassung, und jede Zeile, die beide
- * Seiten aendern, wuerde beim Zusammenfuehren zum Konflikt.
+ * in den Texten selbst: Auf `live` steht `Nutzungsbedingungen()` als Ganzes
+ * in einer aelteren Fassung, bis die Abrechnung startet (README „Livegang“).
+ * Beim Zusammenfuehren bleibt die Funktion dort, wie sie ist; was hier an
+ * ihrem Text geaendert wird, kommt erst mit der Freigabe auf live.
  */
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
@@ -568,13 +569,13 @@ function Nutzungsbedingungen() {
   return (
     <>
       <H1>Nutzungsbedingungen</H1>
-      <p className="mt-1 text-xs text-ui-schiefer">Fassung vom 20. Oktober 2026</p>
+      <p className="mt-1 text-xs text-ui-schiefer">Fassung vom 25. November 2026</p>
 
       <H2>1. Geltungsbereich</H2>
       <P>
         Diese Bedingungen gelten für die Nutzung des JS-Rentenplaners unter js-rentenplaner.de — des Rechners,
-        der Arbeitgeber-Seiten, des Vorsorge-Checks und aller weiteren Inhalte. Anbieter ist [Vor- und Nachname
-        bzw. Firma, Anschrift] (im Folgenden „Anbieter“), siehe{' '}
+        der Arbeitgeber-Seiten, der Mitarbeiterberatung, des Vorsorge-Checks und aller weiteren Inhalte.
+        Anbieter ist [Vor- und Nachname bzw. Firma, Anschrift] (im Folgenden „Anbieter“), siehe{' '}
         <a href="/impressum" className="text-ui-tinte underline underline-offset-2">Impressum</a>. Mit der Registrierung bzw. der
         Zustimmung im Konto akzeptieren Sie diese Bedingungen.
       </P>
@@ -585,6 +586,22 @@ function Nutzungsbedingungen() {
         jeweils hinterlegten Rechtsstands. Die Ergebnisse sind keine Steuer-, Rechts- oder Anlageberatung und
         ersetzen diese nicht. Beiträge, Tarife und Leistungen Dritter (etwa Versicherer) sind Beispiele ohne
         Gewähr; maßgeblich sind deren Angebote.
+      </P>
+      <P>
+        <strong>Unterlagen und Unterschriften.</strong> In der Mitarbeiterberatung erstellen Sie Unterlagen zur
+        betrieblichen Altersversorgung — Beratungsprotokoll, Vereinbarung zur Entgeltumwandlung oder
+        Verzichtserklärung, bei der AXA den Antrag auf Entgeltumwandlung und das Gesprächsprotokoll — und lassen
+        sie am Bildschirm oder über einen Link unterschreiben. Für den Inhalt der Unterlagen, für die Beratung
+        und dafür, wer unterschreibt, sind Sie verantwortlich; der Anbieter prüft weder die Angaben noch die
+        Identität der Unterschreibenden. Links und Codes geben Sie selbst weiter; der Anbieter schreibt Ihre
+        Kunden und deren Mitarbeiter nicht an.
+      </P>
+      <P>
+        Die Unterschrift im JS-Rentenplaner ist eine einfache elektronische Signatur im Sinne der
+        eIDAS-Verordnung, keine qualifizierte. Sie ersetzt die gesetzliche Schriftform (§ 126 BGB) nicht. Ob sie
+        für Ihren Zweck genügt — etwa gegenüber dem Versicherer oder dem Arbeitgeber —, klären Sie selbst.
+        Vorlagen Dritter, etwa der AXA, gibt der JS-Rentenplaner ohne Gewähr dafür wieder, dass sie dem
+        aktuellen Stand entsprechen; maßgeblich sind die Vorgaben des jeweiligen Anbieters. [Prüfen lassen.]
       </P>
 
       <H2>3. Konto</H2>
@@ -666,9 +683,32 @@ function Nutzungsbedingungen() {
           <strong>Bestandskonten.</strong> Konten, die vor der Einführung des Abos bestanden, nutzen den
           JS-Rentenplaner weiterhin kostenlos. Ein Abo brauchen sie nur, um weitere Personen in ihr Büro zu holen.
         </li>
+        <li>
+          <strong>Agenturen und bAV-Verwaltung.</strong> Betreut der Anbieter für eine Agentur die betriebliche
+          Altersversorgung ihrer Firmenkunden, nutzen die Konten, die über einen Einladungslink zu dieser Agentur
+          gehören, die Arbeitgeber-Vorsorgemodelle und die Mitarbeiterberatung ohne Abo — ebenso die vom Anbieter
+          benannten Konten der bAV-Verwaltung. Für die Rentenplanung brauchen sie ein Abo wie alle anderen.
+          Grundlage ist die Vereinbarung zwischen dem Anbieter und der Agentur: Endet sie oder wird ein Zugang
+          entfernt, endet auch dessen kostenlose Nutzung. Firmen und Beratungen, die ein Zugang in der Agentur
+          angelegt hat, bleiben in der Agentur. [Prüfen lassen.]
+        </li>
       </Liste>
 
-      <H2>5. Rechte am JS-Rentenplaner</H2>
+      <H2>5. Daten Ihrer Kunden</H2>
+      <P>
+        Geben Sie Daten Ihrer Kunden, von deren Angehörigen oder von Mitarbeitern Ihrer Firmenkunden in den
+        JS-Rentenplaner ein oder erhalten Sie sie über Ihre Links (Vorsorge-Check, Unterschrift, Angaben für den
+        Antrag), sind Sie für diese Daten verantwortlich. Der Anbieter verarbeitet sie in Ihrem Auftrag
+        (Art. 28 DSGVO). Dafür gilt die Vereinbarung zur Auftragsverarbeitung in der Anlage; sie ist Bestandteil
+        dieser Bedingungen und kommt mit Ihrer Zustimmung zustande.
+      </P>
+      <P>
+        Sie sorgen dafür, dass Sie die Daten verarbeiten dürfen — bei Angaben besonderer Kategorien (etwa
+        Kirchensteuerpflicht oder Gesundheit) in der Regel mit der ausdrücklichen Einwilligung der Betroffenen —,
+        und informieren die Betroffenen. Geben Sie nur ein, was Sie für die Beratung brauchen.
+      </P>
+
+      <H2>6. Rechte am JS-Rentenplaner</H2>
       <P>
         Software, Rechenlogik, Texte, Gestaltung und Grafiken des JS-Rentenplaners sind urheberrechtlich
         geschützt (insbesondere §§ 2, 69a ff. UrhG). Alle Rechte liegen beim Anbieter, soweit nicht anders
@@ -680,7 +720,7 @@ function Nutzungsbedingungen() {
         Ergebnisse dürfen Sie an Ihre Kunden und deren Arbeitgeber weitergeben.
       </P>
 
-      <H2>6. Nicht erlaubt</H2>
+      <H2>7. Nicht erlaubt</H2>
       <P>Ohne vorherige schriftliche Zustimmung des Anbieters ist es nicht erlaubt,</P>
       <Liste>
         <li>den Programmcode oder die Rechenlogik ganz oder teilweise zu kopieren, zu speichern, zu verbreiten
@@ -695,13 +735,13 @@ function Nutzungsbedingungen() {
           Personen zu teilen.</li>
       </Liste>
 
-      <H2>7. Verfügbarkeit und Änderungen</H2>
+      <H2>8. Verfügbarkeit und Änderungen</H2>
       <P>
         Der Anbieter bemüht sich um einen störungsfreien Betrieb, schuldet aber keine bestimmte Verfügbarkeit.
         Funktionen und Rechenregeln können angepasst werden, etwa an einen neuen Rechtsstand.
       </P>
 
-      <H2>8. Haftung</H2>
+      <H2>9. Haftung</H2>
       <P>
         Der Anbieter haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie für Schäden aus der
         Verletzung von Leben, Körper oder Gesundheit. Bei leichter Fahrlässigkeit haftet er nur für die
@@ -710,7 +750,7 @@ function Nutzungsbedingungen() {
         Haftung. [Haftungsregelung anwaltlich prüfen lassen, insbesondere für das kostenpflichtige Abo.]
       </P>
 
-      <H2>9. Sperrung und Kündigung</H2>
+      <H2>10. Sperrung und Kündigung</H2>
       <P>
         Sie können die Nutzung jederzeit beenden, indem Sie Ihr Konto löschen; ein laufendes Abo kündigen Sie
         vorher wie in Abschnitt 4 beschrieben. Bei Verstößen gegen diese Bedingungen kann der Anbieter das Konto
@@ -718,18 +758,102 @@ function Nutzungsbedingungen() {
         Unterlassung und Schadensersatz, bleiben vorbehalten.
       </P>
 
-      <H2>10. Änderungen dieser Bedingungen</H2>
+      <H2>11. Änderungen dieser Bedingungen</H2>
       <P>
         Der Anbieter kann diese Bedingungen mit Wirkung für die Zukunft ändern. Eine neue Fassung wird Ihnen
         beim nächsten Besuch angezeigt; die weitere Nutzung setzt Ihre Zustimmung voraus.
       </P>
 
-      <H2>11. Schlussbestimmungen</H2>
+      <H2>12. Schlussbestimmungen</H2>
       <P>
         Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts. Ist eine
         Bestimmung unwirksam, bleiben die übrigen wirksam. [Gerichtsstand für Kaufleute: Sitz des Anbieters —
         prüfen lassen.]
       </P>
+
+      <H2>Anlage: Vereinbarung zur Auftragsverarbeitung</H2>
+      <P>
+        Diese Vereinbarung nach Art. 28 Abs. 3 DSGVO gilt zwischen Ihnen als Verantwortlichem und dem Anbieter
+        als Auftragsverarbeiter für die Daten nach Abschnitt 5. [Entwurf: Die Anlage bildet ab, was der
+        JS-Rentenplaner tatsächlich tut. Vor dem Start der Abrechnung anwaltlich prüfen oder durch einen
+        geprüften Mustervertrag ersetzen lassen.]
+      </P>
+      <Liste>
+        <li>
+          <strong>1. Gegenstand und Dauer.</strong> Der Anbieter speichert die Daten, die Sie in Ihrem Konto
+          ablegen oder über Ihre Links erhalten, stellt sie Ihnen bereit und löscht sie — damit Sie
+          Modellrechnungen, Gutachten, Mitarbeiterberatungen und Anträge erstellen können. Gerechnet wird in
+          Ihrem Browser. Die Vereinbarung gilt, solange Ihr Konto besteht.
+        </li>
+        <li>
+          <strong>2. Art der Daten.</strong> Namen, Kontaktdaten, Geburtsdaten, Einkommen, Steuermerkmale, Kinder,
+          Krankenversicherung, Rentenansprüche und Verträge; in der Mitarbeiterberatung außerdem Entscheidung,
+          unterschriebene Unterlagen, Unterschriften und deren Nachweise; für Anträge Bezugsrecht, Bankverbindung
+          und Ausweiskopie; im Vorsorge-Check hochgeladene Unterlagen. Darunter können Angaben besonderer
+          Kategorien sein (Art. 9 DSGVO): die Kirchensteuerpflicht, ein Risikozuschlag der privaten
+          Krankenversicherung und die Antworten zur Gesundheit im AXA-Antrag.
+        </li>
+        <li>
+          <strong>3. Betroffene Personen.</strong> Ihre Kunden und Interessenten, deren Partner und Kinder sowie
+          die Mitarbeiter und Ansprechpartner Ihrer Firmenkunden.
+        </li>
+        <li>
+          <strong>4. Weisungen.</strong> Der Anbieter verarbeitet die Daten nur nach Ihrer Weisung und nicht für
+          eigene Zwecke. Ihre Weisungen erteilen Sie, indem Sie die Funktionen nutzen — speichern, freigeben,
+          löschen; weitere Weisungen in Textform an info@js-rentenplaner.de. Hält der Anbieter eine Weisung für
+          rechtswidrig, weist er Sie darauf hin.
+        </li>
+        <li>
+          <strong>5. Vertraulichkeit.</strong> Wer beim Anbieter Zugang zu den Daten haben kann, ist zur
+          Vertraulichkeit verpflichtet. Auf Ihre Daten greift der Anbieter nur zu, soweit es für Betrieb,
+          Fehlerbehebung oder eine Anfrage von Ihnen nötig ist. [Zugriffe des Anbieters auf die Datenbank und
+          ihre Protokollierung beschreiben.]
+        </li>
+        <li>
+          <strong>6. Sicherheit.</strong> Der Anbieter trifft technische und organisatorische Maßnahmen nach
+          Art. 32 DSGVO: verschlüsselte Verbindungen, Trennung der Daten je Konto durch Zugriffsregeln der
+          Datenbank, nicht öffentliche Speicher für Dateien mit kurz gültigen, signierten Verweisen, Passwörter
+          nur als Prüfwert, Speicherung in der EU. Näheres steht in der{' '}
+          <a href="/datenschutz" className="text-ui-tinte underline underline-offset-2">Datenschutzerklärung</a>{' '}
+          (Abschnitt 17). [Um Sicherungen, Wiederherstellung und organisatorische Maßnahmen ergänzen.]
+        </li>
+        <li>
+          <strong>7. Weitere Auftragsverarbeiter.</strong> Sie stimmen zu, dass der Anbieter die Supabase Inc.
+          (Datenbank, Anmeldung und Serverfunktionen; Rechenzentrum in der EU) und die Hostinger International
+          Ltd. (Webhosting und E-Mail-Versand) einsetzt. Mit beiden bestehen Verträge nach Art. 28 Abs. 4 DSGVO.
+          Über einen neuen oder geänderten Auftragsverarbeiter informiert der Anbieter Sie mindestens 30 Tage
+          vorher; Sie können widersprechen und, bleibt es dabei, zum Wirksamwerden kündigen. [Frist und Folge
+          des Widerspruchs prüfen lassen.]
+        </li>
+        <li>
+          <strong>8. Unterstützung.</strong> Der Anbieter unterstützt Sie, soweit möglich, bei Anfragen
+          Betroffener (Art. 15 bis 22 DSGVO), bei Meldungen nach Art. 33 und 34 DSGVO und bei einer
+          Datenschutz-Folgenabschätzung. Wendet sich ein Betroffener an den Anbieter, leitet dieser die Anfrage
+          an Sie weiter.
+        </li>
+        <li>
+          <strong>9. Verletzungen des Datenschutzes.</strong> Stellt der Anbieter fest, dass der Schutz Ihrer
+          Daten verletzt wurde, informiert er Sie unverzüglich und teilt mit, was er weiß und unternimmt.
+        </li>
+        <li>
+          <strong>10. Löschung und Rückgabe.</strong> Sie können Ihre Daten jederzeit selbst löschen und Ihre
+          Szenarien als Datei sichern. Löschen Sie Ihr Konto, löscht der Anbieter alles, was zu diesem Konto
+          gehört; die Fristen und die Ausnahmen für Büros und Agenturen stehen in der Datenschutzerklärung
+          (Abschnitte 7 und 15).
+          [Aufbewahrung in Sicherungskopien: Frist laut Supabase eintragen.]
+        </li>
+        <li>
+          <strong>11. Nachweise.</strong> Der Anbieter stellt Ihnen auf Anfrage die Informationen bereit, mit
+          denen Sie die Einhaltung dieser Vereinbarung nachweisen können, und ermöglicht Überprüfungen nach
+          angemessener Ankündigung. [Umfang, Ankündigungsfrist und Kosten prüfen lassen.]
+        </li>
+        <li>
+          <strong>12. Agenturen.</strong> Betreut die bAV-Verwaltung des Anbieters die Firmenkunden einer
+          Agentur, sehen und bearbeiten ihre Konten deren Firmen und Beratungen. Dafür gilt ergänzend die
+          Vereinbarung zwischen dem Anbieter und der Agentur. [Auftragsverarbeitung oder gemeinsame
+          Verantwortlichkeit (Art. 26 DSGVO) — prüfen lassen.]
+        </li>
+      </Liste>
     </>
   );
 }

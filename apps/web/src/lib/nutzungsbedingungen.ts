@@ -9,7 +9,7 @@
  * Neue Fassung: Datum hochsetzen. Dann fragt die Zugangsschranke jedes Konto
  * beim naechsten Besuch einmal erneut.
  */
-export const NUTZUNGSBEDINGUNGEN_FASSUNG = '2026-10-20';
+export const NUTZUNGSBEDINGUNGEN_FASSUNG = '2026-11-25';
 
 export function zustimmungDaten() {
   return { nutzungsbedingungen: NUTZUNGSBEDINGUNGEN_FASSUNG, nutzungsbedingungen_am: new Date().toISOString() };

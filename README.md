@@ -273,10 +273,17 @@ In dieser Reihenfolge — jeder Schritt laesst sich einzeln pruefen:
    Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt,
    das ihr nicht schon auf der Testseite zugestimmt hat (die Zugangsschranke
    laesst durch, wer der Fassung der Seite oder einer neueren zugestimmt hat
-   — Test und Live teilen die Konten). Bis dahin traegt `live` einen eigenen Commit (`8b7e9b8`, "Live:
-   Nutzungsbedingungen bis zur Prüfung in der Fassung vom 1. Oktober 2026"),
-   der die alte Fassung haelt. Ihn auf `live` mit `git revert` zuruecknehmen,
-   dann den Arbeitszweig in `live` mergen — ein reiner Fast-Forward geht nicht.
+   — Test und Live teilen die Konten). Bis dahin haelt `live` die alte
+   Fassung (seit Commit `8b7e9b8`, "Live: Nutzungsbedingungen bis zur Prüfung
+   in der Fassung vom 1. Oktober 2026"): In `apps/web/src/recht/Seite.tsx`
+   steht dort die Funktion `Nutzungsbedingungen()` als Ganzes im alten Text,
+   in `apps/web/src/lib/nutzungsbedingungen.ts` das alte Datum. Bei jedem
+   Merge nach `live` bleiben genau diese beiden Stellen, wie sie dort sind —
+   alles andere kommt vom Arbeitszweig. Zur Freigabe den Arbeitszweig in
+   `live` mergen und beide Dateien vom Arbeitszweig nehmen
+   (`git checkout <Arbeitszweig> -- <beide Dateien>`); danach sind die Zweige
+   gleich. Ein `git revert` von `8b7e9b8` passt nicht mehr: Der Text hat sich
+   seither geaendert (Fassung vom 25. November 2026).
 8. **Buchung fuer alle oeffnen:**
    `update privat.einstellungen set zahlung_nur_betreiber = false where id;`
    Ab wann ein Paket Pflicht ist, steuert getrennt davon `abo_pflicht_ab`.
