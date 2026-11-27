@@ -1,3 +1,5 @@
+import { useId, useState, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { TuevErgebnis } from '@renten/engine';
 import { GegenueberZeile, euro } from '../components/Feld';
 import type { AnspracheWoerter } from '../lib/ansprache';
@@ -18,6 +20,39 @@ export const BLOCK = 'ui-innen p-4';
 export const BLOCK_TITEL = 'mb-2 text-xs font-medium text-ui-schiefer';
 /** Die Summe eines Blocks unter einer Linie in Tinte, wie die Aufstellungen der Beratung. */
 export const SUMME = 'mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2';
+
+/**
+ * EIN ERKLAERTEXT UNTER DEN KENNZAHLEN — zum Auf- und Zuklappen, anfangs zu.
+ *
+ * Die Hinweise des Rechenkerns („Du bist privat krankenversichert: …“) und
+ * die Erklaerung „rein arbeitgeberfinanziert“ sind mehrere Zeilen lang; zu
+ * dritt schoben sie die Spalte unter die Karte hinaus. Eingeklappt steht von
+ * jedem die erste Zeile da — genug, um zu sehen, worum es geht —, ein Klick
+ * auf das Kaestchen zeigt den ganzen Text.
+ *
+ * Der Text bleibt ein Absatz und ist fuer Screenreader immer ganz da: Gekuerzt
+ * wird nur die Anzeige. Der Knopf traegt den Zustand; seine Flaeche reicht
+ * ueber das ganze Kaestchen. Im Druck steht der Text ausgeschrieben.
+ */
+export function Hinweis({ children }: { children: ReactNode }) {
+  const [offen, setOffen] = useState(false);
+  const id = useId();
+  return (
+    <div className="ui-innen relative flex items-start gap-2 px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
+      <p id={id} className={`min-w-0 flex-1 ${offen ? '' : 'truncate print:whitespace-normal'}`}>{children}</p>
+      <button
+        type="button"
+        aria-expanded={offen}
+        aria-controls={id}
+        aria-label={offen ? 'Hinweis einklappen' : 'Hinweis ausklappen'}
+        onClick={() => setOffen((x) => !x)}
+        className="shrink-0 rounded-full p-0.5 text-ui-schiefer after:absolute after:inset-0 after:content-[''] hover:text-ui-tinte print:hidden"
+      >
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${offen ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+    </div>
+  );
+}
 
 /** Eine Zeile im Vergleich der beiden Auszahlungswege. */
 export function WegZeile({ text, rente, kapital, hervor }: {

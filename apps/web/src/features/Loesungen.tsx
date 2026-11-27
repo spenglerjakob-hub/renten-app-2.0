@@ -13,7 +13,7 @@ import {
 } from './tuev-berechnung';
 import { personNameAus } from './personen';
 import { anteilAmNetto, anteilAnLuecke } from './bezug';
-import { BLOCK, BLOCK_TITEL, SUMME, WegZeile, ZulagenBlock } from './TuevTeile';
+import { BLOCK, BLOCK_TITEL, Hinweis, SUMME, WegZeile, ZulagenBlock } from './TuevTeile';
 
 /**
  * DIE ANGEBOTE — nach dem Vorschlag (`Vorschlag.tsx`) der zweite Schritt zu
@@ -610,13 +610,10 @@ function Auswertung({ position: p, ergebnis: r, szenario, basis, inhaber, nettoH
           </div>
         )}
 
-        {ohne && (
-          <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">{ohneEigenaufwandText(e)}</p>
-        )}
+        {/* Die Erklaertexte: eingeklappt je eine Zeile, per Klick der ganze Text (`Hinweis`). */}
+        {ohne && <Hinweis>{ohneEigenaufwandText(e)}</Hinweis>}
 
-        {r.hinweise.map((h) => (
-          <p key={h} className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">{h}</p>
-        ))}
+        {r.hinweise.map((h) => <Hinweis key={h}>{h}</Hinweis>)}
       </div>
     </>
   );

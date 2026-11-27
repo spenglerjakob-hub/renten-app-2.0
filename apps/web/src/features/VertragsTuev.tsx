@@ -17,7 +17,7 @@ import {
 import { KinderZeilen, KinderHinweis, JahrWahl, KIND_HOECHSTALTER } from '../components/KinderFelder';
 import { EINLEITUNG, FELD, Hervor, Kernsatz, Titel } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
-import { BLOCK, BLOCK_TITEL, SUMME, WegZeile, ZulagenBlock } from './TuevTeile';
+import { BLOCK, BLOCK_TITEL, Hinweis, SUMME, WegZeile, ZulagenBlock } from './TuevTeile';
 
 /** Ein kleiner Knopf mit Kontur in einem Block („Kind“, „Noch eine Änderung“). */
 const KLEIN_KNOPF = 'inline-flex items-center gap-1 rounded-full border border-ui-zweit-rand bg-ui-karte px-2.5 py-1 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden';
@@ -933,19 +933,16 @@ export function VertragsTuev({
                       </div>
                     )}
 
+                    {/* Die Erklaertexte wie bei den Angeboten: eingeklappt je eine Zeile, per Klick der ganze Text. */}
                     {r.zulagenGekuerzt && (
-                      <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
+                      <Hinweis>
                         <strong className="font-medium text-ui-tinte">Zulagen werden gekürzt.</strong> {e.Dein()} Eigenbeitrag liegt unter dem
                         Mindesteigenbeitrag nach § 86 EStG (4 % des Vorjahresbruttos abzüglich
                         Zulagen). Die Zulagen fallen dadurch anteilig geringer aus.
-                      </p>
+                      </Hinweis>
                     )}
 
-                    {r.hinweise.map((h, i) => (
-                      <p key={i} className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
-                        {h}
-                      </p>
-                    ))}
+                    {r.hinweise.map((h, i) => <Hinweis key={i}>{h}</Hinweis>)}
 
                     {!wege && kenntKapitalwahl(v.typ) && (
                       <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
