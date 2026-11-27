@@ -537,6 +537,13 @@ export const angebotSchema = z.object({
    * Altersvorsorgedepot kennen keine volle Kapitalauszahlung.
    */
   kapital: z.number().min(0).max(100_000_000).default(0),
+  /**
+   * Unveraendert aus dem Vorschlag uebernommen. Ein solches Angebot weicht,
+   * wenn ein neuer Vorschlag uebernommen wird — auch mit Anbieter, den der
+   * Vorschlag von Hand mitgebracht hat. Jede Aenderung am Angebot nimmt die
+   * Marke weg: Dann gehoert es dem Berater.
+   */
+  ausVorschlag: z.boolean().default(false),
 });
 
 /**
@@ -555,6 +562,27 @@ export const mixWuenscheSchema = z.object({
   foerderung: z.enum(['ja', 'nein']).optional().catch(undefined),
   /** Den Arbeitgeber einbinden (Betriebsrente) */
   arbeitgeber: z.enum(['ja', 'nein']).optional().catch(undefined),
+});
+
+/**
+ * DER VORSCHLAG VON HAND: Der Berater traegt selbst ein, welche Loesung wie
+ * viel bekommt — statt der Verteilung, die aus den Antworten entsteht
+ * (`loesungsmixEigen` im Rechenkern). Je Loesung hoechstens eine Zeile.
+ *
+ * `aktiv` entscheidet, was gilt: Mit `false` zaehlen wieder die Antworten.
+ * Der Betrag ist der Netto-Aufwand oder — `brutto` — der Beitrag (bAV: die
+ * Umwandlung, Depot: der Eigenbeitrag), je nachdem, welches Feld zuletzt
+ * ausgefuellt wurde.
+ */
+export const eigenerVorschlagSchema = z.object({
+  aktiv: z.boolean().default(false),
+  teile: z.array(z.object({
+    loesung: z.enum(['bav', 'avd', 'basis', 'privat']),
+    betragMonat: z.number().min(0).max(100_000).default(0),
+    vorgabe: z.enum(['netto', 'brutto']).default('netto'),
+    /** Anbieter und Tarif, frei — geht mit dem Vorschlag in das Angebot */
+    name: z.string().max(120).default(''),
+  })).max(4).default([]),
 });
 
 /**
@@ -581,6 +609,12 @@ export const loesungenSchema = z.object({
   lebenserwartung: z.number().int().min(60).max(120).default(85),
   /** Was dem Kunden wichtig ist — `.default({})`: frueher gespeicherte Plaene haben noch keine Antworten */
   wuensche: mixWuenscheSchema.default({}),
+  /**
+   * Die von Hand eingetragene Verteilung. `.default({})`: frueher gespeicherte
+   * Plaene haben keine; ein unbrauchbarer Wert faellt weg, statt den ganzen
+   * Plan unlesbar zu machen — dann gilt wieder der Vorschlag aus den Antworten.
+   */
+  eigen: eigenerVorschlagSchema.default({}).catch({ aktiv: false, teile: [] }),
   angebote: z.array(angebotSchema).max(12).default([]),
   /**
    * Die angenommenen Angebote, als IDs aus `angebote`. Mit „Lösungen

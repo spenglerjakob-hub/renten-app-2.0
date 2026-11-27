@@ -87,20 +87,30 @@ export function wunschAntwort<K extends keyof MixWuensche>(id: K, wert: MixWuens
   return antworten.find((a) => a.wert === wert)?.text ?? '';
 }
 
+type Baustein = MixTeil['loesung'];
+
+/** Was der Staat zum Depot dazulegt — derselbe Satz im Vorschlag aus den Antworten und von Hand. */
+const depotSatz = (l: Baustein) => {
+  const steuer = l.steuerErsparnisMonat >= 0.5 ? `, dazu ${euro(l.steuerErsparnisMonat)} Steuerersparnis` : '';
+  return `Der Staat legt ${euro(l.zulageMonat)} im Monat dazu${steuer}.`
+    + (l.begrenzt ? ' Der geförderte Höchstbetrag ist damit ausgeschöpft.' : '');
+};
+
+/** Was der Arbeitgeber und die Abgabenersparnis zur Betriebsrente beitragen. */
+const bavSatz = (l: Baustein) => `Der Arbeitgeber zahlt mit: ${euro(l.agZuschussMonat)} Zuschuss im Monat, dazu `
+  + `${euro(l.steuerErsparnisMonat + l.svErsparnisMonat)} weniger Steuer und Sozialabgaben.`;
+
+const PRIVAT_SATZ = 'Ohne Förderung, dafür ohne Bindung: jederzeit verfügbar, im Alter als Rente oder Kapital.';
+
 /** Warum der Baustein dabei ist — ein, zwei Saetze, mit den Betraegen dieses Kunden. */
 export function mixGrund(teil: MixTeil, mix: Loesungsmix, w: MixWuensche, t: AnspracheWoerter): string {
   const l = teil.loesung;
   const andere = mix.teile.filter((x) => x.id !== 'privat');
   switch (teil.id) {
-    case 'avd': {
-      const steuer = l.steuerErsparnisMonat >= 0.5
-        ? `, dazu ${euro(l.steuerErsparnisMonat)} Steuerersparnis` : '';
-      return `Zulagen mitnehmen: Der Staat legt ${euro(l.zulageMonat)} im Monat dazu${steuer}.`
-        + (l.begrenzt ? ' Der geförderte Höchstbetrag ist damit ausgeschöpft.' : '');
-    }
+    case 'avd':
+      return `Zulagen mitnehmen: ${depotSatz(l)}`;
     case 'bav':
-      return `Der Arbeitgeber zahlt mit: ${euro(l.agZuschussMonat)} Zuschuss im Monat, dazu `
-        + `${euro(l.steuerErsparnisMonat + l.svErsparnisMonat)} weniger Steuer und Sozialabgaben.`
+      return bavSatz(l)
         + (mix.bavAnGrenze ? ' Bis zur Grenze, bis zu der die Umwandlung frei von Sozialabgaben ist — darüber lohnt sie kaum noch.' : '');
     case 'basis': {
       const davor = andere.filter((x) => x.id !== 'basis').map((x) => MIX_NAME[x.id]);
@@ -110,7 +120,7 @@ export function mixGrund(teil: MixTeil, mix: Loesungsmix, w: MixWuensche, t: Ans
     default: {
       if (andere.length === 0) {
         return w.foerderung === 'nein'
-          ? 'Ohne Förderung, dafür ohne Bindung: jederzeit verfügbar, im Alter als Rente oder Kapital.'
+          ? PRIVAT_SATZ
           : 'Jederzeit verfügbar, im Alter als Rente oder Kapital — eine geförderte Lösung passt hier nicht.';
       }
       const saetze: string[] = [];
@@ -129,8 +139,33 @@ export function mixGrund(teil: MixTeil, mix: Loesungsmix, w: MixWuensche, t: Ans
   }
 }
 
-/** Warum eine Loesung im Vorschlag fehlt — ein Satz. */
-export function mixAusgelassenText(a: MixAusgelassen, w: MixWuensche): string {
+/**
+ * Was der Baustein bringt — fuer die VON HAND eingetragene Verteilung
+ * (`loesungen.eigen`). Ohne Bezug auf die Antworten: Diesen Baustein hat der
+ * Berater gewaehlt, nicht die Regel. Die Saetze nennen deshalb nur, was er
+ * leistet.
+ */
+export function mixGrundEigen(teil: MixTeil): string {
+  const l = teil.loesung;
+  switch (teil.id) {
+    case 'avd':
+      return l.zulageMonat >= 0.5 ? depotSatz(l)
+        : l.steuerErsparnisMonat >= 0.5 ? `Gefördert über die Steuer: ${euro(l.steuerErsparnisMonat)} Steuerersparnis im Monat.`
+          : 'Gefördertes Depot fürs Alter — hier ohne Zulage.';
+    case 'bav':
+      return l.agZuschussMonat >= 0.5 ? bavSatz(l)
+        : `${euro(l.steuerErsparnisMonat + l.svErsparnisMonat)} weniger Steuer und Sozialabgaben im Monat.`;
+    case 'basis':
+      return l.steuerErsparnisMonat >= 0.5
+        ? `Lebenslange Rente mit Steuervorteil: ${euro(l.steuerErsparnisMonat)} Steuerersparnis im Monat.`
+        : 'Lebenslange Rente — hier ohne Steuerersparnis.';
+    default:
+      return PRIVAT_SATZ;
+  }
+}
+
+/** Warum eine Loesung im Vorschlag fehlt — ein Satz. Ohne Antworten (`null`) nur fuer Gruende, die nicht an ihnen haengen. */
+export function mixAusgelassenText(a: MixAusgelassen, w: MixWuensche | null): string {
   const zuKlein = `Unter ${euro(MIX_MINDESTBEITRAG)} im Monat lohnt ein eigener Vertrag nicht.`;
   switch (a.grund) {
     case 'nichtMoeglich': return a.hinweis ?? 'Für diesen Haushalt nicht möglich.';
@@ -144,7 +179,7 @@ export function mixAusgelassenText(a: MixAusgelassen, w: MixWuensche): string {
       return a.id === 'bav' ? `Für zwei geförderte Verträge ist der Beitrag zu klein. ${zuKlein}`
         : `Der Rest ist für einen eigenen Vertrag zu klein. ${zuKlein}`;
     case 'nurRente':
-      return w.auszahlung === 'kapital'
+      return w?.auszahlung === 'kapital'
         ? 'Sie zahlt nur eine lebenslange Rente — gewünscht ist Kapital.'
         : 'Sie zahlt nur eine lebenslange Rente — die Auszahlung soll offen bleiben.';
     case 'gebunden': return 'Das Geld wäre bis zur Rente fest gebunden — gewünscht ist, an möglichst alles zu kommen.';

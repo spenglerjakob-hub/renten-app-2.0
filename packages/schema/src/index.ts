@@ -1,7 +1,7 @@
 export {
   szenarioSchema, personSchema, vertragSchema, haushaltSchema, kindSchema,
   annahmenSchema, einkommenHeuteSchema, planerSchema, teilzeitphaseSchema,
-  tuevPositionSchema, angebotSchema, loesungenSchema,
+  tuevPositionSchema, angebotSchema, loesungenSchema, eigenerVorschlagSchema,
   type SzenarioInput, type SzenarioParsed,
 } from './szenario.js';
 export {

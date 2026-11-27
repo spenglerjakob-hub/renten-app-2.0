@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  loesungsmix, MIX_MINDESTBEITRAG, type MixWuensche, type Loesungsmix,
+  loesungsmix, loesungsmixEigen, loesungenGesperrt, MIX_MINDESTBEITRAG,
+  type MixWuensche, type Loesungsmix, type MixVorgabe,
 } from '../src/analyse/loesungsmix.js';
 import { loesungFuer, type LoesungId } from '../src/analyse/loesungen.js';
 import { type FoerderKontext } from '../src/analyse/foerdercheck.js';
@@ -248,5 +249,93 @@ describe('Lösungsmix — kleine Beiträge', () => {
         }
       }
     }
+  });
+});
+
+describe('Lösungsmix von Hand — der Berater trägt die Verteilung selbst ein', () => {
+  const eigen = (vorgaben: MixVorgabe[], k: FoerderKontext = angestellt) => loesungsmixEigen(k, steuerOpt, p, vorgaben);
+  const netto = (id: LoesungId, betragMonat: number): MixVorgabe => ({ id, betragMonat, vorgabe: 'netto' });
+  const brutto = (id: LoesungId, betragMonat: number): MixVorgabe => ({ id, betragMonat, vorgabe: 'brutto' });
+
+  it('was eingetragen ist, steht im Vorschlag — auch gegen jede Regel', () => {
+    // 10 € privat liegen unter dem Mindestbeitrag, die Basisrente steht ohne Depot davor: Von Hand geht beides.
+    const m = eigen([netto('privat', 10), netto('basis', 80), netto('bav', 60)]);
+    expect(ids(m)).toEqual(['bav', 'basis', 'privat']);
+    expect(teil(m, 'privat')!.loesung.nettoMonat).toBeCloseTo(10, 6);
+    expect(teil(m, 'basis')!.loesung.nettoMonat).toBeCloseTo(80, 1);
+    expect(teil(m, 'bav')!.loesung.nettoMonat).toBeCloseTo(60, 1);
+    expect(m.nettoMonat).toBeCloseTo(150, 1);
+    expect(m.teile.reduce((s, x) => s + x.anteil, 0)).toBeCloseTo(1, 6);
+    expect(m.uebrigMonat).toBe(0);
+    expect(m.einVertrag).toBe(false);
+    expect(m.kapitalRegel).toBe(false);
+  });
+
+  it('der Betrag als Beitrag: 100 € Umwandlung und 150 € Eigenbeitrag stehen genau so im Vertrag', () => {
+    const m = eigen([brutto('bav', 100), brutto('avd', 150)]);
+    const bav = teil(m, 'bav')!.loesung;
+    const avd = teil(m, 'avd')!.loesung;
+    expect(bav.eigenbeitragMonat).toBeCloseTo(100, 6);
+    expect(bav.agZuschussMonat).toBeCloseTo(15, 6);
+    expect(bav.nettoMonat).toBeLessThan(100);
+    expect(avd.eigenbeitragMonat).toBeCloseTo(150, 6);
+    expect(avd.zulageMonat).toBeGreaterThan(0);
+    expect(avd.begrenzt).toBe(false);
+    expect(m.vertragMonat).toBeCloseTo(bav.vertragMonat + avd.vertragMonat, 6);
+  });
+
+  it('nacheinander gerechnet: Das Depot spart seine Steuer auf dem Einkommen nach der Betriebsrente', () => {
+    const m = eigen([brutto('bav', 300), brutto('basis', 400)]);
+    const bav = teil(m, 'bav')!.loesung;
+    const allein = loesungFuer('basis', angestellt, steuerOpt, p, 400, { vorgabe: 'brutto' });
+    const danach = loesungFuer('basis', { ...angestellt, zveHeute: angestellt.zveHeute - bav.zveMinderungMonat * 12 },
+      steuerOpt, p, 400, { vorgabe: 'brutto' });
+    expect(teil(m, 'basis')!.loesung.steuerErsparnisMonat).toBeCloseTo(danach.steuerErsparnisMonat, 6);
+    expect(teil(m, 'basis')!.loesung.steuerErsparnisMonat).toBeLessThanOrEqual(allein.steuerErsparnisMonat + 1e-9);
+  });
+
+  it('über dem Förderrahmen wird mit dem Rahmen gerechnet — und die Lösung sagt es', () => {
+    const m = eigen([brutto('avd', 500)]);
+    const avd = teil(m, 'avd')!.loesung;
+    expect(avd.begrenzt).toBe(true);
+    expect(avd.eigenbeitragMonat).toBeCloseTo(p.avd.hoechstbetragEigenbeitrag / 12, 6);
+    expect(avd.hinweise.join(' ')).toMatch(/Gefördert sind Eigenbeiträge bis/);
+  });
+
+  it('derselbe Vorschlag wie nach den Regeln, wenn man dessen Beträge einträgt', () => {
+    const regel = mix(300, { verfuegbar: 'teil', arbeitgeber: 'ja' });
+    const m = eigen(regel.teile.map((x) => netto(x.id, x.loesung.nettoMonat)));
+    expect(ids(m)).toEqual(ids(regel));
+    expect(m.nettoMonat).toBeCloseTo(regel.nettoMonat, 1);
+    expect(m.vertragMonat).toBeCloseTo(regel.vertragMonat, 0);
+    expect(m.zulageMonat).toBeCloseTo(regel.zulageMonat, 1);
+    expect(m.agZuschussMonat).toBeCloseTo(regel.agZuschussMonat, 1);
+  });
+
+  it('ohne Betrag kein Baustein; je Lösung zählt die erste Zeile mit Betrag', () => {
+    expect(eigen([]).teile).toEqual([]);
+    expect(eigen([netto('privat', 0), brutto('avd', 0)]).teile).toEqual([]);
+    const m = eigen([netto('privat', 0), netto('privat', 70), netto('privat', 999)]);
+    expect(ids(m)).toEqual(['privat']);
+    expect(m.nettoMonat).toBeCloseTo(70, 6);
+  });
+
+  it('Beamte: Die Betriebsrente ist gesperrt und fällt aus dem Vorschlag', () => {
+    const beamter: FoerderKontext = { ...angestellt, beamter: true };
+    const m = eigen([brutto('bav', 100), netto('privat', 50)], beamter);
+    expect(ids(m)).toEqual(['privat']);
+    expect(m.ausgelassen).toEqual([{ id: 'bav', grund: 'nichtMoeglich', hinweis: 'Beamte wandeln kein Entgelt um.' }]);
+    expect(loesungenGesperrt(angestellt, steuerOpt, p)).toEqual([]);
+  });
+
+  it('ein ausgeschöpfter Rahmen sperrt die Lösung', () => {
+    const voll: FoerderKontext = { ...angestellt, avdEigenbeitragJahr: p.avd.hoechstbetragEigenbeitrag };
+    expect(loesungenGesperrt(voll, steuerOpt, p)).toEqual([{ id: 'avd', grund: 'ausgeschoepft' }]);
+    expect(ids(eigen([brutto('avd', 100)], voll))).toEqual([]);
+  });
+
+  it('der Arbeitgeberzuschuss aus den Optionen gilt auch von Hand', () => {
+    const m = loesungsmixEigen(angestellt, steuerOpt, p, [brutto('bav', 200)], { agZuschussQuote: 0.5 });
+    expect(teil(m, 'bav')!.loesung.agZuschussMonat).toBeCloseTo(100, 6);
   });
 });
