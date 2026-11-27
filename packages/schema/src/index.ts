@@ -18,6 +18,7 @@ export {
 export {
   firmenModellSchema, firmenAngebotSchema, beratungAngabenSchema, versichererWerteSchema,
   entscheidungSchema, axaAngabenSchema, hochrechnungSchema, gespraechSchema, beratungDatenSchema, angebotLesen, beratungLesen,
+  BERATUNG_SPRACHEN, type BeratungSprache,
   MODELL_VORGABE, DURCHFUEHRUNGSWEGE, BERATUNG_STATUS, AXA_KANAELE,
   STEUERKLASSEN_BERATUNG, GEHAELTER_IM_JAHR, RENTENZIELE, steuerklasseAus, type SteuerklasseBeratung,
   FREI_STUFEN_MAX,

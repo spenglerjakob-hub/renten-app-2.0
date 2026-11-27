@@ -35,9 +35,19 @@ export function tokenAusAdresse(hash: string): string | null {
   return LINK_TOKEN.test(t) ? t : null;
 }
 
-/** Der Link fuer den Mitarbeiter. */
-export function unterschriftLink(token: string, ursprung: string): string {
-  return `${ursprung}/unterschrift#${token}`;
+/**
+ * Der Link fuer den Mitarbeiter. Laeuft die Beratung auf Englisch, traegt er
+ * `?lang=en` — dann spricht auch die Seite, auf der er unterschreibt,
+ * Englisch. In der Adresse und nicht in der Datenbank: Die Sprache der Seite
+ * ist kein Geheimnis und braucht keine Aenderung an `bav_link_oeffnen`.
+ */
+export function unterschriftLink(token: string, ursprung: string, sprache: 'de' | 'en' = 'de'): string {
+  return `${ursprung}/unterschrift${sprache === 'en' ? '?lang=en' : ''}#${token}`;
+}
+
+/** Die Sprache der Seite aus `location.search` — alles ausser `lang=en` ist Deutsch. */
+export function spracheAusAdresse(suche: string): 'de' | 'en' {
+  return new URLSearchParams(suche).get('lang') === 'en' ? 'en' : 'de';
 }
 
 /** Die eigene Seite, wenn die Datenbank sie kennt — sonst null (lokal, Vorschau). */

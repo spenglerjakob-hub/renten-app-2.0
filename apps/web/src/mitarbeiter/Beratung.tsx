@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardCheck, ClipboardList, Lock, Play, Save } from 'lucide-react';
 import type { BeratungDaten } from '@renten/schema';
+import { SPRACHEN, SpracheKontext, wahl, type Sprache } from '../lib/sprache';
 import {
   beratungLaden, beratungSpeichern, firmaLaden, unterlagenLaden, type Beratung, type Firma, type Unterlagen,
 } from '../lib/bav-beratung';
@@ -20,7 +21,7 @@ import {
 } from './schritte';
 import { GespraechFenster } from './GespraechFenster';
 import {
-  KENNUNGEN, SCHRITTE, auswahlMerken, bereinigt, gezeigterSchritt, letzteAuswahl, schrittSetzen, sichtbareSchritte,
+  KENNUNGEN, SCHRITTE, auswahlMerken, bereinigt, gezeigterSchritt, letzteAuswahl, schrittNamen, schrittSetzen, sichtbareSchritte,
   stueckAusgeblendet, stueckZeigen, weitSichtbar,
 } from './gespraech';
 import {
@@ -60,6 +61,13 @@ export { KENNUNGEN, SCHRITTE };
  * uebrigen zaehlen neu durch, und „Weiter“ ueberspringt, was fehlt. Der
  * Stand gehoert zur Beratung und wird mit ihr gespeichert — nach dem
  * Neuladen laeuft das Gespraech weiter.
+ *
+ * DEUTSCH ODER ENGLISCH (`lib/sprache.tsx`): Die Sprache gehoert zur Beratung
+ * (`daten.sprache`) und gilt fuer das, was der Mitarbeiter liest — die
+ * sieben Schritte mit ihren Zeilen und „Weiter“. Was der Berater bedient
+ * (Kopf, Speichern, „Gespräch starten“, die Auswahl der Seiten), bleibt
+ * deutsch; ebenso die Unterlagen. Unterschrieben laesst sie sich nicht mehr
+ * wechseln — gespeichert wuerde es nicht.
  */
 export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string; beratungId: string; gehe: (o: Ort) => void }) {
   const [firma, setFirma] = useState<Firma | null | 'laedt' | 'fehler'>('laedt');
@@ -271,30 +279,43 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
 
   const props = { firma: f, logo, daten, setze, r, leistung, geheZu, gesperrt };
 
+  const sprache: Sprache = daten.sprache;
+  const w = wahl(sprache);
+  const namen = schrittNamen(sprache);
+  const spracheSetzen = (neu: Sprache) => {
+    if (gesperrt || neu === sprache) return;
+    const d = { ...daten, sprache: neu };
+    setDaten(d);
+    void sichern(d);
+  };
+
   // Jeder Schritt in einem Satz — fuer seine Zeile, sobald er nicht mehr offen ist.
   const heute = new Date();
   const vorbereitung = vorbereitungStand(daten, heute);
-  const zeilen = [
-    { ergebnis: angebotSatz(f.angebot) },
-    angabenZeile(daten.angaben, heute),
-    lueckeZeile(luecke),
-    rechnungZeile(r),
-    leistungZeile(leistung, r, daten),
-    entscheidungZeile(daten, r, automatischerBeginn(f.angebot)),
-    unterlagenZeile(unterlagen),
+  const zeilenIn = (s: Sprache) => [
+    { ergebnis: angebotSatz(f.angebot, s) },
+    angabenZeile(daten.angaben, heute, s),
+    lueckeZeile(luecke, s),
+    rechnungZeile(r, s),
+    leistungZeile(leistung, r, daten, s),
+    entscheidungZeile(daten, r, automatischerBeginn(f.angebot), s),
+    unterlagenZeile(unterlagen, s),
   ];
+  // Im Ablauf in der Sprache der Beratung; das Fenster „Gespräch starten“ liest der Berater — deutsch.
+  const zeilen = zeilenIn(sprache);
+  const zeilenBerater = sprache === 'de' ? zeilen : zeilenIn('de');
   // Ein Haken nur fuer wirklich Erledigtes: „Noch offen“ und „Noch nicht unterschrieben“ tragen die Nummer.
   const erledigt = [
     true, true, luecke !== null, true, true, daten.entscheidung.status !== 'offen', gesperrt,
   ];
-  const etappen: AblaufEtappe[] = SCHRITTE.map((name, i) => ({
+  const etappen: AblaufEtappe[] = namen.map((name, i) => ({
     name, ...zeilen[i], erledigt: erledigt[i]! && !zeilen[i]!.fehlt,
   }));
   // „Weiter“ am Ende des Wegs eines Schritts fuehrt zum naechsten, der dasteht — am Ende der Beratung zur Liste.
   const danach = sichtbar[sichtbar.indexOf(schritt) + 1];
   const weiter = danach !== undefined
-    ? { text: <>Weiter: {SCHRITTE[danach]}</>, onClick: () => geheZu(danach) }
-    : { text: 'Fertig — zur Mitarbeiterliste', onClick: fertig };
+    ? { text: <>{w('Weiter', 'Next')}: {namen[danach]}</>, onClick: () => geheZu(danach) }
+    : { text: w('Fertig — zur Mitarbeiterliste', 'Done — back to the list of employees'), onClick: fertig };
 
   return (
     <div className="space-y-6">
@@ -331,8 +352,21 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
             className="ui-feld max-w-full py-2 pl-2 pr-8 text-sm text-ui-tinte"
           >
             <option value="" disabled hidden>Springen zu …</option>
-            {/* Im Gespraech nur, was dasteht — nummeriert wie im Ablauf darunter. */}
-            {sichtbar.map((i, n) => <option key={SCHRITTE[i]} value={i}>{n + 1} · {SCHRITTE[i]}</option>)}
+            {/* Im Gespraech nur, was dasteht — nummeriert und benannt wie im Ablauf darunter. */}
+            {sichtbar.map((i, n) => <option key={SCHRITTE[i]} value={i}>{n + 1} · {namen[i]}</option>)}
+          </select>
+          {/*
+            Die Sprache des Gespraechs — neben „Springen zu“, weil beides der
+            Berater bedient. Jede Sprache steht in ihrer eigenen da.
+          */}
+          <select
+            aria-label="Sprache der Beratung"
+            value={sprache}
+            disabled={gesperrt}
+            onChange={(e) => spracheSetzen(e.target.value === 'en' ? 'en' : 'de')}
+            className="ui-feld max-w-full py-2 pl-2 pr-8 text-sm text-ui-tinte disabled:opacity-60"
+          >
+            {SPRACHEN.map((x) => <option key={x.id} value={x.id} lang={x.id}>{x.name}</option>)}
           </select>
         </div>
       </div>
@@ -397,15 +431,18 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
         onSchliessen={() => setAuswahl(null)}
       >
         {auswahl !== null && (
-          <GespraechFenster ausgeblendet={auswahl} onAuswahl={setAuswahl} zeilen={zeilen} laeuft={imGespraech} onStart={starten} />
+          <GespraechFenster ausgeblendet={auswahl} onAuswahl={setAuswahl} zeilen={zeilenBerater} laeuft={imGespraech} onStart={starten} />
         )}
       </Dialog>
 
+      {/* Ab hier liest der Mitarbeiter mit: `lang` sagt Vorleseprogrammen, in welcher Sprache. */}
+      <SpracheKontext.Provider value={sprache}>
       <GespraechKontext.Provider value={ausgeblendet}>
+      <div lang={sprache}>
       <AblaufGeber stand={stueckeStand} onStand={merkeStuecke} weiter={weiter} durch={schritt < weit}>
         <EtappenAblauf
           etappen={sichtbar.map((i) => etappen[i]!)} offen={sichtbar.indexOf(schritt)} weit={weitSichtbar(sichtbar, weit)}
-          sprung={sprung} onOeffnen={(n) => geheZu(sichtbar[n] ?? 0)} wort="Schritt"
+          sprung={sprung} onOeffnen={(n) => geheZu(sichtbar[n] ?? 0)} wort={w('Schritt', 'Step')}
         >
           {schritt === 0 && <SchrittAngebot {...props} />}
           {schritt === 1 && <SchrittAngaben {...props} />}
@@ -419,7 +456,9 @@ export function BeratungAnsicht({ firmaId, beratungId, gehe }: { firmaId: string
           )}
         </EtappenAblauf>
       </AblaufGeber>
+      </div>
       </GespraechKontext.Provider>
+      </SpracheKontext.Provider>
     </div>
   );
 }

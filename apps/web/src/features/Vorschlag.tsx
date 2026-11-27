@@ -289,7 +289,7 @@ function Mix({ mix, wuensche, nettoHeute, onUebernehmen }: {
         </ol>
         <p className="mt-3 text-xs leading-relaxed text-ui-schiefer">
           Das ist die Einzahlseite. Was im Alter davon netto ankommt, hängt am Angebot — an der Rente, die der Anbieter
-          nennt, und an Steuer und Krankenversicherung. Das rechnet der Vergleich der Angebote. Ein Vorschlag aus
+          nennt, und an Steuer und Krankenversicherung. Das rechnet der nächste Schritt je Angebot. Ein Vorschlag aus
           {' '}{t.dein('en')} Antworten, keine Empfehlung für ein Produkt oder einen Anbieter.
         </p>
       </Aufklapper>

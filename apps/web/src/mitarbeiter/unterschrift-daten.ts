@@ -131,10 +131,29 @@ export const DOKUMENT_NAME: Record<UnterlagenArt, string> = {
 export const AXA_ANTRAG_NAME = 'AXA-Antrag auf Entgeltumwandlung';
 export const AXA_VERZICHT_NAME = `${DOKUMENT_NAME.verzicht} mit AXA-Gesprächsprotokoll`;
 
-/** „Beratungsprotokoll und Vereinbarung über Entgeltumwandlung“ */
-export function dokumenteText(arten: readonly UnterlagenArt[], axa = false): string {
-  const namen = arten.map((a) => (axa && a === 'vereinbarung' ? AXA_ANTRAG_NAME : axa && a === 'verzicht' ? AXA_VERZICHT_NAME : DOKUMENT_NAME[a]));
-  return namen.length <= 1 ? (namen[0] ?? '') : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`;
+/**
+ * Dieselben Unterlagen fuer eine Beratung auf Englisch: was sie sind, und in
+ * Klammern, wie sie auf dem Papier heissen — die Unterlagen selbst sind deutsch.
+ */
+const DOKUMENT_NAME_EN: Record<UnterlagenArt, string> = {
+  protokoll: `Consultation record (${DOKUMENT_NAME.protokoll})`,
+  vereinbarung: `Salary conversion agreement (${DOKUMENT_NAME.vereinbarung})`,
+  verzicht: `Waiver (${DOKUMENT_NAME.verzicht})`,
+};
+const AXA_ANTRAG_NAME_EN = `AXA application for salary conversion (${AXA_ANTRAG_NAME})`;
+const AXA_VERZICHT_NAME_EN = `Waiver with AXA consultation record (${AXA_VERZICHT_NAME})`;
+
+/**
+ * „Beratungsprotokoll und Vereinbarung über Entgeltumwandlung“
+ *
+ * @param sprache Fuer den Bildschirm einer Beratung auf Englisch. Nachweis und Unterlagen rufen ohne — deutsch.
+ */
+export function dokumenteText(arten: readonly UnterlagenArt[], axa = false, sprache: 'de' | 'en' = 'de'): string {
+  const en = sprache === 'en';
+  const namen = arten.map((a) => (axa && a === 'vereinbarung' ? (en ? AXA_ANTRAG_NAME_EN : AXA_ANTRAG_NAME)
+    : axa && a === 'verzicht' ? (en ? AXA_VERZICHT_NAME_EN : AXA_VERZICHT_NAME)
+      : (en ? DOKUMENT_NAME_EN : DOKUMENT_NAME)[a]));
+  return namen.length <= 1 ? (namen[0] ?? '') : `${namen.slice(0, -1).join(', ')} ${en ? 'and' : 'und'} ${namen[namen.length - 1]}`;
 }
 
 // Die Zeit gilt in Deutschland — auch wenn das Geraet anders eingestellt ist.
@@ -142,9 +161,11 @@ const DATUM = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day:
 const UHRZEIT = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
 
 /** „23.10.2026 um 14:32 Uhr“ */
-export function zeitpunktText(iso: string): string {
+export function zeitpunktText(iso: string, sprache: 'de' | 'en' = 'de'): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : `${DATUM.format(d)} um ${UHRZEIT.format(d)} Uhr`;
+  if (Number.isNaN(d.getTime())) return '';
+  // Auf Englisch dasselbe Datum in deutscher Schreibweise, nur die Woerter dazwischen wechseln.
+  return sprache === 'en' ? `${DATUM.format(d)} at ${UHRZEIT.format(d)}` : `${DATUM.format(d)} um ${UHRZEIT.format(d)} Uhr`;
 }
 
 /** Der Vermerk unter der Linie. */

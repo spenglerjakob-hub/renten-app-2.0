@@ -1250,7 +1250,7 @@ export default function App() {
     },
     {
       id: 'angebote',
-      titel: 'Angebote vergleichen',
+      titel: 'Angebote prüfen',
       ergebnis: angeboteZahl === 0
         ? 'Noch kein Angebot erfasst'
         : `${angeboteZahl === 1 ? '1 Angebot' : `${angeboteZahl} Angebote`}${angenommenZahl > 0 ? `, ${angenommenZahl} angenommen` : ''}`,

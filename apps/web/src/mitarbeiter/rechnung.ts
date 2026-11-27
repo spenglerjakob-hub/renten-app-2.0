@@ -1,5 +1,6 @@
 import {
-  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, parameterFuer, parseDatum, projiziere,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, bruttoZuNetto, entnahmeplan, kennzahlen, mitarbeiterHinweise, parameterFuer, parseDatum,
+  projiziere,
   renteOderKapital, schaetzeEntgeltpunkte, STEUER_FREI_QUOTE, SV_FREI_QUOTE,
   type FirmenModell, type Kennzahlen, type KinderStatus, type LegalParameters, type MatchingSteuer, type MitarbeiterBav,
   type MitarbeiterEingaben, type MitarbeiterVertrag, type RenteOderKapital, type Vertrag,
@@ -84,6 +85,16 @@ export function beitragsRechnung(f: FirmenAngebot, d: BeratungDaten, p: LegalPar
     f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), steuerVon(d.angaben, f), p,
     { unternehmensSteuersatz: f.unternehmensSteuersatz, umlagenSatz: f.umlagenSatz },
   );
+}
+
+/**
+ * Was der Rechenkern zum gewaehlten Betrag anmerkt — in der Sprache der
+ * Beratung. Auf Deutsch dasselbe wie `r.hinweise` (so stehen sie auch in den
+ * Unterlagen).
+ */
+export function beitragsHinweise(f: FirmenAngebot, d: BeratungDaten, r: MitarbeiterBav, sprache: 'de' | 'en', p: LegalParameters = P): string[] {
+  if (sprache === 'de') return r.hinweise;
+  return mitarbeiterHinweise(f.modell as FirmenModell, eingabenVon(d.angaben, d.umwandlungMonat), r, p, sprache);
 }
 
 /** „Rahmen voll nutzen“: die Umwandlung, mit der der beitragsfreie Rahmen genau voll ist. */
@@ -676,6 +687,8 @@ export type BelastungsTreppe = ReturnType<typeof belastungsTreppe>;
  */
 export function belastungJeVertrag(
   v: MitarbeiterVertrag, r: MitarbeiterBav, a: BeratungAngaben, f: FirmenAngebot, p: LegalParameters = P,
+  /** Die Sprache am Bildschirm — die Unterlagen rufen ohne und bleiben deutsch */
+  sprache: 'de' | 'en' = 'de',
 ): BelastungsTreppe | null {
   if (v.beitragMonat - v.arbeitgeberMonat <= 0.005) return null;
   const lohn = nettolohnHeute(a, f, p);
@@ -689,7 +702,7 @@ export function belastungJeVertrag(
   }, {
     zve: lohn.zveJahr, p, beamter: false, selbststaendig: false, privatVersichert: a.kv === 'privat', splitting: lohn.splitting,
     steuerklasse: a.steuerklasse,
-  });
+  }, undefined, sprache);
 }
 
 /* --------------------------------------------------------------------------

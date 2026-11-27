@@ -112,6 +112,16 @@ describe('Daten einer Beratung', () => {
     expect(beratungLesen({ umwandlungMonat: 200, gespraech: 'kaputt' })).toMatchObject({ umwandlungMonat: 200, gespraech: { aktiv: false } });
   });
 
+  it('zeigt die Beratung auf Deutsch, solange keine Sprache gewählt ist', () => {
+    expect(beratungLesen({}).sprache).toBe('de');
+    expect(beratungLesen({ sprache: 'en' }).sprache).toBe('en');
+  });
+
+  it('nimmt eine unbekannte Sprache als Deutsch, statt die Beratung zu verwerfen', () => {
+    const d = beratungLesen({ version: 2, umwandlungMonat: 200, angaben: { name: 'Anna' }, sprache: 'tr' });
+    expect(d).toMatchObject({ umwandlungMonat: 200, angaben: { name: 'Anna' }, sprache: 'de' });
+  });
+
   it('lesen: frühere Felder der Hochrechnung werden verworfen, die Rendite bleibt', () => {
     const d = beratungLesen({ version: 2, schritt: 3, beispielZins: 0.05, umwandlungMonat: 200, angaben: { name: 'Anna' } });
     expect(d).toMatchObject({ schritt: 3, umwandlungMonat: 200, angaben: { name: 'Anna' } });

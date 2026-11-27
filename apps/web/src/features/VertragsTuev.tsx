@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Trash2, Plus, TrendingUp, Calculator } from 'lucide-react';
 import { parameterFuer, parseDatum, toDe, type ProjektionsErgebnis } from '@renten/engine';
 import {
-  tuevPositionen, tuevBasis, belastungsTreppe, laufendeZulageJahr, laufzeitText, ohneEigenaufwand,
+  tuevPositionen, tuevBasis, belastungsTreppe, laufzeitText, ohneEigenaufwand,
   beiKind, kindName, desKindes, jahreText,
 } from './tuev-berechnung';
 import { kenntKapitalwahl, kinderpoliceText, monatJahr, typText } from './vertragsarten';
@@ -17,12 +17,8 @@ import {
 import { KinderZeilen, KinderHinweis, JahrWahl, KIND_HOECHSTALTER } from '../components/KinderFelder';
 import { EINLEITUNG, FELD, Hervor, Kernsatz, Titel } from '../components/stil';
 import { useAnsprache } from '../components/Ansprache';
+import { BLOCK, BLOCK_TITEL, Hinweis, SUMME, WegZeile, ZulagenBlock } from './TuevTeile';
 
-/** Ein Block in der Innenflaeche mit leisem Titel — Belastung, Ertrag, Laufzeit, Kennzahlen. */
-const BLOCK = 'ui-innen p-4';
-const BLOCK_TITEL = 'mb-2 text-xs font-medium text-ui-schiefer';
-/** Die Summe eines Blocks unter einer Linie in Tinte, wie die Aufstellungen der Beratung. */
-const SUMME = 'mt-2 flex items-baseline justify-between gap-3 border-t border-ui-tinte pt-2';
 /** Ein kleiner Knopf mit Kontur in einem Block („Kind“, „Noch eine Änderung“). */
 const KLEIN_KNOPF = 'inline-flex items-center gap-1 rounded-full border border-ui-zweit-rand bg-ui-karte px-2.5 py-1 text-xs font-medium text-ui-tinte transition-colors hover:bg-ui-hover print:hidden';
 
@@ -142,21 +138,6 @@ function FruehereBeitraege({ t, aendern }: {
         </button>
       )}
     </div>
-  );
-}
-
-/** Eine Zeile im Vergleich der beiden Auszahlungswege. */
-function WegZeile({ text, rente, kapital, hervor }: {
-  text: string; rente: string; kapital: string; hervor?: 'rente' | 'kapital';
-}) {
-  // Der bessere Weg in Tinte und mittlerem Gewicht, der andere leiser — ohne Ampel.
-  const stark = 'font-medium text-ui-tinte';
-  return (
-    <tr className="border-b border-ui-linie last:border-0">
-      <td className="px-3 py-1.5 text-ui-schiefer">{text}</td>
-      <td className={`px-2 py-1.5 text-right ${hervor === 'rente' ? stark : 'text-ui-tinte/80'}`}>{rente}</td>
-      <td className={`px-3 py-1.5 text-right ${hervor === 'kapital' ? stark : 'text-ui-tinte/80'}`}>{kapital}</td>
-    </tr>
   );
 }
 
@@ -692,74 +673,8 @@ export function VertragsTuev({
                       </div>
                     </div>
 
-                    {/*
-                      Dieser Kasten schluesselt die Zulagenzeile der Treppe auf:
-                      woraus sie sich zusammensetzt und was sie im JAHR ausmacht.
-
-                      Die Zulagen mindern den Eigenaufwand weiterhin NICHT. Sie
-                      kommen nicht vom Sparer, sondern vom Staat, und stehen
-                      bereits als hoeheres Kapital auf der Habenseite
-                      (avdSteuervorteil.eigenaufwandNetto rechnet genau so). In
-                      der Treppe heben sie die oberste Zeile an und gehen in der
-                      naechsten wieder ab — unten steht unveraendert derselbe
-                      Betrag. Als blosser Minusposten gebucht zaehlten sie
-                      doppelt, und "Kostet dich wirklich" ginge nicht mehr auf.
-                    */}
-                    {r.zulageMonat > 0 && (
-                      <div className={BLOCK}>
-                        <div className={BLOCK_TITEL}>
-                          Was der Staat dazugibt — monatlich, 1. Jahr
-                        </div>
-                        <div className="space-y-1.5">
-                          {r.zulageDetail ? (
-                            <>
-                              <GegenueberZeile
-                                text="Grundzulage"
-                                wert={euro(r.zulageDetail.grundzulageMonat)}
-                              />
-                              <GegenueberZeile
-                                text={r.zulageDetail.kinderMitAnspruch > 0
-                                  ? `Kinderzulage — für ${r.zulageDetail.kinderMitAnspruch} Kind${r.zulageDetail.kinderMitAnspruch > 1 ? 'er' : ''}`
-                                  : 'Kinderzulage — kein Kind im Kindergeldalter'}
-                                wert={euro(r.zulageDetail.kinderzulageMonat)}
-                              />
-                              {/*
-                                MAL ZWOELF. Die Zeilen darueber sind
-                                Monatswerte; hier stand ihre blosse Summe unter
-                                der Ueberschrift "Jedes Jahr". Aus 540 EUR
-                                Foerderung wurden so 45.
-                              */}
-                              <div className={SUMME}>
-                                <span className="text-xs font-medium text-ui-tinte">Jedes Jahr</span>
-                                <span className="text-base font-medium tabular-nums text-ui-tinte">
-                                  {euro(laufendeZulageJahr(r))}
-                                </span>
-                              </div>
-                              {/*
-                                Der Bonus faellt EINMAL an. Neben die laufenden
-                                Zulagen gestellt verspraeche er eine Foerderung
-                                fuer die ganze Laufzeit, die es nur im ersten
-                                Jahr gibt.
-                              */}
-                              {r.zulageDetail.bonusEinmalig > 0 && (
-                                <p className="mt-1 text-xs leading-relaxed text-ui-schiefer">
-                                  Dazu <strong className="font-medium text-ui-tinte">einmalig im ersten Jahr</strong>: Berufseinsteigerbonus{' '}
-                                  {euro(r.zulageDetail.bonusEinmalig)}.
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <GegenueberZeile text="Zulage" wert={euro(r.zulageMonat)} />
-                          )}
-                        </div>
-                        <p className="mt-2 text-xs leading-relaxed text-ui-schiefer">
-                          Die Zulagen sind der Anteil des Staates am Gesamtbeitrag oben — sie
-                          fließen zusätzlich in den Vertrag und senken {e.dein('en')} eigenen Beitrag
-                          nicht. Deshalb stehen sie dort als Abzug vom Zufluss und nicht als
-                          Abzug von {e.dein('en')} Kosten.
-                        </p>
-                      </div>
-                    )}
+                    {/* Die Zulagenzeile der Treppe aufgeschluesselt — derselbe Kasten wie bei den Angeboten. */}
+                    <ZulagenBlock r={r} e={e} />
 
                     {/*
                       Der Gegenpol zum Kasten darueber: dort geht der BRUTTO-
@@ -957,7 +872,7 @@ export function VertragsTuev({
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-ui-linie text-ui-schiefer">
-                              <th className="px-3 py-1.5 text-left font-medium"> </th>
+                              <td className="px-3 py-1.5" />
                               <th className="px-2 py-1.5 text-right font-medium">Rente</th>
                               <th className="px-3 py-1.5 text-right font-medium">Kapital</th>
                             </tr>
@@ -1018,19 +933,16 @@ export function VertragsTuev({
                       </div>
                     )}
 
+                    {/* Die Erklaertexte wie bei den Angeboten: eingeklappt je eine Zeile, per Klick der ganze Text. */}
                     {r.zulagenGekuerzt && (
-                      <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
+                      <Hinweis>
                         <strong className="font-medium text-ui-tinte">Zulagen werden gekürzt.</strong> {e.Dein()} Eigenbeitrag liegt unter dem
                         Mindesteigenbeitrag nach § 86 EStG (4 % des Vorjahresbruttos abzüglich
                         Zulagen). Die Zulagen fallen dadurch anteilig geringer aus.
-                      </p>
+                      </Hinweis>
                     )}
 
-                    {r.hinweise.map((h, i) => (
-                      <p key={i} className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">
-                        {h}
-                      </p>
-                    ))}
+                    {r.hinweise.map((h, i) => <Hinweis key={i}>{h}</Hinweis>)}
 
                     {!wege && kenntKapitalwahl(v.typ) && (
                       <p className="ui-innen px-3 py-2 text-xs leading-relaxed text-ui-tinte/80">

@@ -27,6 +27,8 @@ export interface Krankenkasse {
 
 /** Worauf sich die Saetze beziehen. Steht so auch in der Oberflaeche. */
 export const KASSEN_STAND = 'Zusatzbeiträge 2026';
+/** Derselbe Stand auf Englisch — fuer die Mitarbeiterberatung (`lib/sprache.tsx`). */
+export const KASSEN_STAND_EN = KASSEN_STAND.replace('Zusatzbeiträge', 'Additional contribution rates');
 
 /**
  * Die Kassen, alphabetisch — so sucht man eine Kasse, nicht nach Beitragshoehe.

@@ -269,6 +269,16 @@ export const gespraechSchema = z.object({
   ausgeblendet: z.array(z.string().max(40)).max(40).optional(),
 }).default({}).catch({ aktiv: false });
 
+/**
+ * In welcher Sprache die Beratung dem Mitarbeiter gezeigt wird — die sieben
+ * Schritte am Bildschirm. Deutsch ist die Vorgabe; eine unbekannte Sprache
+ * (eine neuere Fassung kennt mehr) gilt als Deutsch, statt die Beratung
+ * unlesbar zu machen. Zahlen und Daten bleiben in deutscher Schreibweise,
+ * wie auf der Gehaltsabrechnung und in den Unterlagen.
+ */
+export const BERATUNG_SPRACHEN = ['de', 'en'] as const;
+export type BeratungSprache = (typeof BERATUNG_SPRACHEN)[number];
+
 export const beratungDatenSchema = z.object({
   /** 2: sieben Schritte (mit „Ihre Versorgungslücke“) — aeltere Daten hebt `beratungLesen` an */
   version: z.literal(2).default(2),
@@ -295,6 +305,8 @@ export const beratungDatenSchema = z.object({
   schritt: z.number().int().min(0).max(6).default(0),
   /** Vorbereitung oder Gespraech, und welche Seiten im Gespraech ausgeblendet sind */
   gespraech: gespraechSchema,
+  /** Die Sprache am Bildschirm (`BERATUNG_SPRACHEN`) */
+  sprache: z.enum(BERATUNG_SPRACHEN).default('de').catch('de'),
 });
 
 export type FirmenModellDaten = z.infer<typeof firmenModellSchema>;

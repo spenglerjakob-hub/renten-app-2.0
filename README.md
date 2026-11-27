@@ -143,6 +143,30 @@ Die begleitenden Agent-Skills sind nicht eingecheckt, sondern aus
 npx skills add supabase/agent-skills
 ```
 
+## Mitarbeiterberatung auf Englisch
+
+Eine Beratung laeuft auf Deutsch oder Englisch — gewaehlt je Beratung, im Kopf
+neben "Springen zu" (`daten.sprache`, Vorgabe Deutsch).
+
+- **Uebersetzt ist, was der Mitarbeiter am Bildschirm liest:** die sieben
+  Schritte mit ihren Zeilen, die Unterschrift und die Seite `/unterschrift`
+  (der Link traegt dann `?lang=en`).
+- **Deutsch bleibt,** was der Berater bedient (Kopf, "Gespräch starten",
+  Mitarbeiterliste), der Wortlaut der AXA (Belehrung, Fragen zur Gesundheit) —
+  und **die Unterlagen**: Protokoll, Vereinbarung, Verzicht, AXA-Antrag. Sie
+  sind die verbindliche Fassung; die Beratung sagt das vor dem Unterschreiben.
+- **Zahlen und Daten** stehen in beiden Sprachen in deutscher Schreibweise
+  (1.234,56 €, 01.07.2027), wie auf der Gehaltsabrechnung und in den Unterlagen.
+
+Im Code steht der englische Text neben dem deutschen:
+`w('Zur Person', 'About you')` (`apps/web/src/lib/sprache.tsx`). Saetze, die
+sich aus Teilen zusammensetzen, haben eine eigene englische Funktion
+(`mitarbeiter/texte-en.ts`). Fuer eine weitere Sprache bekommt `Wort` ein
+drittes Argument — dann zeigt der Compiler jede Stelle, an der sie fehlt.
+`mitarbeiter/englisch.test.ts` prueft, dass im englischen Satz kein deutsches
+Wort stehen bleibt; der Umlaut-Waechter (`lib/umlaute.test.ts`) laesst die
+englischen Stellen aus.
+
 ## Bekannte Luecken
 
 - **Besoldungstabellen.** Fuer Beamte liegen noch keine amtlichen Tabellen
@@ -273,10 +297,17 @@ In dieser Reihenfolge — jeder Schritt laesst sich einzeln pruefen:
    Fassung der Nutzungsbedingungen wird dann jedem Konto einmal vorgelegt,
    das ihr nicht schon auf der Testseite zugestimmt hat (die Zugangsschranke
    laesst durch, wer der Fassung der Seite oder einer neueren zugestimmt hat
-   — Test und Live teilen die Konten). Bis dahin traegt `live` einen eigenen Commit (`8b7e9b8`, "Live:
-   Nutzungsbedingungen bis zur Prüfung in der Fassung vom 1. Oktober 2026"),
-   der die alte Fassung haelt. Ihn auf `live` mit `git revert` zuruecknehmen,
-   dann den Arbeitszweig in `live` mergen — ein reiner Fast-Forward geht nicht.
+   — Test und Live teilen die Konten). Bis dahin haelt `live` die alte
+   Fassung (seit Commit `8b7e9b8`, "Live: Nutzungsbedingungen bis zur Prüfung
+   in der Fassung vom 1. Oktober 2026"): In `apps/web/src/recht/Seite.tsx`
+   steht dort die Funktion `Nutzungsbedingungen()` als Ganzes im alten Text,
+   in `apps/web/src/lib/nutzungsbedingungen.ts` das alte Datum. Bei jedem
+   Merge nach `live` bleiben genau diese beiden Stellen, wie sie dort sind —
+   alles andere kommt vom Arbeitszweig. Zur Freigabe den Arbeitszweig in
+   `live` mergen und beide Dateien vom Arbeitszweig nehmen
+   (`git checkout <Arbeitszweig> -- <beide Dateien>`); danach sind die Zweige
+   gleich. Ein `git revert` von `8b7e9b8` passt nicht mehr: Der Text hat sich
+   seither geaendert (Fassung vom 25. November 2026).
 8. **Buchung fuer alle oeffnen:**
    `update privat.einstellungen set zahlung_nur_betreiber = false where id;`
    Ab wann ein Paket Pflicht ist, steuert getrennt davon `abo_pflicht_ab`.

@@ -18,7 +18,8 @@ import {
   ZUG_BREITE, codeText, dokumenteFuer, dokumenteText, nachweisZeilen, tinteGenug, zeitpunktText, zugAusStrichen, zugGueltig,
   type Strich,
 } from './unterschrift-daten';
-import { SCHRITTE } from './gespraech';
+import { schrittNamen } from './gespraech';
+import { useSprache, useW } from '../lib/sprache';
 
 /*
  * UNTERSCHRIFT — einfache elektronische Signatur. Der Mitarbeiter
@@ -31,6 +32,12 @@ import { SCHRITTE } from './gespraech';
  *
  * Mit der ersten Unterschrift — oder dem ersten Link — sind die Unterlagen
  * festgeschrieben und die Beratung gesperrt, bis sie aufgehoben werden.
+ *
+ * SPRACHE (`lib/sprache.tsx`): Was der MITARBEITER zum Unterschreiben liest —
+ * die Karte, das Unterschriftsfeld, die E-Mail mit dem Link —, gibt es auch
+ * auf Englisch. Die Werkzeuge des Beraters (Link erstellen, Nachweis,
+ * Aufheben) und die Namen der Unterlagen bleiben deutsch: So heissen sie auf
+ * dem Papier.
  */
 
 /** Wer unterschreibt — mit dem, was die Unterschrift abdeckt. */
@@ -49,6 +56,8 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
   /** true: geklappt; sonst die Meldung */
   onUnterschreiben: (name: string, zug: string) => Promise<true | string>;
 }) {
+  const w = useW();
+  const sprache = useSprache();
   const [striche, setStriche] = useState<Strich[]>([]);
   const [name, setName] = useState(wer.name);
   const [laeuft, setLaeuft] = useState(false);
@@ -62,7 +71,7 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
 
   const zug = zugAusStrichen(striche, ZUG_BREITE, FELD_HOEHE);
   const bereit = tinteGenug(striche, ZUG_BREITE) && zugGueltig(zug) && name.trim() !== '' && !laeuft;
-  const fuer = dokumenteText(dokumenteFuer(status, wer.person, axa), axa);
+  const fuer = dokumenteText(dokumenteFuer(status, wer.person, axa), axa, sprache);
 
   const abschicken = async () => {
     if (!bereit) return;
@@ -75,11 +84,19 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
   };
 
   return (
-    <Dialog offen={offen} titel={`Unterschrift ${wer.rolle}`} onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
+    <Dialog offen={offen} titel={w(`Unterschrift ${wer.rolle}`, `Signature: ${wer.rolle}`)} onSchliessen={() => { if (!laeuft) onSchliessen(); }}>
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-ui-tinte">
-          Ihre Unterschrift gilt für: <strong>{fuer}</strong>. Mit „Unterschreiben“ bestätigen Sie diese Unterlagen in der
-          Fassung, die Sie im Gespräch gesehen haben.
+          {w(
+            <>
+              Ihre Unterschrift gilt für: <strong>{fuer}</strong>. Mit „Unterschreiben“ bestätigen Sie diese Unterlagen in der
+              Fassung, die Sie im Gespräch gesehen haben.
+            </>,
+            <>
+              Your signature applies to: <strong>{fuer}</strong>. By choosing “Sign” you confirm these documents —
+              they are in German — in the version you have seen in the consultation.
+            </>,
+          )}
         </p>
         {wer.nameFest ? (
           <p className="text-sm text-ui-tinte"><span className="text-ui-schiefer">Name:</span> <strong>{name}</strong></p>
@@ -87,18 +104,19 @@ function UnterschriftDialog({ offen, wer, status, axa, onSchliessen, onUnterschr
           <TextFeld label="Name" wert={name} onChange={setName} maxLaenge={120} autoComplete="name" />
         )}
         <UnterschriftFeld striche={striche} setStriche={setStriche}
-          beschriftung={`Unterschriftsfeld für ${name || wer.rolle}: mit Finger, Stift oder Maus unterschreiben`} />
+          beschriftung={w(`Unterschriftsfeld für ${name || wer.rolle}: mit Finger, Stift oder Maus unterschreiben`,
+            `Signature field for ${name || wer.rolle}: sign with your finger, a pen or the mouse`)} />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-ui-schiefer">Mit Finger, Stift oder Maus im Feld unterschreiben.</p>
+          <p className="text-xs text-ui-schiefer">{w('Mit Finger, Stift oder Maus im Feld unterschreiben.', 'Sign in the field with your finger, a pen or the mouse.')}</p>
           <button type="button" onClick={() => setStriche([])} disabled={striche.length === 0 || laeuft} className={KNOPF_ZWEIT}>
-            <Eraser className="h-4 w-4" aria-hidden /> Neu
+            <Eraser className="h-4 w-4" aria-hidden /> {w('Neu', 'Clear')}
           </button>
         </div>
         {fehler && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{fehler}</p>}
         <div className="flex flex-wrap justify-end gap-2 border-t border-ui-linie pt-4">
-          <button type="button" onClick={onSchliessen} disabled={laeuft} className={KNOPF_ZWEIT}>Abbrechen</button>
+          <button type="button" onClick={onSchliessen} disabled={laeuft} className={KNOPF_ZWEIT}>{w('Abbrechen', 'Cancel')}</button>
           <button type="button" onClick={() => void abschicken()} disabled={!bereit} className={KNOPF}>
-            <PenLine className="h-4 w-4" aria-hidden /> {laeuft ? 'Wird unterschrieben …' : 'Unterschreiben'}
+            <PenLine className="h-4 w-4" aria-hidden /> {laeuft ? w('Wird unterschrieben …', 'Signing …') : w('Unterschreiben', 'Sign')}
           </button>
         </div>
       </div>
@@ -136,6 +154,8 @@ function LinkDialog({ offen, mitarbeiter, kontakt, berater, festgeschrieben, ers
   onErstellen: () => Promise<NeuerLink | string>;
   onSchliessen: () => void;
 }) {
+  // Der Link und die E-Mail gehen an den Mitarbeiter — in der Sprache seiner Beratung. Das Fenster selbst liest der Berater.
+  const sprache = useSprache();
   const [neu, setNeu] = useState<NeuerLink | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -154,15 +174,24 @@ function LinkDialog({ offen, mitarbeiter, kontakt, berater, festgeschrieben, ers
     else setNeu(x);
   };
 
-  const link = neu ? unterschriftLink(neu.token, window.location.origin) : '';
+  const link = neu ? unterschriftLink(neu.token, window.location.origin, sprache) : '';
   const mail = () => {
-    const text = `Guten Tag ${mitarbeiter},\n\n`
-      + 'unter diesem Link finden Sie die Unterlagen aus unserem Gespräch zur betrieblichen Altersversorgung. '
-      + 'Sie können sie dort lesen, als PDF speichern und unterschreiben — ein Konto ist nicht nötig.\n\n'
-      + `${link}\n\n`
-      + `Den Code zum Öffnen nenne ich Ihnen getrennt. Der Link ist bis zum ${neu ? datum(neu.gueltigBis) : ''} gültig.\n\n`
-      + `Viele Grüße${berater ? `\n${berater}` : ''}`;
-    return `mailto:${mailEmpfaenger(kontakt.email)}?subject=${encodeURIComponent('Ihre Unterlagen zur betrieblichen Altersversorgung')}&body=${encodeURIComponent(text)}`;
+    const bis = neu ? datum(neu.gueltigBis) : '';
+    const text = sprache === 'en'
+      ? `Hello ${mitarbeiter},\n\n`
+        + 'under this link you will find the documents from our consultation on your company pension. '
+        + 'You can read them there, save them as a PDF and sign them — no account is needed. The documents are in German.\n\n'
+        + `${link}\n\n`
+        + `I will give you the code for opening the link separately. The link is valid until ${bis}.\n\n`
+        + `Kind regards${berater ? `\n${berater}` : ''}`
+      : `Guten Tag ${mitarbeiter},\n\n`
+        + 'unter diesem Link finden Sie die Unterlagen aus unserem Gespräch zur betrieblichen Altersversorgung. '
+        + 'Sie können sie dort lesen, als PDF speichern und unterschreiben — ein Konto ist nicht nötig.\n\n'
+        + `${link}\n\n`
+        + `Den Code zum Öffnen nenne ich Ihnen getrennt. Der Link ist bis zum ${bis} gültig.\n\n`
+        + `Viele Grüße${berater ? `\n${berater}` : ''}`;
+    const betreff = sprache === 'en' ? 'Your company pension documents' : 'Ihre Unterlagen zur betrieblichen Altersversorgung';
+    return `mailto:${mailEmpfaenger(kontakt.email)}?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(text)}`;
   };
   const telefon = kontakt.telefon.trim();
 
@@ -326,6 +355,8 @@ export function UnterschriftenKarte({
   onAufgehoben: () => Promise<void>;
   beratungId: string;
 }) {
+  const w = useW();
+  const sprache = useSprache();
   const [dialog, setDialog] = useState<Unterzeichner | null>(null);
   const [linkDialog, setLinkDialog] = useState(false);
   const [nachweis, setNachweis] = useState<Unterschrift | null>(null);
@@ -353,9 +384,10 @@ export function UnterschriftenKarte({
 
   if (status === 'offen') {
     return (
-      <Karte titel="Unterschrift">
+      <Karte titel={w('Unterschrift', 'Signature')}>
         <p className="text-sm leading-relaxed text-ui-schiefer">
-          Unterschrieben wird nach der Entscheidung. Solange sie offen ist, gibt es die Gesprächsunterlagen zum Mitnehmen.
+          {w('Unterschrieben wird nach der Entscheidung. Solange sie offen ist, gibt es die Gesprächsunterlagen zum Mitnehmen.',
+            'Signing follows the decision. While it is still open, the consultation papers are available to take away.')}
         </p>
       </Karte>
     );
@@ -363,8 +395,8 @@ export function UnterschriftenKarte({
 
   const offeneLuecken = fest ? [] : luecken;
   const gesperrt = offeneLuecken.length > 0 || !bereit || unterlagen === 'fehler';
-  const mitarbeiter = unterzeichner.find((w) => w.person === 'mitarbeiter');
-  const berater = unterzeichner.find((w) => w.person === 'berater');
+  const mitarbeiter = unterzeichner.find((x) => x.person === 'mitarbeiter');
+  const berater = unterzeichner.find((x) => x.person === 'berater');
   const beraterFertig = fest?.unterschriften.some((u) => u.person === 'berater') ?? false;
   const hatUnterschriften = (fest?.unterschriften.length ?? 0) > 0;
 
@@ -375,7 +407,7 @@ export function UnterschriftenKarte({
       <li key={wer.person} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-4">
         <div className="min-w-0">
           <p className="text-base font-medium text-ui-tinte">{wer.rolle}{u ? ` · ${u.name}` : wer.name ? ` · ${wer.name}` : ''}</p>
-          <p className={ETIKETT}>für {dokumenteText(dokumenteFuer(status, wer.person, axa), axa)}</p>
+          <p className={ETIKETT}>{w('für', 'for')} {dokumenteText(dokumenteFuer(status, wer.person, axa), axa, sprache)}</p>
           {perLink && !u && link && <LinkZeile link={link} />}
         </div>
         {u ? (
@@ -383,7 +415,9 @@ export function UnterschriftenKarte({
             <UnterschriftBild zug={u.zug} name={u.name} klasse="h-10 max-w-[10rem]" />
             <p className="flex items-center gap-1.5 text-sm text-ui-tinte">
               <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-              {u.kanal === 'link' ? 'per Link unterschrieben' : 'unterschrieben'} am {zeitpunktText(u.unterschriebenAm)}
+              {u.kanal === 'link'
+                ? w(`per Link unterschrieben am ${zeitpunktText(u.unterschriebenAm)}`, `signed via link on ${zeitpunktText(u.unterschriebenAm, 'en')}`)
+                : w(`unterschrieben am ${zeitpunktText(u.unterschriebenAm)}`, `signed on ${zeitpunktText(u.unterschriebenAm, 'en')}`)}
             </p>
             {u.kanal === 'link' && u.nachweis && (
               <button type="button" onClick={() => setNachweis(u)} className={KNOPF_KLEIN}>
@@ -409,11 +443,11 @@ export function UnterschriftenKarte({
             )}
             {perLink && (
               <button type="button" className={KNOPF_ZWEIT} disabled={gesperrt} onClick={() => { setMeldung(null); setLinkDialog(true); }}>
-                <Link2 className="h-4 w-4" aria-hidden /> {link ? 'Neuer Link' : 'Per Link'}
+                <Link2 className="h-4 w-4" aria-hidden /> {link ? w('Neuer Link', 'New link') : w('Per Link', 'Via link')}
               </button>
             )}
             <button type="button" className={KNOPF} disabled={gesperrt} onClick={() => { setMeldung(null); setDialog(wer); }}>
-              <PenLine className="h-4 w-4" aria-hidden /> Unterschreiben
+              <PenLine className="h-4 w-4" aria-hidden /> {w('Unterschreiben', 'Sign')}
             </button>
           </div>
         )}
@@ -422,10 +456,12 @@ export function UnterschriftenKarte({
   };
 
   return (
-    <Karte titel="Unterschrift">
+    <Karte titel={w('Unterschrift', 'Signature')}>
       <p className="text-sm leading-relaxed text-ui-schiefer">
-        Mitarbeiter und Berater unterschreiben hier mit Finger, Stift oder Maus — der Mitarbeiter auf Wunsch per Link auf
-        dem eigenen Gerät. Die Unterschriften stehen dann in den Unterlagen; der Arbeitgeber unterschreibt auf Papier.
+        {w('Mitarbeiter und Berater unterschreiben hier mit Finger, Stift oder Maus — der Mitarbeiter auf Wunsch per Link auf '
+          + 'dem eigenen Gerät. Die Unterschriften stehen dann in den Unterlagen; der Arbeitgeber unterschreibt auf Papier.',
+          'Employee and adviser sign here with a finger, a pen or the mouse — the employee, if preferred, via a link on their '
+          + 'own device. The signatures then appear in the documents; the employer signs on paper.')}
       </p>
 
       {unterlagen === 'fehler' && (
@@ -435,18 +471,21 @@ export function UnterschriftenKarte({
       )}
       {offeneLuecken.length > 0 && (
         <div className="ui-innen mt-4 p-4 text-sm text-ui-tinte">
-          <p>Vor dem Unterschreiben fehlt noch:</p>
+          <p>{w('Vor dem Unterschreiben fehlt noch:', 'Before signing, this is still missing:')}</p>
           <ul className="mt-1 space-y-1">
             {offeneLuecken.map((l) => (
               <li key={l.text}>
-                — {l.text} <button type="button" onClick={() => geheZu(l.schritt, l.stueck)} className={`${LINK} text-sm`}>zu „{SCHRITTE[l.schritt]}“ →</button>
+                — {l.text}{' '}
+                <button type="button" onClick={() => geheZu(l.schritt, l.stueck)} className={`${LINK} text-sm`}>
+                  {w(`zu „${schrittNamen(sprache)[l.schritt]}“ →`, `go to “${schrittNamen(sprache)[l.schritt]}” →`)}
+                </button>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      <ul className="mt-2 divide-y divide-ui-linie" aria-label="Unterschriften">
+      <ul className="mt-2 divide-y divide-ui-linie" aria-label={w('Unterschriften', 'Signatures')}>
         {unterzeichner.map(zeile)}
       </ul>
 
@@ -469,8 +508,10 @@ export function UnterschriftenKarte({
       {meldung && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">{meldung}</p>}
 
       <p className="mt-5 text-xs leading-relaxed text-ui-schiefer">
-        Einfache elektronische Signatur, am Bildschirm wie per Link: geeignet für Protokoll und Erklärungen ohne gesetzliche
-        Schriftform. Ob Versicherer oder Unterstützungskasse sie für die Vereinbarung annehmen, klären Sie bitte vorab.
+        {w('Einfache elektronische Signatur, am Bildschirm wie per Link: geeignet für Protokoll und Erklärungen ohne gesetzliche '
+          + 'Schriftform. Ob Versicherer oder Unterstützungskasse sie für die Vereinbarung annehmen, klären Sie bitte vorab.',
+          'Simple electronic signature, on screen or via link: suitable for the record and for declarations that do not legally '
+          + 'require written form. Please check beforehand whether the insurer or support fund accepts it for the agreement.')}
       </p>
 
       {dialog && (

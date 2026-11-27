@@ -35,9 +35,10 @@ export type RechtsSeite = 'impressum' | 'datenschutz' | 'nutzungsbedingungen';
  * Lesebreite, Listen mit Gedankenstrich wie die Hinweise der Beratung.
  *
  * Gestaltet wird nur hier, in Rahmen und Helfern (H1, H2, P, Liste) — nicht
- * in den Texten selbst: Auf `live` haelt ein eigener Commit die
- * Nutzungsbedingungen in einer aelteren Fassung, und jede Zeile, die beide
- * Seiten aendern, wuerde beim Zusammenfuehren zum Konflikt.
+ * in den Texten selbst: Auf `live` steht `Nutzungsbedingungen()` als Ganzes
+ * in einer aelteren Fassung, bis die Abrechnung startet (README „Livegang“).
+ * Beim Zusammenfuehren bleibt die Funktion dort, wie sie ist; was hier an
+ * ihrem Text geaendert wird, kommt erst mit der Freigabe auf live.
  */
 export function Seite({ seite }: { seite: RechtsSeite }) {
   return (
@@ -240,6 +241,7 @@ function Datenschutz() {
         einer Beratung speichern wir die Eingaben aus dem Gespräch: Name, E-Mail-Adresse und Telefonnummer, soweit
         angegeben, Geburtsdatum, Gehalt, Steuerklasse (in älteren Beratungen Familienstand und Einkommen des Partners),
         Kinder, Krankenversicherung, Ansprüche auf gesetzliche und betriebliche Rente, das gewählte Rentenziel, die
+        Sprache, in der die Beratung gezeigt wird (Deutsch oder Englisch), die
         Werte des Versicherers sowie Entscheidung, Empfehlung, Ort und Datum. E-Mail-Adresse und Telefonnummer dienen
         dem Berater für Rückfragen und den Versand der Unterlagen aus seinem eigenen Mailprogramm; wir schicken dem
         Mitarbeiter nichts. Gerechnet wird

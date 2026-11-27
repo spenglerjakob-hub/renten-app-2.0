@@ -125,7 +125,7 @@ export {
   type LohnlisteErgebnis, type AnzahlSpalte,
 } from './analyse/betriebs-check.js';
 export {
-  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung, zuschussDeckel,
+  bavMitarbeiter, bavRahmenVoll, bavSteuerRahmenVoll, grvMinderung, zuschussDeckel, mitarbeiterHinweise,
   type FirmenModell, type MitarbeiterEingaben, type MitarbeiterBav, type MitarbeiterVertrag,
   type FirmenSaetze, type ArbeitgeberBelastung, type Mindestzuschuss,
 } from './analyse/bav-mitarbeiter.js';

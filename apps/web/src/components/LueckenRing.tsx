@@ -10,6 +10,12 @@ export interface RingTexte {
   gedeckt: string;
   /** Worauf sich die Prozente beziehen, wenn nicht auf das Ganze — etwa „des Nettolohns“ */
   prozentVon?: string;
+  /**
+   * Der ganze Vorlesetext in einer anderen Sprache — ersetzt den deutschen
+   * Satz darunter (Mitarbeiterberatung auf Englisch). Die Betraege kommen
+   * fertig formatiert.
+   */
+  vorlesen?: (x: { ganz: string; gedeckt: string; luecke: string; gedecktProzent: number; lueckeProzent: number }) => string;
 }
 
 const NETTOLOHN: RingTexte = { ganz: 'Nettolohn', mitte: 'Ihr Nettolohn', gedeckt: 'Netto-Altersrente' };
@@ -18,6 +24,12 @@ export const ZIEL_RING: RingTexte = { ganz: 'Ziel', mitte: 'Ihr Ziel', gedeckt: 
 /** Gemessen am Rentenziel, einem Anteil am Nettolohn — Mitarbeiterberatung. */
 export const RENTENZIEL_RING: RingTexte = {
   ganz: 'Rentenziel', mitte: 'Ihr Rentenziel', gedeckt: 'Netto-Altersrente', prozentVon: 'des Nettolohns',
+};
+/** Dasselbe auf Englisch — nur am Bildschirm der Mitarbeiterberatung, nicht in den Unterlagen. */
+export const RENTENZIEL_RING_EN: RingTexte = {
+  ganz: 'Pension target', mitte: 'Your pension target', gedeckt: 'net pension', prozentVon: 'of net pay',
+  vorlesen: (x) => `Pension target ${x.ganz}: of which ${x.gedeckt} net pension (${x.gedecktProzent} % of net pay) `
+    + `and ${x.luecke} pension gap (${x.lueckeProzent} % of net pay)`,
 };
 
 const R = 42;
@@ -58,7 +70,9 @@ export function LueckenRing({ ganz, gedeckt, luecke, gedecktProzent, lueckeProze
   const von = texte.prozentVon ? ` ${texte.prozentVon}` : '';
   return (
     <svg viewBox="0 0 120 120" className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" role="img"
-      aria-label={`${texte.ganz} ${ganzzahl(ganz)}: davon ${ganzzahl(gedeckt)} ${texte.gedeckt} (${gedecktProzent} %${von})${darin} und ${ganzzahl(luecke)} Versorgungslücke (${lueckeProzent} %${von})`}>
+      aria-label={texte.vorlesen
+        ? texte.vorlesen({ ganz: ganzzahl(ganz), gedeckt: ganzzahl(gedeckt), luecke: ganzzahl(luecke), gedecktProzent, lueckeProzent })
+        : `${texte.ganz} ${ganzzahl(ganz)}: davon ${ganzzahl(gedeckt)} ${texte.gedeckt} (${gedecktProzent} %${von})${darin} und ${ganzzahl(luecke)} Versorgungslücke (${lueckeProzent} %${von})`}>
       <circle cx="60" cy="60" r={R} fill="none" style={{ stroke: 'rgb(var(--ui-luecke))' }} strokeWidth="12" />
       <circle cx="60" cy="60" r={R} fill="none" style={{ stroke: 'rgb(var(--ui-tinte))' }} strokeWidth="12"
         strokeDasharray={`${boegen.alt} ${UMFANG}`} transform="rotate(-90 60 60)" />
