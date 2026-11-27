@@ -1,7 +1,9 @@
 import type { LegalParameters } from '../params/types.js';
 import { BAV_AG_PFLICHTZUSCHUSS, type FoerderKontext, type SteuerOptionen } from './foerdercheck.js';
 import { SV_FREI_QUOTE } from './vertrags-tuev.js';
-import { loesungFuer, type Loesung, type LoesungId, type LoesungsOptionen } from './loesungen.js';
+import {
+  loesungFuer, type Loesung, type LoesungId, type LoesungsOptionen, type LoesungsVorgabe,
+} from './loesungen.js';
 
 /**
  * LOESUNGSMIX — aus dem, was dem Kunden wichtig ist, ein Vorschlag, wie sich
@@ -286,10 +288,30 @@ export function loesungsmix(
     lassen('privat', 'nichtNoetig');
   }
 
-  const netto = verplant();
-  const summe = (f: (l: Loesung) => number) => bausteine.reduce((s, l) => s + f(l), 0);
-  const vertragMonat = summe((l) => l.vertragMonat);
   const hatPrivat = bausteine.some((l) => l.id === 'privat');
+  return mixAus(bausteine, {
+    verfuegbarQuote: gefoerdert ? quote : 1,
+    verfuegbarMonat: hatPrivat ? verfuegbar : 0,
+    ueberlaufMonat: hatPrivat ? rest : 0,
+    uebrigMonat,
+    // Jede Loesung hoechstens einmal — der erste Grund ist der, der gilt.
+    ausgelassen: ausgelassen.filter((a, i) => ausgelassen.findIndex((x) => x.id === a.id) === i
+      && !bausteine.some((l) => l.id === a.id)),
+    kapitalRegel,
+    einVertrag,
+    bavAnGrenze,
+  });
+}
+
+/** Die Bausteine als Vorschlag: sortiert, mit Anteilen und Summen — fuer den Mix nach Regeln und den von Hand. */
+function mixAus(
+  bausteine: readonly Loesung[],
+  mehr: Pick<Loesungsmix, 'verfuegbarQuote' | 'verfuegbarMonat' | 'ueberlaufMonat' | 'uebrigMonat' | 'ausgelassen'
+    | 'kapitalRegel' | 'einVertrag' | 'bavAnGrenze'>,
+): Loesungsmix {
+  const summe = (f: (l: Loesung) => number) => bausteine.reduce((s, l) => s + f(l), 0);
+  const netto = summe((l) => l.nettoMonat);
+  const vertragMonat = summe((l) => l.vertragMonat);
   return {
     teile: [...bausteine]
       .sort((a, b) => REIHENFOLGE.indexOf(a.id) - REIHENFOLGE.indexOf(b.id))
@@ -301,15 +323,89 @@ export function loesungsmix(
     steuerErsparnisMonat: summe((l) => l.steuerErsparnisMonat),
     svErsparnisMonat: summe((l) => l.svErsparnisMonat),
     dazuMonat: Math.max(0, vertragMonat - netto),
-    verfuegbarQuote: gefoerdert ? quote : 1,
-    verfuegbarMonat: hatPrivat ? verfuegbar : 0,
-    ueberlaufMonat: hatPrivat ? rest : 0,
-    uebrigMonat,
-    // Jede Loesung hoechstens einmal — der erste Grund ist der, der gilt.
-    ausgelassen: ausgelassen.filter((a, i) => ausgelassen.findIndex((x) => x.id === a.id) === i
-      && !bausteine.some((l) => l.id === a.id)),
-    kapitalRegel,
-    einVertrag,
-    bavAnGrenze,
+    ...mehr,
   };
+}
+
+/* ======================================================================
+ * DER VORSCHLAG VON HAND
+ * ==================================================================== */
+
+/** Eine von Hand eingetragene Zeile: welche Loesung, wie viel — als Netto-Aufwand oder als Beitrag. */
+export interface MixVorgabe {
+  id: LoesungId;
+  betragMonat: number;
+  /** `netto`: der Netto-Aufwand. `brutto`: der Beitrag (bAV: die Umwandlung, Depot: der Eigenbeitrag) */
+  vorgabe: LoesungsVorgabe;
+}
+
+/**
+ * Welche Loesungen es fuer diesen Haushalt GAR NICHT gibt — gleich, was
+ * eingetragen wird: die Betriebsrente fuer Beamte und Selbststaendige, und
+ * jede gefoerderte Loesung, deren Rahmen mit den bestehenden Vertraegen schon
+ * voll ist. Die Eingabe sperrt diese Zeilen und nennt den Grund.
+ */
+export function loesungenGesperrt(
+  k: FoerderKontext, steuerOpt: SteuerOptionen, p: LegalParameters, opt: LoesungsOptionen = {},
+): MixAusgelassen[] {
+  const gesperrt: MixAusgelassen[] = [];
+  for (const id of ['avd', 'bav', 'basis'] as const) {
+    // Ein Euro Beitrag: Kommt er an, ist die Loesung zu haben.
+    const probe = loesungFuer(id, k, steuerOpt, p, 1, { ...opt, vorgabe: 'brutto' });
+    if (!probe.verfuegbar && id === 'bav') {
+      gesperrt.push({ id, grund: 'nichtMoeglich', ...(probe.hinweise[0] ? { hinweis: probe.hinweise[0] } : {}) });
+    } else if (!probe.verfuegbar || probe.eigenbeitragMonat < 0.005) {
+      gesperrt.push({ id, grund: 'ausgeschoepft' });
+    }
+  }
+  return gesperrt;
+}
+
+/**
+ * DER VORSCHLAG VON HAND — der Berater traegt selbst ein, welche Loesung wie
+ * viel bekommt, statt die Verteilung den Regeln oben zu ueberlassen.
+ *
+ * Die Regeln gelten dann nicht: kein Mindestbeitrag, keine Grenze bei den
+ * Sozialabgaben, keine Reihenfolge der Wuensche. GERECHNET wird aber genauso
+ * wie dort — eine Loesung nach der anderen (Betriebsrente, Depot, Basisrente),
+ * jede auf dem Einkommen, das die vorige schon gemindert hat. Und jede
+ * hoechstens bis zu ihrem Foerderrahmen: Was darueber eingetragen ist, wird
+ * nicht gerechnet (`begrenzt`), und die Loesung sagt in ihren Hinweisen, warum.
+ *
+ * Je Loesung zaehlt die erste Zeile mit einem Betrag. `ausgelassen` nennt
+ * hier, was es fuer den Haushalt gar nicht gibt (`loesungenGesperrt`).
+ */
+export function loesungsmixEigen(
+  k: FoerderKontext,
+  steuerOpt: SteuerOptionen,
+  p: LegalParameters,
+  vorgaben: readonly MixVorgabe[],
+  opt: LoesungsOptionen = {},
+): Loesungsmix {
+  const nach = (kontext: FoerderKontext, l: Loesung): FoerderKontext => ({
+    ...kontext,
+    zveHeute: Math.max(0, kontext.zveHeute - l.zveMinderungMonat * 12),
+  });
+  const bausteine: Loesung[] = [];
+  let kontext = k;
+  // Dieselbe Reihenfolge wie im Mix nach Regeln: erst die Betriebsrente, dann das Depot, dann die Basisrente.
+  for (const id of ['bav', 'avd', 'basis', 'privat'] as const) {
+    const v = vorgaben.find((x) => x.id === id && x.betragMonat > 0);
+    if (!v) continue;
+    // Die private Vorsorge spart keine Steuer — sie rechnet auf dem unveraenderten Einkommen.
+    const l = loesungFuer(id, id === 'privat' ? k : kontext, steuerOpt, p, v.betragMonat, { ...opt, vorgabe: v.vorgabe });
+    if (l.eigenbeitragMonat < 0.005) continue;
+    bausteine.push(l);
+    if (id !== 'privat') kontext = nach(kontext, l);
+  }
+  return mixAus(bausteine, {
+    verfuegbarQuote: 0,
+    verfuegbarMonat: 0,
+    ueberlaufMonat: 0,
+    uebrigMonat: 0,
+    ausgelassen: loesungenGesperrt(k, steuerOpt, p, opt),
+    kapitalRegel: false,
+    einVertrag: false,
+    bavAnGrenze: false,
+  });
 }

@@ -123,14 +123,18 @@ export function useGutachtenSeiten({
 
   /*
     Der Vorschlag und die Angebote der vierten Etappe. Der Vorschlag steht
-    da, sobald alle Fragen beantwortet sind — dann ist er im Gespraech
-    entstanden; die Angebote, sobald eines gerechnet ist. Ohne beides
-    entfaellt die Seite: Ein Vorschlag aus Vorgaben waere keiner.
+    da, sobald alle Fragen beantwortet sind oder die Verteilung von Hand
+    eingetragen ist — dann ist er im Gespraech entstanden; die Angebote,
+    sobald eines gerechnet ist. Ohne beides entfaellt die Seite: Ein Vorschlag
+    aus Vorgaben waere keiner.
   */
   const loesungen = useMemo(() => {
     const stand = vorschlagStand(szenario, ergebnis ? zeile : null);
-    const vorschlag = stand.mix && stand.wuensche && stand.mix.teile.length > 0
-      ? { mix: stand.mix, wuensche: stand.wuensche, mitArbeitgeber: stand.mitArbeitgeber }
+    const vorschlag = stand.mix && (stand.eigen || stand.wuensche) && stand.mix.teile.length > 0
+      ? {
+        mix: stand.mix, wuensche: stand.wuensche, mitArbeitgeber: stand.mitArbeitgeber,
+        eigen: stand.eigen ? szenario.loesungen.eigen.teile : null,
+      }
       : null;
     const angebote = angebotPositionen(szenario);
     const gerechnet = angebote.some((a) => a.rente || a.kapital);

@@ -137,8 +137,9 @@ export {
   loesungsvergleich, loesungFuer, type Loesung, type LoesungId, type LoesungsOptionen, type LoesungsVorgabe,
 } from './analyse/loesungen.js';
 export {
-  loesungsmix, MIX_VERFUEGBAR, MIX_KAPITAL_MINDESTENS, MIX_MINDESTBEITRAG, MIX_BASIS_AB_STEUERQUOTE,
-  type Loesungsmix, type MixTeil, type MixWuensche, type MixGrund, type MixAusgelassen,
+  loesungsmix, loesungsmixEigen, loesungenGesperrt,
+  MIX_VERFUEGBAR, MIX_KAPITAL_MINDESTENS, MIX_MINDESTBEITRAG, MIX_BASIS_AB_STEUERQUOTE,
+  type Loesungsmix, type MixTeil, type MixWuensche, type MixGrund, type MixAusgelassen, type MixVorgabe,
 } from './analyse/loesungsmix.js';
 export {
   foerdercheck, basisrahmenJahr, BAV_AG_PFLICHTZUSCHUSS,

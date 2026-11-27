@@ -93,7 +93,7 @@ export function Angebote({ szenario, nettoHeute = 0, onAnnehmen }: {
             type="button"
             onClick={() => angebotHinzufuegen({
               loesung: 'privat', name: '', inhaber: 'A', beitragMonat: 100, agZuschussMonat: 0, dynamik: 0,
-              renteMonat: 0, kapital: 0,
+              renteMonat: 0, kapital: 0, ausVorschlag: false,
             })}
             className={`shrink-0 print:hidden ${KNOPF_ZWEIT}`}
           >

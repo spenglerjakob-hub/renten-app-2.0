@@ -359,9 +359,13 @@ export const useSzenario = create<SzenarioStore>((set, get) => ({
     loesungen: { ...s.loesungen, angebote: [...s.loesungen.angebote, { ...a, id: neueId('a') }].slice(0, 12) },
   })),
 
+  // Wer ein Angebot aendert, macht es zu seinem: Es weicht keinem neuen Vorschlag mehr von selbst (`ausVorschlag`).
   angebotAendern: (id, p) => get().setze((s) => ({
     ...s,
-    loesungen: { ...s.loesungen, angebote: s.loesungen.angebote.map((x) => (x.id === id ? { ...x, ...p } : x)) },
+    loesungen: {
+      ...s.loesungen,
+      angebote: s.loesungen.angebote.map((x) => (x.id === id ? { ...x, ...p, ausVorschlag: false } : x)),
+    },
   })),
 
   vorschlagUebernehmen: (neu) => get().setze((s) => {

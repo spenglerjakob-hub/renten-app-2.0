@@ -4,8 +4,9 @@ import {
   laufzeitText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText, type AngebotPosition,
 } from '../features/tuev-berechnung';
 import {
-  MIX_NAME, WUNSCH_FRAGEN, mixAusgelassenText, mixGrund, wunschAntwort,
+  MIX_NAME, WUNSCH_FRAGEN, mixAusgelassenText, mixGrund, mixGrundEigen, wunschAntwort,
 } from '../features/vorschlag-texte';
+import type { EigenTeil } from '../features/vorschlag-berechnung';
 import {
   Seite, Tabelle, Zeile, Untertitel, Text, Ergebnis, Angabe, Zweispaltig, GrosseZahl, KASTEN, KASTEN_TITEL,
 } from './Bausteine';
@@ -32,12 +33,15 @@ import { mitTrennstellen } from '../lib/trennstellen';
  * nachvollziehbar, wenn man sieht, worauf er antwortet.
  */
 
-/** Der Vorschlag, wie ihn `vorschlagStand` liefert — nur mit allen Antworten. */
+/** Der Vorschlag, wie ihn `vorschlagStand` liefert — mit allen Antworten oder von Hand eingetragen. */
 export interface GedruckterVorschlag {
   mix: Loesungsmix;
-  wuensche: MixWuensche;
+  /** Die Antworten — bei einer Verteilung von Hand koennen sie fehlen; dann steht die Tabelle nicht da */
+  wuensche: MixWuensche | null;
   /** Wurde nach dem Arbeitgeber gefragt? Sonst steht die Frage nicht auf dem Blatt. */
   mitArbeitgeber: boolean;
+  /** Die von Hand eingetragenen Zeilen (`loesungen.eigen`) — null: der Vorschlag aus den Antworten */
+  eigen: readonly EigenTeil[] | null;
 }
 
 const zahl = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -189,8 +193,15 @@ const aufgezaehlt = (namen: string[]) => (namen.length < 2
   ? namen.join('')
   : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`);
 
-/** Der Vorschlag auf einem Blatt: die Antworten, die Verteilung, die Gruende. */
-function VorschlagSeite({ mix, wuensche, mitArbeitgeber, nettoHeute }: GedruckterVorschlag & { nettoHeute: number }) {
+/**
+ * Der Vorschlag auf einem Blatt: die Antworten, die Verteilung, die Gruende.
+ *
+ * VON HAND EINGETRAGEN (`eigen`) steht dasselbe Blatt da, nur ohne die Regeln:
+ * Zu jedem Baustein, was er bringt — nicht, auf welche Antwort er antwortet —,
+ * mit Anbieter und Tarif, wo sie eingetragen sind. Die Antworten stehen
+ * weiter mit auf dem Blatt, wenn sie gegeben wurden.
+ */
+function VorschlagSeite({ mix, wuensche, mitArbeitgeber, eigen, nettoHeute }: GedruckterVorschlag & { nettoHeute: number }) {
   const an = useAnsprache();
   const teile = mix.teile;
   const fragen = [
@@ -203,30 +214,44 @@ function VorschlagSeite({ mix, wuensche, mitArbeitgeber, nettoHeute }: Gedruckte
     [...teile.map((x) => format(f(x.loesung))), ...(mitSumme ? [format(summe)] : [])];
   const anteil = anteilAmNetto(mix.nettoMonat, nettoHeute);
   const kopf = (id: LoesungId) => kopfVon(MIX_NAME[id]);
+  /** Der Baustein mit Anbieter und Tarif, wo sie von Hand eingetragen sind. */
+  const name = (id: LoesungId) => {
+    const tarif = eigen?.find((x) => x.loesung === id)?.name.trim();
+    return tarif ? `${MIX_NAME[id]} (${tarif})` : MIX_NAME[id];
+  };
+  const nurPrivat = teile.every((x) => x.id === 'privat');
   return (
     <Seite titel={`${an.Dein()} Vorschlag`} nummer={`Wie sich ${euro(mix.nettoMonat)} im Monat verteilen`}>
       <Text>
-        Der Vorschlag entsteht aus dem, was {an.dir} bei der Vorsorge wichtig ist, und aus {an.dein('em')} Beitrag
+        {eigen
+          ? <>Der Vorschlag ist im Gespräch zusammengestellt</>
+          : <>Der Vorschlag entsteht aus dem, was {an.dir} bei der Vorsorge wichtig ist, und aus {an.dein('em')} Beitrag</>}
         {' '}— gerechnet mit {an.dein('em')} persönlichen Steuersatz, den Zulagen und dem Arbeitgeberzuschuss,
         zusätzlich zu dem, was {an.du} heute schon {an.w('einzahlst', 'einzahlt', 'einzahlen')}.
       </Text>
 
-      <Untertitel>Was {an.dir} wichtig ist</Untertitel>
-      <Tabelle kopf={['', 'Antwort']} spalten={[55, 45]} textSpalten={[1]}>
-        {fragen.map((f) => (
-          <Zeile key={f.id} textSpalten={[1]} zellen={[f.kurz, wunschAntwort(f.id, wuensche[f.id])]} />
-        ))}
-      </Tabelle>
+      {wuensche && (
+        <>
+          <Untertitel>Was {an.dir} wichtig ist</Untertitel>
+          <Tabelle kopf={['', 'Antwort']} spalten={[55, 45]} textSpalten={[1]}>
+            {fragen.map((f) => (
+              <Zeile key={f.id} textSpalten={[1]} zellen={[f.kurz, wunschAntwort(f.id, wuensche[f.id])]} />
+            ))}
+          </Tabelle>
+        </>
+      )}
 
       <div className="mt-3">
         <Ergebnis>
           {mix.dazuMonat >= 0.5 ? (
             <>
               Aus {cent(mix.nettoMonat)} netto im Monat werden <strong>{cent(mix.vertragMonat)}</strong>
-              {' '}{teile.length > 1 ? 'in den Verträgen' : 'im Vertrag'}: {aufgezaehlt(teile.map((x) => MIX_NAME[x.id]))}.
+              {' '}{teile.length > 1 ? 'in den Verträgen' : 'im Vertrag'}: {aufgezaehlt(teile.map((x) => name(x.id)))}.
             </>
+          ) : nurPrivat ? (
+            <>{cent(mix.nettoMonat)} im Monat, frei verfügbar und ohne Bindung: {aufgezaehlt(teile.map((x) => name(x.id)))}.</>
           ) : (
-            <>{cent(mix.nettoMonat)} im Monat, frei verfügbar und ohne Bindung: {aufgezaehlt(teile.map((x) => MIX_NAME[x.id]))}.</>
+            <>{cent(mix.nettoMonat)} im Monat: {aufgezaehlt(teile.map((x) => name(x.id)))}.</>
           )}
         </Ergebnis>
       </div>
@@ -255,12 +280,15 @@ function VorschlagSeite({ mix, wuensche, mitArbeitgeber, nettoHeute }: Gedruckte
         </Text>
       )}
 
-      <Untertitel>Warum diese Mischung</Untertitel>
+      <Untertitel>{eigen || !wuensche ? 'Was die Bausteine bringen' : 'Warum diese Mischung'}</Untertitel>
       <ul className="space-y-0.5 text-[11px] leading-relaxed text-ui-schiefer">
         {teile.map((x) => (
-          <li key={x.id}><strong className="text-ui-tinte">{MIX_NAME[x.id]}:</strong> {mixGrund(x, mix, wuensche, an)}</li>
+          <li key={x.id}>
+            <strong className="text-ui-tinte">{name(x.id)}:</strong>{' '}
+            {eigen || !wuensche ? mixGrundEigen(x) : mixGrund(x, mix, wuensche, an)}
+          </li>
         ))}
-        {mix.ausgelassen.map((a) => (
+        {!eigen && wuensche && mix.ausgelassen.map((a) => (
           <li key={a.id}><strong className="text-ui-tinte">Nicht dabei — {MIX_NAME[a.id]}:</strong> {mixAusgelassenText(a, wuensche)}</li>
         ))}
       </ul>
@@ -287,12 +315,20 @@ function VorschlagSeite({ mix, wuensche, mitArbeitgeber, nettoHeute }: Gedruckte
         ))}
       </ul>
 
-      <Text>
-        Der Vorschlag folgt festen Regeln: Was verfügbar bleiben soll, fließt in die private Vorsorge; der Rest
-        dorthin, wo Zulagen, Arbeitgeberzuschuss oder Steuervorteile dazukommen, jeweils bis zum geförderten Rahmen.
-        Was im Alter netto ankommt, hängt am Angebot. Eine Modellrechnung, keine Empfehlung für ein Produkt oder
-        einen Anbieter.
-      </Text>
+      {eigen ? (
+        <Text>
+          Die Auswahl der Lösungen und ihre Beträge stammen aus dem Beratungsgespräch, nicht aus den Regeln des
+          Rechners. Gerechnet ist die Einzahlseite, jeweils bis zum geförderten Rahmen. Was im Alter netto ankommt,
+          hängt am Angebot. Eine Modellrechnung.
+        </Text>
+      ) : (
+        <Text>
+          Der Vorschlag folgt festen Regeln: Was verfügbar bleiben soll, fließt in die private Vorsorge; der Rest
+          dorthin, wo Zulagen, Arbeitgeberzuschuss oder Steuervorteile dazukommen, jeweils bis zum geförderten Rahmen.
+          Was im Alter netto ankommt, hängt am Angebot. Eine Modellrechnung, keine Empfehlung für ein Produkt oder
+          einen Anbieter.
+        </Text>
+      )}
     </Seite>
   );
 }
