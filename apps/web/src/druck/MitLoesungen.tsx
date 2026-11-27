@@ -115,8 +115,8 @@ export function MitLoesungen({ vorher, nachher, ergebnisMit, mit, positionen, ei
 
       <Text>
         Gemeinsam gerechnet: Mit jeder weiteren Rente steigt auch die Steuer auf die übrigen
-        Einkünfte — der Zuwachs ist deshalb etwas kleiner als die Summe der einzelnen Angebote im
-        Vergleich. Was eine Lösung netto kostet, ist je Angebot für sich gerechnet. Rente und Kapital
+        Einkünfte — der Zuwachs ist deshalb etwas kleiner als die Summe der einzeln gerechneten
+        Angebote. Was eine Lösung netto kostet, ist je Angebot für sich gerechnet. Rente und Kapital
         laut Angebot zum Rentenbeginn; eine Modellrechnung, keine Zusage.
       </Text>
     </Seite>

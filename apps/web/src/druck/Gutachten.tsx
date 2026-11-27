@@ -334,7 +334,7 @@ export function useGutachtenSeiten({
         thema: 'loesungen' as const,
         // Die Angebote stehen auf eigenem Blatt — und deshalb auch im Verzeichnis.
         titel: [...(loesungen.vorschlag ? [`${an.Dein()} Vorschlag`] : []),
-          ...(loesungen.gerechnet ? [`${an.Dein('e')} Angebote im Vergleich`] : [])],
+          ...(loesungen.gerechnet ? [`${an.Dein('e')} Angebote`] : [])],
         knoten: (gedruckt: (t: ThemaId) => boolean) => (
           <Loesungsvergleich
             mitRenteneinkuenften={gedruckt('renteneinkuenfte')}

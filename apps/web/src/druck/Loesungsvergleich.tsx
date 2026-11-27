@@ -1,14 +1,14 @@
-import { Fragment } from 'react';
 import type { LoesungId, Loesungsmix, MixWuensche } from '@renten/engine';
 import { euro, euroGenau, prozent } from '../components/Feld';
 import {
-  besteAngebote, besteAngeboteText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText,
-  type AngebotPosition,
+  laufzeitText, ohneEigenaufwand, LOESUNG_KURZ, ohneEigenaufwandText, type AngebotPosition,
 } from '../features/tuev-berechnung';
 import {
   MIX_NAME, WUNSCH_FRAGEN, mixAusgelassenText, mixGrund, wunschAntwort,
 } from '../features/vorschlag-texte';
-import { Seite, Tabelle, Zeile, Gruppenzeile, Untertitel, Text, Abzeichen, Ergebnis } from './Bausteine';
+import {
+  Seite, Tabelle, Zeile, Untertitel, Text, Ergebnis, Angabe, Zweispaltig, GrosseZahl, KASTEN, KASTEN_TITEL,
+} from './Bausteine';
 import { anteilAmNetto, anteilAnLuecke } from '../features/bezug';
 import { useAnsprache } from '../components/Ansprache';
 import { mitTrennstellen } from '../lib/trennstellen';
@@ -18,9 +18,15 @@ import { mitTrennstellen } from '../lib/trennstellen';
  *
  * Vorn der Vorschlag: was dem Kunden wichtig ist, wie sich sein Beitrag
  * danach auf die Loesungen verteilt und warum. Dahinter die erfassten
- * Angebote mit Rente netto und Rendite. Dieselben Rechnungen und dieselben
- * Saetze wie am Bildschirm (`vorschlagStand`, `vorschlag-texte`,
- * `angebotPositionen`); hier wird nichts neu gerechnet.
+ * Angebote, JEDES FUER SICH mit seinen Kennzahlen — wie am Bildschirm und wie
+ * ein Vertrag im Vertrags-TUEV (`TuevBogen`). Bis November 2026 standen sie
+ * in einer Tabelle nebeneinander, das mit der hoechsten Rendite ausgezeichnet;
+ * die Loesungen eines Vorschlags ergaenzen einander aber und treten nicht
+ * gegeneinander an.
+ *
+ * Dieselben Rechnungen und dieselben Saetze wie am Bildschirm
+ * (`vorschlagStand`, `vorschlag-texte`, `angebotPositionen`); hier wird
+ * nichts neu gerechnet.
  *
  * Die Antworten stehen mit auf dem Blatt: Der Vorschlag ist nur
  * nachvollziehbar, wenn man sieht, worauf er antwortet.
@@ -38,6 +44,7 @@ const zahl = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2
 const cent = (n: number) => euroGenau(Math.round(n * 100) / 100);
 /** Ein Posten, den es bei dieser Loesung nicht gibt, als Strich statt „0 €". */
 const posten = (n: number) => (n < 0.005 ? '—' : cent(n));
+const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
 
 /**
  * Spaltenkopf mit weichen Trennstellen: "Altersvorsorgedepot" und
@@ -45,9 +52,6 @@ const posten = (n: number) => (n < 0.005 ? '—' : cent(n));
  * in die Nachbarspalte.
  */
 const kopfVon = mitTrennstellen;
-
-/** Hoechstens vier Angebote nebeneinander — mehr Spalten passen nicht auf A4 hochkant. */
-const JE_TABELLE = 4;
 
 export function Loesungsvergleich({ vorschlag, angebote, nettoHeute = 0, mitRenteneinkuenften = true }: {
   /** Der Vorschlag — null, solange Antworten fehlen: Dann stehen nur die Angebote da */
@@ -60,123 +64,33 @@ export function Loesungsvergleich({ vorschlag, angebote, nettoHeute = 0, mitRent
 }) {
   const an = useAnsprache();
   const gerechnet = angebote.filter((a) => a.rente || a.kapital);
-  const gruppen: AngebotPosition[][] = [];
-  for (let i = 0; i < gerechnet.length; i += JE_TABELLE) gruppen.push(gerechnet.slice(i, i + JE_TABELLE));
   /** Rein arbeitgeberfinanziert: ohne eigenen Aufwand gibt es weder Hebel noch Rendite. */
   const ohneAufwand = (a: AngebotPosition) => ohneEigenaufwand((a.rente ?? a.kapital)!);
-  // Die hoechste Nettorendite der Rente — das Kapital steht ausser Wertung, wie am Bildschirm (`besteAngebote`).
-  const beste = besteAngebote(gerechnet);
-  const besteListe = gerechnet.filter((a) => beste.ids.includes(a.angebot.id));
-  /** Der Stern steht an der Rendite, die gewertet wurde — in der Zeile der Rente (oder, ohne jede Rente, des Kapitals). */
-  const stern = (a: AngebotPosition, weg: 'rente' | 'kapital') => (beste.weg === weg && besteListe.includes(a) ? ' ★' : '');
-  /** Hebel, Rendite und Amortisation: ohne eigenen Aufwand ein Strich, kein „0,00“. */
-  const mitAufwand = (a: AngebotPosition, w: string) => (ohneAufwand(a) ? '—' : w);
-  const angebotName = (a: AngebotPosition) =>
-    `${gerechnet.indexOf(a) + 1}. ${a.angebot.name || LOESUNG_KURZ[a.angebot.loesung]}`;
-  const jahre = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 });
 
   return (
     <>
       {vorschlag && <VorschlagSeite {...vorschlag} nettoHeute={nettoHeute} />}
 
       {/*
-        DIE ANGEBOTE AUF EIGENEM BLATT. Mit Rente UND Kapital braucht jedes
-        Angebot rund siebzehn Zeilen; zusammen mit dem Vorschlag liefe die
-        Seite schon bei vier Angeboten ueber.
+        DIE ANGEBOTE AUF EIGENEM BLATT, eines unter dem anderen. Ein Block
+        bleibt beisammen (`break-inside-avoid`); passen nicht alle auf eine
+        Seite, beginnt der naechste auf der folgenden.
       */}
-      {gruppen.length > 0 && (
-        <Seite titel={`${an.Dein('e')} Angebote im Vergleich`} nummer="Rente und Kapital netto">
+      {gerechnet.length > 0 && (
+        <Seite titel={`${an.Dein('e')} Angebote`} nummer="Jedes für sich gerechnet">
           <Text>
             Die Rente laut Angebot, nach Steuer und Kranken- und Pflegeversicherung im ersten
             Rentenjahr, gegen den Netto-Aufwand in der Ansparphase — und, wo das Angebot sie nennt, die
             Kapitalabfindung nach Steuer im Zuflussjahr und Krankenversicherung. Die Nettorendite ist der
             interne Zinsfuß aller Netto-Zahlungen bis zur angenommenen Lebenserwartung.
           </Text>
-          {beste.weg !== null && (
-            <Ergebnis>
-              Die höchste Nettorendite {beste.weg === 'rente' ? 'der Rente' : 'des Kapitals'} {besteListe.length > 1 ? 'haben' : 'hat'}{' '}
-              {besteListe.map((a, i) => (
-                <Fragment key={a.angebot.id}>
-                  {i > 0 && ' und '}<strong>{angebotName(a)}</strong>
-                </Fragment>
-              ))}
-              {' '}mit <strong>{prozent(beste.rendite, 2)} p. a.</strong>
-            </Ergebnis>
-          )}
-          {gruppen.map((g, gi) => (
-            <Fragment key={gi}>
-              <div className="mt-3">
-                <Tabelle
-                  kopf={['', ...g.map((a) => (
-                    <>
-                      {angebotName(a)}
-                      {ohneAufwand(a) && <span className="block text-[9px] font-normal text-ui-schiefer">rein arbeitgeberfinanziert</span>}
-                      {besteListe.includes(a) && <Abzeichen>★ Höchste Rendite</Abzeichen>}
-                    </>
-                  ))]}
-                  spalten={[36, ...g.map(() => 64 / g.length)]}
-                  markiert={g.flatMap((a, i) => (besteListe.includes(a) ? [i + 1] : []))}
-                >
-                  {(() => {
-                    const r = (f: (x: NonNullable<AngebotPosition['rente']>, a: AngebotPosition) => string) =>
-                      g.map((a) => (a.rente ? f(a.rente, a) : '—'));
-                    const k = (f: (x: NonNullable<AngebotPosition['kapital']>, a: AngebotPosition) => string) =>
-                      g.map((a) => (a.kapital ? f(a.kapital, a) : '—'));
-                    const e = (a: AngebotPosition) => (a.rente ?? a.kapital)!;
-                    const mitRente = g.some((a) => a.rente);
-                    const mitKapital = g.some((a) => a.kapital);
-                    const mitVergleich = g.some((a) => a.breakEven);
-                    const spalten = g.length + 1;
-                    return (
-                      <>
-                        <Zeile zellen={[`Kostet ${an.dich} netto im Monat`, ...g.map((a) => euro(e(a).echterAufwandMonat))]} />
-                        {nettoHeute > 0 && (
-                          <Zeile zellen={[`In % ${an.dein('es')} heutigen Nettos`, ...g.map((a) => anteilAmNetto(e(a).echterAufwandMonat, nettoHeute) ?? '—')]} />
-                        )}
-                        <Zeile zellen={['Fließt in den Vertrag', ...g.map((a) => euro(e(a).beitragMonat + e(a).zulageMonat))]} />
-                        {mitRente && (
-                          <>
-                            <Gruppenzeile text="Als Rente" spalten={spalten} />
-                            <Zeile zellen={['Rente brutto', ...r((x) => euro(x.bruttoRenteMonat))]} />
-                            <Zeile fett zellen={['Rente netto', ...r((x) => euro(x.nettoRenteMonat))]} />
-                            {g.some((a) => a.lueckeAnteil) && (
-                              <Zeile zellen={['Schließt von der Lücke', ...g.map((a) => (a.lueckeAnteil ? anteilAnLuecke(a.lueckeAnteil.anteil) : '—'))]} />
-                            )}
-                            <Zeile zellen={['Netto-Rente je 100 € Aufwand', ...r((x) => (x.echterAufwandMonat > 0
-                              ? cent(x.nettoRenteMonat / x.echterAufwandMonat * 100) : '—'))]} />
-                            <Zeile zellen={['Netto-Hebel', ...r((x, a) => mitAufwand(a, `${zahl(x.nettoHebel)} ×`))]} />
-                            <Zeile fett zellen={['Nettorendite p. a.', ...r((x, a) => mitAufwand(a,
-                              `${prozent(x.rendite, 2)}${stern(a, 'rente')}`))]} />
-                            <Zeile zellen={['Amortisation ab Rentenbeginn', ...r((x, a) => mitAufwand(a,
-                              `${jahre(x.amortisationsJahre)} Jahre`))]} />
-                          </>
-                        )}
-                        {mitKapital && (
-                          <>
-                            <Gruppenzeile text="Als Kapital" spalten={spalten} />
-                            <Zeile zellen={['Kapital brutto', ...k((x) => euro(x.bruttoKapital))]} />
-                            <Zeile zellen={['− Steuer im Zuflussjahr', ...k((x) => euro(x.steuerKapital))]} />
-                            <Zeile zellen={['− Kranken- und Pflegeversicherung', ...k((x) => euro(x.kvPvKapital))]} />
-                            <Zeile fett zellen={['Kapital netto', ...k((x) => euro(x.nettoKapital))]} />
-                            <Zeile fett zellen={['Nettorendite p. a.', ...k((x, a) => mitAufwand(a,
-                              `${prozent(x.rendite, 2)}${stern(a, 'kapital')}`))]} />
-                          </>
-                        )}
-                        {mitVergleich && (
-                          <Zeile zellen={['Rente holt das Kapital ein mit', ...g.map((a) => (a.breakEven
-                            ? `${jahre(a.breakEven.breakEvenOhneZins)} Jahren` : '—'))]} />
-                        )}
-                      </>
-                    );
-                  })()}
-                </Tabelle>
-              </div>
-            </Fragment>
+          {gerechnet.map((a, i) => (
+            <AngebotBlock key={a.angebot.id} position={a} nummer={i + 1} nettoHeute={nettoHeute} />
           ))}
-          {beste.weg !== null && <Text>★ {besteAngeboteText(beste.weg)}</Text>}
           {gerechnet.some(ohneAufwand) && <Text>{ohneEigenaufwandText(an)}</Text>}
           <Text>
-            Die Steuer im Alter ist anteilig an der Steuer des Haushalts gerechnet
+            Jedes Angebot ist für sich gerechnet, zusätzlich zu den bestehenden Verträgen. Die Steuer im Alter
+            ist anteilig an der Steuer des Haushalts gerechnet
             {mitRenteneinkuenften ? ', wie auf der Seite zu den Renteneinkünften. ' : '. '}Eine Kapitalabfindung ist im Jahr des Zuflusses voll zu versteuern (bAV) bzw.
             mit ihrem Ertrag (private Rentenversicherung). Eine Modellrechnung, keine Empfehlung für ein
             Produkt oder einen Anbieter.
@@ -184,6 +98,89 @@ export function Loesungsvergleich({ vorschlag, angebote, nettoHeute = 0, mitRent
         </Seite>
       )}
     </>
+  );
+}
+
+/**
+ * Ein Angebot auf dem Blatt: oben die drei Zahlen, auf die es ankommt — was
+ * es kostet, was ankommt, was aus einem Euro wird —, darunter seine uebrigen
+ * Kennzahlen. Nennt es neben der Rente ein Kapital, steht dieser Weg in einem
+ * eigenen Kasten darunter.
+ */
+function AngebotBlock({ position: a, nummer, nettoHeute }: {
+  position: AngebotPosition; nummer: number; nettoHeute: number;
+}) {
+  const an = useAnsprache();
+  // Ein Angebot gehoert einer Person — auch beim Paar „du“, wie im Vertrags-TUEV
+  const e = an.einzeln;
+  const { rente, kapital } = a;
+  // Die Einzahlseite ist bei beiden Wegen dieselbe — sie kommt aus dem, der gerechnet ist.
+  const r = (rente ?? kapital)!;
+  const ohne = ohneEigenaufwand(r);
+  const gut = r.nettoHebel >= 1;
+  const anteilNetto = anteilAmNetto(r.echterAufwandMonat, nettoHeute);
+  const name = a.angebot.name.trim();
+  const art = LOESUNG_KURZ[a.angebot.loesung];
+
+  const kapitalZeilen = kapital && (
+    <>
+      <Angabe feld="Kapital brutto" wert={euro(kapital.bruttoKapital)} />
+      <Angabe feld="− Steuer im Zuflussjahr" wert={euro(kapital.steuerKapital)} />
+      <Angabe feld="− Kranken- und Pflegeversicherung" wert={euro(kapital.kvPvKapital)} />
+      {rente && <Angabe feld="Kapital netto" wert={euro(kapital.nettoKapital)} />}
+      {rente && <Angabe feld="Nettorendite des Kapitals" wert={ohne ? '—' : `${prozent(kapital.rendite, 2)} p. a.`} />}
+      {a.breakEven && (
+        <Angabe feld="Rente holt das Kapital ein mit" wert={`${jahre(a.breakEven.breakEvenOhneZins)} Jahren`} />
+      )}
+    </>
+  );
+
+  return (
+    // mt-5 am Rahmen: `Untertitel` traegt `first:mt-0` und verloere als erstes Kind sonst seinen Abstand nach oben.
+    <div className="mt-5 break-inside-avoid">
+      <Untertitel>{nummer}. {name || art}{name ? ` — ${art}` : ''}</Untertitel>
+      <div className="grid grid-cols-3 gap-3">
+        <GrosseZahl
+          titel={`Kostet ${e.dich} im Monat`}
+          wert={euro(r.echterAufwandMonat)}
+          hinweis={ohne ? 'Rein arbeitgeberfinanziert' : anteilNetto ? `${anteilNetto} ${an.dein('es')} heutigen Nettos` : undefined}
+        />
+        <GrosseZahl
+          titel={rente ? 'Netto-Rente im Monat' : 'Kapital netto'}
+          wert={rente ? euro(rente.nettoRenteMonat) : euro(r.nettoKapital)}
+          hinweis={rente ? `Laut Angebot ${euro(rente.bruttoRenteMonat)} brutto` : `Laut Angebot ${euro(r.bruttoKapital)} brutto`}
+        />
+        <GrosseZahl
+          titel="Aus einem Euro Aufwand werden"
+          wert={ohne ? '—' : `${zahl(r.nettoHebel)} €`}
+          ton={ohne ? 'neutral' : gut ? 'gut' : 'schlecht'}
+          hinweis={ohne ? 'Kein eigener Aufwand' : `Nettorendite ${prozent(r.rendite, 2)} p. a.`}
+        />
+      </div>
+      <div className="mt-2">
+        <Zweispaltig>
+          <Angabe feld="Fließt in den Vertrag" wert={`${euro(r.beitragMonat + r.zulageMonat)} im Monat`} />
+          <Angabe feld="Einzahlungsdauer" wert={laufzeitText(r.monateEinzahlung)} />
+          {a.lueckeAnteil && <Angabe feld="Schließt von der Lücke" wert={anteilAnLuecke(a.lueckeAnteil.anteil)} />}
+          {rente && rente.echterAufwandMonat > 0 && (
+            <Angabe feld="Netto-Rente je 100 € Aufwand" wert={cent(rente.nettoRenteMonat / rente.echterAufwandMonat * 100)} />
+          )}
+          <Angabe feld="Überschuss über den Aufwand" wert={euro(r.echterGewinn)} />
+          {/* Ohne eigenen Aufwand gibt es nichts, das zurueckfliessen koennte — das sagt schon die Zahl oben. */}
+          {rente && !ohne && (
+            <Angabe feld="Eingesetztes Geld zurück nach" wert={`${jahre(rente.amortisationsJahre)} Rentenjahren`} />
+          )}
+          {/* Nur ein Kapital genannt: Seine Posten sind die Rechnung des Angebots und stehen bei den uebrigen. */}
+          {!rente && kapitalZeilen}
+        </Zweispaltig>
+      </div>
+      {rente && kapital && (
+        <div className={`mt-2 ${KASTEN}`}>
+          <div className={KASTEN_TITEL}>Stattdessen als Kapital — einmalig zum Rentenbeginn</div>
+          <Zweispaltig>{kapitalZeilen}</Zweispaltig>
+        </div>
+      )}
+    </div>
   );
 }
 
